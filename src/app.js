@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.6.0";
+  const APP_VERSION = "0.7.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -10,6 +10,7 @@
   const THEME_KEY = "carryon.theme";
   const IMAGES_KEY = "carryon.images";
   const READING_KEY = "carryon.reading";
+  const FILTER_KEY = "carryon.filter";
 
   const $ = (id) => document.getElementById(id);
 
@@ -76,6 +77,8 @@
     open: null,
     settings: false,
     sheet: false,
+    // Which pages the library shows: "all", "unread", "finished" or "#tag".
+    filter: load(FILTER_KEY, "all"),
   };
   paintTheme(state.theme);
 
@@ -198,7 +201,7 @@
       el("button", { class: "card-open", type: "button", "aria-label": p.title, onclick: () => openPage(p.id) }),
       thumb ? el("img", { class: "card-thumb", src: thumb, alt: "", loading: "lazy" }) : null,
       el("span", { class: "card-body" },
-        el("span", { class: "card-site", dir: "auto" }, p.site),
+        el("span", { class: "card-site", dir: "auto" }, p.site, ...(p.tags || []).map((t) => el("span", { class: "card-tag" }, " · #" + t))),
         el("span", { class: "card-title", dir: "auto" }, p.title),
         el("span", { class: "card-status" }, facts, status, retry ? " · " : null, retry),
         started ? el("span", { class: "progress thin", role: "progressbar", "aria-label": "Read so far",
@@ -229,6 +232,33 @@
     renderLibrary();
   }
 
+  // ---- Filters ----
+
+  const unread = (p) => !p.finished && !(p.at > 0.02);
+  function shown(p) {
+    const f = state.filter;
+    if (f === "unread") return unread(p);
+    if (f === "finished") return !!p.finished;
+    if (f.startsWith("#")) return (p.tags || []).some((t) => sameTag(t, f.slice(1)));
+    return true;
+  }
+
+  function setFilter(f) {
+    state.filter = f;
+    store(FILTER_KEY, f);
+    renderLibrary();
+  }
+
+  function renderFilters() {
+    const box = $("filters");
+    box.hidden = !state.pages.length;
+    if (box.hidden) return;
+    const chip = (f, label) => el("button", { class: "chip" + (state.filter === f ? " on" : ""), type: "button",
+      "aria-pressed": String(state.filter === f), onclick: () => setFilter(state.filter === f && f !== "all" ? "all" : f) }, label);
+    box.replaceChildren(chip("all", "All"), chip("unread", "Unread"), chip("finished", "Finished"),
+      ...allTags().map((t) => chip("#" + t, "#" + t)));
+  }
+
   // Cards are keyed and kept between renders; only ones that weren't there
   // before arrive on a spring, so a re-render never replays the list.
   let firstRender = true;
@@ -236,6 +266,10 @@
     const root = $("library");
     const old = new Map([...root.querySelectorAll(":scope > [data-key]")].map((n) => [n.dataset.key, n]));
     const n = state.pages.length;
+    // A tag filter whose last page lost the tag (or was deleted) falls back to All.
+    if (n && state.filter.startsWith("#")
+      && !allTags().some((t) => sameTag(t, state.filter.slice(1)))) { state.filter = "all"; store(FILTER_KEY, "all"); }
+    renderFilters();
     const allOffline = state.pages.every((p) => !p.missing && p.mode !== "links");
     $("libraryMeta").textContent = n ? pagesLine(n) + (allOffline ? " · all readable offline" : "") : "Nothing saved yet";
     const nodes = [];
@@ -250,7 +284,14 @@
       nodes.push(node);
     };
     for (const s of state.saving) keep((s.error ? "f:" : "s:") + s.key, () => (s.error ? failedCard(s) : savingCard(s)));
-    for (const p of state.pages) keep("p:" + p.id, () => pageCard(p), [p.title, readingLine(p), p.missing, p.thumb, Math.round((p.at || 0) * 50), navigator.onLine].join("|"));
+    const pages = state.pages.filter(shown);
+    for (const p of pages) keep("p:" + p.id, () => pageCard(p), [p.title, readingLine(p), p.missing, p.thumb, Math.round((p.at || 0) * 50), navigator.onLine, (p.tags || []).join(",")].join("|"));
+    if (n && !pages.length) {
+      keep("none:" + state.filter, () => el("div", { class: "empty" },
+        el("p", { class: "empty-text" }, state.filter === "unread" ? "You've started everything you saved."
+          : state.filter === "finished" ? "Nothing finished yet." : "No pages tagged " + state.filter + "."),
+        el("button", { class: "btn-quiet", type: "button", onclick: () => setFilter("all") }, "Show all")));
+    }
     if (!n && !state.saving.length) {
       keep("empty", () => el("div", { class: "empty" },
         el("h2", { class: "empty-title" }, "Pages you take with you"),
@@ -373,7 +414,7 @@
     await C.store.removePage(p.id);
     state.pages = state.pages.filter((x) => x.id !== p.id);
     await C.store.writeIndex(state.pages);
-    history.back();
+    history.go(state.sheet ? -2 : -1);
     renderLibrary();
     toast("Deleted");
   }
@@ -435,31 +476,92 @@
     document.querySelectorAll('input[name$="-theme"], input[name="' + THEME_KEY + '"]').forEach((i) => { i.checked = i.value === state.theme; });
   }
 
-  // ---- The Aa sheet ----
-  // A history entry of its own, so Android's back closes it before the page.
+  // ---- The reader's sheets ----
+  // "reading" (Aa) and "page" (tags, delete) share one sheet. Each is a
+  // history entry of its own, so Android's back closes it before the page.
 
-  function openSheet(fromHistory) {
-    if (state.sheet || !state.open) return;
-    state.sheet = true;
-    $("readingBody").replaceChildren(readingControls(true));
-    if (!fromHistory) history.pushState({ view: "reader", page: state.open.id, sheet: true }, "");
-    $("readerAa").setAttribute("aria-expanded", "true");
+  const SHEETS = {
+    reading: { button: "readerAa", label: "Text and theme", build: () => readingControls(true) },
+    page: { button: "readerMore", label: "This page", build: () => pageControls(state.open) },
+  };
+
+  function openSheet(kind, fromHistory) {
+    if (state.sheet === kind || !state.open || !SHEETS[kind]) return;
+    if (state.sheet) closeSheet(true);
+    state.sheet = kind;
+    const s = SHEETS[kind];
+    $("readingBody").replaceChildren(s.build());
+    $("readingSheet").setAttribute("aria-label", s.label);
+    if (!fromHistory) history.pushState({ view: "reader", page: state.open.id, sheet: kind }, "");
+    $(s.button).setAttribute("aria-expanded", "true");
     $("sheetCatch").hidden = false;
     $("readingSheet").hidden = false;
     M.rise($("readingSheet"));
     const first = $("readingSheet").querySelector("button:not(:disabled), input:checked");
-    if (first) first.focus({ preventScroll: true });
+    if (first && kind === "reading") first.focus({ preventScroll: true });
   }
 
   function closeSheet(now) {
     if (!state.sheet) return;
+    const button = $(SHEETS[state.sheet].button);
     state.sheet = false;
-    $("readerAa").setAttribute("aria-expanded", "false");
+    button.setAttribute("aria-expanded", "false");
     $("sheetCatch").hidden = true;
     const sheet = $("readingSheet");
     if (now) { sheet.hidden = true; return; }
     M.sink(sheet).then(() => { if (!state.sheet) sheet.hidden = true; });
-    $("readerAa").focus({ preventScroll: true });
+    button.focus({ preventScroll: true });
+  }
+
+  // ---- Tags ----
+  // Any number per page, as typed (trimmed, at most 32 characters), with
+  // case-insensitive duplicates dropped.
+
+  const cleanTag = (t) => String(t).replace(/\s+/g, " ").trim().slice(0, 32);
+  const sameTag = (a, b) => a.toLocaleLowerCase() === b.toLocaleLowerCase();
+
+  function allTags() {
+    const counts = new Map();
+    for (const p of state.pages) for (const t of p.tags || []) {
+      const k = [...counts.keys()].find((x) => sameTag(x, t)) || t;
+      counts.set(k, (counts.get(k) || 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([t]) => t);
+  }
+
+  async function setTags(p, tags) {
+    p.tags = tags;
+    await C.store.writeIndex(state.pages);
+    renderLibrary();
+  }
+
+  function pageControls(p) {
+    const box = el("div", { class: "page-controls" });
+    const draw = () => {
+      const tags = p.tags || [];
+      const others = allTags().filter((t) => !tags.some((x) => sameTag(x, t)));
+      const input = el("input", { class: "tag-input", type: "text", placeholder: "Add a tag", "aria-label": "Add a tag",
+        maxlength: "32", enterkeyhint: "done", autocapitalize: "off" });
+      const add = (raw) => {
+        const t = cleanTag(raw);
+        if (!t || tags.some((x) => sameTag(x, t))) return;
+        const known = allTags().find((x) => sameTag(x, t));
+        setTags(p, [...tags, known || t]).then(() => { draw(); box.querySelector(".tag-input").focus({ preventScroll: true }); });
+      };
+      input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); add(input.value); } });
+      box.replaceChildren(
+        el("div", { class: "rc-row top" }, el("span", { class: "rc-label" }, "Tags"),
+          el("div", { class: "tag-edit" },
+            el("div", { class: "chips" },
+              ...tags.map((t) => el("button", { class: "chip on", type: "button", "aria-label": "Remove tag " + t,
+                onclick: () => setTags(p, tags.filter((x) => x !== t)).then(draw) }, t, el("span", { class: "chip-x", "aria-hidden": "true" }, "×"))),
+              input),
+            others.length ? el("div", { class: "chips" },
+              ...others.slice(0, 12).map((t) => el("button", { class: "chip", type: "button", "aria-label": "Add tag " + t, onclick: () => add(t) }, "+ " + t))) : null)),
+        el("button", { class: "sheet-row danger", type: "button", onclick: deleteOpen }, "Delete this page"));
+    };
+    draw();
+    return box;
   }
 
   // ---- Settings ----
@@ -590,8 +692,8 @@
     if (view !== "reader") closeReader();
     if (view !== "settings") closeSettings();
     if (view === "reader" && (!state.open || state.open.id !== s.page)) openPage(s.page, true);
-    if (view === "reader" && !s.sheet) closeSheet();
-    if (view === "reader" && s.sheet && state.open && state.open.id === s.page) openSheet(true);
+    if (view === "reader" && s.sheet !== state.sheet) closeSheet();
+    if (view === "reader" && s.sheet && state.open && state.open.id === s.page) openSheet(s.sheet, true);
     if (view === "settings") openSettings(true);
   }
 
@@ -617,9 +719,16 @@
     savePage(url);
   });
 
-  $("readerBack").addEventListener("click", () => history.back());
-  $("readerDelete").addEventListener("click", deleteOpen);
-  $("readerAa").addEventListener("click", () => (state.sheet ? history.back() : openSheet()));
+  $("readerBack").addEventListener("click", () => history.go(state.sheet ? -2 : -1));
+  // A button closes its own sheet, and swaps the other one in place (one
+  // history entry for whichever sheet is up).
+  function toggleSheet(kind) {
+    if (state.sheet === kind) { history.back(); return; }
+    if (state.sheet) history.replaceState({ view: "reader", page: state.open.id, sheet: kind }, "");
+    openSheet(kind, !!state.sheet);
+  }
+  $("readerMore").addEventListener("click", () => toggleSheet("page"));
+  $("readerAa").addEventListener("click", () => toggleSheet("reading"));
   $("sheetCatch").addEventListener("click", () => history.back());
   addEventListener("keydown", (e) => { if (e.key === "Escape" && state.sheet) history.back(); });
   addEventListener("popstate", (e) => route(e.state));

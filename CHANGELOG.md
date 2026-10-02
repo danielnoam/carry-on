@@ -2,6 +2,19 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.7.0] - 2026-10-02
+
+### Added
+- Tags: ⋯ in the reader opens "This page", where you add tags (type one
+  and press Enter, or tap one you've used before) and remove them. A page
+  can have any number. They show on its library card.
+- Filter chips above the library: All, Unread, Finished and one for each
+  tag. The choice is remembered.
+
+### Changed
+- Delete moved from the reader's top bar into the ⋯ sheet, so it's
+  harder to hit by accident.
+
 ## [0.6.0] - 2026-10-02
 
 ### Added

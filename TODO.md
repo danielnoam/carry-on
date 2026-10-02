@@ -27,8 +27,6 @@ todo:
 
 - Reader top bar: hide on scroll down, back on scroll up; tapping an image
   opens it full screen.
-- Tags: a page has any number of tags (Daniel's word, not "categories");
-  filter the library by them with the chips below.
 - Folders: an ordered collection, at most one per page, e.g. the chapters
   of a web novel read in sequence. The folder shows its pages in order with
   progress across the whole folder; the reader gets next and previous
@@ -49,7 +47,7 @@ todo:
   play/pause, speed and skip by paragraph. On Android the WebView's
   speechSynthesis is unreliable, so likely a small native TTS plugin in
   native/ beside the share target.
-- Library chips (All, Unread, Wikipedia, Articles) and search.
+- Search the library (titles, sites, tags, then the text).
 - Export a page from the reader: as PDF (the phone's print to PDF), EPUB
   (for e-readers; the page is already clean HTML with local images, so
   it's mostly packaging), a self-contained HTML file that can be imported
