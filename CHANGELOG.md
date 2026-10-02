@@ -2,6 +2,18 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.9.0] - 2026-10-02
+
+### Added
+- Save several pages at once: paste (or share) more than one link and
+  "Save several" opens with them one a line, to check or edit, and a
+  folder to save them into (none, one you have, or a new one).
+- They save one after another; the rest show "Waiting" until their turn.
+  Pages in a folder keep the order of the links, and a link you'd
+  already saved joins the folder instead of saving twice. One message
+  sums up how it went; a link that failed keeps its card with Try again,
+  which saves it into the same folder.
+
 ## [0.8.0] - 2026-10-02
 
 ### Added

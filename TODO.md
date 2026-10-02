@@ -29,9 +29,9 @@ todo:
   opens it full screen.
 - Folders, next steps: rename a folder, reorder its pages (drag, or move
   up and down), and delete a whole folder at once.
-- Batch saving: paste several links at once (or share several); they save
-  one after another, in order, optionally into a folder (new or existing)
-  and with tags chosen up front.
+- Saving several, next steps: tags chosen up front, an "Add pages" button
+  on a folder's screen that opens Save several with that folder picked,
+  and a way in without pasting (a button by the save field).
 - Follow "next chapter": from one saved chapter, offer to save the next N
   by following the page's next link (rel="next", or a link named Next or
   Next chapter) into the same folder. Only for sites that link chapters.

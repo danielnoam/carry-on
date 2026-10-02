@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.8.0";
+  const APP_VERSION = "0.9.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -77,6 +77,7 @@
     open: null,
     settings: false,
     sheet: false,
+    batch: false,
     // The folder whose screen is up (its name), under the reader if a page is open.
     folder: null,
     // Which pages the library shows: "all", "unread", "finished" or "#tag".
@@ -137,6 +138,7 @@
   // ---- Library ----
 
   function savingStatus(s) {
+    if (s.waiting) return "Waiting" + (s.folder ? " · into " + s.folder : "");
     return s.total == null ? "Saving · text" : "Saving · " + s.done + " of " + s.total + " image previews";
   }
 
@@ -149,7 +151,7 @@
         el("span", { class: "card-title", dir: "auto" }, s.url),
         el("span", { class: "card-status" }, el("span", { class: "warn" }, s.error)),
         el("span", { class: "card-actions" },
-          el("button", { class: "btn-small", type: "button", onclick: () => { dropFailed(s); savePage(s.url); } }, "Try again"),
+          el("button", { class: "btn-small", type: "button", onclick: () => { dropFailed(s); savePage(s.url, s.folder); } }, "Try again"),
           el("button", { class: "btn-quiet", type: "button", onclick: () => dropFailed(s) }, "Remove"))));
   }
 
@@ -330,34 +332,86 @@
     return null;
   }
 
-  const sameUrl = (a, b) => a && b && a.split("#")[0].replace(/\/$/, "") === b.split("#")[0].replace(/\/$/, "");
+  // Every link in a paste or share, in order and once each. A text field
+  // drops line breaks, so a link also ends where the next one starts.
+  function linksFrom(text) {
+    const out = [];
+    for (const m of String(text).match(/https?:\/\/.+?(?=https?:\/\/|[\s<>"]|$)/gi) || []) {
+      const url = m.replace(/[).,;!?]+$/, "");
+      if (!out.some((u) => sameUrl(u, url))) out.push(url);
+    }
+    return out;
+  }
 
-  async function savePage(url) {
-    const existing = state.pages.find((p) => sameUrl(p.url, url) || sameUrl(p.requested, url));
+  const sameUrl = (a, b) => a && b && a.split("#")[0].replace(/\/$/, "") === b.split("#")[0].replace(/\/$/, "");
+  const savedAs = (url) => state.pages.find((p) => sameUrl(p.url, url) || sameUrl(p.requested, url));
+  const newJob = (url, folder) => ({ key: url, url, site: C.save.siteName(url), done: 0, total: null, error: null, folder: folder || null });
+
+  async function savePage(url, folder) {
+    const existing = savedAs(url);
     if (existing) { toast("Already in your library"); openPage(existing.id); return; }
     if (state.saving.some((s) => !s.error && sameUrl(s.url, url))) return;
     state.saving = state.saving.filter((s) => !(s.error && sameUrl(s.url, url)));
-    const job = { key: url, url, site: C.save.siteName(url), done: 0, total: null, error: null };
+    const job = newJob(url, folder);
     state.saving.unshift(job);
     renderLibrary();
+    const meta = await runJob(job);
+    if (meta) toast(meta.missing ? "Saved. Some previews are missing." : "Saved for offline reading");
+  }
+
+  // Several links saved one after another, in order, optionally into a
+  // folder (so its pages follow the order of the links). A link already
+  // saved isn't saved again; it just joins the folder at its place.
+  async function saveAll(urls, folder) {
+    const name = folder ? folderName(folder) : null;
+    const jobs = urls.filter((u) => !state.saving.some((s) => !s.error && sameUrl(s.url, u))).map((u) => newJob(u, name));
+    state.saving = state.saving.filter((s) => !(s.error && jobs.some((j) => sameUrl(j.url, s.url))));
+    const fresh = jobs.filter((j) => !savedAs(j.url));
+    fresh.forEach((j) => { j.waiting = true; });
+    state.saving = [...fresh, ...state.saving];
+    renderLibrary();
+    let saved = 0, failed = 0, had = 0;
+    for (const job of jobs) {
+      const existing = savedAs(job.url);
+      if (existing) {
+        had++;
+        if (name) { existing.folder = name; existing.folderAt = Date.now(); await C.store.writeIndex(state.pages); renderLibrary(); }
+        continue;
+      }
+      job.waiting = false;
+      updateSavingCard(job);
+      if (await runJob(job)) saved++; else failed++;
+    }
+    if (!jobs.length) return;
+    toast([saved ? "Saved " + countLine(saved) + (name ? " into " + name : "") : "",
+      had ? had + " already saved" + (name && !saved ? ", now in " + name : "") : "",
+      failed ? failed + " couldn't be saved" : ""].filter(Boolean).join(" · ") + ".");
+  }
+
+  // Saves one queued link; resolves to its meta, or null when it failed
+  // (the card then says why and offers Try again).
+  async function runJob(job) {
     try {
-      const meta = await C.save.save(url, {
+      const meta = await C.save.save(job.url, {
         mode: load(IMAGES_KEY, "previews"),
         onProgress: (p) => {
           if (p.stage === "images") { job.done = p.done; job.total = p.total; }
           updateSavingCard(job);
         },
       });
-      meta.requested = url;
+      meta.requested = job.url;
+      if (job.folder) { meta.folder = folderName(job.folder); meta.folderAt = Date.now(); }
       state.pages.unshift(meta);
       await C.store.writeIndex(state.pages);
-      toast(meta.missing ? "Saved. Some previews are missing." : "Saved for offline reading");
       state.saving = state.saving.filter((s) => s !== job);
+      renderLibrary();
+      return meta;
     } catch (e) {
       job.error = e instanceof C.save.SaveError ? e.message : "Couldn't save this page. Try again.";
       if (!(e instanceof C.save.SaveError)) console.error(e);
+      renderLibrary();
+      return null;
     }
-    renderLibrary();
   }
 
   // ---- Screens ----
@@ -594,6 +648,9 @@
     return names;
   }
 
+  // A folder's name as already spelled, if one by that name exists.
+  const folderName = (name) => allFolders().find((n) => sameTag(n, cleanTag(name))) || cleanTag(name);
+
   // The page to carry on with: the first one not finished, else the first.
   function folderNext(list) {
     return list.find((p) => !p.finished) || list[0];
@@ -603,7 +660,7 @@
     const clean = name && cleanTag(name);
     if (clean) {
       if (p.folder && sameTag(p.folder, clean)) return;
-      p.folder = allFolders().find((n) => sameTag(n, clean)) || clean;
+      p.folder = folderName(clean);
       p.folderAt = Date.now();
     } else {
       delete p.folder;
@@ -745,6 +802,69 @@
     return el("div", { class: "step-rows" }, step(prev, "Previous"), step(next, "Next"));
   }
 
+  // ---- Saving several ----
+  // Opens when a paste or share holds more than one link: the links (one
+  // a line, editable), the folder to save them into, and Save.
+
+  function openBatch(text, fromHistory) {
+    if (state.batch) return;
+    state.batch = true;
+    renderBatch(linksFrom(text).join("\n"));
+    if (!fromHistory) history.pushState({ view: "batch" }, "");
+    $("batchBody").scrollTop = 0;
+    cover($("batchView")).then(() => $("batchBack").focus());
+  }
+
+  function closeBatch() {
+    if (!state.batch) return;
+    state.batch = false;
+    uncover($("batchView"));
+  }
+
+  function renderBatch(text) {
+    let folder = null;
+    const area = el("textarea", { class: "batch-links", rows: "6", "aria-label": "Links, one a line", spellcheck: "false",
+      autocapitalize: "off", autocomplete: "off", dir: "ltr" });
+    area.value = text;
+    const count = el("p", { class: "meta batch-count" });
+    const go = el("button", { class: "btn-primary batch-go", type: "submit" });
+    const chips = el("div", { class: "chips" });
+    const input = el("input", { class: "tag-input", type: "text", placeholder: "New folder", "aria-label": "New folder",
+      maxlength: "32", enterkeyhint: "done", autocapitalize: "sentences" });
+    const sync = () => {
+      const n = linksFrom(area.value).length;
+      count.textContent = n ? n + (n === 1 ? " link" : " links") : "No links yet. Paste them here, one a line.";
+      go.textContent = n ? "Save " + countLine(n) + (folder ? " into " + folder : "") : "Save";
+      go.disabled = !n;
+      chips.querySelectorAll(".chip").forEach((c) => {
+        const on = c.dataset.folder === (folder || "");
+        c.classList.toggle("on", on);
+        c.setAttribute("aria-pressed", String(on));
+      });
+    };
+    const pick = (f, typed) => { folder = f; if (!typed) input.value = ""; sync(); };
+    chips.append(...[null, ...allFolders()].map((f) => el("button", { class: "chip", type: "button", "data-folder": f || "",
+      onclick: () => pick(f) }, f || "None")));
+    area.addEventListener("input", sync);
+    input.addEventListener("input", () => pick(cleanTag(input.value) ? folderName(input.value) : null, true));
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); input.blur(); } });
+    const form = el("form", { class: "batch-form" },
+      el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Links"), area, count),
+      el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Folder"),
+        el("div", { class: "tag-edit" }, chips, input),
+        el("p", { class: "meta" }, "Pages in a folder keep the order of the links.")),
+      go);
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const urls = linksFrom(area.value);
+      if (!urls.length) return;
+      history.back();
+      saveAll(urls, folder);
+    });
+    $("batchBody").replaceChildren(form);
+    sync();
+  }
+
   // ---- Settings ----
   // Each group is data: a new setting is a new entry here, not new markup.
 
@@ -872,6 +992,8 @@
     const view = s && s.view;
     if (view !== "reader") closeReader();
     if (view !== "settings") closeSettings();
+    if (view !== "batch") closeBatch();
+    if (view === "batch") openBatch("", true);
     const folder = (view === "folder" || view === "reader") && s.folder;
     if (!folder) closeFolder();
     else if (!state.folder) openFolder(folder, true);
@@ -887,16 +1009,23 @@
     if (!(history.state && history.state.view)) return Promise.resolve();
     return new Promise((resolve) => {
       addEventListener("popstate", () => resolve(), { once: true });
-      history.go(-[state.folder, state.open, state.sheet, state.settings].filter(Boolean).length || -1);
+      history.go(-[state.folder, state.open, state.sheet, state.settings, state.batch].filter(Boolean).length || -1);
     });
   }
 
   $("settingsBtn").addEventListener("click", () => openSettings());
   $("settingsBack").addEventListener("click", () => history.back());
   $("folderBack").addEventListener("click", () => history.back());
+  $("batchBack").addEventListener("click", () => history.back());
 
   $("saveForm").addEventListener("submit", (e) => {
     e.preventDefault();
+    if (linksFrom($("saveUrl").value).length > 1) {
+      openBatch($("saveUrl").value);
+      $("saveUrl").value = "";
+      $("saveUrl").blur();
+      return;
+    }
     const url = linkFrom($("saveUrl").value);
     if (!url) { toast("That doesn't look like a link. Paste the page's address."); return; }
     $("saveUrl").value = "";
@@ -929,6 +1058,7 @@
     let got;
     try { got = await share.take(); } catch (e) { return; }
     if (!got || !got.text) return;
+    if (linksFrom(got.text).length > 1) { await toLibrary(); openBatch(got.text); return; }
     const url = linkFrom(got.text);
     if (!url) { toast("That share had no link in it."); return; }
     await toLibrary();

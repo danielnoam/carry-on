@@ -3,6 +3,14 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Saving several runs one page at a time (0.9.0).** In order, so a
+  folder's pages get rising `folderAt` and the folder reads in the order
+  of the links, and so a phone on a weak connection isn't fetching ten
+  pages and their images at once. A paste goes through a text field,
+  which drops line breaks, so links are also split where the next
+  `https://` starts. Two or more links open the Save several screen; one
+  link saves straight away as before.
+
 - **Folders are a name on the page, not a record of their own (0.8.0).**
   Each index entry may carry `folder` (its name) and `folderAt` (when it
   joined); a folder's order is `folderAt`, falling back to `savedAt`, so
