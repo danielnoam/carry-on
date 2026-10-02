@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Themes and type</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&amp;family=Instrument+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#2F5D8A}a:hover{color:#1F4468}
+</style>
+</helmet>
+<div style="width: 1200px; height: 760px; box-sizing: border-box; padding: 56px; background: #FFFFFF; color: #1C1B19; font-family: 'Instrument Sans', system-ui, sans-serif; display: flex; flex-direction: column; gap: 40px">
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px">
+<sc-for list="{{themes}}" as="t" hint-placeholder-count="3">
+<div style="background: {{t.bg}}; color: {{t.ink}}; border: 1px solid {{t.line}}; border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; justify-content: space-between; align-items: baseline">
+<div style="font-family: 'Source Serif 4', Georgia, serif; font-size: 24px; font-weight: 600">{{t.name}}</div>
+<div style="font-size: 13px; color: {{t.muted}}">{{t.use}}</div>
+</div>
+<div style="font-family: 'Source Serif 4', Georgia, serif; font-size: 17px; line-height: 1.6">The Boeing 747 is a large, long-range wide-body airliner. <span style="color: {{t.accent}}; text-decoration: underline">Original page</span></div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+<sc-for list="{{t.swatches}}" as="s" hint-placeholder-count="6">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<div style="height: 40px; border-radius: 8px; background: {{s.hex}}; border: 1px solid {{t.line}}"></div>
+<div style="font-size: 12px; font-weight: 600">{{s.token}}</div>
+<div style="font-size: 12px; color: {{t.muted}}">{{s.hex}}</div>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-for>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 48px">
+<div style="display: flex; flex-direction: column; gap: 14px">
+<div style="font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #5E5A53">Reading type: Source Serif 4, bundled</div>
+<div style="display: flex; align-items: baseline; gap: 16px"><div style="width: 88px; font-size: 13px; color: #5E5A53">Title 32/38</div><div style="font-family: 'Source Serif 4', Georgia, serif; font-size: 32px; font-weight: 700; line-height: 38px">Boeing 747</div></div>
+<div style="display: flex; align-items: baseline; gap: 16px"><div style="width: 88px; font-size: 13px; color: #5E5A53">Heading 22/28</div><div style="font-family: 'Source Serif 4', Georgia, serif; font-size: 22px; font-weight: 600; line-height: 28px">Development</div></div>
+<div style="display: flex; align-items: baseline; gap: 16px"><div style="width: 88px; flex-shrink: 0; font-size: 13px; color: #5E5A53">Body 19/30</div><div style="font-family: 'Source Serif 4', Georgia, serif; font-size: 19px; line-height: 30px">Body text sits at about 65 characters a line.</div></div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 14px">
+<div style="font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #5E5A53">Interface type: Instrument Sans</div>
+<div style="display: flex; align-items: baseline; gap: 16px"><div style="width: 88px; font-size: 13px; color: #5E5A53">Screen 28/34</div><div style="font-size: 28px; font-weight: 600; line-height: 34px">Library</div></div>
+<div style="display: flex; align-items: baseline; gap: 16px"><div style="width: 88px; font-size: 13px; color: #5E5A53">Label 15/20</div><div style="font-size: 15px; font-weight: 500; line-height: 20px">Save page</div></div>
+<div style="display: flex; align-items: baseline; gap: 16px"><div style="width: 88px; font-size: 13px; color: #5E5A53">Meta 13/18</div><div style="font-size: 13px; line-height: 18px; color: #5E5A53">en.wikipedia.org · 14 min · 2.1 MB</div></div>
+<div style="font-size: 13px; color: #5E5A53; line-height: 1.5">Spacing on an 8-point grid; radius 8, 12, 16; targets at least 44 px.</div>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1200,"height":760}}'>
+class Component extends DCLogic {
+renderVals() {
+const mk = (name, use, c) => ({ name, use, ...c, swatches: [
+{ token: 'bg', hex: c.bg }, { token: 'surface', hex: c.surface }, { token: 'ink', hex: c.ink },
+{ token: 'muted', hex: c.muted }, { token: 'accent', hex: c.accent }, { token: 'line', hex: c.line }
+] });
+return { themes: [
+mk('Paper', 'Default', { bg: '#F7F4EE', surface: '#FFFFFF', ink: '#1C1B19', muted: '#5E5A53', accent: '#2F5D8A', line: '#E4DED3' }),
+mk('Sepia', 'Long reads', { bg: '#F1E7D3', surface: '#F8F0DF', ink: '#2B2118', muted: '#6B5A45', accent: '#8A4B22', line: '#E0D2B8' }),
+mk('Night', 'Dim cabin', { bg: '#0F1216', surface: '#171B21', ink: '#E6E2D9', muted: '#9AA1AB', accent: '#8DB4E2', line: '#252B33' })
+] };
+}
+}
+</script>
+</body>
+</html>

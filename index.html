@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#F7F4EE">
+  <title>Carry-on</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="src/styles.css?v=0.1.0">
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <div class="top-row">
+        <h1 class="screen-title">Library</h1>
+        <div class="top-actions">
+          <button class="icon-btn" id="themeBtn" type="button" aria-label="Change theme">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8"></circle><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"></path></svg>
+          </button>
+        </div>
+      </div>
+      <p class="meta" id="libraryMeta"></p>
+    </header>
+
+    <main class="library" id="library" aria-live="polite"></main>
+
+    <footer class="save-bar">
+      <form id="saveForm" class="save-form">
+        <label for="saveUrl" class="visually-hidden">Page link</label>
+        <input id="saveUrl" type="url" inputmode="url" autocomplete="off" placeholder="Paste a link to save" required>
+        <button class="btn-primary" type="submit">Save</button>
+      </form>
+    </footer>
+  </div>
+  <div class="toast" id="toast" role="status" hidden></div>
+
+  <script src="src/platform.js?v=0.1.0"></script>
+  <script src="src/app.js?v=0.1.0"></script>
+</body>
+</html>

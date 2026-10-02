@@ -1,0 +1,186 @@
+/* Carry-on: tokens first, then layout. Every color is a token here and
+   only here; DESIGN.md is the rulebook for what each one is for. */
+
+@font-face {
+  font-family: "Source Serif 4";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("fonts/SourceSerif4.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Source Serif 4";
+  font-style: italic;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("fonts/SourceSerif4-Italic.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Instrument Sans";
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url("fonts/InstrumentSans.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root,
+[data-theme="paper"] {
+  --bg: #F7F4EE;
+  --surface: #FFFFFF;
+  --ink: #1C1B19;
+  --muted: #5E5A53;
+  --accent: #2F5D8A;
+  --accent-ink: #FFFFFF;
+  --line: #E4DED3;
+  --preview: #D9E2EA;
+  --ok: #1F6F5C;
+  --warn: #8A4B22;
+  color-scheme: light;
+}
+[data-theme="sepia"] {
+  --bg: #F1E7D3;
+  --surface: #F8F0DF;
+  --ink: #2B2118;
+  --muted: #6B5A45;
+  --accent: #8A4B22;
+  --accent-ink: #FFFFFF;
+  --line: #E0D2B8;
+  --preview: #E3D5BC;
+  --ok: #3F6B2E;
+  --warn: #8A4B22;
+  color-scheme: light;
+}
+[data-theme="night"] {
+  --bg: #0F1216;
+  --surface: #171B21;
+  --ink: #E6E2D9;
+  --muted: #9AA1AB;
+  --accent: #8DB4E2;
+  --accent-ink: #0F1216;
+  --line: #252B33;
+  --preview: #232A33;
+  --ok: #7CC4A8;
+  --warn: #E0A46E;
+  color-scheme: dark;
+}
+
+:root {
+  --serif: "Source Serif 4", "New York", "Noto Serif", Georgia, serif;
+  --sans: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px;
+  --s-6: 32px; --s-7: 40px; --s-8: 56px; --s-9: 72px;
+
+  --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-full: 999px;
+
+  --fs-title: 32px; --lh-title: 38px;
+  --fs-heading: 22px; --lh-heading: 28px;
+  --fs-body: 19px; --lh-body: 30px;
+  --fs-screen: 28px; --lh-screen: 34px;
+  --fs-card: 18px; --lh-card: 23px;
+  --fs-label: 15px; --lh-label: 20px;
+  --fs-meta: 13px; --lh-meta: 18px;
+
+  --tap: 44px;
+  --gutter: 16px;
+  --measure: 38rem;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 var(--fs-label)/var(--lh-label) var(--sans);
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+}
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button, input { font: inherit; color: inherit; }
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+.app {
+  min-height: 100dvh;
+  max-width: 44rem;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+html.native .app { padding-top: env(safe-area-inset-top); }
+
+.top { padding: var(--s-6) var(--gutter) var(--s-2); }
+.top-row { display: flex; align-items: center; justify-content: space-between; }
+.screen-title {
+  margin: 0;
+  font: 700 var(--fs-screen)/var(--lh-screen) var(--serif);
+}
+.top-actions { display: flex; gap: var(--s-1); }
+.meta { margin: var(--s-1) 0 0; font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--muted); }
+
+.icon-btn {
+  width: var(--tap); height: var(--tap);
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: var(--r-md);
+  background: transparent; color: var(--ink);
+  cursor: pointer;
+}
+
+.library {
+  flex: 1;
+  padding: var(--s-2) var(--gutter) var(--s-5);
+  display: flex; flex-direction: column; gap: var(--s-3);
+}
+
+.empty {
+  margin: auto 0;
+  padding: var(--s-8) var(--s-5);
+  text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: var(--s-3);
+}
+.empty-title { margin: 0; font: 600 var(--fs-heading)/var(--lh-heading) var(--serif); }
+.empty-text { margin: 0; color: var(--muted); max-width: 22rem; }
+
+.save-bar {
+  position: sticky; bottom: 0;
+  padding: var(--s-3) var(--gutter) calc(var(--s-3) + env(safe-area-inset-bottom));
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+}
+.save-form { display: flex; gap: var(--s-2); }
+.save-form input {
+  flex: 1; min-width: 0;
+  height: 48px; padding: 0 14px;
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--surface);
+  font-size: 16px;
+}
+.save-form input::placeholder { color: var(--muted); }
+.btn-primary {
+  height: 48px; padding: 0 18px;
+  border: 0; border-radius: var(--r-md);
+  background: var(--accent); color: var(--accent-ink);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toast {
+  position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  max-width: calc(100% - 2 * var(--gutter));
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-md);
+  background: var(--ink); color: var(--bg);
+  font-size: var(--fs-label);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 1ms !important; animation-duration: 1ms !important; }
+}

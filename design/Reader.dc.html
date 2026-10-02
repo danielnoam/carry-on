@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Reader</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&amp;family=Instrument+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#2F5D8A}a:hover{color:#1F4468}
+</style>
+</helmet>
+<div style="width: 390px; height: 1100px; box-sizing: border-box; background: {{t.bg}}; color: {{t.ink}}; font-family: 'Instrument Sans', system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+<div style="padding: 48px 8px 8px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid {{t.line}}">
+<button aria-label="Back to library" style="width: 44px; height: 44px; border: 0; background: transparent; color: {{t.ink}}; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg></button>
+<div style="display: flex; align-items: center; gap: 4px">
+<div style="height: 28px; padding: 0 10px; border-radius: 14px; background: {{t.surface}}; border: 1px solid {{t.line}}; font-size: 13px; color: {{t.muted}}; display: flex; align-items: center; gap: 6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 12h20M12 2l3 10-3 10"></path></svg>Offline</div>
+<a href="https://en.wikipedia.org/wiki/Boeing_747" style="height: 44px; padding: 0 10px; display: flex; align-items: center; gap: 4px; font-size: 15px; font-weight: 500; color: {{t.muted}}; text-decoration: none">Original<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 17L17 7M9 7h8v8"></path></svg></a>
+<button aria-label="Text and theme" style="width: 44px; height: 44px; border: 0; background: transparent; color: {{t.ink}}; font: 600 17px 'Source Serif 4', serif">Aa</button>
+</div>
+</div>
+<div style="padding: 24px 20px 40px; display: flex; flex-direction: column; gap: 18px">
+<div style="font-size: 13px; color: {{t.muted}}">Wikipedia · saved 2 Oct 2026 · 14 min</div>
+<h1 style="margin: 0; font-family: 'Source Serif 4', Georgia, serif; font-size: 32px; font-weight: 700; line-height: 38px">Boeing 747</h1>
+<p style="margin: 0; font-family: 'Source Serif 4', Georgia, serif; font-size: 19px; line-height: 30px">The Boeing 747 is a large, long-range wide-body airliner designed and manufactured by Boeing Commercial Airplanes in the United States.</p>
+<figure style="margin: 0; background: {{t.surface}}; border: 1px solid {{t.line}}; border-radius: 12px; overflow: hidden">
+<div style="height: 180px; background: {{t.preview}}; display: flex; align-items: center; justify-content: center; font-size: 13px; color: {{t.muted}}">[saved preview, 480 px wide]</div>
+<figcaption style="padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; gap: 12px">
+<div style="font-size: 14px; line-height: 1.4">[Image caption from the page]</div>
+<div style="font-size: 12px; color: {{t.muted}}; flex-shrink: 0">Full size online</div>
+</figcaption>
+</figure>
+<h2 style="margin: 8px 0 0; font-family: 'Source Serif 4', Georgia, serif; font-size: 22px; font-weight: 600; line-height: 28px">Development</h2>
+<p style="margin: 0; font-family: 'Source Serif 4', Georgia, serif; font-size: 19px; line-height: 30px">[Body paragraph from the saved article continues here at about 65 characters a line.]</p>
+<figure style="margin: 0; background: {{t.surface}}; border: 1px solid {{t.line}}; border-radius: 12px; overflow: hidden">
+<div style="height: 196px; background: {{t.videoBg}}; display: flex; align-items: center; justify-content: center">
+<div style="width: 56px; height: 56px; border-radius: 28px; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; color: #FFFFFF"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg></div>
+</div>
+<figcaption style="padding: 10px 12px; display: flex; flex-direction: column; gap: 2px">
+<div style="font-size: 14px; font-weight: 500">[Video title] · YouTube</div>
+<div style="font-size: 13px; color: {{t.muted}}">Plays when you're back online</div>
+</figcaption>
+</figure>
+<div style="font-size: 13px; color: {{t.muted}}; line-height: 1.5; padding-top: 8px; border-top: 1px solid {{t.line}}">Text from Wikipedia, CC BY-SA 4.0, by Wikipedia contributors. <a href="https://en.wikipedia.org/wiki/Boeing_747" style="color: {{t.accent}}">Read the original</a></div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["Paper","Sepia","Night"],"default":"Paper"},"$preview":{"width":390,"height":1100}}'>
+class Component extends DCLogic {
+renderVals() {
+const themes = {
+Paper: { bg: '#F7F4EE', surface: '#FFFFFF', ink: '#1C1B19', muted: '#5E5A53', accent: '#2F5D8A', line: '#E4DED3', preview: '#D9E2EA', videoBg: '#3A4048' },
+Sepia: { bg: '#F1E7D3', surface: '#F8F0DF', ink: '#2B2118', muted: '#6B5A45', accent: '#8A4B22', line: '#E0D2B8', preview: '#E3D5BC', videoBg: '#4A3F33' },
+Night: { bg: '#0F1216', surface: '#171B21', ink: '#E6E2D9', muted: '#9AA1AB', accent: '#8DB4E2', line: '#252B33', preview: '#232A33', videoBg: '#262C34' }
+};
+return { t: themes[this.props.theme ?? 'Paper'] || themes.Paper };
+}
+}
+</script>
+</body>
+</html>

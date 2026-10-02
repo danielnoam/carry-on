@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Image and video cards</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&amp;family=Instrument+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#2F5D8A}a:hover{color:#1F4468}
+</style>
+</helmet>
+<div style="width: 1200px; height: 844px; box-sizing: border-box; padding: 56px; background: #F7F4EE; color: #1C1B19; font-family: 'Instrument Sans', system-ui, sans-serif; display: flex; flex-direction: column; gap: 40px">
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div style="font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #5E5A53">Image · offline</div>
+<figure style="margin: 0; background: #FFFFFF; border: 1px solid #E4DED3; border-radius: 12px; overflow: hidden">
+<div style="height: 180px; background: #D9E2EA; display: flex; align-items: center; justify-content: center; font-size: 13px; color: #5E5A53">[saved preview, ~30 KB]</div>
+<figcaption style="padding: 10px 12px; display: flex; justify-content: space-between; gap: 12px"><div style="font-size: 14px">[Caption]</div><div style="font-size: 12px; color: #5E5A53">Full size online</div></figcaption>
+</figure>
+<div style="font-size: 14px; color: #5E5A53; line-height: 1.5">The preview is stored; the link to the full image is kept. Readable on a plane.</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div style="font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #5E5A53">Image · online</div>
+<figure style="margin: 0; background: #FFFFFF; border: 1px solid #E4DED3; border-radius: 12px; overflow: hidden">
+<div style="height: 180px; background: #B9CBDB; display: flex; align-items: center; justify-content: center; font-size: 13px; color: #1C1B19">[full image, loaded from the link]</div>
+<figcaption style="padding: 10px 12px; display: flex; justify-content: space-between; gap: 12px"><div style="font-size: 14px">[Caption]</div><a href="#" style="font-size: 12px; color: #2F5D8A">Source</a></figcaption>
+</figure>
+<div style="font-size: 14px; color: #5E5A53; line-height: 1.5">Online, the full image replaces the preview in place. A tap opens it full screen.</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div style="font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #5E5A53">Image · no preview</div>
+<figure style="margin: 0; background: #FFFFFF; border: 1px dashed #C9C1B3; border-radius: 12px; overflow: hidden">
+<div style="height: 180px; padding: 16px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; color: #5E5A53">
+<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 16l5-5 5 5M14 14l2-2 5 5"></path></svg>
+<div style="font-size: 14px; color: #1C1B19">[Alt text from the page]</div>
+<div style="font-size: 12px">Image loads when you're online</div>
+</div>
+</figure>
+<div style="font-size: 14px; color: #5E5A53; line-height: 1.5">If a preview failed to save, the alt text stands in, so the paragraph still makes sense.</div>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div style="font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #5E5A53">Video · offline</div>
+<figure style="margin: 0; background: #FFFFFF; border: 1px solid #E4DED3; border-radius: 12px; overflow: hidden">
+<div style="height: 180px; background: #3A4048; display: flex; align-items: center; justify-content: center"><div style="width: 56px; height: 56px; border-radius: 28px; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; color: #FFFFFF; opacity: .6"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg></div></div>
+<figcaption style="padding: 10px 12px; display: flex; flex-direction: column; gap: 2px"><div style="font-size: 14px; font-weight: 500">[Video title] · YouTube</div><div style="font-size: 13px; color: #5E5A53">Plays when you're back online</div></figcaption>
+</figure>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div style="font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #5E5A53">Video · online</div>
+<figure style="margin: 0; background: #FFFFFF; border: 1px solid #E4DED3; border-radius: 12px; overflow: hidden">
+<div style="height: 180px; background: #3A4048; display: flex; align-items: center; justify-content: center"><div style="width: 56px; height: 56px; border-radius: 28px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; color: #1C1B19"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg></div></div>
+<figcaption style="padding: 10px 12px; display: flex; flex-direction: column; gap: 2px"><div style="font-size: 14px; font-weight: 500">[Video title] · YouTube</div><div style="font-size: 13px; color: #2F5D8A">Tap to play on YouTube</div></figcaption>
+</figure>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div style="font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #5E5A53">Save setting</div>
+<div style="background: #FFFFFF; border: 1px solid #E4DED3; border-radius: 12px; padding: 8px; display: flex; flex-direction: column">
+<label style="display: flex; gap: 12px; align-items: flex-start; padding: 12px; min-height: 44px; box-sizing: border-box"><input type="radio" name="img" checked style="margin-top: 3px; accent-color: #2F5D8A"><span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 500">Previews and links</span><span style="font-size: 13px; color: #5E5A53">About 30 KB an image. Default.</span></span></label>
+<label style="display: flex; gap: 12px; align-items: flex-start; padding: 12px; min-height: 44px; box-sizing: border-box; border-top: 1px solid #E4DED3"><input type="radio" name="img" style="margin-top: 3px; accent-color: #2F5D8A"><span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 500">Full images</span><span style="font-size: 13px; color: #5E5A53">About 150 KB an image. For maps and diagrams.</span></span></label>
+<label style="display: flex; gap: 12px; align-items: flex-start; padding: 12px; min-height: 44px; box-sizing: border-box; border-top: 1px solid #E4DED3"><input type="radio" name="img" style="margin-top: 3px; accent-color: #2F5D8A"><span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 500">Links only</span><span style="font-size: 13px; color: #5E5A53">No image data saved.</span></span></label>
+</div>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1200,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

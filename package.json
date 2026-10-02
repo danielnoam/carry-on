@@ -1,0 +1,20 @@
+{
+  "name": "carry-on",
+  "private": true,
+  "description": "Carry-on's native builds. The web app itself has no build step and doesn't depend on anything here.",
+  "scripts": {
+    "build:www": "node tools/build-www.js",
+    "android:sync": "node tools/build-www.js && npx cap sync android",
+    "test": "node test/run-all.js"
+  },
+  "devDependencies": {
+    "@capacitor/android": "8.5.2",
+    "@capacitor/app": "8.1.1",
+    "@capacitor/app-launcher": "8.0.1",
+    "@capacitor/cli": "8.5.2",
+    "@capacitor/core": "8.5.2",
+    "@capacitor/filesystem": "8.1.3",
+    "@capacitor/ios": "8.5.2",
+    "@capacitor/share": "8.0.2"
+  }
+}

@@ -1,0 +1,104 @@
+# Builds the Android app from the same files GitHub Pages serves, and
+# publishes it as a release when APP_VERSION is new. From LifeLog's
+# android.yml, without its widgets and manifest steps.
+name: Android app
+
+on:
+  push:
+    branches: [main, "claude/**"]
+    paths-ignore: ["**.md", "test/**", ".claude/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      # No Android setup step: ubuntu-latest ships the SDK (ANDROID_HOME) with
+      # its licences accepted, and Gradle fetches any platform it lacks.
+      # android-actions/setup-android@v3 tried to install the long-removed
+      # "tools" package and failed before anything else ran.
+      - name: Check the Android SDK
+        run: |
+          test -n "$ANDROID_HOME" && test -d "$ANDROID_HOME/build-tools"
+          ls "$ANDROID_HOME/build-tools" | sort -V | tail -3
+
+      - run: npm ci
+
+      - name: Bundle the web app
+        run: node tools/build-www.js
+
+      - name: Generate the Android project
+        run: npx cap add android
+
+      - name: Icon and splash
+        run: >-
+          npx --yes @capacitor/assets@3 generate --android
+          --iconBackgroundColor '#F7F4EE' --iconBackgroundColorDark '#F7F4EE'
+          --splashBackgroundColor '#F7F4EE' --splashBackgroundColorDark '#F7F4EE'
+
+      - name: Stamp the version
+        id: v
+        run: |
+          node tools/android-version.js
+          echo "version=$(node -p "require('./tools/build-www').appVersion()")" >> "$GITHUB_OUTPUT"
+
+      - run: npx cap sync android
+
+      - name: Build
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Sign
+        id: sign
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: bash tools/sign-apk.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          # Both branches non-empty: `cond && '' || 'x'` is always 'x' in an
+          # Actions expression, because '' is falsy — which labelled the first
+          # properly signed build "-unsigned-key".
+          name: CarryOn-${{ steps.v.outputs.version }}${{ steps.sign.outputs.signed == 'true' && '-release-key' || '-throwaway-key' }}
+          path: CarryOn.apk
+
+      # Only from main, only with the real key, and only once per version:
+      # each APK has to install over the last.
+      - name: Publish the release
+        if: github.ref == 'refs/heads/main' && steps.sign.outputs.signed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ steps.v.outputs.version }}
+        run: |
+          if gh release view "app-v$V" >/dev/null 2>&1; then
+            echo "app-v$V is already released"; exit 0
+          fi
+          awk -v v="$V" '$0 ~ "^## \\[" v "\\]" {f=1; next} /^## \[/ {f=0} f' CHANGELOG.md > notes.md
+          {
+            echo
+            echo "---"
+            echo "**Installing:** open this page on your phone, tap **CarryOn.apk**, and allow your browser to install apps the first time it asks. Updates install over the top and keep your data."
+            echo
+            echo "**iPhone:** **CarryOn.ipa** is added here a few minutes later. It's unsigned: install it with AltStore or SideStore, which sign it with your own Apple ID."
+          } >> notes.md
+          gh release create "app-v$V" CarryOn.apk --title "Carry-on $V" --notes-file notes.md

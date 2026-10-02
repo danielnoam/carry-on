@@ -1,0 +1,11 @@
+{
+  "name": "Carry-on",
+  "short_name": "Carry-on",
+  "description": "Save web pages and read them offline.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F7F4EE",
+  "theme_color": "#F7F4EE",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

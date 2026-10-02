@@ -1,0 +1,18 @@
+{
+  "appId": "io.github.danielnoam.carryon",
+  "appName": "Carry-on",
+  "webDir": "www",
+  "backgroundColor": "#F7F4EE",
+  "android": {
+    "backgroundColor": "#F7F4EE"
+  },
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "css"
+    }
+  },
+  "ios": {
+    "backgroundColor": "#F7F4EE",
+    "contentInset": "never"
+  }
+}
