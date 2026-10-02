@@ -1,12 +1,5 @@
 todo:
 
-## Prove the core (do first)
-
-- Spike on a phone build: save five hard pages with CapacitorHttp,
-  Readability and `Filesystem.downloadFile`: a Wikipedia article, a news
-  site behind Cloudflare, a Medium post, a JavaScript-only page, and a page
-  with YouTube embeds. Record what fails in NOTES.md before building on it.
-
 ## Saving
 
 - Save pages that build themselves with JavaScript (Daniel asked again
@@ -22,8 +15,6 @@ todo:
 
 ## Capture
 
-- Check the Android share target on a phone (Chrome, and an app that
-  shares "Title https://…").
 - iOS share extension, with the Safari JavaScript preprocessing file to
   hand over the rendered HTML.
 
