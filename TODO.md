@@ -51,7 +51,10 @@ todo:
   speechSynthesis is unreliable, so likely a small native TTS plugin in
   native/ beside the share target.
 - Library chips (All, Unread, Wikipedia, Articles) and search.
-- Export one page as a self-contained HTML file; import it back.
+- Export a page from the reader: as PDF (the phone's print to PDF), EPUB
+  (for e-readers; the page is already clean HTML with local images, so
+  it's mostly packaging), a self-contained HTML file that can be imported
+  back, or shared through the share sheet as one of those or as the link.
 
 ## Sync
 
