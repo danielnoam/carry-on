@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.11.0";
+  const APP_VERSION = "0.12.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -145,7 +145,7 @@
     if (s.waiting) return "Waiting" + (s.folder ? " · into " + s.folder : "");
     const secs = s.started ? Math.floor((Date.now() - s.started) / 1000) : 0;
     const took = secs >= 5 ? " · " + secs + " s" : "";
-    if (s.total == null) return "Getting the page" + took;
+    if (s.total == null) return (s.drawing ? "Letting the page draw itself" : "Getting the page") + took;
     if (!s.total) return "Writing it to the phone" + took;
     return "Saving " + s.done + " of " + s.total + (s.total === 1 ? " image" : " images") + took;
   }
@@ -418,6 +418,7 @@
       const meta = await C.save.save(job.url, {
         mode: load(IMAGES_KEY, "previews"),
         onProgress: (p) => {
+          if (p.stage === "drawing") job.drawing = true;
           if (p.stage === "images") { job.done = p.done; job.total = p.total; }
           updateSavingCard(job);
         },

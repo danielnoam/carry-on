@@ -2,12 +2,6 @@ todo:
 
 ## Saving
 
-- Save pages that build themselves with JavaScript (Daniel asked again
-  on 2 Oct 2026). Plan: load the page in a hidden WebView with scripts
-  on, wait for its text to settle, then take the rendered HTML through the
-  same Readability and cleaning as now. Only the capture runs scripts;
-  the saved copy stays script-free. Today these are refused with "This
-  page builds itself with JavaScript".
 - Previews from pages other than Wikipedia are whatever srcset width is
   nearest 480 px, or the original when there's no srcset; resize big ones
   on the device.
@@ -16,12 +10,16 @@ todo:
 ## Capture
 
 - iOS share extension, with the Safari JavaScript preprocessing file to
-  hand over the rendered HTML.
+  hand over the rendered HTML. That's also how iOS would save pages that
+  build themselves with JavaScript, which only Android does (0.12.0).
 
 ## Library and reader
 
 - Reader top bar: hide on scroll down, back on scroll up; tapping an image
   opens it full screen.
+- Reader progress: a thin bar at the bottom of the reader showing how far
+  through the page you are (Daniel, 2 Oct 2026). Reduced motion: it
+  still moves with the scroll, it just doesn't animate between jumps.
 - Folders, next steps: reorder its pages (drag, or move up and down), and
   delete a whole folder at once.
 - Follow next links on pages saved before 0.10.0 (they have no `next`
@@ -44,6 +42,13 @@ todo:
   (for e-readers; the page is already clean HTML with local images, so
   it's mostly packaging), a self-contained HTML file that can be imported
   back, or shared through the share sheet as one of those or as the link.
+- Research WebToEpub (https://github.com/dteviot/WebToEpub) before
+  building more of folders and EPUB export (Daniel, 2 Oct 2026): how it
+  finds a web novel's chapter list (its per-site parsers versus a
+  generic one), collects many chapters into one book, and packs the EPUB
+  (structure, cover, table of contents, images). Then decide what a
+  folder borrows from it: a "Save all chapters" from a table-of-contents
+  page, and exporting a whole folder as one EPUB.
 
 ## Sync
 

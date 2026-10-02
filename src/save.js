@@ -211,14 +211,14 @@
     };
   }
 
-  async function fromAnyPage(url) {
-    const res = await get(url);
-    const finalUrl = res.url || url;
-    const doc = parse(res.text, finalUrl);
+  const CHECK_TITLE = /^(just a moment|attention required|access denied|are you a robot)/i;
+
+  // Reads the article out of a page's HTML. null when there isn't enough
+  // text, or the page is a browser check, so the caller can try drawing it.
+  function readArticle(html, finalUrl) {
+    const doc = parse(html, finalUrl);
     const docTitle = (doc.querySelector("title") || {}).textContent || "";
-    if (/^(just a moment|attention required|access denied|are you a robot)/i.test(docTitle.trim())) {
-      throw new SaveError("The site asked for a browser check, so Carry-on can't save it yet.");
-    }
+    if (CHECK_TITLE.test(docTitle.trim())) return { check: true };
     const og = doc.querySelector('meta[property="og:title"]');
     const h1s = doc.querySelectorAll("h1");
     const headline = (og && og.content) || (h1s.length === 1 ? h1s[0].textContent : "");
@@ -226,9 +226,32 @@
     resolveLazyImages(doc, finalUrl);
     if (typeof window.Readability !== "function") throw new SaveError("The reader part of the app didn't load. Restart Carry-on.");
     const article = new window.Readability(doc, { charThreshold: 500, keepClasses: false }).parse();
-    if (!article || (article.textContent || "").trim().length < MIN_TEXT) {
-      throw new SaveError("This page builds itself with JavaScript, which Carry-on can't save yet.");
+    if (!article || (article.textContent || "").trim().length < MIN_TEXT) return null;
+    return { doc, docTitle, headline, next, article };
+  }
+
+  async function fromAnyPage(url, onDrawing) {
+    const res = await get(url);
+    let finalUrl = res.url || url;
+    let got = readArticle(res.text, finalUrl);
+    // Pages that build themselves with scripts, or wait behind a browser
+    // check, get drawn in a hidden WebView on Android and read again. The
+    // saved copy is the same script-free HTML as any other page's.
+    if ((!got || got.check) && C.platform.canRender) {
+      if (onDrawing) onDrawing();
+      const drawn = await C.platform.render(finalUrl);
+      if (drawn) {
+        finalUrl = drawn.url;
+        got = readArticle(drawn.text, finalUrl);
+      }
     }
+    if (got && got.check) throw new SaveError("The site asked for a browser check, so Carry-on can't save it yet.");
+    if (!got) {
+      throw new SaveError(C.platform.canRender
+        ? "Carry-on couldn't find the article on this page, even after letting it draw itself."
+        : "This page builds itself with JavaScript, which Carry-on can't save yet.");
+    }
+    const { doc, docTitle, headline, next, article } = got;
     const body = new DOMParser().parseFromString(article.content, "text/html").body;
     return {
       url: finalUrl,
@@ -470,12 +493,12 @@
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   }
 
-  // Saves `url`; onProgress({ stage, done, total }) reports images as they
-  // land. Resolves to the page's meta, which the library index lists.
+  // Saves `url`; onProgress({ stage, done, total }) reports drawing a
+  // script-built page, then images as they land. Resolves to the page's meta, which the library index lists.
   async function save(url, { mode = "previews", onProgress } = {}) {
     const wiki = wikipediaPage(url);
     if (onProgress) onProgress({ stage: "text" });
-    const got = wiki ? await fromWikipedia(wiki) : await fromAnyPage(url);
+    const got = wiki ? await fromWikipedia(wiki) : await fromAnyPage(url, () => onProgress && onProgress({ stage: "drawing" }));
     const out = document.implementation.createHTMLDocument("");
     const { root, media } = clean(got.body, got.base, got.url, out);
     if (!root.textContent.trim()) throw new SaveError("Nothing readable was found on this page.");

@@ -2,6 +2,16 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.12.0] - 2026-10-02
+
+### Added
+- Pages that build themselves with JavaScript can be saved on Android.
+  When a page comes back as an empty shell, or a browser check, Carry-on
+  lets it draw itself out of sight, then saves the text it drew. The
+  card says "Letting the page draw itself" meanwhile. The saved copy is
+  still plain text and images, with no scripts. iOS still says it can't
+  save these yet.
+
 ## [0.11.0] - 2026-10-02
 
 ### Added
