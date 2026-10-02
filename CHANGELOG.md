@@ -2,6 +2,18 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.14.0] - 2026-10-02
+
+### Added
+- Tap an image in a saved page to see it full screen. Pinch or double-tap
+  to zoom, drag to look around, and swipe down, tap ×, or go back to
+  close it. It shows the full image when you're online and the saved
+  preview when you're not, with its caption underneath.
+
+### Changed
+- Behind the scenes, the code now uses the same names for things as the
+  app and its notes do. Nothing you'd notice.
+
 ## [0.13.0] - 2026-10-02
 
 ### Added

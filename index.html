@@ -7,8 +7,8 @@
   <title>Carry-on</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="src/fonts.css?v=0.13.0">
-  <link rel="stylesheet" href="src/styles.css?v=0.13.0">
+  <link rel="stylesheet" href="src/fonts.css?v=0.14.0">
+  <link rel="stylesheet" href="src/styles.css?v=0.14.0">
 </head>
 <body>
   <div class="app" id="libraryView">
@@ -61,6 +61,13 @@
     </header>
     <iframe class="reader-frame" id="readerFrame" sandbox="allow-same-origin" title="Saved page"></iframe>
     <div class="read-progress" id="readProgress" aria-hidden="true"><span></span></div>
+    <div class="viewer" id="imageViewer" role="dialog" aria-modal="true" aria-label="Image" hidden>
+      <div class="viewer-stage" id="viewerStage"><img class="viewer-img" id="viewerImg" alt=""></div>
+      <p class="viewer-caption" id="viewerCaption" dir="auto" hidden></p>
+      <button class="icon-btn viewer-close" id="viewerClose" type="button" aria-label="Close image">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+      </button>
+    </div>
     <div class="sheet-catch" id="sheetCatch" hidden></div>
     <div class="sheet" id="readingSheet" role="dialog" aria-label="Text and theme" hidden>
       <span class="sheet-grip" aria-hidden="true"></span>
@@ -109,12 +116,12 @@
   </section>
   <div class="toast" id="toast" role="status" hidden></div>
 
-  <script src="src/platform.js?v=0.13.0"></script>
-  <script src="src/motion.js?v=0.13.0"></script>
-  <script src="src/vendor/Readability.js?v=0.13.0"></script>
-  <script src="src/store.js?v=0.13.0"></script>
-  <script src="src/save.js?v=0.13.0"></script>
-  <script src="src/reader.js?v=0.13.0"></script>
-  <script src="src/app.js?v=0.13.0"></script>
+  <script src="src/platform.js?v=0.14.0"></script>
+  <script src="src/motion.js?v=0.14.0"></script>
+  <script src="src/vendor/Readability.js?v=0.14.0"></script>
+  <script src="src/store.js?v=0.14.0"></script>
+  <script src="src/save.js?v=0.14.0"></script>
+  <script src="src/reader.js?v=0.14.0"></script>
+  <script src="src/app.js?v=0.14.0"></script>
 </body>
 </html>

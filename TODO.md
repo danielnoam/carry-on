@@ -24,35 +24,6 @@ asks from Daniel.
 
 ---
 
-## 0.14.0: Naming pass and image viewer
-
-**Goal:** one vocabulary before folders, export and comics add more code
-on top, and a full-screen image viewer that comics will reuse.
-
-**Items**
-- Naming pass: glossary in NOTES.md (saved page, preview, full image,
-  capture, library, index entry, tag, folder, page directory), then rename
-  what doesn't match: save.js `clean`, `localise`, `pageHtml`; app.js
-  `takeShared`, `cover`; store.js `folderUrl` (a page's directory, not a
-  folder, per NOTES 0.8.0).
-- Tap an image in the reader to open it full screen, with pinch zoom and
-  swipe down to close.
-
-**Steps**
-1. Write the glossary; list every rename with old and new name.
-2. Rename in one commit, no behaviour change; `node test/run-all.js`.
-3. Viewer: reader.js catches the tap on an `<img>` in the iframe (it
-   already catches link taps), opens an overlay in the app's document
-   with the full image when online, the preview offline. Reduced motion:
-   fade instead of the zoom-from-image spring.
-
-**Daniel's phone:** pinch zoom and swipe to close on Android; a few saved
-pages still open and read after the renames.
-
-**Depends on:** 0.13.0 (the floating reader bar).
-
----
-
 ## 0.15.0: Folders, next steps
 
 **Goal:** a folder can be managed without workarounds.
@@ -79,7 +50,7 @@ pages still open and read after the renames.
 **Daniel's phone:** reorder a real web-novel folder and check Next and
 previous follow the new order; delete a folder both ways.
 
-**Depends on:** 0.14.0 (renamed folder code).
+**Depends on:** nothing left.
 
 ---
 
@@ -176,7 +147,8 @@ or an uninstall.
 back up the library, uninstall, reinstall, restore, and check reading
 positions, tags and folder order came back.
 
-**Depends on:** 0.14.0 (glossary names the format's fields).
+**Depends on:** nothing left (the 0.14.0 glossary in NOTES.md names
+the format's fields).
 
 ---
 
