@@ -197,7 +197,7 @@
         });
         resolve();
       };
-      iframe.srcdoc = srcdoc(html, C.store.folderUrl(meta.id));
+      iframe.srcdoc = srcdoc(html, C.store.pageDirUrl(meta.id));
     });
   }
 

@@ -9,6 +9,26 @@ bold title and its version so a search finds it.
   `Filesystem.downloadFile`) and the share target are proven. Pages that
   build themselves with JavaScript still fail; that's its own TODO item.
 
+- **Glossary (0.14.0).** One word per thing, in the code, the interface
+  and these docs:
+  - **Saved page:** a page kept on the phone; its **index entry** is its
+    line in `library.json` (title, url, tags, folder, place read).
+  - **Page directory:** `pages/<id>/` on disk, holding `page.html`,
+    `meta.json` and `images/` (`store.pageDirUrl`). Never "folder".
+  - **Folder:** an ordered collection of saved pages, one per page at
+    most (`folder`, `folderAt` on the index entry). **Tag:** a label, any
+    number per page.
+  - **Preview:** the small copy of an image kept on disk; **full image:**
+    the original, loaded from its link when online.
+  - **Saving** a page: fetch (or **draw**, for script-built pages),
+    **rebuild** it from the allowlist (`save.rebuild`), **save its images**
+    (`saveImages`), write the **saved page HTML** (`savedPageHtml`).
+  - **Library:** the list of saved pages. **Screens** are pushed over it
+    and popped (`pushScreen`, `popScreen`); **sheets** rise from the
+    bottom of the reader.
+  - **Shared:** a link sent from another app's share sheet, saved
+    straight away (`saveShared`).
+
 - **The reader bar floats; the page makes room for it (0.13.0).** The
   bar is absolutely placed over the iframe, which now fills the screen,
   and reader.js sets `--co-top` (the bar's height) on the page, which
@@ -76,9 +96,8 @@ bold title and its version so a search finds it.
   joined); a folder's order is `folderAt`, falling back to `savedAt`, so
   batch saving will order chapters just by saving them in turn. No
   separate folders file means nothing to keep in step: a folder exists
-  while a page names it. Names match ignoring case, like tags. "Folder"
-  in store.js (`folderUrl`) still means a page's directory on disk; the
-  naming pass should split the two. Next and previous replace the
+  while a page names it. Names match ignoring case, like tags. (Until
+  0.14.0 store.js also said "folder" for a page's directory on disk.) Next and previous replace the
   reader's history entry rather than pushing one, so back leaves for the
   folder however many chapters were read. The "Next in …" link is added
   by reader.js after the page loads and only that element is honoured,

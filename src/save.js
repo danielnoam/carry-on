@@ -292,11 +292,11 @@
     });
   }
 
-  // ---- Cleaning ----
+  // ---- Rebuilding ----
 
   // Rebuilds `body` into `out` (a fresh document) from the allowlist.
-  // Returns the images and videos found, for localise().
-  function clean(body, base, pageUrl, out) {
+  // Returns the images and videos found, for saveImages().
+  function rebuild(body, base, pageUrl, out) {
     const media = [];
     const pageNoHash = pageUrl.split("#")[0];
 
@@ -414,7 +414,7 @@
   // Downloads previews (or full images, or nothing, per the image setting)
   // into images/ beside page.html. A failed one keeps its link and is
   // counted as missing; the reader shows a placeholder for it offline.
-  async function localise(id, media, mode, onProgress) {
+  async function saveImages(id, media, mode, onProgress) {
     let done = 0, missing = 0, bytes = 0, thumb = null;
     const total = media.length;
     const queue = media.map((m, i) => ({ ...m, i }));
@@ -457,7 +457,7 @@
     return new Date(ts).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
   }
 
-  function pageHtml(meta, root, out) {
+  function savedPageHtml(meta, root, out) {
     const head = out.createElement("header");
     head.className = "co-head";
     const line = out.createElement("p");
@@ -500,10 +500,10 @@
     if (onProgress) onProgress({ stage: "text" });
     const got = wiki ? await fromWikipedia(wiki) : await fromAnyPage(url, () => onProgress && onProgress({ stage: "drawing" }));
     const out = document.implementation.createHTMLDocument("");
-    const { root, media } = clean(got.body, got.base, got.url, out);
+    const { root, media } = rebuild(got.body, got.base, got.url, out);
     if (!root.textContent.trim()) throw new SaveError("Nothing readable was found on this page.");
     // The page's own headline, when the article kept it, would sit under the
-    // one pageHtml writes.
+    // one savedPageHtml writes.
     const norm = (t) => t.replace(/\s+/g, " ").trim().toLowerCase();
     const first = root.querySelector("h2, h3");
     if (first && norm(first.textContent) === norm(got.title) && norm(root.textContent).startsWith(norm(first.textContent))) first.remove();
@@ -516,9 +516,9 @@
       next: got.next || "",
     };
     if (onProgress) onProgress({ stage: "images", done: 0, total: media.length });
-    const res = await localise(id, media, mode, (done, total) => onProgress && onProgress({ stage: "images", done, total }));
+    const res = await saveImages(id, media, mode, (done, total) => onProgress && onProgress({ stage: "images", done, total }));
     Object.assign(meta, { images: res.total, missing: res.missing, thumb: res.thumb });
-    const html = pageHtml(meta, root, out);
+    const html = savedPageHtml(meta, root, out);
     try {
       meta.bytes = res.bytes + await C.store.writePage(id, html, meta);
     } catch (e) {
@@ -529,7 +529,7 @@
   }
 
   // Tries the previews that didn't download when the page was saved again,
-  // into the same folder. Pages saved before 0.6.0 didn't keep the preview's
+  // into the same page directory. Pages saved before 0.6.0 didn't keep the preview's
   // address, so those use the full image's (a Wikimedia one is narrowed to
   // the preview width). Resolves to { got, missing, bytes, thumb }.
   async function retryMissing(meta, onProgress) {

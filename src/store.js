@@ -1,8 +1,8 @@
-// Carry-on: where saved pages live. One folder per page under the app's
+// Carry-on: where saved pages live. One directory per page under the app's
 // data directory, `pages/<id>/` with page.html, meta.json and images/, plus
 // library.json listing them (docs/PROPOSAL.md, "Store and read").
 //
-// In a browser there is no folder: page.html goes to IndexedDB and the
+// In a browser there is no directory: page.html goes to IndexedDB and the
 // index to localStorage, and images stay links (downloadTo returns null).
 (function () {
   const P = window.CarryOn.platform;
@@ -12,7 +12,7 @@
 
   const bytesOf = (text) => new Blob([text]).size;
 
-  // The data folder as a URL the WebView can load, so a page folder can be
+  // The data directory as a URL the WebView can load, so a page directory can be
   // the reader's <base> and a card can show its preview. null in a browser.
   let dataUrl = null;
   const ready = (async () => {
@@ -88,10 +88,10 @@
     try { await idbDo("readwrite", (s) => s.delete(id)); } catch (e) { /* already gone */ }
   }
 
-  // Downloads `url` into the page's folder; resolves to the file's size.
-  // Throws where there is no folder, so callers keep the link instead.
+  // Downloads `url` into the page's directory; resolves to the file's size.
+  // Throws where there is no directory, so callers keep the link instead.
   async function download(id, rel, url) {
-    if (!FS()) throw new Error("no folder");
+    if (!FS()) throw new Error("no directory");
     const path = "pages/" + id + "/" + rel;
     await P.downloadTo(url, path);
     const { size } = await FS().stat({ path, directory: DIR });
@@ -100,9 +100,9 @@
   }
 
   // The URL a page's relative paths (images/3.jpg) resolve against.
-  function folderUrl(id) {
+  function pageDirUrl(id) {
     return dataUrl ? dataUrl + "pages/" + id + "/" : null;
   }
 
-  window.CarryOn.store = { ready, readIndex, writeIndex, writePage, readPage, removePage, download, folderUrl, bytesOf };
+  window.CarryOn.store = { ready, readIndex, writeIndex, writePage, readPage, removePage, download, pageDirUrl, bytesOf };
 })();

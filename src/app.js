@@ -133,7 +133,7 @@
   function thumbUrl(p) {
     if (!p.thumb) return null;
     if (/^https?:/.test(p.thumb)) return p.thumb;
-    const base = C.store.folderUrl(p.id);
+    const base = C.store.pageDirUrl(p.id);
     return base ? base + p.thumb : null;
   }
 
@@ -447,7 +447,7 @@
   const below = (screen) => (screen.id === "readerView" && state.folder ? $("folderView")
     : screen.id === "newsView" && state.settings ? $("settingsView") : $("libraryView"));
 
-  function cover(screen) {
+  function pushScreen(screen) {
     const under = below(screen);
     under.inert = true;
     screen.hidden = false;
@@ -455,7 +455,7 @@
     return M.pushIn(screen);
   }
 
-  function uncover(screen) {
+  function popScreen(screen) {
     const under = below(screen);
     under.inert = false;
     M.under(under, false);
@@ -474,7 +474,7 @@
     if (!html) { toast("This page's file is missing. Delete it and save it again."); return; }
     if (!fromHistory) history.pushState(readerState(p), "");
     const shown = show(p, html);
-    cover($("readerView"));
+    pushScreen($("readerView"));
     await shown;
     $("readerFrame").focus();
   }
@@ -567,7 +567,7 @@
     if (state.folder) renderFolder();
     closeSheet(true);
     state.open = null;
-    uncover($("readerView")).then(() => { if (!state.open) C.reader.close(); });
+    popScreen($("readerView")).then(() => { if (!state.open) C.reader.close(); });
   }
 
   async function deleteOpen() {
@@ -766,13 +766,13 @@
     renderFolder();
     if (!fromHistory) history.pushState({ view: "folder", folder: state.folder }, "");
     $("folderBody").scrollTop = 0;
-    cover($("folderView")).then(() => $("folderBack").focus());
+    pushScreen($("folderView")).then(() => $("folderBack").focus());
   }
 
   function closeFolder() {
     if (!state.folder) return;
     state.folder = null;
-    uncover($("folderView"));
+    popScreen($("folderView"));
   }
 
   function renderFolder() {
@@ -881,13 +881,13 @@
     renderBatch(linksFrom(text).join("\n"));
     if (!fromHistory) history.pushState({ view: "batch" }, "");
     $("batchBody").scrollTop = 0;
-    cover($("batchView")).then(() => $("batchBack").focus());
+    pushScreen($("batchView")).then(() => $("batchBack").focus());
   }
 
   function closeBatch() {
     if (!state.batch) return;
     state.batch = false;
-    uncover($("batchView"));
+    popScreen($("batchView"));
   }
 
   function renderBatch(text) {
@@ -1121,7 +1121,7 @@
     renderSettings();
     if (!fromHistory) history.pushState({ view: "settings" }, "");
     $("settingsBody").scrollTop = 0;
-    const shown = cover($("settingsView"));
+    const shown = pushScreen($("settingsView"));
     if (at && $(at)) $("settingsBody").scrollTop = $(at).offsetTop - $("settingsBody").offsetTop - 8;
     shown.then(() => $("settingsBack").focus());
   }
@@ -1129,7 +1129,7 @@
   function closeSettings() {
     if (!state.settings) return;
     state.settings = false;
-    uncover($("settingsView"));
+    popScreen($("settingsView"));
   }
 
   // ---- Wiring ----
@@ -1201,7 +1201,7 @@
   // ---- Shared from another app (Android) ----
   // native/share hands over what Chrome's share sheet sent: usually the
   // link, sometimes "Title https://…". Saved straight away.
-  async function takeShared() {
+  async function saveShared() {
     const share = C.platform.plugin("ShareTarget");
     if (!share) return;
     let got;
@@ -1221,8 +1221,8 @@
     renderLibrary();
     noteVersion();
     const share = C.platform.plugin("ShareTarget");
-    if (share && share.addListener) share.addListener("shared", takeShared);
-    takeShared();
+    if (share && share.addListener) share.addListener("shared", saveShared);
+    saveShared();
   });
 
   // ---- The app updating itself (from LifeLog's 0.179.0) ----
@@ -1417,7 +1417,7 @@
     paintUpdateBar();
     $("newsBody").replaceChildren(el("p", { class: "meta" }, "Loading…"));
     $("newsBody").scrollTop = 0;
-    cover($("newsView")).then(() => $("newsBack").focus());
+    pushScreen($("newsView")).then(() => $("newsBack").focus());
     const entries = await readChangelog();
     if (!state.news) return;
     $("newsBody").replaceChildren(...(entries && entries.length ? entries.map((e) => el("section", { class: "news-entry" + (e.version === APP_VERSION ? " now" : "") },
@@ -1429,7 +1429,7 @@
   function closeNews() {
     if (!state.news) return;
     state.news = false;
-    uncover($("newsView"));
+    popScreen($("newsView"));
   }
 
   function formatDay(iso) {
