@@ -9,7 +9,8 @@ Plain HTML, CSS and JS with no build step and no dependencies. The same
 files run in a browser (GitHub Pages) and, wrapped by
 [Capacitor](https://capacitorjs.com), as the Android and iOS apps.
 
-**Status:** an app shell. Saving pages is the next step (see TODO.md).
+**Status:** saving and reading work: paste a link, read it offline.
+Sharing to the app from other apps is next (see TODO.md).
 
 ## Run it
 
@@ -34,9 +35,15 @@ files run in a browser (GitHub Pages) and, wrapped by
 
 ```
 index.html          app shell
+src/fonts.css       the bundled fonts, for the app and the reader
 src/styles.css      tokens, themes, layout (see DESIGN.md)
+src/reader.css      the saved page inside the reader's sandboxed iframe
 src/platform.js     browser vs app: native fetch, downloads, opening links
-src/app.js          version, state, the library view
+src/store.js        page folders and the library index (IndexedDB in a browser)
+src/save.js         link to saved page: Wikipedia adapter, Readability,
+                    the allowlist cleaner, image previews, video cards
+src/reader.js       shows a saved page in the sandboxed iframe
+src/app.js          version, state, the library and reader views
 src/vendor/         Mozilla Readability 0.6.0 (Apache-2.0)
 src/fonts/          Source Serif 4, Instrument Sans (OFL)
 sw.js               offline cache for the web copy; its ASSETS list is

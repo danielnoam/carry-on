@@ -25,6 +25,9 @@ Every color is a token on `:root`, redefined per theme on
 | `--preview` | #D9E2EA | #E3D5BC | #232A33 | Empty image preview |
 | `--ok` | #1F6F5C | #3F6B2E | #7CC4A8 | "Offline ready" |
 | `--warn` | #8A4B22 | #8A4B22 | #E0A46E | "Previews missing", retry |
+| `--video` | #3A4048 | #4A3F33 | #262C34 | Video card ground behind the thumbnail |
+| `--on-video` | #FFFFFF | #FFFFFF | #FFFFFF | Play glyph |
+| `--scrim` | black 55% | black 55% | black 55% | Play button disc |
 
 Night is for a dim cabin: no pure white text, no pure black ground.
 "System" follows the phone's light or dark setting (Paper or Night).
@@ -73,24 +76,25 @@ text size is adjustable in five steps from 16 to 24 px (Target).
 
 ## 5. Components
 
-- **Library card (Now in design, Target in code):** site line with
+- **Library card (Now):** site line with
   favicon, serif title, then status: a progress bar and "Saving · 14 of 31
   image previews", or "9 min · 1.4 MB · Offline ready", or "Text saved · 3
   previews missing · Retry".
 - **Reader top bar:** back, an "Offline" pill when there is no connection,
   "Original" with an arrow (opens the source in the phone's browser), and
   "Aa" for text size and theme. Hides on scroll down, returns on scroll up.
-- **Image figure:** saved preview, caption, "Full size online" on the
+  Now: back, Offline, Original and Delete; Aa and hiding are Target.
+- **Image figure (Now):** saved preview, caption, "Full size online" on the
   right. Online, the full image replaces the preview in place; a tap opens
   it full screen. No preview saved: dashed border, image glyph, the page's
   alt text, "Image loads when you're online".
-- **Video figure:** local thumbnail, play glyph (dimmed offline), title and
+- **Video figure (Now):** local thumbnail, play glyph (dimmed offline), title and
   site, "Plays when you're back online". Online: "Tap to play on
   YouTube", opening the original. Nothing autoplays.
 - **Save setting:** radio list: "Previews and links" (default, about 30 KB
   an image), "Full images" (about 150 KB, for maps and diagrams), "Links
   only".
-- **Licence footer:** on every page whose licence asks for it, e.g. "Text
+- **Licence footer (Now):** on every page whose licence asks for it, e.g. "Text
   from Wikipedia, CC BY-SA 4.0, by Wikipedia contributors. Read the
   original".
 

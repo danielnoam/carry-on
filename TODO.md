@@ -6,32 +6,35 @@ todo:
   Readability and `Filesystem.downloadFile`: a Wikipedia article, a news
   site behind Cloudflare, a Medium post, a JavaScript-only page, and a page
   with YouTube embeds. Record what fails in NOTES.md before building on it.
-- The sandboxed reader: `page.html` in an iframe with no `allow-scripts`,
-  a strict CSP, the reader CSS injected. Build this before any styling.
+- Check on a phone what 0.2.0 could only check in a desktop browser with
+  Capacitor mocked: `Filesystem.downloadFile` into `pages/<id>/images/`,
+  the page folder as the reader's `<base>` under its CSP, and links
+  leaving through AppLauncher.
 
 ## Saving
 
-- Wikipedia adapter: `/api/rest_v1/page/html/{title}`, User-Agent naming
-  the app, licence line, Commons thumbnails at 480 px.
-- Generic path: fetch, Readability, clean (scripts, iframes, forms,
-  handlers, pixels), resolve lazy images.
-- Image previews and links per the save setting; video cards with local
-  thumbnails.
-- Page folder: `page.html`, `images/`, `meta.json`; library index JSON.
-- Empty-shell detection, then a hidden WebView render.
+- Hidden WebView render for pages that build themselves with JavaScript
+  (empty shells are detected and refused with a message since 0.2.0).
+- Previews from pages other than Wikipedia are whatever srcset width is
+  nearest 480 px, or the original when there's no srcset; resize big ones
+  on the device.
+- Commons images: keep each image's own credit line (author, licence).
 
 ## Capture
 
 - Android share target (intent filter via a tools/android-manifest.js like LifeLog's, added to android.yml after `cap add android`).
 - iOS share extension, with the Safari JavaScript preprocessing file to
   hand over the rendered HTML.
-- Paste a link (the library's bottom bar).
 
 ## Library and reader
 
-- Library cards with save progress, sizes, retry for missing previews.
-- Reader top bar (Offline pill, Original, Aa), text size steps, themes.
-- Settings: theme, save setting, storage used per page and in total.
+- Retry for missing previews (the card says how many are missing).
+- Reader top bar: Aa (text size steps, theme), hide on scroll down;
+  tapping an image opens it full screen.
+- Library chips (All, Unread, Wikipedia, Articles) and search.
+- Settings: theme, save setting (stored as `carryon.images`: previews,
+  full, links; saving already honours it), storage used per page and in
+  total.
 - Export one page as a self-contained HTML file; import it back.
 
 ## Before shipping to other people

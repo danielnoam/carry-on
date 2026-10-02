@@ -2,6 +2,27 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.2.0] - 2026-10-02
+
+### Added
+- Saving: paste a link (or a message with a link in it) and the page is
+  saved for offline reading. Wikipedia articles come through Wikipedia's
+  own API with the CC BY-SA licence line; other pages are reduced to the
+  article.
+- Image previews are saved with each page and the full image loads in
+  their place when you're online. A preview that couldn't be saved shows
+  the image's description and "Image loads when you're online".
+- Videos (YouTube, Vimeo, Wikipedia) become a card with a saved thumbnail
+  that opens the video when you're back online.
+- The reader: the saved page in your theme, an Offline pill, Original to
+  open the page in your browser, and Delete.
+- Library cards with save progress, reading time, size and whether the
+  page is fully offline.
+
+### Changed
+- An Android build signed with a keystore that has no "carryon" key now
+  stops with a message saying so, instead of failing inside the signer.
+
 ## [0.1.0] - 2026-10-02
 
 ### Added
