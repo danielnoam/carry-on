@@ -2,6 +2,39 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.19.0] - 2026-10-02
+
+### Added
+- Pick several pages and change them together. "Select" (the tick
+  icon in the library, or in a folder) turns taps into picks; a bar along
+  the bottom then adds or removes tags, moves them into a folder, marks
+  them read or unread, or deletes them. A long press on a folder picks
+  all its pages.
+- Press and hold a page in the library or a folder for its menu without
+  opening it: open, share, send, the original, tags, folder, mark as
+  read, select, full images and delete. Right-click does the same on a
+  computer.
+- Contents in the reader: the list icon jumps to any heading of a long
+  page, with the part you're in marked.
+- Tap the text to hide the reader's bar, and tap again to bring it back.
+  While the bar is up, the bottom shows the part you're reading and the
+  minutes left.
+
+### Changed
+- The library is in sections: Continue reading (the page you read last),
+  Folders as a row of tiles, then your pages. A sort menu orders them by
+  newest saved, last read, longest or site. Tags sit behind their own
+  chip so Unread and Finished stay in reach. Search opens from its icon,
+  and Settings has a gear.
+- Cards only mention offline when something needs a look ("2 previews
+  missing", "Images online"); "Offline ready" is gone from every card.
+- Settings is a short menu: Appearance (theme and reading type
+  together), Saving, Storage and backup, Updates and About, each on its
+  own screen. On a computer the menu stays on the left.
+- The reader's ⋯ is in groups: Share, Send and Original at the top, then
+  this page's tags and folder, the series, and the rest. Original moved
+  there from the bar.
+
 ## [0.18.0] - 2026-10-02
 
 ### Added

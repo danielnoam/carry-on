@@ -332,6 +332,7 @@ html.native .screen-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top
 }
 html.native .reader-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top)); }
 .reader { z-index: 11; }
+.icon-btn[hidden] { display: none; }
 .aa-btn { font: 600 var(--fs-label)/1 var(--serif); letter-spacing: -0.01em; }
 .aa-btn[aria-expanded="true"] { background: var(--line); }
 
@@ -383,11 +384,20 @@ html.native .reader::before {
 }
 
 /* How far through the page: a line along the bottom, filling in the
-   page's own direction. */
-.read-progress {
-  position: absolute; left: 0; right: 0; bottom: 0; z-index: 1;
-  height: 3px; pointer-events: none;
+   page's own direction, with the section and the minutes left over it
+   while the bar is up. */
+.read-foot { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; pointer-events: none; }
+.read-left {
+  display: flex; justify-content: space-between; gap: var(--s-3);
+  margin: 0; padding: var(--s-1) var(--gutter) calc(var(--s-1) + env(safe-area-inset-bottom));
+  background: var(--bg); color: var(--muted);
+  font-size: var(--fs-meta); line-height: var(--lh-meta); font-variant-numeric: tabular-nums;
+  transition: transform var(--spring-control-ms, 300ms) var(--spring-control, ease-out), opacity 120ms linear;
 }
+.read-section { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.read-left span:last-child { flex-shrink: 0; }
+.reader.bar-away .read-left { transform: translateY(100%); opacity: 0; }
+.read-progress { height: 3px; background: var(--line); }
 .read-progress span {
   display: block; height: 100%;
   background: var(--accent);
@@ -406,6 +416,7 @@ html.native .reader::before {
 }
 .sheet-grip { display: block; width: 36px; height: 4px; margin: 0 auto var(--s-3); border-radius: var(--r-full); background: var(--line); }
 .sheet-body, .reading-controls { display: flex; flex-direction: column; gap: var(--s-3); }
+.sheet-body { max-height: min(76dvh, 40rem); overflow-y: auto; overscroll-behavior: contain; margin: 0 calc(-1 * var(--s-4)); padding: 0 var(--s-4) var(--s-1); }
 .rc-row { display: flex; align-items: center; gap: var(--s-3); }
 .rc-label { width: 84px; flex-shrink: 0; color: var(--muted); font-size: var(--fs-meta); line-height: var(--lh-meta); }
 .stepper { flex: 1; display: flex; align-items: center; gap: var(--s-2); }
@@ -529,11 +540,6 @@ html.native .reader::before {
   font-size: var(--fs-meta);
 }
 .pill[hidden] { display: none; }
-.bar-link {
-  height: var(--tap); padding: 0 10px;
-  display: inline-flex; align-items: center; gap: var(--s-1);
-  color: var(--muted); text-decoration: none; font-weight: 500;
-}
 .reader-frame { flex: 1; width: 100%; border: 0; background: var(--bg); }
 .app[hidden] { display: none; }
 
@@ -551,11 +557,11 @@ html.native .reader::before {
 }
 
 /* Presses answer on the small-control spring. */
-.card, .btn-primary, .btn-small, .btn-quiet, .icon-btn, .step-btn, .choice, .row, .bar-link {
+.card, .tile, .tile-btn, .btn-primary, .btn-small, .btn-quiet, .icon-btn, .step-btn, .choice, .row {
   transition: transform var(--spring-control-ms, 300ms) var(--spring-control, ease-out), background-color 120ms linear;
   -webkit-tap-highlight-color: transparent;
 }
-.card:active, .btn-primary:active, .btn-small:active, .btn-quiet:active, .icon-btn:active, .step-btn:active:not(:disabled) { transform: scale(0.97); }
+.card:active, .tile:active, .tile-btn:active, .btn-primary:active, .btn-small:active, .btn-quiet:active, .icon-btn:active, .step-btn:active:not(:disabled) { transform: scale(0.97); }
 .choice:active, .row:active { background: var(--bg); }
 .icon-btn:active { background: var(--line); }
 
@@ -617,3 +623,154 @@ html.native .reader::before {
 .news-list li { margin: var(--s-1) 0; line-height: 1.5; }
 .news-list li::marker { color: var(--muted); }
 .update-notes + .row { border-top: 1px solid var(--line); }
+
+/* ---- 0.19.0: the library in sections ---- */
+.section-head {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-3);
+  min-height: 32px; margin: var(--s-2) 0 calc(-1 * var(--s-1));
+}
+.section-head .overline { margin: 0 0 0 var(--s-1); }
+.sort-wrap {
+  position: relative; display: inline-flex; align-items: center; gap: var(--s-1);
+  min-height: var(--tap); padding: 0 var(--s-2); margin: calc((32px - var(--tap)) / 2) calc(-1 * var(--s-2)) calc((32px - var(--tap)) / 2) 0;
+  color: var(--muted); border-radius: var(--r-md); cursor: pointer;
+}
+.sort {
+  appearance: none; -webkit-appearance: none; border: 0; background: transparent;
+  color: var(--muted); font: 500 var(--fs-meta)/var(--lh-meta) var(--sans); cursor: pointer; padding: 0;
+}
+.sort:focus-visible { outline: 0; }
+.sort-wrap:has(.sort:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+.chip-caret { font-size: 11px; opacity: 0.8; }
+.tag-filters { margin-top: var(--s-2); }
+
+.folder-strip {
+  display: flex; gap: var(--s-3); overflow-x: auto; scrollbar-width: none;
+  margin: 0 calc(-1 * var(--gutter)); padding: var(--s-1) var(--gutter) var(--s-2); scroll-padding-inline: var(--gutter);
+  scroll-snap-type: x proximity;
+}
+.folder-strip::-webkit-scrollbar { display: none; }
+.tile {
+  position: relative; flex: 0 0 136px; scroll-snap-align: start;
+  display: flex; flex-direction: column; gap: var(--s-1);
+  padding: var(--s-2); background: var(--surface); color: var(--ink);
+  border: 1px solid var(--line); border-radius: var(--r-lg); cursor: pointer;
+}
+.tile-thumb {
+  display: flex; align-items: center; justify-content: center;
+  height: 88px; margin-bottom: var(--s-1); border-radius: var(--r-sm); overflow: hidden;
+  background: var(--preview); color: var(--muted);
+}
+.tile-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tile-name {
+  font: 600 var(--fs-label)/var(--lh-label) var(--serif);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere;
+}
+.tile-meta { font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--muted); }
+.tile .progress { margin-top: auto; }
+.card-open ~ *, .tile .card-open ~ * { pointer-events: none; }
+.card-open ~ .card-body .card-retry { pointer-events: auto; }
+.card, .tile, .chapter { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+
+/* Picking several: a circle on each card, filled once picked. */
+.pick { display: none; }
+.selecting .pick {
+  display: flex; align-items: center; justify-content: center;
+  position: absolute; z-index: 1; top: var(--s-2); inset-inline-end: var(--s-2);
+  width: 24px; height: 24px; border-radius: var(--r-full);
+  border: 2px solid var(--muted); background: var(--surface);
+  transition: transform var(--spring-control-ms, 300ms) var(--spring-control, ease-out), background-color 120ms linear;
+}
+.selecting .picked .pick { background: var(--accent); border-color: var(--accent); transform: scale(1.08); }
+.selecting .picked .pick::after {
+  content: ""; width: 10px; height: 5px; margin-top: -2px;
+  border: solid var(--accent-ink); border-width: 0 0 2px 2px; transform: rotate(-45deg);
+}
+.selecting .card .card-body { padding-inline-end: var(--s-6); }
+.selecting .picked.card, .selecting .picked.tile { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.selecting .chapter { position: relative; padding-inline-end: var(--s-7); }
+.selecting .chapter .pick { top: 50%; margin-top: -12px; inset-inline-end: var(--s-4); }
+.selecting .picked .chapter { background: var(--bg); }
+.selecting .save-bar { visibility: hidden; }
+.selecting .library, .selecting .screen-body { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+
+.select-head, .select-bar {
+  position: fixed; left: 0; right: 0; z-index: 14;
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-2);
+  background: var(--surface); border-color: var(--line); border-style: solid; border-width: 0;
+}
+.select-head { top: 0; padding: var(--s-2) var(--s-2); padding-top: calc(var(--s-2) + env(safe-area-inset-top)); border-bottom-width: 1px; }
+.select-bar { bottom: 0; padding: var(--s-1) var(--s-2) calc(var(--s-1) + env(safe-area-inset-bottom)); border-top-width: 1px; justify-content: space-around; }
+.select-head[hidden], .select-bar[hidden] { display: none; }
+.select-count { margin: 0; flex: 1; text-align: center; font-weight: 600; }
+.btn-text {
+  min-height: var(--tap); min-width: var(--tap); padding: 0 var(--s-2);
+  border: 0; border-radius: var(--r-md); background: transparent;
+  color: var(--accent); font-weight: 600; cursor: pointer;
+}
+.select-act {
+  flex: 1; max-width: 120px; min-height: 56px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  border: 0; border-radius: var(--r-md); background: transparent; color: var(--accent);
+  font: 500 var(--fs-meta)/var(--lh-meta) var(--sans); cursor: pointer;
+}
+.select-act.danger { color: var(--warn); }
+.select-act:disabled { color: var(--muted); opacity: 0.5; cursor: default; }
+.select-act:active:not(:disabled), .btn-text:active { background: var(--bg); }
+
+/* The library's sheet: over a dimmed library, from the bottom. */
+.menu-catch { position: fixed; inset: 0; z-index: 15; background: var(--scrim); }
+.menu-catch[hidden] { display: none; }
+.menu-sheet { position: fixed; z-index: 16; box-shadow: 0 -8px 32px var(--shadow); }
+.menu-head { display: flex; flex-direction: column; gap: 2px; }
+.menu-head .meta { margin: 0; }
+.menu-title {
+  margin: 0; font: 600 var(--fs-card)/var(--lh-card) var(--serif);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.menu-done { width: 100%; }
+.tile-row { display: flex; gap: var(--s-2); }
+.tile-btn {
+  flex: 1; min-width: 0; min-height: 72px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-1);
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--bg); color: var(--ink); font: 500 var(--fs-meta)/var(--lh-meta) var(--sans); cursor: pointer;
+}
+.tile-btn:disabled { opacity: 0.5; cursor: default; }
+.tile-icon { display: flex; color: var(--accent); }
+.page-controls > .overline { margin: var(--s-2) 0 calc(-1 * var(--s-1)) var(--s-1); }
+.page-controls .group .row { min-height: 48px; }
+.chip.some { border-style: dashed; border-color: var(--accent); }
+.chip-n { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* The reader's contents: h2s, with h3s indented under them. */
+.contents-list { margin: 0; padding: 0; list-style: none; }
+.contents-list li + li { border-top: 1px solid var(--line); }
+.contents-row { min-height: 48px; text-align: start; }
+.contents-row .row-label { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.contents-row.sub { padding-inline-start: var(--s-6); font-size: var(--fs-meta); }
+.contents-row[aria-current] { color: var(--accent); font-weight: 600; box-shadow: inset 3px 0 0 var(--accent); }
+.contents-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* Settings: a short menu of screens. */
+.settings-menu { display: flex; flex-direction: column; gap: var(--s-5); }
+.nav-row .row-value { max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-chev { flex-shrink: 0; color: var(--muted); font-size: 22px; line-height: 1; margin-inline-start: calc(-1 * var(--s-1)); }
+.nav-row[aria-current] { background: var(--bg); }
+.storage-total { margin: 0 0 var(--s-1) var(--s-1); font: 700 var(--fs-title)/var(--lh-title) var(--serif); }
+.settings-section > .section-lead { margin-bottom: var(--s-5); }
+.update-card { border-color: var(--accent); }
+
+/* Desktop: two columns of pages, Settings' menu beside its section. */
+@media (min-width: 900px) {
+  .app { max-width: 64rem; }
+  .library { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; }
+  .library > .wide { grid-column: 1 / -1; }
+  .folder-strip { flex-wrap: wrap; overflow: visible; margin: 0; padding: var(--s-1) 0 var(--s-2); }
+  #settingsView .screen-body > * { margin-left: 0; max-width: 320px; }
+  #sectionView { left: 360px; box-shadow: -1px 0 0 var(--line); z-index: 11; }
+  .select-head, .select-bar { max-width: 64rem; margin: 0 auto; }
+}
+@media (min-width: 900px) {
+  #settingsView .screen-bar { width: 360px; }
+}

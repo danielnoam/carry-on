@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.18.0";
+  const APP_VERSION = "0.19.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -12,6 +12,7 @@
   const READING_KEY = "carryon.reading";
   const FILTER_KEY = "carryon.filter";
   const SEEN_KEY = "carryon.seenVersion";
+  const SORT_KEY = "carryon.sort";
 
   const $ = (id) => document.getElementById(id);
 
@@ -89,8 +90,19 @@
     folder: null,
     // Which pages the library shows: "all", "unread", "finished" or "#tag".
     filter: load(FILTER_KEY, "all"),
-    // What's typed in the library's search field.
+    // What's typed in the library's search field, and whether it's open.
     query: "",
+    searchOpen: false,
+    // The row of tag chips under the status chips.
+    tagsOpen: false,
+    // The library's order: "saved", "read", "length" or "site".
+    sort: load(SORT_KEY, "saved"),
+    // Picking pages to change together: the ids picked, or null.
+    select: null,
+    // The library's sheet: { kind: "page" | "tags" | "folder", page }, or null.
+    menu: null,
+    // Settings' screen up over its menu: "appearance", "saving", "storage", "updates" or "about".
+    section: null,
   };
   paintTheme(state.theme);
 
@@ -165,7 +177,7 @@
   // A save that failed stays in the list with the reason until it's retried
   // or removed: a toast alone is gone before anyone looks back at the phone.
   function failedCard(s) {
-    return el("div", { class: "card saving failed", role: "group", "aria-label": "Couldn't save " + s.site },
+    return el("div", { class: "card saving failed wide", role: "group", "aria-label": "Couldn't save " + s.site },
       el("span", { class: "card-body" },
         el("span", { class: "card-site" }, s.site),
         el("span", { class: "card-title", dir: "auto" }, s.url),
@@ -181,7 +193,7 @@
   }
 
   function savingCard(s) {
-    return el("div", { class: "card saving", role: "group", "aria-label": "Saving " + s.site },
+    return el("div", { class: "card saving wide", role: "group", "aria-label": "Saving " + s.site },
       el("span", { class: "card-body" },
         el("span", { class: "card-site" }, s.site),
         el("span", { class: "card-title", dir: "auto" }, s.url),
@@ -218,32 +230,36 @@
     return p.minutes + " min";
   }
 
+  // Only what needs a look gets a word: missing previews, or images that
+  // load online only. Anything else is ready offline, which goes unsaid.
   function pageCard(p, found) {
     const thumb = thumbUrl(p);
-    const facts = [readingLine(p), formatSize(p.bytes || 0)].join(" · ") + " · ";
+    const facts = [readingLine(p), formatSize(p.bytes || 0)].join(" · ");
     const started = !p.finished && p.at > 0.02;
     const status = p.missing
-      ? el("span", { class: "warn" }, "Text saved · " + p.missing + (p.missing === 1 ? " preview" : " previews") + " missing")
-      : p.mode === "links"
-        ? el("span", null, "Text offline · images online")
-        : el("span", { class: "ok" }, "Offline ready");
+      ? el("span", { class: "warn" }, p.missing + (p.missing === 1 ? " preview" : " previews") + " missing")
+      : p.mode === "links" ? el("span", null, "Images online") : null;
     // The whole card opens the page (a button stretched under everything);
     // Retry sits above it, since a button can't hold another.
     const retry = p.missing && C.platform.native && navigator.onLine
       ? el("button", { class: "card-retry", type: "button", onclick: (e) => retryPreviews(p, e.currentTarget) }, "Retry")
       : null;
-    return el("div", { class: "card" },
-      el("button", { class: "card-open", type: "button", "aria-label": p.title, onclick: () => openPage(p.id) }),
+    return el("div", { class: "card", "data-ids": p.id },
+      el("button", { class: "card-open", type: "button", "aria-label": p.title, onclick: () => tapPages([p.id], () => openPage(p.id)) }),
+      pickMark(),
       thumb ? el("img", { class: "card-thumb", src: thumb, alt: "", loading: "lazy" }) : null,
       el("span", { class: "card-body" },
         el("span", { class: "card-site", dir: "auto" }, p.site, p.folder ? " · " + p.folder : null, ...(p.tags || []).map((t) => el("span", { class: "card-tag" }, " · #" + t))),
         el("span", { class: "card-title", dir: "auto" }, p.title),
         found ? el("span", { class: "card-found", dir: "auto" }, found) : null,
-        el("span", { class: "card-status" }, facts, status, retry ? " · " : null, retry),
+        el("span", { class: "card-status" }, facts, status ? " · " : null, status, retry ? " · " : null, retry),
         started ? el("span", { class: "progress thin", role: "progressbar", "aria-label": "Read so far",
           "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": String(Math.round(p.at * 100)) },
           el("span", { class: "progress-fill", style: "transform: scaleX(" + p.at + ")" })) : null));
   }
+
+  // The circle a card shows while picking pages.
+  const pickMark = () => el("span", { class: "pick", "aria-hidden": "true" });
 
   async function retryPreviews(p, btn) {
     btn.disabled = true;
@@ -354,7 +370,17 @@
     onSearch();
   }
 
-  // ---- Filters ----
+  // Search sits behind its icon; closing it clears what was typed.
+  function toggleSearch(open) {
+    state.searchOpen = open;
+    $("searchBtn").setAttribute("aria-expanded", String(open));
+    $("searchBox").hidden = !open;
+    if (open) { M.arrive($("searchBox"), -8); $("librarySearch").focus(); return; }
+    if (state.query) clearSearch();
+    searchNote("");
+  }
+
+  // ---- Filters and order ----
 
   const unread = (p) => !p.finished && !(p.at > 0.02);
   function shown(p) {
@@ -373,18 +399,73 @@
     renderLibrary();
   }
 
+  // Status first (All, Unread, Finished), then Tags, which opens a row of
+  // its own so a long tag list doesn't push the status chips away.
   function renderFilters() {
-    const box = $("filters");
+    const box = $("filters"), row = $("tagFilters");
+    const tags = allTags();
+    const tagOn = state.filter.startsWith("#");
     box.hidden = !state.pages.length;
+    row.hidden = box.hidden || !tags.length || !(state.tagsOpen || tagOn);
     if (box.hidden) return;
     const chip = (f, label) => el("button", { class: "chip" + (state.filter === f ? " on" : ""), type: "button",
       "aria-pressed": String(state.filter === f), onclick: () => setFilter(state.filter === f && f !== "all" ? "all" : f) }, label);
-    fill(box, chip("all", "All"), chip("unread", "Unread"), chip("finished", "Finished"),
-      ...allTags().map((t) => chip("#" + t, "#" + t)));
+    const tagsChip = tags.length ? el("button", { class: "chip" + (tagOn ? " on" : ""), type: "button",
+      "aria-expanded": String(!row.hidden), "aria-controls": "tagFilters",
+      onclick: () => {
+        if (tagOn) { state.tagsOpen = false; setFilter("all"); return; }
+        state.tagsOpen = !state.tagsOpen;
+        renderFilters();
+      } }, tagOn ? state.filter : "Tags", el("span", { class: "chip-caret", "aria-hidden": "true" }, tagOn ? "×" : "▾")) : null;
+    fill(box, chip("all", "All"), chip("unread", "Unread"), chip("finished", "Finished"), tagsChip);
+    if (!row.hidden) fill(row, ...tags.map((t) => chip("#" + t, "#" + t)));
   }
+
+  const SORTS = [["saved", "Newest saved"], ["read", "Last read"], ["length", "Longest"], ["site", "Site"]];
+  const BY = {
+    saved: (a, b) => (b.savedAt || 0) - (a.savedAt || 0),
+    read: (a, b) => (b.readAt || 0) - (a.readAt || 0) || (b.savedAt || 0) - (a.savedAt || 0),
+    length: (a, b) => (b.minutes || 0) - (a.minutes || 0),
+    site: (a, b) => (a.site || "").localeCompare(b.site || "") || a.title.localeCompare(b.title),
+  };
+  const sorted = (list) => [...list].sort(BY[state.sort] || BY.saved);
+
+  function sortControl() {
+    const select = el("select", { class: "sort", "aria-label": "Order", onchange: (e) => {
+      state.sort = e.target.value;
+      store(SORT_KEY, state.sort);
+      renderLibrary();
+    } }, ...SORTS.map(([v, label]) => el("option", { value: v }, label)));
+    select.value = BY[state.sort] ? state.sort : "saved";
+    const wrap = el("label", { class: "sort-wrap" }, select);
+    wrap.insertAdjacentHTML("afterbegin", '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4"/></svg>');
+    return wrap;
+  }
+
+  const sectionHead = (label, extra) => el("div", { class: "section-head wide" }, el("h2", { class: "overline" }, label), extra || null);
+
+  // The page to carry on with: the one read last that isn't finished.
+  function continuePage() {
+    const going = state.pages.filter((p) => !p.finished && p.at > 0.02);
+    return going.sort((a, b) => (b.readAt || 0) - (a.readAt || 0))[0] || null;
+  }
+
+  // Folders, the one touched last first.
+  function foldersByUse() {
+    const last = (name) => Math.max(...folderPages(name).map((p) => Math.max(p.readAt || 0, p.savedAt || 0)));
+    return allFolders().map((n) => [n, last(n)]).sort((a, b) => b[1] - a[1]).map(([n]) => n);
+  }
+
+  const pageSig = (p) => [p.title, readingLine(p), p.missing, p.thumb, Math.round((p.at || 0) * 50), navigator.onLine, (p.tags || []).join(","), p.folder, p.mode].join("|");
+
+  // The pages the library is showing, for Select all.
+  let onScreen = [];
 
   // Cards are keyed and kept between renders; only ones that weren't there
   // before arrive on a spring, so a re-render never replays the list.
+  // Under All the library is in sections: Continue reading, Folders, then
+  // the pages in no folder. A status or tag filter, or a search, lists the
+  // pages themselves.
   let firstRender = true;
   function renderLibrary() {
     const root = $("library");
@@ -394,9 +475,9 @@
     if (n && state.filter.startsWith("#")
       && !allTags().some((t) => sameTag(t, state.filter.slice(1)))) { state.filter = "all"; store(FILTER_KEY, "all"); }
     renderFilters();
-    const allOffline = state.pages.every((p) => !p.missing && p.mode !== "links");
-    $("libraryMeta").textContent = n ? pagesLine(n) + (allOffline ? " · all readable offline" : "") : "Nothing saved yet";
-    $("searchBox").hidden = !n;
+    $("libraryMeta").textContent = n ? pagesLine(n) : "Nothing saved yet";
+    $("searchBtn").hidden = $("selectBtn").hidden = !n;
+    if (!n && state.searchOpen) toggleSearch(false);
     const nodes = [];
     const fresh = [];
     // A kept card whose content changed (reading progress, a renamed page)
@@ -411,46 +492,52 @@
     for (const s of state.saving) keep((s.error ? "f:" : "s:") + s.key, () => (s.error ? failedCard(s) : savingCard(s)));
     const ts = terms();
     const found = new Map();
-    const pages = state.pages.filter(shown).filter((p) => {
+    const pages = sorted(state.pages.filter(shown).filter((p) => {
       if (!ts.length) return true;
       if (metaMatch(p, ts)) return found.set(p.id, null), true;
       const s = snippet(p, ts);
       if (s) return found.set(p.id, s), true;
       return false;
-    });
-    // Under All, a folder's pages are one card, where its newest page would
-    // be; a search lists the pages themselves.
-    const grouped = new Set();
-    for (const p of pages) {
+    }));
+    onScreen = pages;
+    const flat = ts.length || state.filter !== "all";
+    if (!flat) {
+      const going = !state.select && continuePage();
+      if (going) {
+        keep("h:continue", () => sectionHead("Continue reading"));
+        keep("c:" + going.id, () => pageCard(going), pageSig(going));
+      }
+      const folders = foldersByUse();
+      if (folders.length) {
+        keep("h:folders", () => sectionHead("Folders"));
+        keep("folders", () => foldersStrip(folders), folders.map((f) => [f, ...folderPages(f).map((x) => x.id + readingLine(x) + (x.thumb || ""))].join("|")).join("‖"));
+      }
+    }
+    const loose = flat ? pages : pages.filter((p) => !p.folder);
+    if (loose.length) {
+      const label = (ts.length ? "Found" : state.filter === "all" ? (n > loose.length ? "Pages in no folder" : "Pages") : filterName()) + " · " + loose.length;
+      keep("h:pages", () => sectionHead(label, sortControl()), label);
+    }
+    for (const p of loose) {
       if (ts.length) {
         const s = found.get(p.id);
-        keep("q:" + p.id, () => pageCard(p, s), [p.title, readingLine(p), p.missing, p.thumb, s].join("|"));
-        continue;
-      }
-      if (p.folder && state.filter === "all") {
-        const k = p.folder.toLocaleLowerCase();
-        if (grouped.has(k)) continue;
-        grouped.add(k);
-        const list = folderPages(p.folder);
-        keep("d:" + k, () => folderCard(p.folder), [p.folder, ...list.map((x) => x.id + readingLine(x) + (x.thumb || ""))].join("|"));
-        continue;
-      }
-      keep("p:" + p.id, () => pageCard(p), [p.title, readingLine(p), p.missing, p.thumb, Math.round((p.at || 0) * 50), navigator.onLine, (p.tags || []).join(","), p.folder].join("|"));
+        keep("q:" + p.id, () => pageCard(p, s), [pageSig(p), s].join("|"));
+      } else keep("p:" + p.id, () => pageCard(p), pageSig(p));
     }
     if (n && !pages.length && ts.length) {
-      keep("none:q", () => el("div", { class: "empty" },
+      keep("none:q", () => el("div", { class: "empty wide" },
         el("p", { class: "empty-text", "data-q": "" }),
         el("button", { class: "btn-quiet", type: "button", onclick: clearSearch }, "Clear search")));
       nodes[nodes.length - 1].querySelector("[data-q]").textContent = searching ? "Searching…"
         : "Nothing matches “" + state.query.trim() + "”" + (state.filter === "all" ? "." : " in " + filterName() + ".");
     } else if (n && !pages.length) {
-      keep("none:" + state.filter, () => el("div", { class: "empty" },
+      keep("none:" + state.filter, () => el("div", { class: "empty wide" },
         el("p", { class: "empty-text" }, state.filter === "unread" ? "You've started everything you saved."
           : state.filter === "finished" ? "Nothing finished yet." : "No pages tagged " + state.filter + "."),
         el("button", { class: "btn-quiet", type: "button", onclick: () => setFilter("all") }, "Show all")));
     }
     if (!n && !state.saving.length) {
-      keep("empty", () => el("div", { class: "empty" },
+      keep("empty", () => el("div", { class: "empty wide" },
         el("h2", { class: "empty-title" }, "Pages you take with you"),
         el("p", { class: "empty-text" },
           "Share a page to Carry-on from your browser, or paste its link below. It stays readable with no connection, with a link back to the original.")));
@@ -459,6 +546,7 @@
     for (const s of state.saving) updateSavingCard(s);
     if (!firstRender) fresh.forEach((node) => M.arrive(node));
     firstRender = false;
+    paintPicks();
   }
 
   // The first link in whatever was pasted or shared ("Read this:
@@ -567,9 +655,20 @@
 
   // The reader can open over a folder's screen; everything else is over the library.
   const below = (screen) => ((screen.id === "readerView" || screen.id === "batchView") && state.folder ? $("folderView")
+    : screen.id === "sectionView" ? $("settingsView")
+    : screen.id === "newsView" && state.section ? $("sectionView")
     : screen.id === "newsView" && state.settings ? $("settingsView") : $("libraryView"));
 
+  // Wide enough for Settings' menu to stay beside the section it opened.
+  const wide = window.matchMedia ? matchMedia("(min-width: 900px)") : { matches: false };
+
   function pushScreen(screen) {
+    if (screen.id === "sectionView" && wide.matches) {
+      screen.dataset.beside = "1";
+      screen.hidden = false;
+      return M.arrive(screen, 0);
+    }
+    delete screen.dataset.beside;
     const under = below(screen);
     under.inert = true;
     screen.hidden = false;
@@ -578,6 +677,7 @@
   }
 
   function popScreen(screen) {
+    if (screen.dataset.beside) return M.leave(screen).then(() => { screen.hidden = true; });
     const under = below(screen);
     under.inert = false;
     M.under(under, false);
@@ -606,17 +706,39 @@
 
   function show(p, html) {
     state.open = p;
-    $("readerOriginal").href = p.url;
+    p.readAt = Date.now();
+    clearTimeout(positionTimer);
+    positionTimer = setTimeout(savePositions, 1500);
     showOffline();
     $("readProgress").dir = p.dir || "ltr";
+    $("readerContents").hidden = true;
+    $("readerView").classList.remove("bar-away");
     readerScrolled(p.at || 0, 0);
     return C.reader.open($("readerFrame"), html, p, {
       at: p.at || 0, next: endLink(p),
       onPosition: (f) => notePosition(p, f),
       onScroll: readerScrolled,
       onImage: openImage,
+      onTap: toggleBar,
       top: () => $("readerView").querySelector(".reader-bar").offsetHeight,
-    });
+    }).then(() => { $("readerContents").hidden = C.reader.headings().length < 2; });
+  }
+
+  // A tap on the text hides the bar for reading, or brings it back.
+  function toggleBar() {
+    if (state.sheet) return;
+    const away = !$("readerView").classList.contains("bar-away");
+    $("readerView").classList.toggle("bar-away", away);
+    if (!away) readerFoot(C.reader.position());
+  }
+
+  // Under the bar's line along the bottom: the section being read and the
+  // minutes left, shown with the bar.
+  function readerFoot(at) {
+    const p = state.open;
+    if (!p) return;
+    $("readLeft").textContent = at >= 0.995 ? "End" : Math.max(1, Math.ceil((p.minutes || 1) * (1 - at))) + " min left";
+    $("readSection").textContent = C.reader.section();
   }
 
   // The bar along the bottom fills as the page is read. The top bar slides
@@ -625,6 +747,7 @@
   let lastY = 0;
   function readerScrolled(at, y) {
     $("readProgress").firstElementChild.style.transform = "scaleX(" + at + ")";
+    if (!$("readerView").classList.contains("bar-away")) readerFoot(at);
     const bar = $("readerView").querySelector(".reader-bar").offsetHeight;
     const dy = y - lastY;
     let away = $("readerView").classList.contains("bar-away");
@@ -634,6 +757,24 @@
     else return;
     lastY = y;
     $("readerView").classList.toggle("bar-away", away);
+    if (!away) readerFoot(at);
+  }
+
+  // The page's h2 and h3 headings; a tap goes there.
+  function contentsList() {
+    const now = C.reader.section();
+    let current = -1;
+    const list = C.reader.headings();
+    list.forEach((h, i) => { if (h.text === now) current = i; });
+    const rows = list.map((h, i) => {
+      const b = el("button", { class: "row contents-row" + (h.level === 3 ? " sub" : ""), type: "button",
+        onclick: () => { history.back(); C.reader.jumpTo(i); } }, el("span", { class: "row-label", dir: "auto" }, h.text));
+      if (i === current) b.setAttribute("aria-current", "location");
+      return el("li", null, b);
+    });
+    const nav = el("nav", { class: "contents", "aria-label": "Contents" }, el("ol", { class: "group contents-list" }, ...rows));
+    if (current > 0) requestAnimationFrame(() => { const r = nav.querySelector("[aria-current]"); if (r) r.scrollIntoView({ block: "center" }); });
+    return nav;
   }
 
   // What the end of a page offers: the next page in its folder, else the
@@ -692,17 +833,6 @@
     if (state.image) { state.image = false; $("imageViewer").hidden = true; $("viewerImg").removeAttribute("src"); }
     state.open = null;
     popScreen($("readerView")).then(() => { if (!state.open) C.reader.close(); });
-  }
-
-  async function deleteOpen() {
-    const p = state.open;
-    if (!p || !confirm("Delete “" + p.title + "” from this phone?")) return;
-    await C.store.removePage(p.id);
-    state.pages = state.pages.filter((x) => x.id !== p.id);
-    await C.store.writeIndex(state.pages);
-    history.go(state.sheet ? -2 : -1);
-    renderLibrary();
-    toast("Deleted");
   }
 
   // The same controls in the Aa sheet and in Settings. A change is applied
@@ -768,7 +898,8 @@
 
   const SHEETS = {
     reading: { button: "readerAa", label: "Text and theme", build: () => readingControls(true) },
-    page: { button: "readerMore", label: "This page", build: () => pageControls(state.open) },
+    page: { button: "readerMore", label: "This page", build: () => pageSheet(state.open, "reader") },
+    contents: { button: "readerContents", label: "Contents", build: contentsList },
   };
 
   function openSheet(kind, fromHistory) {
@@ -784,8 +915,9 @@
     $("sheetCatch").hidden = false;
     $("readingSheet").hidden = false;
     M.rise($("readingSheet"));
-    const first = $("readingSheet").querySelector("button:not(:disabled), input:checked");
-    if (first && kind === "reading") first.focus({ preventScroll: true });
+    const first = kind === "contents" ? $("readingSheet").querySelector("[aria-current]") || $("readingSheet").querySelector("button")
+      : $("readingSheet").querySelector("button:not(:disabled), input:checked");
+    if (first && kind !== "page") first.focus({ preventScroll: true });
   }
 
   function closeSheet(now) {
@@ -1020,27 +1152,29 @@
     if (state.folder) renderFolder();
   }
 
-  function folderCard(name) {
+  // A folder in the library's Folders row: its first picture, its name and
+  // how much of it is read.
+  function folderTile(name) {
     const list = folderPages(name);
     const done = list.filter((p) => p.finished).length;
-    const next = folderNext(list);
     const withThumb = list.find((p) => thumbUrl(p));
     const thumb = withThumb ? thumbUrl(withThumb) : null;
-    const line = done === list.length ? "All read"
-      : (next.at > 0.02 ? "Continue: " : done ? "Next: " : "Start: ") + next.title;
-    return el("div", { class: "card folder-card" },
+    const tile = el("div", { class: "tile", role: "listitem", "data-ids": list.map((p) => p.id).join(",") },
       el("button", { class: "card-open", type: "button", "aria-label": name + ", folder, " + list.length + " pages, " + done + " read",
-        onclick: () => openFolder(name) }),
-      el("span", { class: "card-thumb stack" + (thumb ? "" : " blank"), "aria-hidden": "true" },
+        onclick: () => tapPages(list.map((p) => p.id), () => openFolder(name)) }),
+      pickMark(),
+      el("span", { class: "tile-thumb" + (thumb ? "" : " blank"), "aria-hidden": "true" },
         thumb ? el("img", { src: thumb, alt: "", loading: "lazy" }) : null),
-      el("span", { class: "card-body" },
-        el("span", { class: "card-site" }, "Folder · " + countLine(list.length) + " · " + done + " read · " + formatSize(sizeOf(list))),
-        el("span", { class: "card-title", dir: "auto" }, name),
-        el("span", { class: "card-status", dir: "auto" }, line),
-        done && done < list.length ? el("span", { class: "progress thin", role: "progressbar", "aria-label": "Pages read",
-          "aria-valuemin": "0", "aria-valuemax": String(list.length), "aria-valuenow": String(done) },
-          el("span", { class: "progress-fill", style: "transform: scaleX(" + done / list.length + ")" })) : null));
+      el("span", { class: "tile-name", dir: "auto" }, name),
+      el("span", { class: "tile-meta" }, (done === list.length ? "All read" : done + " of " + list.length + " read") + " · " + formatSize(sizeOf(list))),
+      el("span", { class: "progress thin", "aria-hidden": "true" },
+        el("span", { class: "progress-fill", style: "transform: scaleX(" + done / list.length + ")" })));
+    if (!thumb) tile.querySelector(".tile-thumb").innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
+    return tile;
   }
+
+  // Scrolls sideways at phone width, wraps on a desktop.
+  const foldersStrip = (names) => el("div", { class: "folder-strip wide", role: "list", "aria-label": "Folders" }, ...names.map(folderTile));
 
   function openFolder(name, fromHistory) {
     if (state.folder && sameTag(state.folder, name)) return;
@@ -1073,21 +1207,25 @@
     const next = folderNext(list);
     const done = list.filter((p) => p.finished).length;
     const go = done === list.length ? "Read again from the start" : (next.at > 0.02 || done ? "Continue: " : "Start: ") + next.title;
+    const picking = !!state.select;
+    if (picking) folderMode = "";
     fill($("folderBody"),
       el("p", { class: "meta folder-meta" }, countLine(list.length) + " · " + done + " read · " + formatSize(sizeOf(list))),
-      el("button", { class: "btn-primary folder-go", type: "button", dir: "auto",
+      picking ? null : el("button", { class: "btn-primary folder-go", type: "button", dir: "auto",
         onclick: () => openPage(done === list.length ? list[0].id : next.id) }, go),
       el("ol", { class: "group folder-list" + (folderMode === "order" ? " ordering" : "") },
-        ...list.map((p, i) => el("li", { "data-id": p.id },
-          el("button", { class: "row chapter" + (p === next && done < list.length ? " now" : ""), type: "button", onclick: () => openPage(p.id) },
+        ...list.map((p, i) => el("li", folderMode ? { "data-id": p.id } : { "data-id": p.id, "data-ids": p.id },
+          el("button", { class: "row chapter" + (p === next && done < list.length ? " now" : ""), type: "button", onclick: () => tapPages([p.id], () => openPage(p.id)) },
+            pickMark(),
             el("span", { class: "chapter-n", "aria-hidden": "true" }, String(i + 1)),
             el("span", { class: "choice-text" },
               el("span", { class: "row-label", dir: "auto" }, p.title),
               el("span", { class: "choice-note" + (p.finished ? "" : p.at > 0.02 ? " accent" : "") }, readingLine(p)))),
           folderMode === "order" ? moveButton(p, i, -1, list.length) : null,
           folderMode === "order" ? moveButton(p, i, 1, list.length) : null))),
-      folderMode ? null : followControls(list[list.length - 1]),
-      folderActions(list));
+      folderMode || picking ? null : followControls(list[list.length - 1]),
+      picking ? null : folderActions(list));
+    paintPicks();
   }
 
   const CHEVRON = (d) => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + d + '"/></svg>';
@@ -1139,6 +1277,7 @@
     }
     return el("div", { class: "folder-actions" },
       el("button", { class: "btn-quiet", type: "button", onclick: () => openBatch("", false, state.folder) }, "Add pages"),
+      el("button", { class: "btn-quiet", type: "button", onclick: () => startSelect([]) }, "Select"),
       n > 1 ? el("button", { class: "btn-quiet", type: "button", onclick: mode("order") }, "Reorder") : null,
       el("button", { class: "btn-quiet", type: "button", onclick: renameFolder }, "Rename"),
       el("button", { class: "btn-quiet danger", type: "button", onclick: mode("remove") }, "Remove folder"));
@@ -1169,40 +1308,346 @@
     return list[list.indexOf(p) + step] || null;
   }
 
-  function pageControls(p) {
+  const ICONS = {
+    open: '<path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5zM13 4h5.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H13z"/>',
+    share: '<path d="M12 15V4M8 8l4-4 4 4M5 12v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/>',
+    send: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
+    original: '<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+  };
+  function tileButton(icon, label, onclick) {
+    const b = el("button", { class: "tile-btn", type: "button", onclick }, el("span", { class: "tile-icon", "aria-hidden": "true" }), label);
+    b.firstChild.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICONS[icon] + "</svg>";
+    return b;
+  }
+  const menuRow = (label, onclick, cls) => el("button", { class: "row", type: "button", onclick }, el("span", { class: "row-label" + (cls ? " " + cls : "") }, label));
+
+  // A page's actions in the order they're used: where it goes (open,
+  // share, send, the original), what it is (tags, folder), its series in
+  // the reader, then the rarely used. The reader's ⋯ and the library's
+  // long press are the same sheet.
+  function pageSheet(p, where) {
     const box = el("div", { class: "page-controls" });
+    const inReader = where === "reader";
     const draw = () => {
-      const tags = p.tags || [];
-      const others = allTags().filter((t) => !tags.some((x) => sameTag(x, t)));
-      const input = el("input", { class: "tag-input", type: "text", placeholder: "Add a tag", "aria-label": "Add a tag",
-        maxlength: "32", enterkeyhint: "done", autocapitalize: "off" });
-      const add = (raw) => {
-        const t = cleanTag(raw);
-        if (!t || tags.some((x) => sameTag(x, t))) return;
-        const known = allTags().find((x) => sameTag(x, t));
-        setTags(p, [...tags, known || t]).then(() => { draw(); box.querySelector(".tag-input").focus({ preventScroll: true }); });
-      };
-      input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); add(input.value); } });
+      const series = inReader ? [neighbours(p), neighbour(p, 1) ? null : followControls(p)].filter(Boolean) : [];
       fill(box,
-        el("div", { class: "rc-row tall" }, el("span", { class: "rc-label" }, "Tags"),
-          el("div", { class: "tag-edit" },
-            el("div", { class: "chips" },
-              ...tags.map((t) => el("button", { class: "chip on", type: "button", "aria-label": "Remove tag " + t,
-                onclick: () => setTags(p, tags.filter((x) => x !== t)).then(draw) }, t, el("span", { class: "chip-x", "aria-hidden": "true" }, "×"))),
-              input),
-            others.length ? el("div", { class: "chips" },
-              ...others.slice(0, 12).map((t) => el("button", { class: "chip", type: "button", "aria-label": "Add tag " + t, onclick: () => add(t) }, "+ " + t))) : null)),
+        inReader ? null : el("div", { class: "menu-head" },
+          el("p", { class: "menu-title", dir: "auto" }, p.title),
+          el("p", { class: "meta" }, [p.site, p.folder, readingLine(p), formatSize(p.bytes || 0)].filter(Boolean).join(" · "))),
+        el("div", { class: "tile-row" },
+          inReader ? null : tileButton("open", "Open", () => back().then(() => openPage(p.id))),
+          tileButton("share", "Share", () => shareLink(p)),
+          tileButton("send", "Send", (e) => sendPage(p, e.currentTarget)),
+          tileButton("original", "Original", () => C.platform.openOutside(p.url))),
+        el("h3", { class: "overline" }, "This page"),
+        tagsRow(p, draw),
         folderRow(p, draw),
-        neighbours(p),
-        neighbour(p, 1) ? null : followControls(p),
-        el("div", { class: "share-rows" },
-          el("button", { class: "sheet-row", type: "button", onclick: () => shareLink(p) }, "Share link"),
-          el("button", { class: "sheet-row", type: "button", onclick: (e) => sendPage(p, e.currentTarget) }, "Send as a file")),
-        fullImagesRow(p),
-        el("button", { class: "sheet-row danger", type: "button", onclick: deleteOpen }, "Delete this page"));
+        series.length ? el("h3", { class: "overline" }, "Series") : null,
+        ...series,
+        el("h3", { class: "overline" }, "More"),
+        el("div", { class: "group" },
+          menuRow(p.finished ? "Mark as unread" : "Mark as read", () => markRead([p], !p.finished).then(draw)),
+          inReader ? null : menuRow("Select", () => back().then(() => startSelect([p.id]))),
+          fullImagesRow(p),
+          menuRow("Delete this page", () => deletePage(p, where), "warn")));
     };
     draw();
     return box;
+  }
+
+  function tagsRow(p, redraw) {
+    const tags = p.tags || [];
+    const others = allTags().filter((t) => !tags.some((x) => sameTag(x, t)));
+    const input = el("input", { class: "tag-input", type: "text", placeholder: "Add a tag", "aria-label": "Add a tag",
+      maxlength: "32", enterkeyhint: "done", autocapitalize: "off" });
+    const refocus = () => { const i = document.querySelector(".sheet:not([hidden]) .tag-input"); if (i) i.focus({ preventScroll: true }); };
+    const add = (raw) => {
+      const t = cleanTag(raw);
+      if (!t || tags.some((x) => sameTag(x, t))) return;
+      const known = allTags().find((x) => sameTag(x, t));
+      setTags(p, [...tags, known || t]).then(() => { redraw(); refocus(); });
+    };
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); add(input.value); } });
+    return el("div", { class: "rc-row tall" }, el("span", { class: "rc-label" }, "Tags"),
+      el("div", { class: "tag-edit" },
+        el("div", { class: "chips" },
+          ...tags.map((t) => el("button", { class: "chip on", type: "button", "aria-label": "Remove tag " + t,
+            onclick: () => setTags(p, tags.filter((x) => x !== t)).then(redraw) }, t, el("span", { class: "chip-x", "aria-hidden": "true" }, "×"))),
+          input),
+        others.length ? el("div", { class: "chips" },
+          ...others.slice(0, 12).map((t) => el("button", { class: "chip", type: "button", "aria-label": "Add tag " + t, onclick: () => add(t) }, "+ " + t))) : null));
+  }
+
+  // From the reader, back out of it; from the library's sheet, back to the
+  // library (or out of a folder this emptied).
+  async function deletePage(p, where) {
+    if (!confirm("Delete “" + p.title + "” from this phone?")) return;
+    await C.store.removePage(p.id);
+    state.pages = state.pages.filter((x) => x.id !== p.id);
+    await C.store.writeIndex(state.pages);
+    if (where === "reader") history.go(state.sheet ? -2 : -1);
+    else await back(andFolder(1));
+    renderLibrary();
+    if (state.folder) renderFolder();
+    toast("Deleted");
+  }
+
+  // ---- Picking several ----
+  // "Select" (or a long press on a folder) turns taps into picks; the bar
+  // along the bottom then tags, moves, marks or deletes every picked page
+  // at once. A history entry, so back leaves it.
+
+  const picked = () => state.pages.filter((p) => state.select && state.select.has(p.id));
+
+  // A tap on a card or a folder: opens it, or picks it while picking.
+  function tapPages(ids, open) {
+    if (!state.select) { open(); return; }
+    const all = ids.every((id) => state.select.has(id));
+    for (const id of ids) all ? state.select.delete(id) : state.select.add(id);
+    paintPicks();
+  }
+
+  function startSelect(ids, fromHistory) {
+    if (state.select) return;
+    state.select = new Set(ids || []);
+    if (!fromHistory) history.pushState({ view: "select", folder: state.folder || undefined }, "");
+    $("selectHead").hidden = false;
+    $("selectBar").hidden = false;
+    M.arrive($("selectHead"), -8);
+    M.arrive($("selectBar"), 16);
+    if (state.folder) renderFolder(); else renderLibrary();
+    paintPicks();
+    $("selectCancel").focus({ preventScroll: true });
+  }
+
+  function endSelect() {
+    if (!state.select) return;
+    state.select = null;
+    $("selectHead").hidden = true;
+    $("selectBar").hidden = true;
+    renderLibrary();
+    if (state.folder) renderFolder();
+  }
+
+  // Picks are painted onto the cards already there, so picking never
+  // rebuilds the list or moves focus.
+  function paintPicks() {
+    const on = !!state.select;
+    document.body.classList.toggle("selecting", on);
+    for (const node of document.querySelectorAll("[data-ids]")) {
+      const ids = node.dataset.ids.split(",");
+      const isPicked = on && ids.every((id) => state.select.has(id));
+      node.classList.toggle("picked", isPicked);
+      const open = node.querySelector("button");
+      if (on) open.setAttribute("aria-pressed", String(isPicked)); else open.removeAttribute("aria-pressed");
+    }
+    if (!on) return;
+    const list = picked();
+    const scope = state.folder ? folderPages(state.folder) : onScreen;
+    $("selectCount").textContent = list.length ? countLine(list.length) + " picked" : "Pick pages";
+    $("selectAll").textContent = scope.length && scope.every((p) => state.select.has(p.id)) ? "Pick none" : "Select all";
+    $("selReadLabel").textContent = list.length && list.every((p) => p.finished) ? "Mark unread" : "Mark read";
+    for (const id of ["selTags", "selFolder", "selRead", "selDelete"]) $(id).disabled = !list.length;
+  }
+
+  function selectAll() {
+    const scope = state.folder ? folderPages(state.folder) : onScreen;
+    const all = scope.every((p) => state.select.has(p.id));
+    for (const p of scope) all ? state.select.delete(p.id) : state.select.add(p.id);
+    paintPicks();
+  }
+
+  async function markRead(list, read) {
+    for (const p of list) {
+      p.finished = read;
+      if (!read) p.at = 0;
+    }
+    await C.store.writeIndex(state.pages);
+    renderLibrary();
+    if (state.folder) renderFolder();
+  }
+
+  // Back through `n` history entries; resolves once there.
+  const back = (n = 1) => new Promise((resolve) => {
+    addEventListener("popstate", () => resolve(), { once: true });
+    history.go(-n);
+  });
+
+  // How far back a change that empties the open folder has to go.
+  const andFolder = (n) => n + (state.folder && !folderPages(state.folder).length ? 1 : 0);
+
+  async function readPicked() {
+    const list = picked();
+    if (!list.length) return;
+    const read = !list.every((p) => p.finished);
+    await markRead(list, read);
+    await back();
+    toast("Marked " + countLine(list.length) + (read ? " as read" : " as unread"));
+  }
+
+  async function deletePicked() {
+    const list = picked();
+    if (!list.length || !confirm("Delete " + countLine(list.length) + " from this phone?")) return;
+    for (const p of list) await C.store.removePage(p.id);
+    state.pages = state.pages.filter((p) => !list.includes(p));
+    await C.store.writeIndex(state.pages);
+    await back(andFolder(1));
+    renderLibrary();
+    toast("Deleted " + countLine(list.length));
+  }
+
+  // ---- The library's sheet ----
+  // A page's menu (a long press, or right-click), and the tags and folder
+  // for picked pages. One sheet from the bottom over a dimmed library, in
+  // its own history entry.
+
+  const MENUS = {
+    page: { label: "Page", build: () => pageSheet(state.menu.page, "library") },
+    tags: { label: "Tags", build: tagsSheet },
+    folder: { label: "Folder", build: folderSheet },
+  };
+  let menuUnder = [];
+
+  function openMenu(kind, page) {
+    if (state.menu || !MENUS[kind]) return;
+    state.menu = { kind, page };
+    history.pushState({ view: "menu", kind, page: page ? page.id : undefined, folder: state.folder || undefined,
+      select: state.select ? true : undefined }, "");
+    $("menuBody").replaceChildren(MENUS[kind].build());
+    $("menuSheet").setAttribute("aria-label", MENUS[kind].label);
+    menuUnder = [state.folder ? $("folderView") : $("libraryView"), $("selectHead"), $("selectBar")].filter((n) => !n.inert);
+    menuUnder.forEach((n) => { n.inert = true; });
+    $("menuCatch").hidden = false;
+    $("menuSheet").hidden = false;
+    M.arrive($("menuCatch"), 0);
+    M.rise($("menuSheet"));
+    const first = $("menuSheet").querySelector("button:not(:disabled)");
+    if (first) first.focus({ preventScroll: true });
+  }
+
+  function closeMenu() {
+    if (!state.menu) return;
+    state.menu = null;
+    menuUnder.forEach((n) => { n.inert = false; });
+    menuUnder = [];
+    const sheet = $("menuSheet"), catcher = $("menuCatch");
+    M.leave(catcher).then(() => { if (!state.menu) catcher.hidden = true; });
+    M.sink(sheet).then(() => { if (!state.menu) sheet.hidden = true; });
+  }
+
+  function redrawMenu() {
+    if (state.menu) $("menuBody").replaceChildren(MENUS[state.menu.kind].build());
+  }
+
+  // Tags for every picked page: a tag on all of them is on, one on some
+  // shows how many; a tap puts it on all of them, or takes it off all.
+  function tagsSheet() {
+    const box = el("div", { class: "page-controls" });
+    const draw = () => {
+      const list = picked(), n = list.length;
+      const on = (t) => list.filter((p) => (p.tags || []).some((x) => sameTag(x, t))).length;
+      const write = async (change) => {
+        list.forEach(change);
+        await C.store.writeIndex(state.pages);
+        renderLibrary();
+        if (state.folder) renderFolder();
+        draw();
+      };
+      const add = (raw) => {
+        const t = cleanTag(raw);
+        if (!t) return;
+        const name = allTags().find((x) => sameTag(x, t)) || t;
+        write((p) => { p.tags = withTags(p.tags, [name]); }).then(() => box.querySelector(".tag-input").focus({ preventScroll: true }));
+      };
+      const input = el("input", { class: "tag-input", type: "text", placeholder: "New tag", "aria-label": "New tag",
+        maxlength: "32", enterkeyhint: "done", autocapitalize: "off" });
+      input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); add(input.value); } });
+      const tags = allTags();
+      fill(box,
+        el("h2", { class: "menu-title" }, "Tags for " + countLine(n)),
+        tags.length ? el("div", { class: "chips" }, ...tags.map((t) => {
+          const k = on(t), all = k === n;
+          return el("button", { class: "chip" + (all ? " on" : k ? " some" : ""), type: "button", "aria-pressed": all ? "true" : k ? "mixed" : "false",
+            "aria-label": t + (all ? ", on all, remove" : k ? ", on " + k + " of " + n + ", add to all" : ", add"),
+            onclick: () => (all ? write((p) => { p.tags = (p.tags || []).filter((x) => !sameTag(x, t)); }) : add(t)) },
+          t, k && !all ? el("span", { class: "chip-n" }, k + "/" + n) : null);
+        })) : null,
+        input,
+        el("button", { class: "btn-primary menu-done", type: "button", onclick: () => history.back() }, "Done"));
+    };
+    draw();
+    return box;
+  }
+
+  // Moves every picked page into one folder, keeping their order, or out
+  // of their folders.
+  function folderSheet() {
+    const list = picked(), n = list.length;
+    const move = async (name) => {
+      const target = name && cleanTag(name) ? folderName(name) : null;
+      const now = Date.now();
+      [...list].sort((a, b) => (a.folderAt || a.savedAt || 0) - (b.folderAt || b.savedAt || 0)).forEach((p, i) => {
+        if (!target) { delete p.folder; delete p.folderAt; return; }
+        if (p.folder && sameTag(p.folder, target)) return;
+        p.folder = target;
+        p.folderAt = now + i;
+      });
+      await C.store.writeIndex(state.pages);
+      await back(andFolder(2));
+      renderLibrary();
+      if (state.folder) renderFolder();
+      toast(target ? "Moved " + countLine(n) + " to " + target : "Took " + countLine(n) + " out of their folders");
+    };
+    const input = el("input", { class: "tag-input", type: "text", placeholder: "New folder", "aria-label": "New folder",
+      maxlength: "32", enterkeyhint: "done", autocapitalize: "sentences" });
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter" && cleanTag(input.value)) { e.preventDefault(); move(input.value); } });
+    const folders = allFolders();
+    return el("div", { class: "page-controls" },
+      el("h2", { class: "menu-title" }, "Move " + countLine(n) + " to"),
+      folders.length ? el("div", { class: "chips" }, ...folders.map((f) => el("button", { class: "chip", type: "button", onclick: () => move(f) }, f))) : null,
+      input,
+      list.some((p) => p.folder) ? el("div", { class: "group" },
+        el("button", { class: "row", type: "button", onclick: () => move(null) }, el("span", { class: "row-label" }, "Take out of their folders"))) : null);
+  }
+
+  // A long press (or right-click) on a page opens its menu; on a folder it
+  // starts picking with the folder picked; while picking it picks.
+  function onLongPress(node) {
+    const ids = node.dataset.ids.split(",");
+    if (state.select) { tapPages(ids); return; }
+    if (node.classList.contains("tile")) { startSelect(ids); return; }
+    const p = state.pages.find((x) => x.id === ids[0]);
+    if (p) openMenu("page", p);
+  }
+
+  function longPress(root) {
+    let timer = null, start = null, fired = false;
+    const cancel = () => { clearTimeout(timer); timer = null; };
+    root.addEventListener("pointerdown", (e) => {
+      fired = false;
+      const node = e.button === 0 && e.target.closest("[data-ids]");
+      if (!node || e.target.closest(".card-retry, .move")) return;
+      start = { x: e.clientX, y: e.clientY };
+      cancel();
+      timer = setTimeout(() => {
+        timer = null;
+        fired = true;
+        if (navigator.vibrate) navigator.vibrate(10);
+        onLongPress(node);
+      }, 480);
+    });
+    root.addEventListener("pointermove", (e) => { if (timer && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 10) cancel(); });
+    for (const t of ["pointerup", "pointercancel", "pointerleave"]) root.addEventListener(t, cancel);
+    root.addEventListener("click", (e) => { if (fired) { fired = false; e.preventDefault(); e.stopPropagation(); } }, true);
+    root.addEventListener("contextmenu", (e) => {
+      const node = e.target.closest("[data-ids]");
+      if (!node) return;
+      e.preventDefault();
+      cancel();
+      if (fired) return;
+      fired = true;
+      onLongPress(node);
+    });
   }
 
   // ---- Pages leaving the app, and coming back (backup.js) ----
@@ -1277,6 +1722,7 @@
       toast(/Carry-on|empty/.test(e.message) ? e.message : "Couldn't open that file. Try again.");
     }
     if (state.settings) renderSettings();
+    if (state.section) renderSection();
   }
 
   function backupGroup() {
@@ -1296,14 +1742,16 @@
   // "Save full images" for a page saved with previews or links only.
   function fullImagesRow(p) {
     if (!C.platform.native || p.mode === "full" || !p.images) return null;
-    return el("button", { class: "sheet-row two-line", type: "button", onclick: (e) => saveFullImages(p, e.currentTarget) },
-      "Save full images", el("span", { class: "sheet-note" }, "For maps, diagrams and comics. About 150 KB an image."));
+    return el("button", { class: "row", type: "button", onclick: (e) => saveFullImages(p, e.currentTarget) },
+      el("span", { class: "choice-text" },
+        el("span", { class: "row-label" }, "Save full images"),
+        el("span", { class: "choice-note" }, "For maps, diagrams and comics. About 150 KB an image.")));
   }
 
   async function saveFullImages(p, btn) {
     if (!navigator.onLine) { toast("You're offline. Try again when you're back online."); return; }
     btn.disabled = true;
-    const label = btn.firstChild;
+    const label = btn.querySelector(".row-label");
     label.textContent = "Saving full images…";
     let res;
     try {
@@ -1314,6 +1762,7 @@
     await C.store.writeIndex(state.pages);
     renderLibrary();
     toast(res.failed ? "Saved " + res.got + " full images. " + res.failed + " kept their previews." : "Full images saved.");
+    if (state.menu && state.menu.page === p) redrawMenu();
     if (state.open !== p) return;
     if (state.sheet === "page") $("readingBody").replaceChildren(SHEETS.page.build());
     const html = await C.store.readPage(p.id).catch(() => null);
@@ -1588,18 +2037,18 @@
         check));
     }
     return el("section", { class: "settings-section" },
-      el("h2", { class: "overline" }, g.title),
+      el("h2", { class: "overline" }, g.label),
       list,
       g.footnote ? el("p", { class: "footnote" }, g.footnote) : null);
   }
 
   function readingGroup() {
     return el("section", { class: "settings-section" },
-      el("h2", { class: "overline" }, "Reading"),
+      el("h2", { class: "overline" }, "Reading type"),
       el("div", { class: "group" },
         el("p", { class: "reading-sample" }, "The page is the product. Everything else gets out of its way."),
         readingControls(false)),
-      el("p", { class: "footnote" }, "Also under Aa while you read."));
+      el("p", { class: "footnote" }, "The same as Aa while you read."));
   }
 
   function storageGroup() {
@@ -1608,33 +2057,90 @@
     if (!n) list.append(el("div", { class: "row" }, el("span", { class: "row-label muted" }, "Nothing saved yet")));
     for (const p of [...state.pages].sort((a, b) => (b.bytes || 0) - (a.bytes || 0))) {
       list.append(el("button", { class: "row", type: "button", onclick: () => toLibrary().then(() => openPage(p.id)) },
-        el("span", { class: "row-label" }, p.title),
+        el("span", { class: "row-label", dir: "auto" }, p.title),
         el("span", { class: "row-value" }, formatSize(p.bytes || 0))));
     }
     return el("section", { class: "settings-section" },
-      el("h2", { class: "overline" }, "Storage"),
-      el("p", { class: "section-lead" }, n ? pagesLine(n).replace(" · ", " using ") : "Pages you save show here with their size."),
+      el("p", { class: "storage-total" }, formatSize(totalBytes())),
+      el("p", { class: "section-lead" }, n ? countLine(n) + " on this phone. Delete a page from its menu: press and hold it in the library." : "Pages you save show here with their size."),
+      el("h2", { class: "overline" }, "Pages by size"),
       list);
   }
 
   function aboutGroup() {
     const list = el("div", { class: "group" });
     const releases = C.platform.releasesUrl() || "https://github.com/danielnoam/carry-on/releases/latest";
+    list.append(el("div", { class: "row" }, el("span", { class: "row-label" }, "Version"), el("span", { class: "row-value" }, APP_VERSION)));
     list.append(el("a", { class: "row", href: releases, target: "_blank", rel: "noopener" },
       el("span", { class: "row-label accent" }, "Releases and source"),
       el("span", { class: "row-value", "aria-hidden": "true" }, "↗")));
     return el("section", { class: "settings-section" },
-      el("h2", { class: "overline" }, "About"),
       list,
       el("p", { class: "footnote" }, "Pages stay on this phone. Carry-on collects nothing."));
   }
 
+  // Settings is a short menu; each entry is a screen of its own.
+  const updateOut = () => ["available", "downloading", "ready"].includes(upd.phase) && upd.latest;
+  const SECTIONS = {
+    appearance: { title: "Appearance", build: () => [choiceGroup(SETTINGS[0]), readingGroup()],
+      value: () => SETTINGS[0].options.find((o) => o.value === state.theme).label },
+    saving: { title: "Saving", build: () => [choiceGroup(SETTINGS[1])],
+      value: () => SETTINGS[1].options.find((o) => o.value === SETTINGS[1].get()).label },
+    storage: { title: "Storage and backup", build: () => [storageGroup(), backupGroup()], value: () => formatSize(totalBytes()) },
+    updates: { title: "Updates", build: () => [updatesGroup()], value: () => (updateOut() ? upd.latest + " is out" : "") },
+    about: { title: "About", build: () => [aboutGroup()], value: () => APP_VERSION },
+  };
+
   function renderSettings() {
-    const [appearance, saving] = SETTINGS.map(choiceGroup);
-    $("settingsBody").replaceChildren(appearance, readingGroup(), saving, storageGroup(), backupGroup(), updatesGroup(), aboutGroup());
+    const row = (key) => {
+      const s = SECTIONS[key];
+      const b = el("button", { class: "row nav-row", type: "button", onclick: () => openSection(key) },
+        el("span", { class: "row-label" }, s.title),
+        el("span", { class: "row-value" + (key === "updates" && updateOut() ? " accent" : "") }, s.value()),
+        el("span", { class: "row-chev", "aria-hidden": "true" }, "›"));
+      if (state.section === key) b.setAttribute("aria-current", "page");
+      return b;
+    };
+    const out = updateOut();
+    fill($("settingsBody"),
+      el("div", { class: "settings-menu" },
+        out ? el("div", { class: "group update-card" },
+          el("div", { class: "row update-row out" },
+            el("span", { class: "row-label accent" }, "Carry-on " + upd.latest + " is out"),
+            el("button", { class: "btn-small", type: "button", onclick: () => openSection("updates") }, "View"))) : null,
+        el("div", { class: "group" }, row("appearance"), row("saving")),
+        el("div", { class: "group" }, row("storage")),
+        el("div", { class: "group" }, row("updates"), row("about"))));
   }
 
-  // `at` names a section to scroll to (the update bar opens at Updates).
+  function renderSection() {
+    const s = SECTIONS[state.section];
+    $("sectionTitle").textContent = s.title;
+    fill($("sectionBody"), ...s.build());
+  }
+
+  // On a phone a section is pushed over the menu; on a desktop it sits
+  // beside it, and another entry swaps it in place.
+  function openSection(key, fromHistory) {
+    if (!SECTIONS[key] || state.section === key) return;
+    const swap = !!state.section;
+    state.section = key;
+    renderSection();
+    const entry = { view: "settings", section: key };
+    if (!fromHistory) swap ? history.replaceState(entry, "") : history.pushState(entry, "");
+    renderSettings();
+    $("sectionBody").scrollTop = 0;
+    if (!swap) pushScreen($("sectionView")).then(() => { if (!wide.matches) $("sectionBack").focus(); });
+  }
+
+  function closeSection() {
+    if (!state.section) return;
+    state.section = null;
+    popScreen($("sectionView"));
+    if (state.settings) renderSettings();
+  }
+
+  // `at` names a section to open over the menu (the update bar opens Updates).
   function openSettings(fromHistory, at) {
     if (state.settings) return;
     state.settings = true;
@@ -1642,12 +2148,13 @@
     if (!fromHistory) history.pushState({ view: "settings" }, "");
     $("settingsBody").scrollTop = 0;
     const shown = pushScreen($("settingsView"));
-    if (at && $(at)) $("settingsBody").scrollTop = $(at).offsetTop - $("settingsBody").offsetTop - 8;
-    shown.then(() => $("settingsBack").focus());
+    if (at) openSection(at);
+    else shown.then(() => $("settingsBack").focus());
   }
 
   function closeSettings() {
     if (!state.settings) return;
+    closeSection();
     state.settings = false;
     popScreen($("settingsView"));
   }
@@ -1656,21 +2163,28 @@
 
   function route(s) {
     const view = s && s.view;
+    const inSettings = view === "settings" || (view === "news" && s.over === "settings");
     if (view !== "reader") closeReader();
+    if (view !== "menu") closeMenu();
+    if (view !== "select" && !(view === "menu" && s.select)) endSelect();
     if (view !== "news") closeNews();
-    if (view !== "settings" && !(view === "news" && s.over === "settings")) closeSettings();
+    if (!inSettings) closeSettings();
+    else if (!s.section) closeSection();
     if (view !== "batch") closeBatch();
     if (view === "batch") openBatch("", true, s.folder);
-    const folder = (view === "folder" || view === "reader" || view === "batch") && s.folder;
+    const folder = ["folder", "reader", "batch", "select", "menu"].includes(view) && s.folder;
     if (!folder) closeFolder();
     else if (!state.folder) openFolder(folder, true);
+    if (view === "select") startSelect([], true);
+    // A sheet isn't rebuilt going forward: step back off it instead.
+    if (view === "menu" && !state.menu) history.back();
     if (view === "reader" && (!state.open || state.open.id !== s.page)) openPage(s.page, true);
     if (state.image && !(view === "reader" && s.image)) closeImage();
     if (view === "reader" && s.image && !state.image) history.back();
     if (view === "reader" && s.sheet !== state.sheet) closeSheet();
     if (view === "reader" && s.sheet && state.open && state.open.id === s.page) openSheet(s.sheet, true);
-    if (view === "settings") openSettings(true);
-    if (view === "news") { if (s.over === "settings") openSettings(true); openNews(true); }
+    if (inSettings) { openSettings(true); if (s.section) openSection(s.section, true); }
+    if (view === "news") openNews(true);
   }
 
   // Back to the library from whatever screen is up, through history so the
@@ -1679,17 +2193,33 @@
     if (!(history.state && history.state.view)) return Promise.resolve();
     return new Promise((resolve) => {
       addEventListener("popstate", () => resolve(), { once: true });
-      history.go(-[state.folder, state.open, state.sheet, state.image, state.settings, state.batch, state.news].filter(Boolean).length || -1);
+      history.go(-[state.folder, state.open, state.sheet, state.image, state.settings, state.section, state.batch, state.news, state.select, state.menu].filter(Boolean).length || -1);
     });
   }
 
   $("settingsBtn").addEventListener("click", () => openSettings());
+  $("sectionBack").addEventListener("click", () => history.back());
+  $("searchBtn").addEventListener("click", () => toggleSearch(!state.searchOpen));
+  $("selectBtn").addEventListener("click", () => startSelect([]));
+  $("selectCancel").addEventListener("click", () => history.back());
+  $("selectAll").addEventListener("click", selectAll);
+  $("selTags").addEventListener("click", () => openMenu("tags"));
+  $("selFolder").addEventListener("click", () => openMenu("folder"));
+  $("selRead").addEventListener("click", readPicked);
+  $("selDelete").addEventListener("click", deletePicked);
+  $("menuCatch").addEventListener("click", () => history.back());
+  longPress($("library"));
+  longPress($("folderBody"));
   $("settingsBack").addEventListener("click", () => history.back());
   $("folderBack").addEventListener("click", () => history.back());
   $("batchBack").addEventListener("click", () => history.back());
   $("severalBtn").addEventListener("click", () => openBatch(""));
   $("librarySearch").addEventListener("input", onSearch);
-  $("librarySearch").addEventListener("keydown", (e) => { if (e.key === "Escape" && state.query) { e.preventDefault(); clearSearch(); } });
+  $("librarySearch").addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    e.preventDefault();
+    if (state.query) clearSearch(); else { toggleSearch(false); $("searchBtn").focus(); }
+  });
   $("searchClear").addEventListener("click", () => { clearSearch(); $("librarySearch").focus(); });
   $("newsBack").addEventListener("click", () => history.back());
 
@@ -1718,8 +2248,11 @@
   }
   $("readerMore").addEventListener("click", () => toggleSheet("page"));
   $("readerAa").addEventListener("click", () => toggleSheet("reading"));
+  $("readerContents").addEventListener("click", () => toggleSheet("contents"));
   $("sheetCatch").addEventListener("click", () => history.back());
-  addEventListener("keydown", (e) => { if (e.key === "Escape" && (state.sheet || state.image)) history.back(); });
+  addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !e.defaultPrevented && (state.sheet || state.image || state.menu || state.select)) history.back();
+  });
   addEventListener("popstate", (e) => route(e.state));
   addEventListener("online", () => { showOffline(); renderLibrary(); });
   addEventListener("offline", () => { showOffline(); renderLibrary(); });
@@ -1769,7 +2302,8 @@
   function setUpd(change) {
     Object.assign(upd, change);
     paintUpdateBar();
-    if (state.settings && $("updatesSection")) $("updatesSection").replaceWith(updatesGroup());
+    if (state.settings) renderSettings();
+    if (state.section === "updates" && $("updatesSection")) $("updatesSection").replaceWith(updatesGroup());
   }
 
   async function checkForNewerApp() {
@@ -1841,7 +2375,7 @@
       : "Updated to " + APP_VERSION;
     const btn = $("updateBtn");
     btn.textContent = out ? "View" : "What's new";
-    btn.onclick = () => (out ? openSettings(false, "updatesSection") : openNews());
+    btn.onclick = () => (out ? openSettings(false, "updates") : openNews());
     $("updateClose").onclick = () => {
       barDismissed = key;
       if (fresh) justUpdated = false;
@@ -1888,7 +2422,7 @@
     }
     list.append(el("button", { class: "row", type: "button", onclick: () => openNews() },
       el("span", { class: "row-label accent" }, "What's new"), el("span", { class: "row-value", "aria-hidden": "true" }, "›")));
-    return el("section", { class: "settings-section", id: "updatesSection" }, el("h2", { class: "overline" }, "Updates"), list);
+    return el("section", { class: "settings-section", id: "updatesSection" }, list);
   }
 
   // ---- What's new ----
@@ -1938,7 +2472,7 @@
     if (state.news) return;
     state.news = true;
     const over = state.settings ? "settings" : undefined;
-    if (!fromHistory) history.pushState({ view: "news", over }, "");
+    if (!fromHistory) history.pushState({ view: "news", over, section: state.section || undefined }, "");
     justUpdated = false;
     paintUpdateBar();
     $("newsBody").replaceChildren(el("p", { class: "meta" }, "Loading…"));

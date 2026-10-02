@@ -17,7 +17,9 @@
   let frame = null, doc = null, scrollTimer = null, scrollFrame = 0, topSpace = null;
   // The "Next" link this file adds at the end of a page in a folder; only
   // that element (not a look-alike in the page) moves on.
-  let nextLink = null, onNext = null, onImage = null;
+  let nextLink = null, onNext = null, onImage = null, onTap = null;
+  // The page's h2 and h3 headings, found once it's shown.
+  let heads = [];
   // A page saved with full images already has them: nothing to swap in.
   let savedFull = false;
   // Each missing image's placeholder, which sits before the image's link
@@ -140,7 +142,11 @@
       return;
     }
     const a = e.target.closest && e.target.closest("a[href]");
-    if (!a) return;
+    if (!a) {
+      const sel = doc.getSelection();
+      if (onTap && (!sel || sel.isCollapsed) && !(e.target.closest && e.target.closest("button, summary, input, label"))) onTap();
+      return;
+    }
     e.preventDefault();
     if (a === nextLink) { onNext(); return; }
     const href = a.getAttribute("href");
@@ -163,6 +169,31 @@
     return room <= 0 ? 1 : Math.min(1, Math.max(0, w.scrollY / room));
   }
 
+  const clean = (h) => h.textContent.replace(/\s+/g, " ").trim();
+
+  function headings() {
+    return heads.map((h) => ({ level: h.tagName === "H3" ? 3 : 2, text: clean(h) }));
+  }
+
+  // The heading of the part being read: the last one above the bar's edge.
+  function section() {
+    let cur = null;
+    const edge = (topSpace ? topSpace() : 0) + 24;
+    for (const h of heads) {
+      if (h.getBoundingClientRect().top > edge) break;
+      cur = h;
+    }
+    return cur ? clean(cur) : "";
+  }
+
+  // Straight to a heading, just under the bar.
+  function jumpTo(i) {
+    const h = heads[i];
+    if (!h || !frame) return;
+    const w = frame.contentWindow;
+    w.scrollTo(0, h.getBoundingClientRect().top + w.scrollY - (topSpace ? topSpace() : 0) - 8);
+  }
+
   // Room at the top of the page for the reader bar, which floats over it.
   function applyTop() {
     if (doc && topSpace) doc.documentElement.style.setProperty("--co-top", topSpace() + "px");
@@ -174,9 +205,11 @@
   // `next` ({ over, title, go }) adds a link to the next page at the end;
   // `top` () gives the height the bar covers; onImage(info) opens a tapped
   // image.
-  function open(iframe, html, meta, { at = 0, onPosition, onScroll, next, top, onImage: image } = {}) {
+  function open(iframe, html, meta, { at = 0, onPosition, onScroll, next, top, onImage: image, onTap: tap } = {}) {
     frame = iframe;
     onImage = image || null;
+    onTap = tap || null;
+    heads = [];
     topSpace = top || null;
     savedFull = meta.mode === "full";
     doc = null;
@@ -205,6 +238,7 @@
           nextLink.append(over, title);
           doc.body.append(nextLink);
         }
+        heads = [...doc.body.querySelectorAll("h2, h3")].filter((h) => clean(h));
         doc.addEventListener("click", onClick);
         iframe.contentWindow.addEventListener("scroll", () => {
           if (onScroll && !scrollFrame) {
@@ -241,6 +275,8 @@
     doc = null;
     topSpace = null;
     onImage = null;
+    onTap = null;
+    heads = [];
     nextLink = null;
     onNext = null;
   }
@@ -249,5 +285,5 @@
   addEventListener("resize", applyTop);
   addEventListener("offline", applyConnection);
 
-  C.reader = { open, close, position, applyTheme, applyConnection, srcdoc, CSP };
+  C.reader = { open, close, position, headings, section, jumpTo, applyTheme, applyConnection, srcdoc, CSP };
 })();

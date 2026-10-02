@@ -29,6 +29,7 @@
       images: num(m.images), missing: num(m.missing), bytes: num(m.bytes),
       at: Math.min(1, Math.max(0, num(m.at))), finished: m.finished === true,
     };
+    if (num(m.readAt)) out.readAt = num(m.readAt);
     if (typeof m.next === "string") out.next = httpUrl(m.next);
     if (httpUrl(m.requested)) out.requested = httpUrl(m.requested);
     if (typeof m.thumb === "string" && (LOCAL.test(m.thumb) || httpUrl(m.thumb))) out.thumb = m.thumb;
