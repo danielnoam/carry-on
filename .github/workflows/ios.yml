@@ -26,6 +26,8 @@ concurrency:
 jobs:
   ipa:
     runs-on: macos-15
+    env:
+      HAS_SIGNING_KEY: ${{ secrets.ANDROID_KEYSTORE_B64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -86,9 +88,12 @@ jobs:
 
       # The Android workflow creates the release; this waits for it rather than
       # racing it, since whichever created it first would leave the other's
-      # "already released" check skipping its own upload.
+      # "already released" check skipping its own upload. Android publishes
+      # only with the signing secrets, so without them there is no release to
+      # wait for, and waiting would burn 20 Mac minutes (billed 10x on a
+      # private repo) before failing.
       - name: Attach to the release
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && env.HAS_SIGNING_KEY == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           V: ${{ steps.v.outputs.version }}
