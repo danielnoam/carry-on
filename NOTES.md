@@ -3,6 +3,12 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **The core works on a phone (2 Oct 2026).** Daniel saved Wikipedia
+  and ynet on the Android build and shared pages into the app from
+  Chrome, so the on-device fetch (CapacitorHttp, Readability,
+  `Filesystem.downloadFile`) and the share target are proven. Pages that
+  build themselves with JavaScript still fail; that's its own TODO item.
+
 - **Updates live in Settings; the bar only points there (0.11.0).** One
   `upd` state (phase, latest, notes, progress, the downloaded APK) drives
   both Settings' Updates section and the library's bar, so a download
