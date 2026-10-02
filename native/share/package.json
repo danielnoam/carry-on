@@ -2,7 +2,7 @@
   "name": "carryon-share",
   "version": "1.0.0",
   "private": true,
-  "description": "Carry-on's Android share target, as a local Capacitor plugin (the same shape as LifeLog's native/widgets). No JavaScript: the app calls it as Capacitor.Plugins.ShareTarget.",
+  "description": "Carry-on's Android share target and page renderer, as a local Capacitor plugin (the same shape as LifeLog's native/widgets). No JavaScript: the app calls them as Capacitor.Plugins.ShareTarget and Capacitor.Plugins.PageRender.",
   "capacitor": {
     "android": {
       "src": "android"

@@ -115,7 +115,8 @@ Source Serif 4 and Instrument Sans (Now).
 - **Saving card (Now):** a 12 px ring turning (accent arc on the line
   colour) before the status, a bar that sweeps while the page downloads
   and fills as images land, and "Getting the page · 12 s" once it passes
-  five seconds. Reduced motion: both breathe instead.
+  five seconds. A page that builds itself says "Letting the page draw
+  itself" while it's drawn. Reduced motion: both breathe instead.
 - **Save next (Now):** "Save next" with 1, 5 and 10 as chips, in ⋯ and
   at the end of a folder's list, when the last page has a next link.
 - **Updates (Now):** a Settings section: "This version", a status row

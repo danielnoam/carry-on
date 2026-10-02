@@ -9,6 +9,20 @@ bold title and its version so a search finds it.
   `Filesystem.downloadFile`) and the share target are proven. Pages that
   build themselves with JavaScript still fail; that's its own TODO item.
 
+- **Script-built pages are drawn in a hidden WebView (0.12.0).** When
+  Readability finds under 250 characters, or the title is a browser
+  check, save.js asks native/share's PageRender plugin to draw the page:
+  a second WebView behind the app's own (alpha 0, so it never takes a
+  touch), scripts and DOM storage on, images off, no Capacitor bridge, no
+  JavaScript interfaces, no file access, http(s) navigation only. It
+  waits for the body text to reach 500 characters and hold still for two
+  polls 0.7 s apart, or 20 s, then hands back `outerHTML`, which goes
+  through the same Readability and cleaning as any page, so the saved
+  copy keeps no scripts. It runs only after a plain fetch fails, because
+  drawing costs seconds and data the fetch doesn't. Not on iOS: there
+  the Safari share extension's preprocessing file is the planned route.
+  The e2e test mocks the plugin; the Java has only run on Daniel's phone.
+
 - **Updates live in Settings; the bar only points there (0.11.0).** One
   `upd` state (phase, latest, notes, progress, the downloaded APK) drives
   both Settings' Updates section and the library's bar, so a download

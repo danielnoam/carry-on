@@ -96,6 +96,21 @@
     return { status: res.status, url: res.url || url, text: await res.text() };
   }
 
+  // A page that builds itself with JavaScript, drawn in a hidden WebView by
+  // native/share's PageRender plugin: { text, url } of the HTML it ended up
+  // with. null where there's no such plugin (iOS for now, a browser) or the
+  // page never drew.
+  async function render(url) {
+    const R = plugin("PageRender");
+    if (!R) return null;
+    try {
+      const res = await deadline(R.render({ url, timeoutMs: 20000 }), 30000);
+      return res && res.html ? { text: res.html, url: res.url || url } : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   // Downloads a file (an image preview, a video thumbnail) straight to disk
   // in the app's data folder, natively: no CORS, and the bytes never cross
   // the JavaScript bridge as base64. Resolves to a URL the WebView can load.
@@ -181,6 +196,8 @@
     // CORS (a browser).
     get canFetchPages() { return !!plugin("CapacitorHttp"); },
     fetchText,
+    render,
+    get canRender() { return !!plugin("PageRender"); },
     downloadTo,
     openOutside,
     saveAndShare,
