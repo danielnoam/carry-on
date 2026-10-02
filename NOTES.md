@@ -18,7 +18,7 @@ bold title and its version so a search finds it.
   picked file through `Blob.slice` from its central directory. So a
   library of hundreds of megabytes is never held in memory or sent across
   the bridge whole. A zip re-made with a computer's own tool (deflated)
-  still restores where `DecompressionStream` exists. Sync (0.23.0)
+  still restores where `DecompressionStream` exists. Sync (0.24.0)
   reuses this format.
 - **Restore never trusts the file (0.18.0).** Index entries go through
   `backup.cleanMeta`, which keeps only the fields Carry-on writes, with
@@ -38,8 +38,8 @@ bold title and its version so a search finds it.
   answers `<input type="file">` with the system picker on Android and iOS,
   so no plugin is needed. It has no `accept`, because Android filters by
   MIME type and phones disagree about a zip's type.
-- **PDF moved to 0.19.0 (0.18.0).** It needs native print calls on both
-  platforms that can only be tested on the phones (TODO.md, 0.19.0).
+- **PDF moved to the EPUB release (0.18.0).** It needs native print calls on both
+  platforms that can only be tested on the phones (TODO.md, 0.20.0).
 
 - **Previews are redrawn on the phone (0.17.0).** Sites other than
   Wikipedia often serve one huge image with no smaller size. After it

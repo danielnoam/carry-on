@@ -24,7 +24,66 @@ asks from Daniel.
 
 ---
 
-## 0.19.0: EPUB of one page (after the WebToEpub research)
+## 0.19.0: Rework the UI (Daniel, 2 Oct 2026)
+
+**Goal:** each screen has one job and its controls in order of use.
+Settings stops being one long scroll, the library is easier to find
+your way around, and reading has less in the way. Daniel asked for this
+before the remaining features, since each of them adds more UI.
+
+**What's wrong now** (from the 0.18.0 screens)
+- **Settings is one long list:** Appearance (4 tall rows), Reading (a
+  copy of Aa), Saving, Storage listing every page (100 rows with a big
+  library), Backup, Updates and About, all on one screen.
+- **The library mixes everything in one column:** folder cards and page
+  cards are interleaved, and the filter chips mix status (Unread,
+  Finished) with every tag. There's no "carry on reading" at the top, no
+  sort order, "Offline ready" repeats on every card, the search field is
+  always open, and the settings icon (sliders) reads as a filter.
+- **The reader's ⋯ is everything at once:** tags, folder, previous and
+  next, save next, share, full images and delete in one sheet with no
+  order. "Original ↗" takes the bar's widest spot. There's no way to jump
+  to a heading, hide the bar for reading, or see time left.
+
+**Items**
+- **Settings as a short menu:** Appearance (theme and reading type
+  together, so Aa and Settings are one control set), Saving, Storage and
+  backup (total size, the per-page list on its own screen, sorted, with
+  delete), Updates, About. Each opens its own pushed screen.
+- **Library sections:** a "Continue reading" row at the top (the last
+  page or folder you were in), then Folders, then Pages. A sort menu
+  (newest saved, last read, longest, site). Status chips (All, Unread,
+  Finished) apart from a Tags row, or tags behind one chip. Card status
+  only when it needs attention (missing previews, text only). Search as
+  an icon that opens the field. A plain gear for Settings.
+- **The reader's ⋯ in groups:** a top row of actions (Share, Send,
+  Original), then This page (tags, folder), then the series (previous,
+  next, save next), then More (full images, delete). Original moves out
+  of the bar into that row.
+- **Reading with less in the way:** tap the page to hide or show the bar;
+  a contents list from the page's headings (h2/h3) in the bar; "12 min
+  left" under the progress bar while scrolling.
+- Desktop width: the library as two columns, Settings with its menu on
+  the left.
+
+**Steps**
+1. Sketch the three screens on the design canvas first (library,
+   Settings menu, reader with grouped ⋯), Paper and Night, phone and
+   desktop. Daniel picks before code.
+2. Settings: the menu and pushed sub-screens through the existing
+   `pushScreen` and history states (`{view:"settings", section}`).
+3. Library: sections and sort, keeping the keyed render (`keep()`).
+4. Reader: grouped sheet, tap to hide, contents list.
+5. DESIGN.md: rewrite the library, Settings and reader entries to match.
+
+**Daniel's phone:** find a page in a 50-page library, change the theme
+mid-read, and read a long Wikipedia article jumping by headings.
+
+**Depends on:** nothing. Every later release builds on it.
+
+---
+
+## 0.20.0: EPUB of one page (after the WebToEpub research)
 
 **Goal:** a saved page reads on an e-reader.
 
@@ -33,7 +92,7 @@ asks from Daniel.
   against its generic one), collects chapters, and packs the EPUB
   (structure, cover, table of contents, images). Outcome: a NOTES.md entry
   saying what Carry-on borrows, and a yes or no on "Save all chapters" for
-  0.20.0. No code ships from the research alone.
+  0.21.0. No code ships from the research alone.
 - Export a page as EPUB 3 from the reader's ⋯.
 - **(moved from 0.18.0)** PDF through the phone's print. Android's
   WebView ignores `window.print()`, so this needs a native call:
@@ -60,14 +119,14 @@ Send to Kindle, which accepts EPUB) with Hebrew and with images.
 
 ---
 
-## 0.20.0: Whole folders as books
+## 0.21.0: Whole folders as books
 
 **Goal:** a web novel goes from a table of contents page to one EPUB.
 
 **Items**
 - Export a whole folder as one EPUB: chapters in folder order, a table of
   contents, the first page's image or a generated title card as cover.
-- "Save all chapters" from a table-of-contents page (if the 0.19.0
+- "Save all chapters" from a table-of-contents page (if the 0.20.0
   research says a generic finder is good enough): list the chapter links
   it found, in Save several, for Daniel to check before saving.
 
@@ -81,11 +140,11 @@ Send to Kindle, which accepts EPUB) with Hebrew and with images.
 **Daniel's phone:** a real web novel with 30+ chapters, from its contents
 page to an EPUB on an e-reader.
 
-**Depends on:** 0.19.0 (EPUB writer, research).
+**Depends on:** 0.20.0 (EPUB writer, research).
 
 ---
 
-## 0.21.0: Comics and manga
+## 0.22.0: Comics and manga
 
 **Goal:** a chapter that is a column of images saves and reads well.
 
@@ -119,7 +178,7 @@ chapter "Save next" with the size warning; reading in the plane case
 
 ---
 
-## 0.22.0: Read aloud
+## 0.23.0: Read aloud
 
 **Goal:** listen to a saved page, offline.
 
@@ -144,18 +203,18 @@ the screen locks.
 
 ---
 
-## 0.23.0 and 0.24.0: Sync through a private GitHub repo
+## 0.24.0 and 0.25.0: Sync through a private GitHub repo
 
 Split in two because it's the riskiest work and loses data if wrong.
 
-**0.23.0, the index and text.** A fine-grained token for one repo, kept on
+**0.24.0, the index and text.** A fine-grained token for one repo, kept on
 the device. Sync `library.json` and each `page.html` + `meta.json`
 through the contents API with `sha` for conflicts, as LifeLog's
 src/storage.js does. Deletes become tombstones in `library.json` so they
 don't come back from the other device. The other device re-downloads
 previews from the original links. Reuses the 0.18.0 backup format.
 
-**0.24.0, images.** Push `images/` through the Git Data API (blobs, one
+**0.25.0, images.** Push `images/` through the Git Data API (blobs, one
 tree and one commit per save), since the contents API stops at 1 MB and
 broke LifeLog's sync. Decide first whether the repo's growth (0.5 to 1.5
 MB per illustrated page, far more for comics) is acceptable, or whether
