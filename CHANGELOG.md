@@ -2,6 +2,31 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.20.0] - 2026-10-02
+
+### Added
+- Send a page as an EPUB book from the reader's ⋯ (or a long press in
+  the library), for an e-reader app or a Kindle through Send to Kindle.
+  Its pictures, contents, language and right-to-left direction come
+  along, with the Wikipedia licence line and the link to the original.
+  A folder's EPUB tile makes one book of all its pages, in order.
+- Print or save as PDF from the same menu, through the phone's own
+  print screen (Save as PDF is one of its printers).
+- Save previous: a folder's first page offers to save the pages before
+  it, and they go in front.
+- "All" next to 1, 5 and 10 saves every next (or previous) page there
+  is, with Stop to end it early.
+- Settings, Appearance can turn off Continue reading.
+
+### Changed
+- A folder's tools are at the top, as tiles: Add pages, Select,
+  Reorder, Rename, EPUB and Remove.
+- Search is always at the top of the library, and All, Unread and
+  Finished sit below the folders, just above the pages.
+
+### Fixed
+- A card's Retry no longer draws over the save bar when scrolling.
+
 ## [0.19.0] - 2026-10-02
 
 ### Added

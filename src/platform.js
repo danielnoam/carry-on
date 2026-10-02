@@ -111,6 +111,23 @@
     }
   }
 
+  // A page (one self-contained HTML file) to the print screen, where Save as
+  // PDF is one of the printers: native/share's Print plugin in the app,
+  // whose WebView ignores window.print(). In a browser, a hidden frame
+  // that runs no scripts prints it.
+  async function printHtml(name, html) {
+    const P = plugin("Print");
+    if (P) { await P.print({ html, name }); return; }
+    const f = document.createElement("iframe");
+    f.setAttribute("sandbox", "allow-same-origin allow-modals");
+    f.setAttribute("aria-hidden", "true");
+    f.tabIndex = -1;
+    f.style.cssText = "position:fixed;left:-10000px;top:0;width:800px;height:600px;border:0";
+    await new Promise((done) => { f.onload = done; f.srcdoc = html; document.body.append(f); });
+    f.contentWindow.print();
+    setTimeout(() => f.remove(), 60000);
+  }
+
   // Downloads a file (an image preview, a video thumbnail) straight to disk
   // in the app's data folder, natively: no CORS, and the bytes never cross
   // the JavaScript bridge as base64. Resolves to a URL the WebView can load.
@@ -225,6 +242,7 @@
     saveAndShare,
     shareFile,
     shareLink,
+    printHtml,
     download,
     downloadUpdate,
     openInstaller,

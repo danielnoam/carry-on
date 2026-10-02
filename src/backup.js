@@ -31,6 +31,7 @@
     };
     if (num(m.readAt)) out.readAt = num(m.readAt);
     if (typeof m.next === "string") out.next = httpUrl(m.next);
+    if (typeof m.prev === "string") out.prev = httpUrl(m.prev);
     if (httpUrl(m.requested)) out.requested = httpUrl(m.requested);
     if (typeof m.thumb === "string" && (LOCAL.test(m.thumb) || httpUrl(m.thumb))) out.thumb = m.thumb;
     const tags = Array.isArray(m.tags) ? m.tags.filter((t) => typeof t === "string").map((t) => t.replace(/\s+/g, " ").trim().slice(0, 32)).filter(Boolean) : [];
@@ -317,5 +318,5 @@
     return meta;
   }
 
-  C.backup = { cleanMeta, crc32, zipWriter, zipEntries, zipRead, exportLibrary, restoreLibrary, exportPage, importPage };
+  C.backup = { cleanMeta, crc32, zipWriter, zipEntries, zipRead, exportLibrary, restoreLibrary, exportPage, importPage, imageType };
 })();

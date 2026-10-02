@@ -100,18 +100,18 @@
     return Math.max(1, Math.round(words / WORDS_PER_MINUTE));
   }
 
-  // Words a site uses on its link to the next chapter or page.
+  // Words a site uses on its links to the next and previous chapter or page.
   const NEXT_WORDS = /^(next|next (chapter|page|part|episode|post)|הבא|הפרק הבא|לפרק הבא|לעמוד הבא|siguiente|suivant|weiter|nächste|下一章|下一页|次へ|次の話)$/i;
-
-  function isNextText(text) {
-    const t = String(text || "").replace(/[›»→>\s]+$/u, "").replace(/^[‹«←<\s]+/u, "").replace(/\s+/g, " ").trim();
-    return NEXT_WORDS.test(t);
-  }
+  const PREV_WORDS = /^(prev|previous|previous (chapter|page|part|episode|post)|prev (chapter|page)|הקודם|הפרק הקודם|לפרק הקודם|לעמוד הקודם|anterior|précédent|zurück|vorherige|上一章|上一页|前へ|前の話)$/i;
+  const bare = (text) => String(text || "").replace(/[›»→>‹«←<\s]+$/u, "").replace(/^[‹«←<›»→>\s]+/u, "").replace(/\s+/g, " ").trim();
+  const isNextText = (text) => NEXT_WORDS.test(bare(text));
+  const isPrevText = (text) => PREV_WORDS.test(bare(text));
 
   // The page's link to what comes next (rel="next", or a link worded like
-  // "Next chapter"), on the same site and not the page itself; "" if none.
-  // Read before Readability, which strips navigation.
-  function nextLink(doc, pageUrl) {
+  // "Next chapter"), or before it with `back`, on the same site and not
+  // the page itself; "" if none. Read before Readability, which strips
+  // navigation.
+  function nextLink(doc, pageUrl, back) {
     let host;
     try { host = new URL(pageUrl).host; } catch (e) { return ""; }
     const ok = (href) => {
@@ -121,12 +121,14 @@
         return /^https?:$/.test(x.protocol) && x.host === host && u.split("#")[0] !== pageUrl.split("#")[0] ? u.split("#")[0] : "";
       } catch (e) { return ""; }
     };
-    for (const l of doc.querySelectorAll('link[rel~="next"][href], a[rel~="next"][href]')) {
+    const rel = back ? 'link[rel~="prev"][href], a[rel~="prev"][href], link[rel~="previous"][href], a[rel~="previous"][href]' : 'link[rel~="next"][href], a[rel~="next"][href]';
+    const is = back ? isPrevText : isNextText;
+    for (const l of doc.querySelectorAll(rel)) {
       const u = ok(l.getAttribute("href"));
       if (u) return u;
     }
     for (const a of doc.querySelectorAll("a[href]")) {
-      if (!isNextText(a.textContent) && !isNextText(a.getAttribute("aria-label")) && !isNextText(a.getAttribute("title"))) continue;
+      if (!is(a.textContent) && !is(a.getAttribute("aria-label")) && !is(a.getAttribute("title"))) continue;
       const u = ok(a.getAttribute("href"));
       if (u) return u;
     }
@@ -265,11 +267,12 @@
     const h1s = doc.querySelectorAll("h1");
     const headline = (og && og.content) || (h1s.length === 1 ? h1s[0].textContent : "");
     const next = nextLink(doc, finalUrl);
+    const prev = nextLink(doc, finalUrl, true);
     resolveLazyImages(doc, finalUrl);
     if (typeof window.Readability !== "function") throw new SaveError("The reader part of the app didn't load. Restart Carry-on.");
     const article = new window.Readability(doc, { charThreshold: 500, keepClasses: false }).parse();
     if (!article || (article.textContent || "").trim().length < MIN_TEXT) return null;
-    return { doc, docTitle, headline, next, article };
+    return { doc, docTitle, headline, next, prev, article };
   }
 
   async function fromAnyPage(url, onDrawing) {
@@ -293,7 +296,7 @@
         ? "Carry-on couldn't find the article on this page, even after letting it draw itself."
         : "This page builds itself with JavaScript, which Carry-on can't save yet.");
     }
-    const { doc, docTitle, headline, next, article } = got;
+    const { doc, docTitle, headline, next, prev, article } = got;
     const body = new DOMParser().parseFromString(article.content, "text/html").body;
     return {
       url: finalUrl,
@@ -303,7 +306,7 @@
       body, base: finalUrl, licence: null,
       lang: (doc.documentElement.getAttribute("lang") || article.lang || "").trim(),
       dir: article.dir === "rtl" || textDir(doc, article.textContent) === "rtl" ? "rtl" : "",
-      next,
+      next, prev,
     };
   }
 
@@ -640,7 +643,7 @@
       id, url: got.url, title: got.title, site: got.site, byline: got.byline,
       licence: got.licence, savedAt: Date.now(), minutes: readingMinutes(root.textContent),
       lang: wiki ? wiki.host.split(".")[0] : got.lang || "", dir: got.dir || "", mode: C.platform.native ? mode : "links",
-      next: got.next || "",
+      next: got.next || "", prev: got.prev || "",
     };
     if (onProgress) onProgress({ stage: "images", done: 0, total: media.length });
     const res = await saveImages(id, media, mode, (done, total) => onProgress && onProgress({ stage: "images", done, total }));
@@ -723,15 +726,16 @@
     return { got, failed, bytes, missing: out.missing };
   }
 
-  // A page's next link, read from the original: for pages saved before
-  // 0.10.0, which didn't keep one. "" when it has none.
-  async function findNext(url) {
+  // A page's next (or with `back`, previous) link, read from the original:
+  // for pages saved before 0.10.0, which kept no next link, or 0.20.0,
+  // which kept no previous one. "" when it has none.
+  async function findNext(url, back) {
     const res = await get(url);
-    return nextLink(parse(res.text, res.url || url), res.url || url);
+    return nextLink(parse(res.text, res.url || url), res.url || url, back);
   }
 
   C.save = {
-    save, SaveError, retryMissing, saveFullImages, findNext, creditLine, cleanSaved, savedPageHtml, newId, textDir, isNextText, plainText,
+    save, SaveError, retryMissing, saveFullImages, findNext, creditLine, cleanSaved, savedPageHtml, newId, textDir, isNextText, isPrevText, plainText,
     wikipediaPage, wikimediaThumb, parseSrcset, pickWidth, youtubeId, vimeoId, extOf, isTrackingPixel, readingMinutes, siteName,
   };
 })();

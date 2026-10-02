@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.19.0";
+  const APP_VERSION = "0.20.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -13,8 +13,12 @@
   const FILTER_KEY = "carryon.filter";
   const SEEN_KEY = "carryon.seenVersion";
   const SORT_KEY = "carryon.sort";
+  const CONTINUE_KEY = "carryon.continue";
 
   const $ = (id) => document.getElementById(id);
+  // The filter chips move into the library's list, and out of the page
+  // while it's empty, so they're held here rather than looked up.
+  const filterBox = $("filterBox"), filterRow = $("filters"), tagRow = $("tagFilters");
 
   function el(tag, attrs, ...children) {
     const node = document.createElement(tag);
@@ -90,9 +94,8 @@
     folder: null,
     // Which pages the library shows: "all", "unread", "finished" or "#tag".
     filter: load(FILTER_KEY, "all"),
-    // What's typed in the library's search field, and whether it's open.
+    // What's typed in the library's search field.
     query: "",
-    searchOpen: false,
     // The row of tag chips under the status chips.
     tagsOpen: false,
     // The library's order: "saved", "read", "length" or "site".
@@ -370,16 +373,6 @@
     onSearch();
   }
 
-  // Search sits behind its icon; closing it clears what was typed.
-  function toggleSearch(open) {
-    state.searchOpen = open;
-    $("searchBtn").setAttribute("aria-expanded", String(open));
-    $("searchBox").hidden = !open;
-    if (open) { M.arrive($("searchBox"), -8); $("librarySearch").focus(); return; }
-    if (state.query) clearSearch();
-    searchNote("");
-  }
-
   // ---- Filters and order ----
 
   const unread = (p) => !p.finished && !(p.at > 0.02);
@@ -402,7 +395,7 @@
   // Status first (All, Unread, Finished), then Tags, which opens a row of
   // its own so a long tag list doesn't push the status chips away.
   function renderFilters() {
-    const box = $("filters"), row = $("tagFilters");
+    const box = filterRow, row = tagRow;
     const tags = allTags();
     const tagOn = state.filter.startsWith("#");
     box.hidden = !state.pages.length;
@@ -463,9 +456,10 @@
 
   // Cards are keyed and kept between renders; only ones that weren't there
   // before arrive on a spring, so a re-render never replays the list.
-  // Under All the library is in sections: Continue reading, Folders, then
-  // the pages in no folder. A status or tag filter, or a search, lists the
-  // pages themselves.
+  // The library is in sections: Continue reading (unless it's turned off),
+  // Folders, the filters, then the pages in no folder. A status or tag
+  // filter lists every page it matches, folders' pages too; a search
+  // lists only what it found.
   let firstRender = true;
   function renderLibrary() {
     const root = $("library");
@@ -476,8 +470,7 @@
       && !allTags().some((t) => sameTag(t, state.filter.slice(1)))) { state.filter = "all"; store(FILTER_KEY, "all"); }
     renderFilters();
     $("libraryMeta").textContent = n ? pagesLine(n) : "Nothing saved yet";
-    $("searchBtn").hidden = $("selectBtn").hidden = !n;
-    if (!n && state.searchOpen) toggleSearch(false);
+    $("searchBox").hidden = $("selectBtn").hidden = !n;
     const nodes = [];
     const fresh = [];
     // A kept card whose content changed (reading progress, a renamed page)
@@ -501,8 +494,8 @@
     }));
     onScreen = pages;
     const flat = ts.length || state.filter !== "all";
-    if (!flat) {
-      const going = !state.select && continuePage();
+    if (!ts.length) {
+      const going = !state.select && load(CONTINUE_KEY, true) && continuePage();
       if (going) {
         keep("h:continue", () => sectionHead("Continue reading"));
         keep("c:" + going.id, () => pageCard(going), pageSig(going));
@@ -513,6 +506,8 @@
         keep("folders", () => foldersStrip(folders), folders.map((f) => [f, ...folderPages(f).map((x) => x.id + readingLine(x) + (x.thumb || ""))].join("|")).join("‖"));
       }
     }
+    // The filters sit over the pages they filter, under the folders.
+    if (n) nodes.push(filterBox); else filterBox.remove();
     const loose = flat ? pages : pages.filter((p) => !p.folder);
     if (loose.length) {
       const label = (ts.length ? "Found" : state.filter === "all" ? (n > loose.length ? "Pages in no folder" : "Pages") : filterName()) + " · " + loose.length;
@@ -633,7 +628,7 @@
         },
       });
       meta.requested = job.url;
-      if (job.folder) { meta.folder = folderName(job.folder); meta.folderAt = Date.now(); }
+      if (job.folder) { meta.folder = folderName(job.folder); meta.folderAt = job.folderAt || Date.now(); }
       if (job.tags && job.tags.length) meta.tags = withTags([], job.tags);
       state.pages.unshift(meta);
       await C.store.writeIndex(state.pages);
@@ -1209,10 +1204,13 @@
     const go = done === list.length ? "Read again from the start" : (next.at > 0.02 || done ? "Continue: " : "Start: ") + next.title;
     const picking = !!state.select;
     if (picking) folderMode = "";
+    if (!picking && !folderMode) lookBack(list[0]);
     fill($("folderBody"),
       el("p", { class: "meta folder-meta" }, countLine(list.length) + " · " + done + " read · " + formatSize(sizeOf(list))),
-      picking ? null : el("button", { class: "btn-primary folder-go", type: "button", dir: "auto",
+      picking ? null : folderActions(list),
+      picking || folderMode ? null : el("button", { class: "btn-primary folder-go", type: "button", dir: "auto",
         onclick: () => openPage(done === list.length ? list[0].id : next.id) }, go),
+      folderMode || picking ? null : followControls(list[0], true),
       el("ol", { class: "group folder-list" + (folderMode === "order" ? " ordering" : "") },
         ...list.map((p, i) => el("li", folderMode ? { "data-id": p.id } : { "data-id": p.id, "data-ids": p.id },
           el("button", { class: "row chapter" + (p === next && done < list.length ? " now" : ""), type: "button", onclick: () => tapPages([p.id], () => openPage(p.id)) },
@@ -1223,8 +1221,7 @@
               el("span", { class: "choice-note" + (p.finished ? "" : p.at > 0.02 ? " accent" : "") }, readingLine(p)))),
           folderMode === "order" ? moveButton(p, i, -1, list.length) : null,
           folderMode === "order" ? moveButton(p, i, 1, list.length) : null))),
-      folderMode || picking ? null : followControls(list[list.length - 1]),
-      picking ? null : folderActions(list));
+      folderMode || picking ? null : followControls(list[list.length - 1]));
     paintPicks();
   }
 
@@ -1259,6 +1256,8 @@
     if (focus) focus.focus();
   }
 
+  // The folder's tools, above its pages: two rows of three on a phone,
+  // one row on a desktop. Reordering and removing take their place.
   function folderActions(list) {
     const n = list.length;
     const mode = (m) => () => { folderMode = m; renderFolder(); };
@@ -1272,15 +1271,19 @@
         el("button", { class: "btn-quiet", type: "button", onclick: mode("") }, "Cancel"));
     }
     if (folderMode === "order") {
-      return el("div", { class: "folder-actions" },
+      return el("div", { class: "folder-actions order" },
+        el("p", { class: "meta" }, "Move pages with the arrows."),
         el("button", { class: "btn-primary", type: "button", onclick: mode("") }, "Done"));
     }
-    return el("div", { class: "folder-actions" },
-      el("button", { class: "btn-quiet", type: "button", onclick: () => openBatch("", false, state.folder) }, "Add pages"),
-      el("button", { class: "btn-quiet", type: "button", onclick: () => startSelect([]) }, "Select"),
-      n > 1 ? el("button", { class: "btn-quiet", type: "button", onclick: mode("order") }, "Reorder") : null,
-      el("button", { class: "btn-quiet", type: "button", onclick: renameFolder }, "Rename"),
-      el("button", { class: "btn-quiet danger", type: "button", onclick: mode("remove") }, "Remove folder"));
+    const reorder = tileButton("reorder", "Reorder", mode("order"));
+    reorder.disabled = n < 2;
+    return el("div", { class: "folder-tools", role: "group", "aria-label": "Folder" },
+      tileButton("add", "Add pages", () => openBatch("", false, state.folder)),
+      tileButton("select", "Select", () => startSelect([])),
+      reorder,
+      tileButton("rename", "Rename", renameFolder),
+      tileButton("book", "EPUB", (e) => sendBook(list, e.currentTarget, state.folder)),
+      tileButton("remove", "Remove", mode("remove"), "warn"));
   }
 
   // Takes the folder off its pages, or deletes them with it (asked once
@@ -1313,9 +1316,15 @@
     share: '<path d="M12 15V4M8 8l4-4 4 4M5 12v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/>',
     send: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
     original: '<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+    add: '<path d="M12 5v14M5 12h14"/>',
+    select: '<circle cx="12" cy="12" r="8.5"/><path d="M8.5 12.2l2.4 2.4 4.6-5"/>',
+    reorder: '<path d="M8 4v16M4.5 7.5L8 4l3.5 3.5M16 20V4M12.5 16.5L16 20l3.5-3.5"/>',
+    rename: '<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
+    book: '<path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5zM5 19.5A1.5 1.5 0 0 0 6.5 21H19"/>',
+    remove: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>',
   };
-  function tileButton(icon, label, onclick) {
-    const b = el("button", { class: "tile-btn", type: "button", onclick }, el("span", { class: "tile-icon", "aria-hidden": "true" }), label);
+  function tileButton(icon, label, onclick, cls) {
+    const b = el("button", { class: "tile-btn" + (cls ? " " + cls : ""), type: "button", onclick }, el("span", { class: "tile-icon", "aria-hidden": "true" }), label);
     b.firstChild.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICONS[icon] + "</svg>";
     return b;
   }
@@ -1329,7 +1338,7 @@
     const box = el("div", { class: "page-controls" });
     const inReader = where === "reader";
     const draw = () => {
-      const series = inReader ? [neighbours(p), neighbour(p, 1) ? null : followControls(p)].filter(Boolean) : [];
+      const series = inReader ? [neighbours(p), neighbour(p, -1) ? null : followControls(p, true), neighbour(p, 1) ? null : followControls(p)].filter(Boolean) : [];
       fill(box,
         inReader ? null : el("div", { class: "menu-head" },
           el("p", { class: "menu-title", dir: "auto" }, p.title),
@@ -1346,6 +1355,8 @@
         ...series,
         el("h3", { class: "overline" }, "More"),
         el("div", { class: "group" },
+          menuRow("Send as EPUB", (e) => sendBook(p, e.currentTarget)),
+          menuRow("Print or save as PDF", (e) => printPage(p, e.currentTarget)),
           menuRow(p.finished ? "Mark as unread" : "Mark as read", () => markRead([p], !p.finished).then(draw)),
           inReader ? null : menuRow("Select", () => back().then(() => startSelect([p.id]))),
           fullImagesRow(p),
@@ -1674,6 +1685,37 @@
     btn.disabled = false;
   }
 
+  // A page, or a folder in its order, as an e-book (epub.js), for an
+  // e-reader or Send to Kindle.
+  async function sendBook(pages, btn, title) {
+    btn.disabled = true;
+    try {
+      const out = await C.epub.exportBook([].concat(pages), title);
+      if (out.uri) await C.platform.shareFile(out.uri, out.name);
+      else C.platform.download(out.name, out.blob);
+    } catch (e) {
+      console.error(e);
+      toast("Couldn't make the book. Try again.");
+    }
+    btn.disabled = false;
+  }
+
+  // The page file with a plain print style, on the phone's print screen;
+  // it runs no scripts and loads nothing, its pictures are inside it.
+  async function printPage(p, btn) {
+    btn.disabled = true;
+    try {
+      const { name, html } = await C.backup.exportPage(p);
+      const head = '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; img-src data:; style-src \'unsafe-inline\'">' +
+        "<style>" + C.epub.STYLE + "</style>";
+      await C.platform.printHtml(name.replace(/\.html$/, ""), html.replace(/<head>/i, "<head>" + head));
+    } catch (e) {
+      console.error(e);
+      toast("Couldn't open printing. Try again.");
+    }
+    btn.disabled = false;
+  }
+
   async function backUp(btn) {
     if (!state.pages.length) { toast("There's nothing to back up yet."); return; }
     btn.disabled = true;
@@ -1906,65 +1948,105 @@
     return cleanTag(t && t !== p.title ? t : p.title) || p.site;
   }
 
-  // Saves up to `n` pages following `from`'s next links; resolves to the
-  // first one saved (or already there), or null. Quiet when asked.
-  async function follow(from, n, quiet) {
-    if (from.next === undefined) {
-      try { from.next = await C.save.findNext(from.url); } catch (e) { toast("Couldn't reach " + from.site + " to find the next page."); return null; }
+  // Saves up to `n` pages following `from`'s next links (previous ones
+  // with `back`, placed before it in the folder); resolves to the first
+  // one saved (or already there), or null. Quiet when asked. A folder's
+  // run stops early when its Stop is tapped.
+  const stopping = new Set();
+  const PACE_MS = 500;
+  async function follow(from, n, quiet, back) {
+    const key = back ? "prev" : "next", word = back ? "previous" : "next";
+    if (from[key] === undefined) {
+      try { from[key] = await C.save.findNext(from.url, back); } catch (e) { toast("Couldn't reach " + from.site + " to find the " + word + " page."); return null; }
       await C.store.writeIndex(state.pages);
-      if (!from.next) { toast("There's no next page."); return null; }
+      if (!from[key]) { toast("There's no " + word + " page."); return null; }
     }
     if (!from.folder) { from.folder = folderName(seriesName(from)); from.folderAt = Date.now(); }
     const name = from.folder;
+    let at = from.folderAt || from.savedAt || Date.now();
+    const place = () => (back ? --at : undefined);
+    stopping.delete(name);
     const seen = new Set([from.url]);
-    let url = from.next, saved = 0, first = null, failed = false;
+    let url = from[key], saved = 0, first = null, failed = false, stopped = false;
     while (url && saved < n && !seen.has(url)) {
+      if (stopping.has(name)) { stopped = true; break; }
       seen.add(url);
       const had = savedAs(url);
       if (had) {
-        if (!had.folder) { had.folder = name; had.folderAt = Date.now(); }
+        if (!had.folder) { had.folder = name; had.folderAt = place() || Date.now(); }
+        else if (back && sameTag(had.folder, name)) at = Math.min(at, had.folderAt || at);
         first = first || had;
-        url = had.next;
+        url = had[key];
         continue;
       }
       if (state.saving.some((s) => !s.error && sameUrl(s.url, url))) break;
       state.saving = state.saving.filter((s) => !(s.error && sameUrl(s.url, url)));
-      const job = newJob(url, name);
+      if (saved) await new Promise((done) => setTimeout(done, PACE_MS));
+      const job = { ...newJob(url, name), folderAt: place() };
       state.saving.unshift(job);
       renderLibrary();
       const meta = await runJob(job);
       if (!meta) { failed = true; break; }
       saved++;
       first = first || meta;
-      url = meta.next;
+      url = meta[key];
       if (state.folder) renderFolder();
     }
+    stopping.delete(name);
     await C.store.writeIndex(state.pages);
     renderLibrary();
     if (state.folder) renderFolder();
     if (!quiet || failed) {
-      toast(saved ? "Saved " + countLine(saved) + " into " + name + (failed ? ". The next one couldn't be saved." : !url ? ". That's the last one." : ".")
-        : failed ? "Couldn't save the next page." : first ? "The next page is already saved." : "There's no next page.");
+      const end = back ? ". That's the first one." : ". That's the last one.";
+      toast(saved ? "Saved " + countLine(saved) + " into " + name + (failed ? ". The " + word + " one couldn't be saved." : stopped ? ". Stopped." : !url ? end : ".")
+        : failed ? "Couldn't save the " + word + " page." : first ? "The " + word + " page is already saved." : "There's no " + word + " page.");
     }
     return first;
   }
 
-  // "Save the next 1 · 5 · 10" for the last page of a run with a next link.
-  function followControls(p) {
+  // A folder's first page saved before 0.20.0 never looked for a previous
+  // link: read it from the original once, quietly, when the folder opens.
+  const lookingBack = new Set();
+  function lookBack(p) {
+    if (!p || p.prev !== undefined || p.licence === "wikipedia" || !navigator.onLine || lookingBack.has(p.id)) return;
+    lookingBack.add(p.id);
+    C.save.findNext(p.url, true).then((u) => {
+      p.prev = u || "";
+      return C.store.writeIndex(state.pages);
+    }).then(() => { if (state.folder && p.prev && !savedAs(p.prev)) renderFolder(); }, () => {});
+  }
+
+  // "Save the next 1 · 5 · 10 · All" for the last page of a run with a
+  // next link, or the previous ones (`back`) for the first. While a run
+  // saves, Stop.
+  function followControls(p, back) {
+    const key = back ? "prev" : "next";
     // Pages saved before 0.10.0 never looked for a next link (`next` is
     // missing, not ""); follow() reads it from the original on first use.
-    const unknown = p && p.next === undefined && p.licence !== "wikipedia";
-    if (!p || (!unknown && (!p.next || savedAs(p.next)))) return null;
+    // A missing previous link is read when the folder opens (lookBack).
+    const unknown = !back && p && p.next === undefined && p.licence !== "wikipedia";
+    if (!p || (!unknown && (!p[key] || savedAs(p[key])))) return null;
     const busy = () => state.saving.some((s) => !s.error && s.folder && p.folder && sameTag(s.folder, p.folder));
-    return el("div", { class: "rc-row follow" }, el("span", { class: "rc-label" }, "Save next"),
-      el("div", { class: "chips" }, ...[1, 5, 10].map((n) => el("button", { class: "chip", type: "button",
-        "aria-label": "Save the next " + countLine(n) + " from " + p.site,
-        onclick: (e) => {
-          if (busy()) return;
-          if (!navigator.onLine) { toast("You're offline. Try again when you're back online."); return; }
-          e.currentTarget.closest(".follow").querySelectorAll("button").forEach((b) => { b.disabled = true; });
-          follow(p, n).then(() => { if (state.sheet === "page" && state.open) $("readingBody").replaceChildren(SHEETS.page.build()); });
-        } }, String(n)))));
+    const what = back ? "previous" : "next";
+    const stop = el("button", { class: "chip stop", type: "button", "aria-label": "Stop saving",
+      onclick: () => { if (p.folder) stopping.add(p.folder); stop.disabled = true; } }, "Stop");
+    stop.hidden = !busy();
+    const run = (n) => (e) => {
+      if (busy()) return;
+      if (!navigator.onLine) { toast("You're offline. Try again when you're back online."); return; }
+      e.currentTarget.closest(".follow").querySelectorAll("button:not(.stop)").forEach((b) => { b.disabled = true; });
+      stop.hidden = false;
+      follow(p, n, false, back).then(() => { if (state.sheet === "page" && state.open) $("readingBody").replaceChildren(SHEETS.page.build()); });
+    };
+    const chip = (n) => {
+      const b = el("button", { class: "chip", type: "button",
+        "aria-label": n === Infinity ? "Save all the " + what + " pages from " + p.site : "Save the " + what + " " + countLine(n) + " from " + p.site,
+        onclick: run(n) }, n === Infinity ? "All" : String(n));
+      b.disabled = busy();
+      return b;
+    };
+    return el("div", { class: "rc-row follow" + (back ? " back" : "") }, el("span", { class: "rc-label" }, back ? "Save previous" : "Save next"),
+      el("div", { class: "chips" }, ...[1, 5, 10, Infinity].map(chip), stop));
   }
 
   async function renameFolder() {
@@ -2051,6 +2133,19 @@
       el("p", { class: "footnote" }, "The same as Aa while you read."));
   }
 
+  function libraryGroup() {
+    const input = el("input", { class: "switch", type: "checkbox", role: "switch", checked: load(CONTINUE_KEY, true),
+      onchange: (e) => { store(CONTINUE_KEY, e.target.checked); renderLibrary(); } });
+    return el("section", { class: "settings-section" },
+      el("h2", { class: "overline" }, "Library"),
+      el("div", { class: "group" },
+        el("label", { class: "row" },
+          el("span", { class: "choice-text" },
+            el("span", { class: "choice-label" }, "Continue reading"),
+            el("span", { class: "choice-note" }, "The page you read last, at the top of the library")),
+          input)));
+  }
+
   function storageGroup() {
     const n = state.pages.length;
     const list = el("div", { class: "group" });
@@ -2082,7 +2177,7 @@
   // Settings is a short menu; each entry is a screen of its own.
   const updateOut = () => ["available", "downloading", "ready"].includes(upd.phase) && upd.latest;
   const SECTIONS = {
-    appearance: { title: "Appearance", build: () => [choiceGroup(SETTINGS[0]), readingGroup()],
+    appearance: { title: "Appearance", build: () => [choiceGroup(SETTINGS[0]), readingGroup(), libraryGroup()],
       value: () => SETTINGS[0].options.find((o) => o.value === state.theme).label },
     saving: { title: "Saving", build: () => [choiceGroup(SETTINGS[1])],
       value: () => SETTINGS[1].options.find((o) => o.value === SETTINGS[1].get()).label },
@@ -2199,7 +2294,6 @@
 
   $("settingsBtn").addEventListener("click", () => openSettings());
   $("sectionBack").addEventListener("click", () => history.back());
-  $("searchBtn").addEventListener("click", () => toggleSearch(!state.searchOpen));
   $("selectBtn").addEventListener("click", () => startSelect([]));
   $("selectCancel").addEventListener("click", () => history.back());
   $("selectAll").addEventListener("click", selectAll);
@@ -2218,7 +2312,7 @@
   $("librarySearch").addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
     e.preventDefault();
-    if (state.query) clearSearch(); else { toggleSearch(false); $("searchBtn").focus(); }
+    if (state.query) clearSearch();
   });
   $("searchClear").addEventListener("click", () => { clearSearch(); $("librarySearch").focus(); });
   $("newsBack").addEventListener("click", () => history.back());
