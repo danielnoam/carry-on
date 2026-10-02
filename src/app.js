@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.16.0";
+  const APP_VERSION = "0.17.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -133,7 +133,8 @@
     if (bytes >= 1e6) return (bytes / 1e6).toFixed(bytes >= 1e7 ? 0 : 1) + " MB";
     return Math.max(1, Math.round(bytes / 1e3)) + " KB";
   }
-  const totalBytes = () => state.pages.reduce((sum, p) => sum + (p.bytes || 0), 0);
+  const sizeOf = (pages) => pages.reduce((sum, p) => sum + (p.bytes || 0), 0);
+  const totalBytes = () => sizeOf(state.pages);
   const countLine = (n) => n + (n === 1 ? " page" : " pages");
   const pagesLine = (n) => countLine(n) + " · " + formatSize(totalBytes());
 
@@ -501,9 +502,9 @@
   // Several links saved one after another, in order, optionally into a
   // folder (so its pages follow the order of the links). A link already
   // saved isn't saved again; it just joins the folder at its place.
-  async function saveAll(urls, folder, tags = []) {
+  async function saveAll(urls, folder, tags = [], mode) {
     const name = folder ? folderName(folder) : null;
-    const jobs = urls.filter((u) => !state.saving.some((s) => !s.error && sameUrl(s.url, u))).map((u) => ({ ...newJob(u, name), tags }));
+    const jobs = urls.filter((u) => !state.saving.some((s) => !s.error && sameUrl(s.url, u))).map((u) => ({ ...newJob(u, name), tags, mode }));
     state.saving = state.saving.filter((s) => !(s.error && jobs.some((j) => sameUrl(j.url, s.url))));
     const fresh = jobs.filter((j) => !savedAs(j.url));
     fresh.forEach((j) => { j.waiting = true; });
@@ -536,7 +537,7 @@
     job.started = Date.now();
     try {
       const meta = await C.save.save(job.url, {
-        mode: load(IMAGES_KEY, "previews"),
+        mode: job.mode || load(IMAGES_KEY, "previews"),
         onProgress: (p) => {
           if (p.stage === "drawing") job.drawing = true;
           if (p.stage === "images") { job.done = p.done; job.total = p.total; }
@@ -1033,7 +1034,7 @@
       el("span", { class: "card-thumb stack" + (thumb ? "" : " blank"), "aria-hidden": "true" },
         thumb ? el("img", { src: thumb, alt: "", loading: "lazy" }) : null),
       el("span", { class: "card-body" },
-        el("span", { class: "card-site" }, "Folder · " + countLine(list.length) + " · " + done + " read"),
+        el("span", { class: "card-site" }, "Folder · " + countLine(list.length) + " · " + done + " read · " + formatSize(sizeOf(list))),
         el("span", { class: "card-title", dir: "auto" }, name),
         el("span", { class: "card-status", dir: "auto" }, line),
         done && done < list.length ? el("span", { class: "progress thin", role: "progressbar", "aria-label": "Pages read",
@@ -1073,7 +1074,7 @@
     const done = list.filter((p) => p.finished).length;
     const go = done === list.length ? "Read again from the start" : (next.at > 0.02 || done ? "Continue: " : "Start: ") + next.title;
     fill($("folderBody"),
-      el("p", { class: "meta folder-meta" }, countLine(list.length) + " · " + done + " read"),
+      el("p", { class: "meta folder-meta" }, countLine(list.length) + " · " + done + " read · " + formatSize(sizeOf(list))),
       el("button", { class: "btn-primary folder-go", type: "button", dir: "auto",
         onclick: () => openPage(done === list.length ? list[0].id : next.id) }, go),
       el("ol", { class: "group folder-list" + (folderMode === "order" ? " ordering" : "") },
@@ -1194,10 +1195,38 @@
         folderRow(p, draw),
         neighbours(p),
         neighbour(p, 1) ? null : followControls(p),
+        fullImagesRow(p),
         el("button", { class: "sheet-row danger", type: "button", onclick: deleteOpen }, "Delete this page"));
     };
     draw();
     return box;
+  }
+
+  // "Save full images" for a page saved with previews or links only.
+  function fullImagesRow(p) {
+    if (!C.platform.native || p.mode === "full" || !p.images) return null;
+    return el("button", { class: "sheet-row two-line", type: "button", onclick: (e) => saveFullImages(p, e.currentTarget) },
+      "Save full images", el("span", { class: "sheet-note" }, "For maps, diagrams and comics. About 150 KB an image."));
+  }
+
+  async function saveFullImages(p, btn) {
+    if (!navigator.onLine) { toast("You're offline. Try again when you're back online."); return; }
+    btn.disabled = true;
+    const label = btn.firstChild;
+    label.textContent = "Saving full images…";
+    let res;
+    try {
+      res = await C.save.saveFullImages(p, (done, total) => { label.textContent = "Saving full images, " + done + " of " + total; });
+    } catch (e) { res = null; }
+    if (!res) { btn.disabled = false; label.textContent = "Save full images"; toast("Couldn't open this page's file. Try again."); return; }
+    Object.assign(p, { mode: "full", missing: res.missing, bytes: Math.max(0, (p.bytes || 0) + res.bytes) });
+    await C.store.writeIndex(state.pages);
+    renderLibrary();
+    toast(res.failed ? "Saved " + res.got + " full images. " + res.failed + " kept their previews." : "Full images saved.");
+    if (state.open !== p) return;
+    if (state.sheet === "page") $("readingBody").replaceChildren(SHEETS.page.build());
+    const html = await C.store.readPage(p.id).catch(() => null);
+    if (html) show(p, html);
   }
 
   function folderRow(p, redraw) {
@@ -1253,6 +1282,7 @@
 
   function renderBatch(text, preset) {
     let folder = preset;
+    let mode = load(IMAGES_KEY, "previews");
     const tags = [];
     const area = el("textarea", { class: "batch-links", rows: "6", "aria-label": "Links, one a line", spellcheck: "false",
       autocapitalize: "off", autocomplete: "off", dir: "ltr" });
@@ -1308,13 +1338,18 @@
         el("div", { class: "tag-edit" }, chips, input),
         el("p", { class: "meta" }, "Pages in a folder keep the order of the links.")),
       el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Tags"), tagBox),
+      C.platform.native ? el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Images"),
+        seg("batch-images", "Images", [
+          { value: "previews", label: "Previews" }, { value: "full", label: "Full" }, { value: "links", label: "Links" },
+        ], mode, (v) => { mode = v; }),
+        el("p", { class: "meta" }, "Full images for comics, maps and diagrams. Settings picks the usual choice.")) : null,
       go);
     form.addEventListener("submit", (e) => {
       e.preventDefault();
       const urls = linksFrom(area.value);
       if (!urls.length) return;
       history.back();
-      saveAll(urls, folder, tags);
+      saveAll(urls, folder, tags, mode);
     });
     $("batchBody").replaceChildren(form);
     sync();
@@ -1334,6 +1369,11 @@
   // Saves up to `n` pages following `from`'s next links; resolves to the
   // first one saved (or already there), or null. Quiet when asked.
   async function follow(from, n, quiet) {
+    if (from.next === undefined) {
+      try { from.next = await C.save.findNext(from.url); } catch (e) { toast("Couldn't reach " + from.site + " to find the next page."); return null; }
+      await C.store.writeIndex(state.pages);
+      if (!from.next) { toast("There's no next page."); return null; }
+    }
     if (!from.folder) { from.folder = folderName(seriesName(from)); from.folderAt = Date.now(); }
     const name = from.folder;
     const seen = new Set([from.url]);
@@ -1371,7 +1411,10 @@
 
   // "Save the next 1 · 5 · 10" for the last page of a run with a next link.
   function followControls(p) {
-    if (!p || !p.next || savedAs(p.next)) return null;
+    // Pages saved before 0.10.0 never looked for a next link (`next` is
+    // missing, not ""); follow() reads it from the original on first use.
+    const unknown = p && p.next === undefined && p.licence !== "wikipedia";
+    if (!p || (!unknown && (!p.next || savedAs(p.next)))) return null;
     const busy = () => state.saving.some((s) => !s.error && s.folder && p.folder && sameTag(s.folder, p.folder));
     return el("div", { class: "rc-row follow" }, el("span", { class: "rc-label" }, "Save next"),
       el("div", { class: "chips" }, ...[1, 5, 10].map((n) => el("button", { class: "chip", type: "button",

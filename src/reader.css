@@ -52,11 +52,13 @@ figure {
 figure img { width: 100%; border-radius: 0; background: var(--preview); }
 figure > a { display: block; }
 figcaption {
-  display: flex; justify-content: space-between; align-items: baseline; gap: var(--s-3);
+  display: flow-root;
   padding: 10px var(--s-3);
   font: 400 var(--fs-label)/var(--lh-label) var(--sans);
 }
-.co-full { flex-shrink: 0; font-size: var(--fs-meta); color: var(--muted); }
+.co-full { float: inline-end; margin-inline-start: var(--s-3); font-size: var(--fs-meta); color: var(--muted); }
+.co-credit { display: block; font: 400 var(--fs-meta)/var(--lh-meta) var(--sans); color: var(--muted); }
+figcaption > .co-credit:not(:first-child) { margin-top: 2px; }
 
 .co-placeholder {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-1);
@@ -83,7 +85,7 @@ figure .co-placeholder { border-width: 0 0 1.5px; border-radius: 0; }
   clip-path: polygon(0 0, 100% 50%, 0 100%);
 }
 .offline .co-play { opacity: 0.5; }
-.co-video figcaption { flex-direction: column; align-items: flex-start; gap: 2px; }
+.co-video figcaption { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
 .co-video-title { font-weight: 500; }
 .co-video-note { font-size: var(--fs-meta); color: var(--muted); }
 

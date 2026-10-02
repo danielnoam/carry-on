@@ -18,6 +18,8 @@
   // The "Next" link this file adds at the end of a page in a folder; only
   // that element (not a look-alike in the page) moves on.
   let nextLink = null, onNext = null, onImage = null;
+  // A page saved with full images already has them: nothing to swap in.
+  let savedFull = false;
   // Each missing image's placeholder, which sits before the image's link
   // when it has one, so the link's underline doesn't run through it.
   let placeholders = new WeakMap();
@@ -61,7 +63,7 @@
     const h = frame.contentWindow.innerHeight;
     for (const img of doc.querySelectorAll("img[data-full]:not([data-swapped])")) {
       const full = img.getAttribute("data-full");
-      if (img.getAttribute("src") === full) { img.setAttribute("data-swapped", ""); continue; }
+      if (img.getAttribute("src") === full || (savedFull && !img.classList.contains("co-missing"))) { img.setAttribute("data-swapped", ""); continue; }
       const r = (placeholders.get(img) || img).getBoundingClientRect();
       if (r.bottom < -h * NEAR || r.top > h * (1 + NEAR)) continue;
       img.setAttribute("data-swapped", "");
@@ -95,12 +97,12 @@
     for (const cap of doc.querySelectorAll("figure:not(.co-video) > figcaption")) {
       const img = cap.parentElement.querySelector("img[data-full]");
       let label = cap.querySelector(".co-full");
-      if (!online && img && !img.hasAttribute("data-swapped") && !img.classList.contains("co-missing")) {
+      if (!online && !savedFull && img && !img.hasAttribute("data-swapped") && !img.classList.contains("co-missing")) {
         if (!label) {
           label = doc.createElement("span");
           label.className = "co-full";
           label.textContent = "Full size online";
-          cap.append(label);
+          cap.prepend(label);
         }
       } else if (label) label.remove();
     }
@@ -118,11 +120,12 @@
     if (cap) {
       const c = cap.cloneNode(true);
       c.querySelectorAll(".co-full").forEach((n) => n.remove());
-      caption = c.textContent.replace(/\s+/g, " ").trim();
-    }
+      c.querySelectorAll(".co-credit").forEach((n) => n.before(" · "));
+      caption = c.textContent.replace(/\s+/g, " ").replace(/^ · /, "").trim();
+    } else if (img.hasAttribute("data-credit")) caption = img.getAttribute("data-credit");
     return {
       src: img.currentSrc || img.src,
-      full: /^https:/.test(img.getAttribute("data-full") || "") ? img.getAttribute("data-full") : "",
+      full: /^https:/.test(img.getAttribute("data-full") || "") && !(savedFull && !img.classList.contains("co-missing")) ? img.getAttribute("data-full") : "",
       alt: (img.getAttribute("alt") || "").trim(),
       caption,
       rect: { left: f.left + r.left, top: f.top + r.top, width: r.width, height: r.height },
@@ -175,6 +178,7 @@
     frame = iframe;
     onImage = image || null;
     topSpace = top || null;
+    savedFull = meta.mode === "full";
     doc = null;
     nextLink = null;
     onNext = next ? next.go : null;

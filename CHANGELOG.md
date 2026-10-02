@@ -2,6 +2,27 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.17.0] - 2026-10-02
+
+### Added
+- Big pictures are made smaller on the phone. A preview wider than the
+  screen needs is redrawn at 480 px, so a news site's 3 MB photo takes
+  about 40 KB. Logos and diagrams with see-through parts stay sharp
+  PNGs.
+- Wikipedia pictures carry their own credit under the caption, like
+  "Jane Doe, CC BY-SA 4.0", and in the full-screen view.
+- Save full images for one page: ⋯ swaps its previews for the full
+  pictures, for a map, a diagram or a comic. Save several has the same
+  choice for everything it saves, without changing Settings.
+- Each folder shows its size, on its card and on its screen.
+- Save next works on pages saved before 0.10.0: the first time, it
+  looks at the original page for the next link.
+
+### Fixed
+- A caption with a link in it was spread out in pieces across the line.
+- Pages saved with full images no longer download each picture again
+  when you read them online.
+
 ## [0.16.0] - 2026-10-02
 
 ### Added
