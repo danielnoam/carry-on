@@ -43,6 +43,15 @@
     if (reduced()) return Promise.resolve();
     return run(el, covering ? [home, away] : [away, home], "sheet", []);
   }
+  // A sheet from the bottom edge (the reader's Aa).
+  function rise(el) {
+    return run(el, [{ transform: "translateY(100%)" }, { transform: "translateY(0)" }], "sheet",
+      [{ opacity: 0 }, { opacity: 1 }]);
+  }
+  function sink(el) {
+    return run(el, [{ transform: "translateY(0)" }, { transform: "translateY(100%)" }], "sheet",
+      [{ opacity: 1 }, { opacity: 0 }]);
+  }
   // Something arriving in a list or a bar: a card, the update bar, a toast.
   function arrive(el, from = 12) {
     return run(el, [{ opacity: 0, transform: "translateY(" + from + "px) scale(0.98)" }, { opacity: 1, transform: "none" }], "sheet",
@@ -62,5 +71,5 @@
   root.setProperty("--spring-control-ms", SPRINGS.control.ms + "ms");
 
   window.CarryOn = window.CarryOn || {};
-  window.CarryOn.motion = { timing, pushIn, popOut, under, arrive, leave, reduced };
+  window.CarryOn.motion = { timing, pushIn, popOut, under, rise, sink, arrive, leave, reduced };
 })();

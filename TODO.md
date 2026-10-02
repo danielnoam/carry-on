@@ -26,10 +26,8 @@ todo:
 ## Library and reader
 
 - Retry for missing previews (the card says how many are missing).
-- Reader top bar: an Aa button for quick changes while reading: font,
-  theme, text size and line spacing, the same settings also in Settings
-  (Reading section). Hide the bar on scroll down; tapping an image opens
-  it full screen.
+- Reader top bar: hide on scroll down, back on scroll up; tapping an image
+  opens it full screen.
 - Reading progress: remember where each page was left, and show how much
   is left under each library card (e.g. "6 min left", a thin progress
   line), "Finished" once read to the end.

@@ -7,8 +7,8 @@
   <title>Carry-on</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="src/fonts.css?v=0.3.1">
-  <link rel="stylesheet" href="src/styles.css?v=0.3.1">
+  <link rel="stylesheet" href="src/fonts.css?v=0.4.0">
+  <link rel="stylesheet" href="src/styles.css?v=0.4.0">
 </head>
 <body>
   <div class="app" id="libraryView">
@@ -49,12 +49,18 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 12h20M12 2l3 10-3 10"></path></svg>Offline
         </span>
         <a class="bar-link" id="readerOriginal" href="#" target="_blank" rel="noopener">Original<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 17L17 7M9 7h8v8"></path></svg></a>
+        <button class="icon-btn aa-btn" id="readerAa" type="button" aria-label="Text and theme" aria-expanded="false" aria-controls="readingSheet">Aa</button>
         <button class="icon-btn" id="readerDelete" type="button" aria-label="Delete this page">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"></path></svg>
         </button>
       </div>
     </header>
     <iframe class="reader-frame" id="readerFrame" sandbox="allow-same-origin" title="Saved page"></iframe>
+    <div class="sheet-catch" id="sheetCatch" hidden></div>
+    <div class="sheet" id="readingSheet" role="dialog" aria-label="Text and theme" hidden>
+      <span class="sheet-grip" aria-hidden="true"></span>
+      <div class="sheet-body" id="readingBody"></div>
+    </div>
   </section>
   <section class="screen" id="settingsView" hidden aria-label="Settings">
     <header class="screen-bar">
@@ -68,12 +74,12 @@
   </section>
   <div class="toast" id="toast" role="status" hidden></div>
 
-  <script src="src/platform.js?v=0.3.1"></script>
-  <script src="src/motion.js?v=0.3.1"></script>
-  <script src="src/vendor/Readability.js?v=0.3.1"></script>
-  <script src="src/store.js?v=0.3.1"></script>
-  <script src="src/save.js?v=0.3.1"></script>
-  <script src="src/reader.js?v=0.3.1"></script>
-  <script src="src/app.js?v=0.3.1"></script>
+  <script src="src/platform.js?v=0.4.0"></script>
+  <script src="src/motion.js?v=0.4.0"></script>
+  <script src="src/vendor/Readability.js?v=0.4.0"></script>
+  <script src="src/store.js?v=0.4.0"></script>
+  <script src="src/save.js?v=0.4.0"></script>
+  <script src="src/reader.js?v=0.4.0"></script>
+  <script src="src/app.js?v=0.4.0"></script>
 </body>
 </html>
