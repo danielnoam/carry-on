@@ -7,14 +7,14 @@
 // release's changed files new URLs. Third-party requests are never touched.
 //
 // ASSETS is also exactly what tools/build-www.js copies into the app.
-const CACHE = "carryon-v11";
+const CACHE = "carryon-v12";
 const ASSETS = [
   "./", "./index.html",
   "./src/fonts.css", "./src/styles.css", "./src/reader.css",
   "./src/platform.js", "./src/motion.js", "./src/store.js", "./src/save.js", "./src/reader.js", "./src/app.js",
   "./src/vendor/Readability.js",
   "./src/fonts/SourceSerif4.woff2", "./src/fonts/SourceSerif4-Italic.woff2", "./src/fonts/InstrumentSans.woff2",
-  "./manifest.json", "./icon.svg",
+  "./manifest.json", "./icon.svg", "./CHANGELOG.md",
 ];
 
 self.addEventListener("install", (e) => {

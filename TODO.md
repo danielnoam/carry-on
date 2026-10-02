@@ -54,15 +54,6 @@ todo:
   it's mostly packaging), a self-contained HTML file that can be imported
   back, or shared through the share sheet as one of those or as the link.
 
-## Updates
-
-- An Updates section in Settings: the version you have, "Check for
-  updates", and when a newer one is out, its download and install right
-  there (the library's update bar stays as the nudge that sends you to it).
-- An in-app changelog: what's new in each version, readable from Settings,
-  shown once after an update installs. Built from CHANGELOG.md so it's
-  written in one place.
-
 ## Sync
 
 - Sync saved pages to a private GitHub repo, like LifeLog's sync

@@ -7,8 +7,8 @@
   <title>Carry-on</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="src/fonts.css?v=0.10.0">
-  <link rel="stylesheet" href="src/styles.css?v=0.10.0">
+  <link rel="stylesheet" href="src/fonts.css?v=0.11.0">
+  <link rel="stylesheet" href="src/styles.css?v=0.11.0">
 </head>
 <body>
   <div class="app" id="libraryView">
@@ -30,7 +30,10 @@
     <footer class="save-bar">
       <div class="update-bar" id="updateBar" role="status" hidden>
         <span class="update-text" id="updateText"></span>
-        <button class="btn-small" id="updateBtn" type="button">Update</button>
+        <button class="btn-small" id="updateBtn" type="button">View</button>
+        <button class="icon-btn update-close" id="updateClose" type="button" aria-label="Dismiss">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+        </button>
       </div>
       <form id="saveForm" class="save-form">
         <label for="saveUrl" class="visually-hidden">Page link</label>
@@ -93,14 +96,24 @@
     </header>
     <div class="screen-body" id="settingsBody"></div>
   </section>
+  <section class="screen" id="newsView" hidden aria-label="What's new">
+    <header class="screen-bar">
+      <button class="icon-btn" id="newsBack" type="button" aria-label="Back">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg>
+      </button>
+      <h1 class="bar-title">What's new</h1>
+      <span class="bar-spacer" aria-hidden="true"></span>
+    </header>
+    <div class="screen-body" id="newsBody"></div>
+  </section>
   <div class="toast" id="toast" role="status" hidden></div>
 
-  <script src="src/platform.js?v=0.10.0"></script>
-  <script src="src/motion.js?v=0.10.0"></script>
-  <script src="src/vendor/Readability.js?v=0.10.0"></script>
-  <script src="src/store.js?v=0.10.0"></script>
-  <script src="src/save.js?v=0.10.0"></script>
-  <script src="src/reader.js?v=0.10.0"></script>
-  <script src="src/app.js?v=0.10.0"></script>
+  <script src="src/platform.js?v=0.11.0"></script>
+  <script src="src/motion.js?v=0.11.0"></script>
+  <script src="src/vendor/Readability.js?v=0.11.0"></script>
+  <script src="src/store.js?v=0.11.0"></script>
+  <script src="src/save.js?v=0.11.0"></script>
+  <script src="src/reader.js?v=0.11.0"></script>
+  <script src="src/app.js?v=0.11.0"></script>
 </body>
 </html>
