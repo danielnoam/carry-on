@@ -55,7 +55,9 @@ scripts (Hebrew, Arabic, CJK) fall back to the system font by
 | Overline | Instrument Sans | 13 / 18 | 600, caps, 0.08em |
 
 Body text runs at about 65 characters a line (`max-width: 38rem`). Reader
-text size is adjustable in five steps from 16 to 24 px (Target).
+text size is adjustable in five steps (16, 18, 19, 21, 24 px), line
+spacing in three (1.4, 1.58, 1.8 times the size), and the font between
+Source Serif 4 and Instrument Sans (Now).
 
 ## 3. Space, shape, depth (Now)
 
@@ -84,7 +86,11 @@ text size is adjustable in five steps from 16 to 24 px (Target).
 - **Reader top bar:** back, an "Offline" pill when there is no connection,
   "Original" with an arrow (opens the source in the phone's browser), and
   "Aa" for text size and theme. Hides on scroll down, returns on scroll up.
-  Now: back, Offline, Original and Delete; Aa and hiding are Target.
+  Now: back, Offline, Original, Aa and Delete; hiding is Target.
+- **Aa sheet (Now):** rises from the bottom on the sheet spring, the one
+  soft shadow, no scrim. Rows: text size (A, five dots, A), spacing and
+  font as segmented controls, theme as four swatches. Tapping the page or
+  back closes it.
 - **Image figure (Now):** saved preview, caption, "Full size online" on the
   right. Online, the full image replaces the preview in place; a tap opens
   it full screen. No preview saved: dashed border, image glyph, the page's

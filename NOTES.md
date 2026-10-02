@@ -3,6 +3,16 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Reading settings are tokens too (0.4.0).** Text size, spacing and font
+  are `--reader-fs`, `--reader-lh` and `--reader-font` on the app's :root,
+  copied into the sandboxed page with the theme's colours, so the reader
+  needs no script of its own. Sizes are 16, 18, 19, 21, 24 px (19 is the
+  design's body size, so the default stays put); line height is the size
+  times 1.4, 1.58 or 1.8. The Aa sheet is a history entry, so Android's
+  back closes it before the page, and it has no scrim so each change shows
+  on the text as it's made. One builder makes the controls for the sheet
+  and for Settings.
+
 - **Page requests carry the WebView's browser string (0.3.1).** The app
   name alone as User-Agent made some sites (ynet) never answer, and with no
   deadline on native requests a save sat on "Saving" for good. Now the

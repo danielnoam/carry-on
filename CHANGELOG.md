@@ -2,6 +2,16 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.4.0] - 2026-10-02
+
+### Added
+- Aa in the reader: a sheet rises from the bottom with text size (five
+  steps), line spacing (tight, normal, loose), font (serif or sans) and
+  theme. Changes show on the page as you make them; tap the page or go
+  back to close it.
+- Settings has a Reading section with the same text size, spacing and
+  font, and a sample line to judge them by.
+
 ## [0.3.1] - 2026-10-02
 
 ### Fixed

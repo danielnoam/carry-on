@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.3.1";
+  const APP_VERSION = "0.4.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -9,6 +9,7 @@
   const THEMES = ["paper", "sepia", "night"];
   const THEME_KEY = "carryon.theme";
   const IMAGES_KEY = "carryon.images";
+  const READING_KEY = "carryon.reading";
 
   const $ = (id) => document.getElementById(id);
 
@@ -74,8 +75,43 @@
     saving: [],
     open: null,
     settings: false,
+    sheet: false,
   };
   paintTheme(state.theme);
+
+  // ---- Reading ----
+  // Text size, line spacing and font for saved pages, set from the reader's
+  // Aa sheet or Settings. They're tokens on the app's :root, which
+  // src/reader.js copies into the page like the theme's colours.
+  const SIZES = [16, 18, 19, 21, 24];
+  const SPACING = { tight: 1.4, normal: 1.58, loose: 1.8 };
+  const FONTS = { serif: "--serif", sans: "--sans" };
+  const READING_DEFAULT = { size: 2, spacing: "normal", font: "serif" };
+
+  function readingPrefs() {
+    const r = { ...READING_DEFAULT, ...load(READING_KEY, {}) };
+    if (!(r.size >= 0 && r.size < SIZES.length)) r.size = READING_DEFAULT.size;
+    if (!SPACING[r.spacing]) r.spacing = READING_DEFAULT.spacing;
+    if (!FONTS[r.font]) r.font = READING_DEFAULT.font;
+    return r;
+  }
+
+  function paintReading() {
+    const r = readingPrefs();
+    const px = SIZES[r.size];
+    const root = document.documentElement.style;
+    root.setProperty("--reader-fs", px + "px");
+    root.setProperty("--reader-lh", Math.round(px * SPACING[r.spacing]) + "px");
+    root.setProperty("--reader-font", "var(" + FONTS[r.font] + ")");
+    if (C.reader) C.reader.applyTheme();
+  }
+
+  function setReading(change) {
+    store(READING_KEY, { ...readingPrefs(), ...change });
+    paintReading();
+    document.querySelectorAll(".reading-controls").forEach(syncReadingControls);
+  }
+  paintReading();
   if (darkQuery && darkQuery.addEventListener) darkQuery.addEventListener("change", () => { if (state.theme === "system") paintTheme("system"); });
 
   function formatSize(bytes) {
@@ -264,6 +300,7 @@
 
   function closeReader() {
     if (!state.open) return;
+    closeSheet(true);
     state.open = null;
     uncover($("readerView")).then(() => { if (!state.open) C.reader.close(); });
   }
@@ -277,6 +314,90 @@
     history.back();
     renderLibrary();
     toast("Deleted");
+  }
+
+  // The same controls in the Aa sheet and in Settings. A change is applied
+  // at once and every copy on screen follows it in place, so focus stays put.
+  function seg(name, label, options, current, onpick, cls) {
+    return el("div", { class: "seg" + (cls ? " " + cls : ""), role: "radiogroup", "aria-label": label },
+      ...options.map((o) => el("label", { class: "seg-item" },
+        el("input", { class: "visually-hidden", type: "radio", name, value: o.value, checked: o.value === current,
+          onchange: () => onpick(o.value) }),
+        el("span", { class: "seg-face", style: o.style || null }, o.swatch ? swatch(o.swatch) : null, o.label))));
+  }
+
+  let readingGroups = 0;
+  function readingControls(withTheme) {
+    const r = readingPrefs();
+    const id = "rc" + ++readingGroups;
+    const row = (label, control) => el("div", { class: "rc-row" }, el("span", { class: "rc-label" }, label), control);
+    const steps = el("span", { class: "steps", role: "img" }, ...SIZES.map(() => el("span", { class: "step" })));
+    const stepper = el("div", { class: "stepper" },
+      el("button", { class: "step-btn small", type: "button", "data-step": "-1", "aria-label": "Smaller text",
+        onclick: () => setReading({ size: Math.max(0, readingPrefs().size - 1) }) }, "A"),
+      steps,
+      el("button", { class: "step-btn large", type: "button", "data-step": "1", "aria-label": "Larger text",
+        onclick: () => setReading({ size: Math.min(SIZES.length - 1, readingPrefs().size + 1) }) }, "A"));
+    const box = el("div", { class: "reading-controls" },
+      row("Text size", stepper),
+      row("Spacing", seg(id + "-spacing", "Line spacing", [
+        { value: "tight", label: "Tight" }, { value: "normal", label: "Normal" }, { value: "loose", label: "Loose" },
+      ], r.spacing, (v) => setReading({ spacing: v }))),
+      row("Font", seg(id + "-font", "Font", [
+        { value: "serif", label: "Serif", style: "font-family: var(--serif)" },
+        { value: "sans", label: "Sans", style: "font-family: var(--sans)" },
+      ], r.font, (v) => setReading({ font: v }))),
+      withTheme ? row("Theme", seg(id + "-theme", "Theme", [
+        { value: "system", label: "Auto", swatch: ["paper", "night"] },
+        { value: "paper", label: "Paper", swatch: ["paper"] },
+        { value: "sepia", label: "Sepia", swatch: ["sepia"] },
+        { value: "night", label: "Night", swatch: ["night"] },
+      ], state.theme, (v) => { setTheme(v); syncThemeInputs(); }, "themes")) : null);
+    syncReadingControls(box);
+    return box;
+  }
+
+  function syncReadingControls(box) {
+    const r = readingPrefs();
+    box.querySelectorAll(".step").forEach((s, i) => { s.classList.toggle("on", i <= r.size); s.classList.toggle("now", i === r.size); });
+    box.querySelector(".steps").setAttribute("aria-label", "Text size " + (r.size + 1) + " of " + SIZES.length);
+    box.querySelector('[data-step="-1"]').disabled = r.size === 0;
+    box.querySelector('[data-step="1"]').disabled = r.size === SIZES.length - 1;
+    for (const [k, v] of [["spacing", r.spacing], ["font", r.font]]) {
+      box.querySelectorAll('input[name$="-' + k + '"]').forEach((i) => { i.checked = i.value === v; });
+    }
+  }
+
+  // The theme lives in two places (Aa and Settings); keep both radios true.
+  function syncThemeInputs() {
+    document.querySelectorAll('input[name$="-theme"], input[name="' + THEME_KEY + '"]').forEach((i) => { i.checked = i.value === state.theme; });
+  }
+
+  // ---- The Aa sheet ----
+  // A history entry of its own, so Android's back closes it before the page.
+
+  function openSheet(fromHistory) {
+    if (state.sheet || !state.open) return;
+    state.sheet = true;
+    $("readingBody").replaceChildren(readingControls(true));
+    if (!fromHistory) history.pushState({ view: "reader", page: state.open.id, sheet: true }, "");
+    $("readerAa").setAttribute("aria-expanded", "true");
+    $("sheetCatch").hidden = false;
+    $("readingSheet").hidden = false;
+    M.rise($("readingSheet"));
+    const first = $("readingSheet").querySelector("button:not(:disabled), input:checked");
+    if (first) first.focus({ preventScroll: true });
+  }
+
+  function closeSheet(now) {
+    if (!state.sheet) return;
+    state.sheet = false;
+    $("readerAa").setAttribute("aria-expanded", "false");
+    $("sheetCatch").hidden = true;
+    const sheet = $("readingSheet");
+    if (now) { sheet.hidden = true; return; }
+    M.sink(sheet).then(() => { if (!state.sheet) sheet.hidden = true; });
+    $("readerAa").focus({ preventScroll: true });
   }
 
   // ---- Settings ----
@@ -339,6 +460,15 @@
       g.footnote ? el("p", { class: "footnote" }, g.footnote) : null);
   }
 
+  function readingGroup() {
+    return el("section", { class: "settings-section" },
+      el("h2", { class: "overline" }, "Reading"),
+      el("div", { class: "group" },
+        el("p", { class: "reading-sample" }, "The page is the product. Everything else gets out of its way."),
+        readingControls(false)),
+      el("p", { class: "footnote" }, "Also under Aa while you read."));
+  }
+
   function storageGroup() {
     const n = state.pages.length;
     const list = el("div", { class: "group" });
@@ -372,7 +502,8 @@
   }
 
   function renderSettings() {
-    $("settingsBody").replaceChildren(...SETTINGS.map(choiceGroup), storageGroup(), aboutGroup());
+    const [appearance, saving] = SETTINGS.map(choiceGroup);
+    $("settingsBody").replaceChildren(appearance, readingGroup(), saving, storageGroup(), aboutGroup());
   }
 
   function openSettings(fromHistory) {
@@ -397,6 +528,8 @@
     if (view !== "reader") closeReader();
     if (view !== "settings") closeSettings();
     if (view === "reader" && (!state.open || state.open.id !== s.page)) openPage(s.page, true);
+    if (view === "reader" && !s.sheet) closeSheet();
+    if (view === "reader" && s.sheet && state.open && state.open.id === s.page) openSheet(true);
     if (view === "settings") openSettings(true);
   }
 
@@ -424,6 +557,9 @@
 
   $("readerBack").addEventListener("click", () => history.back());
   $("readerDelete").addEventListener("click", deleteOpen);
+  $("readerAa").addEventListener("click", () => (state.sheet ? history.back() : openSheet()));
+  $("sheetCatch").addEventListener("click", () => history.back());
+  addEventListener("keydown", (e) => { if (e.key === "Escape" && state.sheet) history.back(); });
   addEventListener("popstate", (e) => route(e.state));
   addEventListener("online", showOffline);
   addEventListener("offline", showOffline);
