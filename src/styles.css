@@ -311,6 +311,8 @@ html.native .reader-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top
 /* The reader's Aa sheet: rises over the bottom of the page, no scrim, so
    each change shows on the text above it as it's made. */
 .sheet-catch { position: absolute; inset: 0; z-index: 1; }
+/* The bar stays live over the catch, so Aa and ⋯ swap or close their sheet. */
+.reader-bar { position: relative; z-index: 3; }
 .sheet-catch[hidden], .sheet[hidden] { display: none; }
 .sheet {
   position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
@@ -340,6 +342,47 @@ html.native .reader-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top
 .step { width: 8px; height: 8px; border-radius: var(--r-full); background: var(--muted); opacity: 0.35; transition: transform var(--spring-control-ms, 300ms) var(--spring-control, ease-out), background-color 120ms linear; }
 .step.on { background: var(--accent); opacity: 1; }
 .step.now { transform: scale(1.5); }
+.rc-row.top { align-items: flex-start; }
+.rc-row.top .rc-label { padding-top: 9px; }
+.page-controls { display: flex; flex-direction: column; gap: var(--s-4); }
+.tag-edit { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--s-2); }
+.chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); }
+.chip {
+  position: relative; min-height: 36px; min-width: var(--tap); padding: 0 var(--s-3);
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border: 1px solid var(--line); border-radius: var(--r-full);
+  background: var(--bg); color: var(--ink); font: inherit; font-size: var(--fs-meta); font-weight: 500;
+  cursor: pointer; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+  transition: background-color 120ms linear, color 120ms linear, border-color 120ms linear;
+}
+/* 36px to look at, 44px to hit. */
+.chip::before { content: ""; position: absolute; inset: -4px 0; }
+.chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.chip-x { font-size: 16px; line-height: 1; opacity: 0.8; }
+/* Scrolls edge to edge, so a long tag list isn't clipped at the gutter. */
+.filters {
+  flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+  margin: var(--s-3) calc(-1 * var(--gutter)) 0; padding: 4px var(--gutter); scroll-padding-inline: var(--gutter);
+}
+.filters[hidden] { display: none; }
+.filters::-webkit-scrollbar { display: none; }
+.filters .chip { flex-shrink: 0; }
+.tag-input {
+  flex: 1; min-width: 120px; min-height: var(--tap); padding: 0 var(--s-3);
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--bg); color: var(--ink); font: inherit;
+}
+.tag-input:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
+.sheet-row {
+  min-height: var(--tap); padding: 0 var(--s-3);
+  display: flex; align-items: center;
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--bg); color: var(--ink); font: inherit; font-weight: 500; cursor: pointer;
+}
+.sheet-row.danger { color: var(--warn); }
+.sheet-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.card-tag { color: var(--accent); }
 .seg {
   flex: 1; display: flex; padding: 3px; gap: 3px;
   border-radius: var(--r-md); background: var(--bg); border: 1px solid var(--line);

@@ -7,8 +7,8 @@
   <title>Carry-on</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="src/fonts.css?v=0.6.0">
-  <link rel="stylesheet" href="src/styles.css?v=0.6.0">
+  <link rel="stylesheet" href="src/fonts.css?v=0.7.0">
+  <link rel="stylesheet" href="src/styles.css?v=0.7.0">
 </head>
 <body>
   <div class="app" id="libraryView">
@@ -22,6 +22,7 @@
         </div>
       </div>
       <p class="meta" id="libraryMeta"></p>
+      <div class="chips filters" id="filters" role="group" aria-label="Show" hidden></div>
     </header>
 
     <main class="library" id="library" aria-live="polite"></main>
@@ -50,8 +51,8 @@
         </span>
         <a class="bar-link" id="readerOriginal" href="#" target="_blank" rel="noopener">Original<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 17L17 7M9 7h8v8"></path></svg></a>
         <button class="icon-btn aa-btn" id="readerAa" type="button" aria-label="Text and theme" aria-expanded="false" aria-controls="readingSheet">Aa</button>
-        <button class="icon-btn" id="readerDelete" type="button" aria-label="Delete this page">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"></path></svg>
+        <button class="icon-btn" id="readerMore" type="button" aria-label="This page" aria-expanded="false" aria-controls="readingSheet">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg>
         </button>
       </div>
     </header>
@@ -74,12 +75,12 @@
   </section>
   <div class="toast" id="toast" role="status" hidden></div>
 
-  <script src="src/platform.js?v=0.6.0"></script>
-  <script src="src/motion.js?v=0.6.0"></script>
-  <script src="src/vendor/Readability.js?v=0.6.0"></script>
-  <script src="src/store.js?v=0.6.0"></script>
-  <script src="src/save.js?v=0.6.0"></script>
-  <script src="src/reader.js?v=0.6.0"></script>
-  <script src="src/app.js?v=0.6.0"></script>
+  <script src="src/platform.js?v=0.7.0"></script>
+  <script src="src/motion.js?v=0.7.0"></script>
+  <script src="src/vendor/Readability.js?v=0.7.0"></script>
+  <script src="src/store.js?v=0.7.0"></script>
+  <script src="src/save.js?v=0.7.0"></script>
+  <script src="src/reader.js?v=0.7.0"></script>
+  <script src="src/app.js?v=0.7.0"></script>
 </body>
 </html>

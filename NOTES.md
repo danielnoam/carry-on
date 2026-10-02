@@ -3,6 +3,18 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Tags and filters (0.7.0).** Tags live in the library index as
+  `tags` (an array of strings) on each entry, so filtering never opens a
+  page's folder. Matching is case-insensitive, and a new tag takes the
+  spelling of one already in use. The filter is a single value
+  (`carryon.filter`: all, unread, finished or `#tag`); a tag filter whose
+  last page loses the tag falls back to All. "Unread" means never scrolled
+  past the first 2%, the same line the card uses for "min left". The Aa
+  and ⋯ sheets share one element and one history entry: tapping the other
+  button swaps the sheet in place, so back still leaves in one step, and
+  the reader bar sits above the sheet's tap-catcher so its buttons work
+  while a sheet is up.
+
 - **A library card is a div with a stretched button (0.6.0).** Retry has
   to sit on the card, and a button can't hold another, so `.card-open`
   is an empty button covering the card (labelled with the title) and

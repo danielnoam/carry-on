@@ -87,11 +87,19 @@ Source Serif 4 and Instrument Sans (Now).
 - **Reader top bar:** back, an "Offline" pill when there is no connection,
   "Original" with an arrow (opens the source in the phone's browser), and
   "Aa" for text size and theme. Hides on scroll down, returns on scroll up.
-  Now: back, Offline, Original, Aa and Delete; hiding is Target.
+  Now: back, Offline, Original, Aa and ⋯ (This page); hiding is Target.
 - **Aa sheet (Now):** rises from the bottom on the sheet spring, the one
   soft shadow, no scrim. Rows: text size (A, five dots, A), spacing and
   font as segmented controls, theme as four swatches. Tapping the page or
   back closes it.
+- **Page sheet (Now):** ⋯ opens it in the Aa sheet's place. Tags as
+  round chips (accent fill, × to remove), an "Add a tag" field, then
+  "+ tag" chips for tags used elsewhere, most used first. "Delete this
+  page" last, as a full-width row in the warn colour.
+- **Filter chips (Now):** under the library's meta line, scrolling edge
+  to edge: All, Unread, Finished, then #tags. The chosen one is filled
+  with the accent; tapping it again goes back to All. Hidden while the
+  library is empty. Chips are 36 px to the eye and 44 px to the touch.
 - **Image figure (Now):** saved preview, caption, "Full size online" on the
   right. Online, the full image replaces the preview in place; a tap opens
   it full screen. No preview saved: dashed border, image glyph, the page's
