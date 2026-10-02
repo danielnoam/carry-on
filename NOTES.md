@@ -3,6 +3,56 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **What Carry-on takes from WebToEpub (0.20.0).** WebToEpub (the
+  browser extension that packs web novels into EPUBs) was read before
+  writing the EPUB export. It is GPLv3, so no code is copied: epub.js is
+  written from the EPUB 3.3 spec, and only these ideas come from it.
+  `mimetype` first and stored; both nav.xhtml and toc.ncx, since older
+  readers and Kindle's conversion still read the NCX;
+  `dcterms:modified` without milliseconds; the legacy `<meta
+  name="cover">` (name before content, for Nook) beside the
+  `cover-image` property; chapters built in an XHTML-namespaced document
+  and serialised with XMLSerializer, then parsed back as XML to prove
+  they're well-formed; numbered file names; no WebP (it warns that
+  readers may not show it), so epub.js turns WebP into JPEG on a canvas.
+  Where it differs: EPUB 3 always (WebToEpub defaults to EPUB 2), a
+  `urn:uuid` identifier rather than the address, and no SVG cover page,
+  since one article doesn't need a cover screen. epubcheck 5.4 passes
+  English and Hebrew pages and a two-page book in the e2e run; it isn't
+  in `node test/run-all.js`, which has no Java.
+- **"Save all chapters" from a contents page: yes, for 0.21.0, as a
+  list to check (0.20.0).** WebToEpub's generic finder takes every link
+  on the page in order, with no host or container logic, and is usable
+  only because the user filters it, picks a range and ticks boxes; its
+  427 per-site parsers exist for contents split over several pages or
+  drawn by scripts, and for finding the text. Carry-on already finds the
+  text (Readability, and the hidden WebView for script-built pages), so
+  it needs only the list: same-host links, the largest group of sibling
+  links, sorted by chapter number, shown in Save several to check
+  before saving. It won't follow a contents page split over several
+  pages; Save next and Save previous, All cover those series instead.
+- **Saving runs one page at a time, half a second apart (0.20.0).**
+  "All" could mean hundreds of chapters, so pages come in one after
+  another with a 500 ms pause (what WebToEpub uses), and Stop ends the
+  run after the page being saved. Previous pages get `folderAt` just
+  below the first page's, so they go in front without renumbering the
+  folder. Pages saved before 0.20.0 never looked for a previous link
+  (`prev` is missing, not ""), so a folder reads its first page's from
+  the original once, quietly, when it opens.
+- **PDF goes through the phone's print screen, not a PDF writer
+  (0.20.0).** Android's WebView ignores `window.print()`, so
+  native/share has a Print plugin on both platforms (PrintManager with a
+  WebView's print adapter; UIPrintInteractionController with a
+  WKWebView's print formatter on iOS). The page goes in as the same
+  one-file HTML as Send, pictures inlined, laid out in a WebView of its
+  own with JavaScript and the network off and a CSP that allows only
+  `data:` images. The web copy prints it from a frame sandboxed without
+  scripts. Neither plugin can be tried off a phone.
+- **The folder's tools moved to the top (0.20.0).** Daniel asked for
+  them at the top, where a long folder doesn't hide them. They are the page
+  sheet's tiles, so a folder and a page look alike; Save previous sits
+  above the list and Save next below it, where those pages will go.
+
 - **The UI rework follows sketches Daniel picked (0.19.0).** The design
   canvas has the 0.19.0 rows: library A (sections) over B (tabs), the
   grouped ⋯ and the Settings menu. Daniel's AI design guide was checked

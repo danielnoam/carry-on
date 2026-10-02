@@ -80,6 +80,11 @@ test("links worded as the next chapter are recognised, other links aren't", () =
   for (const t of ["Previous", "Next week's issue", "Chapter 2", "Read next: ten more", "", null]) assert.ok(!S.isNextText(t), String(t));
 });
 
+test("links worded as the previous chapter are recognised, other links aren't", () => {
+  for (const t of ["Previous", "Prev", "« Previous Chapter", "‹ Prev", "← previous page", "הפרק הקודם", "Anterior", "上一章"]) assert.ok(S.isPrevText(t), t);
+  for (const t of ["Next", "Previously on the show", "Chapter 1", "Previous issues: 12", "", null]) assert.ok(!S.isPrevText(t), String(t));
+});
+
 test("the reader's CSP allows no scripts, frames, forms or connections", () => {
   assert.ok(/default-src 'none'/.test(R.CSP));
   assert.ok(!/script-src|unsafe-eval|connect-src|frame-src|child-src/.test(R.CSP));

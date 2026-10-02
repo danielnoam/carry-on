@@ -7,8 +7,8 @@
   <title>Carry-on</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="src/fonts.css?v=0.19.0">
-  <link rel="stylesheet" href="src/styles.css?v=0.19.0">
+  <link rel="stylesheet" href="src/fonts.css?v=0.20.0">
+  <link rel="stylesheet" href="src/styles.css?v=0.20.0">
 </head>
 <body>
   <div class="app" id="libraryView">
@@ -16,9 +16,6 @@
       <div class="top-row">
         <h1 class="screen-title">Library</h1>
         <div class="top-actions">
-          <button class="icon-btn" id="searchBtn" type="button" aria-label="Search" aria-expanded="false" aria-controls="searchBox">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path></svg>
-          </button>
           <button class="icon-btn" id="selectBtn" type="button" aria-label="Select pages">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M8.5 12.2l2.4 2.4 4.6-4.8"></path></svg>
           </button>
@@ -36,11 +33,13 @@
         </button>
       </div>
       <p class="meta search-note" id="searchNote" role="status" hidden></p>
-      <div class="chips filters" id="filters" role="group" aria-label="Show" hidden></div>
-      <div class="chips filters tag-filters" id="tagFilters" role="group" aria-label="Tags" hidden></div>
     </header>
 
     <main class="library" id="library" aria-live="polite"></main>
+    <div class="filter-box wide" id="filterBox" data-key="filters">
+      <div class="chips filters" id="filters" role="group" aria-label="Show" hidden></div>
+      <div class="chips filters tag-filters" id="tagFilters" role="group" aria-label="Tags" hidden></div>
+    </div>
 
     <footer class="save-bar">
       <div class="update-bar" id="updateBar" role="status" hidden>
@@ -165,13 +164,14 @@
   </div>
   <div class="toast" id="toast" role="status" hidden></div>
 
-  <script src="src/platform.js?v=0.19.0"></script>
-  <script src="src/motion.js?v=0.19.0"></script>
-  <script src="src/vendor/Readability.js?v=0.19.0"></script>
-  <script src="src/store.js?v=0.19.0"></script>
-  <script src="src/save.js?v=0.19.0"></script>
-  <script src="src/backup.js?v=0.19.0"></script>
-  <script src="src/reader.js?v=0.19.0"></script>
-  <script src="src/app.js?v=0.19.0"></script>
+  <script src="src/platform.js?v=0.20.0"></script>
+  <script src="src/motion.js?v=0.20.0"></script>
+  <script src="src/vendor/Readability.js?v=0.20.0"></script>
+  <script src="src/store.js?v=0.20.0"></script>
+  <script src="src/save.js?v=0.20.0"></script>
+  <script src="src/backup.js?v=0.20.0"></script>
+  <script src="src/epub.js?v=0.20.0"></script>
+  <script src="src/reader.js?v=0.20.0"></script>
+  <script src="src/app.js?v=0.20.0"></script>
 </body>
 </html>

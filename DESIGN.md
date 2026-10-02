@@ -80,16 +80,18 @@ Source Serif 4 and Instrument Sans (Now).
 
 ## 5. Components
 
-- **Library (Now):** title, then search (magnifier), Select (a tick in
-  a circle) and Settings (a gear) as 44 px icons; the count; the filter
-  chips. Under All the library is in sections, each with an overline:
-  "Continue reading" (the started page read last, one card), "Folders"
-  (a row of tiles that scrolls sideways on a phone and wraps on a
-  desktop), then "Pages" or "Pages in no folder · N" with the order on
-  the right ("Newest saved", "Last read", "Longest", "Site", a quiet
-  select with an arrows icon). A filter or a search lists pages only,
-  under "Unread · 4", "#trip · 3" or "Found · 2". At 900 px and wider
-  the pages are two columns.
+- **Library (Now):** title, then Select (a tick in a circle) and
+  Settings (a gear) as 44 px icons; the count; search, always open.
+  Without a search the library is in sections, each with an overline:
+  "Continue reading" (the started page read last, one card; Settings,
+  Appearance, Library can turn it off), "Folders" (a row of tiles that
+  scrolls sideways on a phone and wraps on a desktop), then the filter
+  chips, then "Pages" or "Pages in no folder · N" with the order on the
+  right ("Newest saved", "Last read", "Longest", "Site", a quiet select
+  with an arrows icon). A filter lists every page it matches, folder
+  pages too, under "Unread · 4" or "#trip · 3"; a search lists pages
+  only, under "Found · 2". At 900 px and wider the pages are two
+  columns.
 - **Library card (Now):** thumbnail, site line (site, folder, #tags),
   serif title, then the reading line ("9 min", "6 min left" with a 3 px
   accent line, or "Finished") and the size. A status only when it needs
@@ -129,8 +131,9 @@ Source Serif 4 and Instrument Sans (Now).
   accent icon over the label). "This page": tags as round chips (accent
   fill, × to remove), an "Add a tag" field, then "+ tag" chips for tags
   used elsewhere; the folder the same way. "Series": Previous and Next
-  side by side, and Save next. "More": a group of rows, Mark as read or
-  unread, Save full images (counting "Saving full images, 3 of 12"),
+  side by side, and Save previous and Save next. "More": a group of rows,
+  Send as EPUB, Print or save as PDF, Mark as read or unread, Save full
+  images (counting "Saving full images, 3 of 12"),
   then "Delete this page" in the warn colour. The sheet scrolls past 76%
   of the screen.
 - **Settings (Now):** a menu of three groups: Appearance and Saving (the
@@ -147,9 +150,10 @@ Source Serif 4 and Instrument Sans (Now).
   footnote saying what a backup holds and that the copy saved last wins.
   The result is a toast, such as "Restored 12 pages. 3 already here were
   kept."
-- **Folder screen (Now):** pushed like Settings. The count, a full-width
-  primary button to carry on, then the pages as a numbered group; the
-  next one's number is in the accent.
+- **Folder screen (Now):** pushed like Settings. The count, the
+  folder's tools, a full-width primary button to carry on, Save
+  previous, then the pages as a numbered group (the next one's number in
+  the accent), then Save next.
 - **Next in a folder (Now):** at the end of the page, after the licence,
   a bordered block "Next in Novel" over the title in the accent serif. In
   ⋯, Previous and Next side by side, dimmed when there's none.
@@ -171,18 +175,20 @@ Source Serif 4 and Instrument Sans (Now).
   with the position, from the page's start side; it's decoration
   (aria-hidden), the page itself being the content. Reduced motion: the
   bar appears and disappears without sliding.
-- **Library search (Now):** opens from the magnifier in the title row
-  (it arrives on the sheet spring and takes focus): a 44 px field on
-  `--surface` under the library's count, magnifier inside on the start
-  side, × to clear on the end side once there's text. Escape clears, and
-  a second Escape closes it. Results are page cards;
+- **Library search (Now):** always there once something is saved: a
+  44 px field on `--surface` under the library's count, magnifier inside
+  on the start side, × to clear on the end side once there's text.
+  Escape clears. Results are page cards;
   a text match adds its sentence in muted meta type under the title,
   two lines at most. None found: "Nothing matches “…”." (with " in
   Finished" and the like when a filter is on) and Clear search.
-- **Folder screen actions (Now):** quiet buttons under the list: Add
-  pages, Select, Reorder, Rename, Remove folder (warn colour). Reorder shows a
-  chevron up and down (44 px, accent; disabled ones in `--line`) on each
-  row and a full-width Done. Remove folder asks in place: "Remove the
+- **Folder screen tools (Now):** above the pages, the page sheet's tiles
+  (64 px, accent icon over the label) three to a row on a phone and six
+  in one row from 600 px: Add pages, Select, Reorder (dimmed with one
+  page), Rename, EPUB, Remove (icon and label in the warn colour).
+  Reorder swaps them for "Move pages with the arrows." and Done, and
+  shows a chevron up and down (44 px, accent; disabled ones in
+  `--line`) on each row. Remove asks in place: "Remove the
   folder, keep its N pages", "Delete the folder and its N pages" (warn,
   then a system confirm), Cancel.
 - **Save several button (Now):** a list icon (44 px) after Save in the
@@ -193,8 +199,16 @@ Source Serif 4 and Instrument Sans (Now).
   tap zooms (up to 5×), a swipe down fades the ground as it goes and
   closes past 120 px. Reduced motion: it fades in and out, and zoom
   steps without easing.
-- **Save next (Now):** "Save next" with 1, 5 and 10 as chips, in ⋯ and
-  at the end of a folder's list, when the last page has a next link.
+- **Save next and previous (Now):** "Save next" with 1, 5, 10 and All
+  as chips, in ⋯ and under a folder's list, when the last page has a
+  next link; "Save previous" the same above the list, for the first
+  page. While a run saves, the chips dim and Stop (warn colour) joins
+  them. Pages come one at a time, half a second apart.
+- **Switch (Now):** 52 × 32, a `--muted` knob in a `--muted` outline
+  when off; on, the track fills with the accent and the knob, in
+  `--accent-ink`, slides to the end (mirrored right to left). A focus
+  ring like every control's; the whole row is the target. Reduced motion: the knob
+  moves without sliding.
 - **Updates (Now):** a Settings screen: "This version", a status row
   (spinner while checking or downloading; "Carry-on 0.12.0 is out" in the
   accent with Update / 42% / Install, or Get it on iOS), what's in it as

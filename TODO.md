@@ -24,55 +24,21 @@ asks from Daniel.
 
 ---
 
-## 0.20.0: EPUB of one page (after the WebToEpub research)
-
-**Goal:** a saved page reads on an e-reader.
-
-**Items**
-- Research WebToEpub first: how it finds a chapter list (per-site parsers
-  against its generic one), collects chapters, and packs the EPUB
-  (structure, cover, table of contents, images). Outcome: a NOTES.md entry
-  saying what Carry-on borrows, and a yes or no on "Save all chapters" for
-  0.21.0. No code ships from the research alone.
-- Export a page as EPUB 3 from the reader's ⋯.
-- **(moved from 0.18.0)** PDF through the phone's print. Android's
-  WebView ignores `window.print()`, so this needs a native call:
-  `PrintManager` with a WebView's `createPrintDocumentAdapter` in
-  native/share, and `UIPrintInteractionController` on iOS. It was left
-  out of 0.18.0 because both plugins can only be tested on the phones,
-  and EPUB covers reading elsewhere better than a PDF does.
-
-**Steps**
-1. Read WebToEpub's parser and packer code; write the NOTES entry.
-2. EPUB writer in src/: mimetype stored first and uncompressed, then
-   META-INF/container.xml, content.opf, nav.xhtml, one XHTML chapter,
-   images. Reuse 0.18.0's zip helper.
-3. The page is already clean HTML with local images, so this is mostly
-   converting it to XHTML (self-closing tags, escaped entities) and
-   packaging. Include the Wikipedia licence line and the original link.
-4. Validate with epubcheck in the test run (or in CI if it needs Java).
-
-**Daniel's phone:** open the EPUB in an e-reader app (and on a Kindle via
-Send to Kindle, which accepts EPUB) with Hebrew and with images.
-
-**Depends on:** 0.18.0 (zip helper `C.backup.zipWriter`, share sheet
-`C.platform.shareFile`).
-
----
-
 ## 0.21.0: Whole folders as books
 
 **Goal:** a web novel goes from a table of contents page to one EPUB.
 
 **Items**
-- Export a whole folder as one EPUB: chapters in folder order, a table of
-  contents, the first page's image or a generated title card as cover.
-- "Save all chapters" from a table-of-contents page (if the 0.20.0
-  research says a generic finder is good enough): list the chapter links
-  it found, in Save several, for Daniel to check before saving.
+- A folder's EPUB already makes one book of its pages, in order, with
+  contents (0.20.0). Left: a cover, the first page's image or a
+  generated title card, and the folder's name as the series.
+- "Save all chapters" from a table-of-contents page (0.20.0's research
+  says yes, as a list to check; see NOTES.md): list the chapter links it
+  found, in Save several, for Daniel to check before saving.
 
 **Steps**
-1. Folder EPUB: one XHTML per page, nav from page titles.
+1. Cover: a title card drawn on a canvas (folder name, site) when the
+   first page has no picture; an XHTML cover page first in the spine.
 2. Chapter list finder: the largest run of same-host links in one list
    or table whose text looks like chapters (numbers in order); hand them
    to Save several with a new folder named after the page.
@@ -81,7 +47,7 @@ Send to Kindle, which accepts EPUB) with Hebrew and with images.
 **Daniel's phone:** a real web novel with 30+ chapters, from its contents
 page to an EPUB on an e-reader.
 
-**Depends on:** 0.20.0 (EPUB writer, research).
+**Depends on:** 0.20.0 (EPUB writer, research, Save all).
 
 ---
 
