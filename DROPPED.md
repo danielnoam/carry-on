@@ -19,4 +19,5 @@ stops being true.
 - **Syncing saved pages through a GitHub repo, as LifeLog syncs its
   data.** Fine for a JSON index, wrong for megabytes of images, and asking
   other people for a GitHub token is a non-starter. v1 is per device with
-  export and import.
+  export and import. *Revived 2 Oct 2026:* Daniel wants it for his own
+  devices; it's in TODO.md under Sync, with the image question open.

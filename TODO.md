@@ -38,6 +38,23 @@ todo:
   total.
 - Export one page as a self-contained HTML file; import it back.
 
+## Sync
+
+- Sync saved pages to a private GitHub repo, like LifeLog's sync
+  (src/storage.js there: a fine-grained token for one repo, the contents
+  API, `sha` for conflicts, offline edits merged on the next sync). Daniel
+  asked for it on 2 Oct 2026, reviving the DROPPED.md entry. Open points:
+  - Images. The contents API reads files up to 1 MB inline (LifeLog's sync
+    broke at 1 MB, see its NOTES.md), and a repo of previews grows fast:
+    about 0.5 to 1.5 MB per illustrated page. Options: sync `library.json`
+    and each `page.html` + `meta.json` and re-download previews on the other
+    device; or also push `images/` through the Git Data API (blobs and one
+    tree per save, not one commit per file).
+  - Deletes have to sync too (a tombstone in `library.json`), or a page
+    deleted on one phone comes back from the other.
+  - The token is per device and stays in the app; for anyone but Daniel
+    this stays optional, with export and import as the no-account way.
+
 ## Before shipping to other people
 
 - Decide: desktop browser version in v1 (adds the optional worker)?
