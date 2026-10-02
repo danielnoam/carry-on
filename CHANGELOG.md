@@ -2,6 +2,20 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.3.1] - 2026-10-02
+
+### Fixed
+- Saving a page from some news sites (ynet among them) stayed on "Saving"
+  forever. Requests now look like the phone's browser, a site that doesn't
+  answer gives up after 30 seconds, and an image after 20.
+- A save that fails now stays in the library as a card with the reason,
+  "Try again" and "Remove", instead of a message that was gone in three
+  seconds.
+- Hebrew and other right-to-left pages are saved and read right to left,
+  in the reader and on their library card.
+- A page's own headline no longer appears twice at the top of the saved
+  page.
+
 ## [0.3.0] - 2026-10-02
 
 ### Added

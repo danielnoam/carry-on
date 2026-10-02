@@ -3,6 +3,18 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Page requests carry the WebView's browser string (0.3.1).** The app
+  name alone as User-Agent made some sites (ynet) never answer, and with no
+  deadline on native requests a save sat on "Saving" for good. Now the
+  User-Agent is the WebView's own plus "Carry-on (…)", which still names
+  the app as Wikipedia asks, and every fetch and download has a deadline
+  (`deadline()` in src/platform.js) on top of the native timeouts, which
+  not every plugin version honours.
+- **Failed saves stay as cards (0.3.1).** A toast is gone before anyone
+  looks back at the phone, which read as "nothing happened". The failed
+  card keeps the reason until Try again or Remove; it isn't stored, so it
+  goes on restart.
+
 - **Sharing into the app is a small local plugin (0.3.0).** native/share
   follows LifeLog's native/widgets: a Capacitor plugin in this repo,
   installed with a `file:` dependency, so `cap sync` picks it up with no

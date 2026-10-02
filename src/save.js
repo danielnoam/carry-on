@@ -113,6 +113,7 @@
     try {
       res = await C.platform.fetchText(url, { headers });
     } catch (e) {
+      if (/time(d)?\s?out/i.test((e && e.message) || "")) throw new SaveError("The site didn't answer. Try again, or later on a better connection.");
       throw new SaveError(C.platform.canFetchPages
         ? "Couldn't reach this page. Check the link, or try again when you're online."
         : "This browser can't fetch that site directly. Save it from the Carry-on app.");
@@ -121,6 +122,13 @@
     if (res.status === 404 || res.status === 410) throw new SaveError("That page doesn't exist any more. Check the link.");
     if (res.status >= 400) throw new SaveError("The site answered with an error (" + res.status + "). Try again later.");
     return res;
+  }
+
+  // Hebrew and Arabic pages say so on <html> or <body>; the saved page keeps
+  // it, or the reader lays them out left to right.
+  function textDir(doc) {
+    const d = (doc.documentElement.getAttribute("dir") || (doc.body && doc.body.getAttribute("dir")) || "").toLowerCase();
+    return d === "rtl" ? "rtl" : "";
   }
 
   function parse(html, base) {
@@ -158,7 +166,7 @@
     return {
       url, title: title.trim(), site: "Wikipedia", byline: "",
       body: doc.body, base: url,
-      licence: "wikipedia",
+      licence: "wikipedia", dir: textDir(doc),
     };
   }
 
@@ -186,6 +194,8 @@
       site: (article.siteName || siteName(finalUrl)).trim(),
       byline: (article.byline || "").trim(),
       body, base: finalUrl, licence: null,
+      lang: (doc.documentElement.getAttribute("lang") || article.lang || "").trim(),
+      dir: article.dir === "rtl" || textDir(doc) === "rtl" ? "rtl" : "",
     };
   }
 
@@ -405,6 +415,7 @@
       : "Saved from " + meta.site + " on " + formatDate(meta.savedAt) + ". ", link);
     const doc = out.implementation.createHTMLDocument(meta.title);
     if (meta.lang) doc.documentElement.lang = meta.lang;
+    if (meta.dir) doc.documentElement.dir = meta.dir;
     doc.body.append(head, root, foot);
     return "<!doctype html>\n" + doc.documentElement.outerHTML;
   }
@@ -424,12 +435,17 @@
     const out = document.implementation.createHTMLDocument("");
     const { root, media } = clean(got.body, got.base, got.url, out);
     if (!root.textContent.trim()) throw new SaveError("Nothing readable was found on this page.");
+    // The page's own headline, when the article kept it, would sit under the
+    // one pageHtml writes.
+    const norm = (t) => t.replace(/\s+/g, " ").trim().toLowerCase();
+    const first = root.querySelector("h2, h3");
+    if (first && norm(first.textContent) === norm(got.title) && norm(root.textContent).startsWith(norm(first.textContent))) first.remove();
 
     const id = newId();
     const meta = {
       id, url: got.url, title: got.title, site: got.site, byline: got.byline,
       licence: got.licence, savedAt: Date.now(), minutes: readingMinutes(root.textContent),
-      lang: wiki ? wiki.host.split(".")[0] : "", mode: C.platform.native ? mode : "links",
+      lang: wiki ? wiki.host.split(".")[0] : got.lang || "", dir: got.dir || "", mode: C.platform.native ? mode : "links",
     };
     if (onProgress) onProgress({ stage: "images", done: 0, total: media.length });
     const res = await localise(id, media, mode, (done, total) => onProgress && onProgress({ stage: "images", done, total }));
@@ -445,7 +461,7 @@
   }
 
   C.save = {
-    save, SaveError,
+    save, SaveError, textDir,
     wikipediaPage, wikimediaThumb, parseSrcset, pickWidth, youtubeId, vimeoId, extOf, isTrackingPixel, readingMinutes, siteName,
   };
 })();
