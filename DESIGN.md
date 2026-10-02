@@ -28,6 +28,7 @@ Every color is a token on `:root`, redefined per theme on
 | `--video` | #3A4048 | #4A3F33 | #262C34 | Video card ground behind the thumbnail |
 | `--on-video` | #FFFFFF | #FFFFFF | #FFFFFF | Play glyph |
 | `--scrim` | black 55% | black 55% | black 55% | Play button disc |
+| `--viewer` | #0B0D10 | #0B0D10 | #0B0D10 | Behind a full-screen image (with `--on-video` for its controls) |
 | `--shadow` | black 8% | brown 10% | black 45% | The one soft shadow: a screen pushed over the library |
 
 Night is for a dim cabin: no pure white text, no pure black ground.
@@ -123,6 +124,12 @@ Source Serif 4 and Instrument Sans (Now).
   fills with the position, from the page's start side; it's decoration
   (aria-hidden), the page itself being the content. Reduced motion: the
   bar appears and disappears without sliding.
+- **Image viewer (Now):** a tapped image fills the screen on `--viewer`,
+  growing from where it sat (sheet spring), its caption below in
+  `--on-video`, × top right on a `--scrim` disc (44 px). Pinch or double
+  tap zooms (up to 5×), a swipe down fades the ground as it goes and
+  closes past 120 px. Reduced motion: it fades in and out, and zoom
+  steps without easing.
 - **Save next (Now):** "Save next" with 1, 5 and 10 as chips, in ⋯ and
   at the end of a folder's list, when the last page has a next link.
 - **Updates (Now):** a Settings section: "This version", a status row

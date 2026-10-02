@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.13.0";
+  const APP_VERSION = "0.14.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -78,6 +78,8 @@
     open: null,
     settings: false,
     sheet: false,
+    // Whether a tapped image is up full screen over the reader.
+    image: false,
     batch: false,
     news: false,
     // The folder whose screen is up (its name), under the reader if a page is open.
@@ -480,7 +482,7 @@
   }
 
   // The history entry for a page in the reader (and the sheet over it).
-  const readerState = (p, sheet) => ({ view: "reader", page: p.id, folder: state.folder || undefined, sheet: sheet || undefined });
+  const readerState = (p, sheet, image) => ({ view: "reader", page: p.id, folder: state.folder || undefined, sheet: sheet || undefined, image: image || undefined });
 
   function show(p, html) {
     state.open = p;
@@ -492,6 +494,7 @@
       at: p.at || 0, next: endLink(p),
       onPosition: (f) => notePosition(p, f),
       onScroll: readerScrolled,
+      onImage: openImage,
       top: () => $("readerView").querySelector(".reader-bar").offsetHeight,
     });
   }
@@ -566,6 +569,7 @@
     renderLibrary();
     if (state.folder) renderFolder();
     closeSheet(true);
+    if (state.image) { state.image = false; $("imageViewer").hidden = true; $("viewerImg").removeAttribute("src"); }
     state.open = null;
     popScreen($("readerView")).then(() => { if (!state.open) C.reader.close(); });
   }
@@ -675,6 +679,158 @@
     M.sink(sheet).then(() => { if (!state.sheet) sheet.hidden = true; });
     button.focus({ preventScroll: true });
   }
+
+  // ---- Image viewer ----
+  // A tapped image, full screen, in its own history entry so back closes
+  // it. It grows from where it sat in the page (a fade under reduced
+  // motion), shows the preview at once and the full image when online.
+
+  const V = { s: 1, x: 0, y: 0, drag: 0, pointers: new Map(), start: null, tap: null };
+  const MAX_ZOOM = 5;
+
+  function openImage(info) {
+    if (state.image || !state.open) return;
+    state.image = true;
+    history.pushState(readerState(state.open, undefined, true), "");
+    const viewer = $("imageViewer"), img = $("viewerImg");
+    img.alt = info.alt || info.caption || "";
+    img.src = info.src;
+    $("viewerCaption").textContent = info.caption;
+    $("viewerCaption").hidden = !info.caption;
+    if (info.full && info.full !== info.src && navigator.onLine) {
+      const probe = new Image();
+      probe.onload = () => { if (state.image && img.getAttribute("src") === info.src) img.src = info.full; };
+      probe.src = info.full;
+    }
+    resetView(false);
+    viewer.hidden = false;
+    $("readerView").classList.remove("bar-away");
+    $("viewerClose").focus({ preventScroll: true });
+    const grow = () => {
+      if (M.reduced() || !info.rect.width) return M.arrive(viewer, 0);
+      const r = img.getBoundingClientRect();
+      if (!r.width) return M.arrive(viewer, 0);
+      const k = info.rect.width / r.width;
+      const dx = info.rect.left + info.rect.width / 2 - (r.left + r.width / 2);
+      const dy = info.rect.top + info.rect.height / 2 - (r.top + r.height / 2);
+      const t = M.timing("sheet");
+      viewer.animate([{ backgroundColor: "transparent" }, { backgroundColor: getComputedStyle(viewer).backgroundColor }], t);
+      img.animate([{ transform: "translate(" + dx + "px," + dy + "px) scale(" + k + ")" }, { transform: "none" }], t);
+    };
+    if (img.complete && img.naturalWidth) grow(); else img.addEventListener("load", grow, { once: true });
+  }
+
+  function closeImage() {
+    if (!state.image) return;
+    state.image = false;
+    const viewer = $("imageViewer");
+    M.leave(viewer).then(() => {
+      if (state.image) return;
+      viewer.hidden = true;
+      $("viewerImg").removeAttribute("src");
+      resetView(false);
+    });
+    $("readerFrame").focus({ preventScroll: true });
+  }
+
+  function paintView(settle) {
+    const img = $("viewerImg");
+    img.classList.toggle("settle", !!settle);
+    img.style.transform = "translate(" + V.x + "px," + (V.y + V.drag) + "px) scale(" + V.s + ")";
+    $("imageViewer").classList.toggle("zoomed", V.s > 1);
+    const fade = V.s === 1 ? Math.max(0.3, 1 - Math.abs(V.drag) / 400) : 1;
+    $("imageViewer").style.backgroundColor = fade < 1 ? "rgb(11 13 16 / " + fade + ")" : "";
+  }
+  function resetView(settle) {
+    V.s = 1; V.x = 0; V.y = 0; V.drag = 0;
+    paintView(settle);
+  }
+  // Keeps a zoomed image covering the stage: no panning off into black.
+  function clampView() {
+    const stage = $("viewerStage").getBoundingClientRect();
+    const img = $("viewerImg");
+    const w = img.offsetWidth * V.s, h = img.offsetHeight * V.s;
+    const mx = Math.max(0, (w - stage.width) / 2), my = Math.max(0, (h - stage.height) / 2);
+    V.x = Math.min(mx, Math.max(-mx, V.x));
+    V.y = Math.min(my, Math.max(-my, V.y));
+  }
+  // Zooms to `s` keeping the point under (px, py) (stage coordinates) still.
+  function zoomAt(s, px, py) {
+    const stage = $("viewerStage").getBoundingClientRect();
+    const cx = px - stage.left - stage.width / 2, cy = py - stage.top - stage.height / 2;
+    s = Math.min(MAX_ZOOM, Math.max(1, s));
+    const k = s / V.s;
+    V.x = cx - (cx - V.x) * k;
+    V.y = cy - (cy - V.y) * k;
+    V.s = s;
+    if (s === 1) { V.x = 0; V.y = 0; }
+    clampView();
+  }
+
+  const stage = $("viewerStage");
+  const pts = () => [...V.pointers.values()];
+  stage.addEventListener("pointerdown", (e) => {
+    stage.setPointerCapture(e.pointerId);
+    V.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const p = pts();
+    if (p.length === 2) {
+      V.start = { d: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y), s: V.s, x: V.x, y: V.y, mx: (p[0].x + p[1].x) / 2, my: (p[0].y + p[1].y) / 2, pinch: true };
+      V.drag = 0;
+    } else if (p.length === 1) {
+      V.start = { px: e.clientX, py: e.clientY, x: V.x, y: V.y, t: Date.now(), moved: false };
+    }
+  });
+  stage.addEventListener("pointermove", (e) => {
+    if (!V.pointers.has(e.pointerId) || !V.start) return;
+    V.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const p = pts();
+    if (V.start.pinch && p.length === 2) {
+      const d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+      const mx = (p[0].x + p[1].x) / 2, my = (p[0].y + p[1].y) / 2;
+      V.x = V.start.x + (mx - V.start.mx); V.y = V.start.y + (my - V.start.my);
+      zoomAt(V.start.s * d / V.start.d, mx, my);
+      paintView(false);
+      return;
+    }
+    if (V.start.pinch) return;
+    const dx = e.clientX - V.start.px, dy = e.clientY - V.start.py;
+    if (Math.hypot(dx, dy) > 6) V.start.moved = true;
+    if (V.s > 1) { V.x = V.start.x + dx; V.y = V.start.y + dy; clampView(); }
+    else V.drag = dy;
+    paintView(false);
+  });
+  const lift = (e) => {
+    if (!V.pointers.has(e.pointerId)) return;
+    V.pointers.delete(e.pointerId);
+    const start = V.start;
+    if (V.pointers.size) { if (start && start.pinch) V.start = null; return; }
+    V.start = null;
+    if (!start || start.pinch) { clampView(); paintView(true); return; }
+    if (V.drag) {
+      const far = Math.abs(V.drag) > 120 || Math.abs(V.drag) / Math.max(1, Date.now() - start.t) > 0.6;
+      if (far) { history.back(); return; }
+      V.drag = 0;
+      paintView(true);
+      return;
+    }
+    if (start.moved || e.type === "pointercancel") return;
+    // A double tap zooms in on that spot, or back out.
+    const now = Date.now();
+    if (V.tap && now - V.tap.t < 300 && Math.hypot(e.clientX - V.tap.x, e.clientY - V.tap.y) < 30) {
+      V.tap = null;
+      if (V.s > 1) resetView(true); else { zoomAt(2.5, e.clientX, e.clientY); paintView(true); }
+      return;
+    }
+    V.tap = { t: now, x: e.clientX, y: e.clientY };
+  };
+  stage.addEventListener("pointerup", lift);
+  stage.addEventListener("pointercancel", lift);
+  stage.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    zoomAt(V.s * Math.exp(-e.deltaY / 300), e.clientX, e.clientY);
+    paintView(false);
+  }, { passive: false });
+  $("viewerClose").addEventListener("click", () => history.back());
 
   // ---- Tags ----
   // Any number per page, as typed (trimmed, at most 32 characters), with
@@ -1145,6 +1301,8 @@
     if (!folder) closeFolder();
     else if (!state.folder) openFolder(folder, true);
     if (view === "reader" && (!state.open || state.open.id !== s.page)) openPage(s.page, true);
+    if (state.image && !(view === "reader" && s.image)) closeImage();
+    if (view === "reader" && s.image && !state.image) history.back();
     if (view === "reader" && s.sheet !== state.sheet) closeSheet();
     if (view === "reader" && s.sheet && state.open && state.open.id === s.page) openSheet(s.sheet, true);
     if (view === "settings") openSettings(true);
@@ -1157,7 +1315,7 @@
     if (!(history.state && history.state.view)) return Promise.resolve();
     return new Promise((resolve) => {
       addEventListener("popstate", () => resolve(), { once: true });
-      history.go(-[state.folder, state.open, state.sheet, state.settings, state.batch, state.news].filter(Boolean).length || -1);
+      history.go(-[state.folder, state.open, state.sheet, state.image, state.settings, state.batch, state.news].filter(Boolean).length || -1);
     });
   }
 
@@ -1182,7 +1340,7 @@
     savePage(url);
   });
 
-  $("readerBack").addEventListener("click", () => history.go(state.sheet ? -2 : -1));
+  $("readerBack").addEventListener("click", () => history.go(state.sheet || state.image ? -2 : -1));
   // A button closes its own sheet, and swaps the other one in place (one
   // history entry for whichever sheet is up).
   function toggleSheet(kind) {
@@ -1193,7 +1351,7 @@
   $("readerMore").addEventListener("click", () => toggleSheet("page"));
   $("readerAa").addEventListener("click", () => toggleSheet("reading"));
   $("sheetCatch").addEventListener("click", () => history.back());
-  addEventListener("keydown", (e) => { if (e.key === "Escape" && state.sheet) history.back(); });
+  addEventListener("keydown", (e) => { if (e.key === "Escape" && (state.sheet || state.image)) history.back(); });
   addEventListener("popstate", (e) => route(e.state));
   addEventListener("online", () => { showOffline(); renderLibrary(); });
   addEventListener("offline", () => { showOffline(); renderLibrary(); });

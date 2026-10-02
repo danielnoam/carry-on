@@ -17,7 +17,7 @@
   let frame = null, doc = null, scrollTimer = null, scrollFrame = 0, topSpace = null;
   // The "Next" link this file adds at the end of a page in a folder; only
   // that element (not a look-alike in the page) moves on.
-  let nextLink = null, onNext = null;
+  let nextLink = null, onNext = null, onImage = null;
   // Each missing image's placeholder, which sits before the image's link
   // when it has one, so the link's underline doesn't run through it.
   let placeholders = new WeakMap();
@@ -107,7 +107,35 @@
     swapNearImages();
   }
 
+  // What a tapped image hands the viewer: where it is on screen, what to
+  // show now, the full image to swap in when online, and its words.
+  function imageInfo(img) {
+    const r = img.getBoundingClientRect();
+    const f = frame.getBoundingClientRect();
+    const fig = img.closest("figure");
+    const cap = fig && fig.querySelector("figcaption");
+    let caption = "";
+    if (cap) {
+      const c = cap.cloneNode(true);
+      c.querySelectorAll(".co-full").forEach((n) => n.remove());
+      caption = c.textContent.replace(/\s+/g, " ").trim();
+    }
+    return {
+      src: img.currentSrc || img.src,
+      full: /^https:/.test(img.getAttribute("data-full") || "") ? img.getAttribute("data-full") : "",
+      alt: (img.getAttribute("alt") || "").trim(),
+      caption,
+      rect: { left: f.left + r.left, top: f.top + r.top, width: r.width, height: r.height },
+    };
+  }
+
   function onClick(e) {
+    const img = onImage && e.target.closest && e.target.closest("img");
+    if (img && !img.hidden && !img.closest(".co-video") && img.naturalWidth) {
+      e.preventDefault();
+      onImage(imageInfo(img));
+      return;
+    }
     const a = e.target.closest && e.target.closest("a[href]");
     if (!a) return;
     e.preventDefault();
@@ -141,9 +169,11 @@
   // and reports the position as the reader scrolls: onScroll(at, y) every
   // frame, onPosition(at) once it stops. Resolves once it's shown.
   // `next` ({ over, title, go }) adds a link to the next page at the end;
-  // `top` () gives the height the bar covers.
-  function open(iframe, html, meta, { at = 0, onPosition, onScroll, next, top } = {}) {
+  // `top` () gives the height the bar covers; onImage(info) opens a tapped
+  // image.
+  function open(iframe, html, meta, { at = 0, onPosition, onScroll, next, top, onImage: image } = {}) {
     frame = iframe;
+    onImage = image || null;
     topSpace = top || null;
     doc = null;
     nextLink = null;
@@ -206,6 +236,7 @@
     frame = null;
     doc = null;
     topSpace = null;
+    onImage = null;
     nextLink = null;
     onNext = null;
   }

@@ -9,6 +9,20 @@ bold title and its version so a search finds it.
   `Filesystem.downloadFile`) and the share target are proven. Pages that
   build themselves with JavaScript still fail; that's its own TODO item.
 
+- **The image viewer lives in the app, not the page (0.14.0).** The
+  saved page can't run scripts, so reader.js catches the tap on an
+  `<img>` (as it does links) and hands the app its on-screen rect, its
+  current source, its `data-full` (https only) and its caption; the
+  viewer is an overlay in the app's own document. Its own history entry
+  (`image: true` on the reader's state) means Android's back closes it.
+  Zoom is done by hand with pointer events (two pointers pinch, one pans
+  when zoomed, else drags to dismiss past 120 px or a fast flick), the
+  wheel on desktop, and a double tap toggles 2.5×; panning is clamped so
+  the image always covers the stage. Opening animates the image from its
+  rect in the page (a FLIP with the sheet spring); reduced motion fades.
+  An image already swapped to its full version in the page is shown as
+  is, so offline it comes from the WebView's cache.
+
 - **Glossary (0.14.0).** One word per thing, in the code, the interface
   and these docs:
   - **Saved page:** a page kept on the phone; its **index entry** is its
