@@ -2,6 +2,20 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.18.0] - 2026-10-02
+
+### Added
+- Back up the whole library to one file: Settings, Backup, "Back up the
+  library" makes a file with every page, its pictures, tags, folders and
+  where you were, and hands it to the share sheet so you can keep it in
+  your files, a cloud drive or an email. "Restore or open a file" brings
+  it back on a new phone or after reinstalling. When a page is in both,
+  the copy saved last is kept.
+- Share a page from ⋯: "Share link" sends its address, and "Send as a
+  file" sends the page itself as one HTML file, with its pictures inside,
+  that opens in any browser. Opened in Carry-on, it comes back into the
+  library with its tags and folder.
+
 ## [0.17.0] - 2026-10-02
 
 ### Added

@@ -466,6 +466,57 @@
     return { root, media };
   }
 
+  // A saved page coming back in (an exported file, 0.18.0): the article
+  // part of its body, rebuilt from the same allowlist plus the few classes
+  // and attributes Carry-on itself writes. Images keep only a data: picture
+  // or an https link; anything else a hand-edited file carries is dropped.
+  // Resolves to { root, images } with the data: pictures to write out.
+  const CO_CLASS = /^co-(body|video|play|video-title|video-note|credit|missing)$/;
+  const DATA_IMAGE = /^data:image\/(png|jpe?g|gif|webp);base64,[a-z0-9+/=\s]+$/i;
+  function cleanSaved(body, out) {
+    const images = [];
+    const https = (v) => (/^https:\/\//i.test(v || "") ? v : null);
+    function walk(from, to) {
+      for (const node of [...from.childNodes]) {
+        if (node.nodeType === 3) { to.append(out.createTextNode(node.data)); continue; }
+        if (node.nodeType !== 1) continue;
+        let tag = node.localName;
+        if (DROP.has(tag)) continue;
+        if (tag === "h1") tag = "h2";
+        if (!KEEP.has(tag)) { walk(node, to); continue; }
+        const el = out.createElement(tag);
+        for (const a of GLOBAL_ATTRS.concat(ATTRS[tag] || [])) {
+          const v = node.getAttribute(a);
+          if (v != null && a !== "href") el.setAttribute(a, v);
+        }
+        const cls = (node.getAttribute("class") || "").split(/\s+/).filter((c) => CO_CLASS.test(c));
+        if (cls.length) el.className = cls.join(" ");
+        if (tag === "a") {
+          const h = node.getAttribute("href") || "";
+          if (h.startsWith("#") || /^(https?|mailto):/i.test(h)) el.setAttribute("href", h);
+        }
+        if (tag === "span" && node.hasAttribute("data-site")) el.setAttribute("data-site", node.getAttribute("data-site"));
+        if (tag === "span" && cls.includes("co-play")) el.setAttribute("aria-hidden", "true");
+        if (tag === "img") {
+          const src = node.getAttribute("src") || "";
+          for (const a of ["data-full", "data-preview"]) if (https(node.getAttribute(a))) el.setAttribute(a, node.getAttribute(a));
+          if (node.hasAttribute("data-credit")) el.setAttribute("data-credit", node.getAttribute("data-credit"));
+          if (DATA_IMAGE.test(src)) images.push({ el, data: src });
+          else if (https(src)) el.setAttribute("src", src);
+          else if (!el.hasAttribute("data-full")) continue;
+          else el.className = "co-missing";
+        }
+        walk(node, el);
+        to.append(el);
+      }
+    }
+    body.querySelectorAll(".co-head, .co-licence, .co-next").forEach((n) => n.remove());
+    const root = out.createElement("div");
+    root.className = "co-body";
+    walk(body.querySelector(".co-body") || body, root);
+    return { root, images };
+  }
+
   // ---- Media ----
 
   // Downloads one image into the page's directory; a preview much wider
@@ -680,7 +731,7 @@
   }
 
   C.save = {
-    save, SaveError, retryMissing, saveFullImages, findNext, creditLine, textDir, isNextText, plainText,
+    save, SaveError, retryMissing, saveFullImages, findNext, creditLine, cleanSaved, savedPageHtml, newId, textDir, isNextText, plainText,
     wikipediaPage, wikimediaThumb, parseSrcset, pickWidth, youtubeId, vimeoId, extOf, isTrackingPixel, readingMinutes, siteName,
   };
 })();

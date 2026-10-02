@@ -179,10 +179,60 @@
     });
   }
 
+  // ---- Files for export and backup (0.18.0) ----
+
+  // Every file in a page's directory, as paths inside it ("page.html",
+  // "images/0s.jpg"). Empty in a browser.
+  async function listFiles(id) {
+    if (!FS()) return [];
+    const out = [];
+    async function walk(dir) {
+      let files;
+      try { ({ files } = await FS().readdir({ path: "pages/" + id + (dir ? "/" + dir : ""), directory: DIR })); } catch (e) { return; }
+      for (const f of files) {
+        const name = typeof f === "string" ? f : f.name;
+        const rel = (dir ? dir + "/" : "") + name;
+        if (f.type === "directory") await walk(rel);
+        else out.push(rel);
+      }
+    }
+    await walk("");
+    return out;
+  }
+
+  // A file in a page's directory as bytes, read through the WebView's own
+  // file server like an image is.
+  async function readBytes(id, rel) {
+    const r = await fetch(pageDirUrl(id) + rel.split("/").map(encodeURIComponent).join("/"));
+    if (!r.ok) throw new Error("missing " + rel);
+    return new Uint8Array(await r.arrayBuffer());
+  }
+
+  async function writeBytes(id, rel, bytes) {
+    await FS().writeFile({ path: "pages/" + id + "/" + rel, data: toBase64(bytes), directory: DIR, recursive: true });
+  }
+
+  // A file in the app's cache written a piece at a time, so a backup of
+  // hundreds of megabytes never sits in memory or crosses the bridge whole.
+  async function cacheFile(name) {
+    await FS().writeFile({ path: name, data: "", directory: "CACHE", recursive: true });
+    return {
+      append: (bytes) => FS().appendFile({ path: name, data: toBase64(bytes), directory: "CACHE" }),
+      uri: async () => (await FS().getUri({ path: name, directory: "CACHE" })).uri,
+    };
+  }
+
+  function toBase64(bytes) {
+    let s = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(s);
+  }
+
   // The URL a page's relative paths (images/3.jpg) resolve against.
   function pageDirUrl(id) {
     return dataUrl ? dataUrl + "pages/" + id + "/" : null;
   }
 
-  window.CarryOn.store = { ready, readIndex, writeIndex, writePage, readPage, removePage, writeText, readText, download, removeFile, shrink, pageDirUrl, bytesOf };
+  window.CarryOn.store = { ready, readIndex, writeIndex, writePage, readPage, removePage, writeText, readText, download, removeFile, shrink, pageDirUrl, bytesOf,
+    listFiles, readBytes, writeBytes, cacheFile, toBase64 };
 })();
