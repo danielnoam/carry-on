@@ -124,6 +124,12 @@ Source Serif 4 and Instrument Sans (Now).
   fills with the position, from the page's start side; it's decoration
   (aria-hidden), the page itself being the content. Reduced motion: the
   bar appears and disappears without sliding.
+- **Library search (Now):** a 44 px field on `--surface` under the
+  library's count, magnifier inside on the start side, × to clear on the
+  end side once there's text; Escape clears too. Results are page cards;
+  a text match adds its sentence in muted meta type under the title,
+  two lines at most. None found: "Nothing matches “…”." (with " in
+  Finished" and the like when a filter is on) and Clear search.
 - **Folder screen actions (Now):** quiet buttons under the list: Add
   pages, Reorder, Rename, Remove folder (warn colour). Reorder shows a
   chevron up and down (44 px, accent; disabled ones in `--line`) on each

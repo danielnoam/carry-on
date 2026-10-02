@@ -24,30 +24,6 @@ asks from Daniel.
 
 ---
 
-## 0.16.0: Search the library
-
-**Goal:** find a page once the library is long.
-
-**Items**
-- A search field at the top of the library: titles, sites and tags first,
-  then the text of the pages.
-
-**Steps**
-1. Title, site and tag search on the index, as you type, with the filter
-   chips still applying.
-2. Text search: store a plain-text copy (`text.txt`) beside each new
-   `page.html` at save time; for older pages, build it the first time a
-   search runs, with a progress line. Search text only after a pause in
-   typing, and show the matching sentence on the card.
-3. Hebrew and Arabic: compare without niqqud and harakat, case-folded.
-
-**Daniel's phone:** search a library of 50+ pages, including Hebrew; time
-the first full-text search.
-
-**Depends on:** nothing.
-
----
-
 ## 0.17.0: Better images
 
 **Goal:** previews are small on every site, credits are kept, and a page

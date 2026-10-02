@@ -85,7 +85,24 @@
       try { await FS().rmdir({ path: "pages/" + id, directory: DIR, recursive: true }); } catch (e) { /* already gone */ }
       return;
     }
-    try { await idbDo("readwrite", (s) => s.delete(id)); } catch (e) { /* already gone */ }
+    try { await idbDo("readwrite", (s) => { s.delete(id + ":text"); return s.delete(id); }); } catch (e) { /* already gone */ }
+  }
+
+  // The page's words as plain text (text.txt), for searching the library.
+  // null when it was saved before 0.16.0 and hasn't been read for it yet.
+  async function writeText(id, text) {
+    if (FS()) {
+      await FS().writeFile({ path: "pages/" + id + "/text.txt", data: text, directory: DIR, encoding: "utf8", recursive: true });
+    } else {
+      await idbDo("readwrite", (s) => s.put(text, id + ":text"));
+    }
+  }
+  async function readText(id) {
+    try {
+      if (FS()) return (await FS().readFile({ path: "pages/" + id + "/text.txt", directory: DIR, encoding: "utf8" })).data;
+      const t = await idbDo("readonly", (s) => s.get(id + ":text"));
+      return typeof t === "string" ? t : null;
+    } catch (e) { return null; }
   }
 
   // Downloads `url` into the page's directory; resolves to the file's size.
@@ -104,5 +121,5 @@
     return dataUrl ? dataUrl + "pages/" + id + "/" : null;
   }
 
-  window.CarryOn.store = { ready, readIndex, writeIndex, writePage, readPage, removePage, download, pageDirUrl, bytesOf };
+  window.CarryOn.store = { ready, readIndex, writeIndex, writePage, readPage, removePage, writeText, readText, download, pageDirUrl, bytesOf };
 })();

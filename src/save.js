@@ -487,6 +487,16 @@
     return "<!doctype html>\n" + doc.documentElement.outerHTML;
   }
 
+  // A page's words with a line break after each block, for search: the
+  // article only, without the header and licence lines savedPageHtml adds.
+  const BLOCKS = "p, li, h1, h2, h3, h4, h5, h6, figcaption, blockquote, pre, td, th, dt, dd, div, section, article";
+  function plainText(root) {
+    const copy = root.cloneNode(true);
+    copy.querySelectorAll(".co-head, .co-licence, .co-next, script, style").forEach((n) => n.remove());
+    copy.querySelectorAll(BLOCKS).forEach((n) => n.append("\n"));
+    return copy.textContent.split("\n").map((l) => l.replace(/\s+/g, " ").trim()).filter(Boolean).join("\n");
+  }
+
   // ---- Saving ----
 
   function newId() {
@@ -521,6 +531,9 @@
     const html = savedPageHtml(meta, root, out);
     try {
       meta.bytes = res.bytes + await C.store.writePage(id, html, meta);
+      const text = plainText(root);
+      await C.store.writeText(id, text);
+      meta.bytes += C.store.bytesOf(text);
     } catch (e) {
       await C.store.removePage(id);
       throw new SaveError("Couldn't write the page to the phone. Free some space and try again.");
@@ -563,7 +576,7 @@
   }
 
   C.save = {
-    save, SaveError, retryMissing, textDir, isNextText,
+    save, SaveError, retryMissing, textDir, isNextText, plainText,
     wikipediaPage, wikimediaThumb, parseSrcset, pickWidth, youtubeId, vimeoId, extOf, isTrackingPixel, readingMinutes, siteName,
   };
 })();

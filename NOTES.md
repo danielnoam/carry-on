@@ -9,6 +9,21 @@ bold title and its version so a search finds it.
   `Filesystem.downloadFile`) and the share target are proven. Pages that
   build themselves with JavaScript still fail; that's its own TODO item.
 
+- **Search keeps each page's words in text.txt (0.16.0).** Saving
+  writes `pages/<id>/text.txt` (IndexedDB key `<id>:text` in a browser)
+  beside page.html: the article only, a line per block (`save.plainText`).
+  The library reads them all into memory the first time a search needs
+  text, so later searches don't touch the disk; a page saved before
+  0.16.0 is read from its page.html once and gets its text.txt then.
+  Titles, sites, tags and folders match on every keystroke; the text
+  after 300 ms still. Matching folds both sides: NFKD, then every
+  combining mark dropped (niqqud, harakat, Latin accents) plus the
+  Arabic tatweel, then lower case; every word typed must be present,
+  in any order. A search lists pages, not folder cards, and a text
+  match shows its sentence (cut to about 150 characters around the
+  first word). No index structure: a few hundred pages of text is a
+  few megabytes, and `includes` over that is instant.
+
 - **Reordering hands out the folder's own places (0.15.0).** A move
   takes the folder's `folderAt` values in order, nudges any equal ones
   apart by a millisecond, swaps the two pages and gives the places back
