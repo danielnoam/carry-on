@@ -1,0 +1,93 @@
+/* Carry-on: the saved page inside the reader's sandboxed iframe. No colors
+   or sizes of its own: src/reader.js copies the app's tokens onto this
+   document's :root, so a theme change reaches both. */
+
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0 auto;
+  max-width: var(--measure);
+  padding: var(--s-5) 20px var(--s-7);
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 var(--fs-body)/var(--lh-body) var(--serif);
+  overflow-wrap: break-word;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent); }
+[hidden] { display: none !important; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.co-meta { margin: 0 0 var(--s-3); font: 400 var(--fs-meta)/var(--lh-meta) var(--sans); color: var(--muted); }
+h1 { margin: 0 0 var(--s-4); font: 700 var(--fs-title)/var(--lh-title) var(--serif); }
+.co-byline { margin: calc(-1 * var(--s-2)) 0 var(--s-4); font: 400 var(--fs-label)/var(--lh-label) var(--sans); color: var(--muted); }
+h2 { margin: var(--s-6) 0 var(--s-3); font: 600 var(--fs-heading)/var(--lh-heading) var(--serif); }
+h3, h4, h5, h6 { margin: var(--s-5) 0 var(--s-2); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 600; }
+p, ul, ol, dl, blockquote, pre, table, details { margin: 0 0 var(--s-4); }
+ul, ol { padding-left: var(--s-5); }
+blockquote { padding-left: var(--s-4); border-left: 3px solid var(--line); }
+sup, sub { line-height: 0; }
+sup a { text-decoration: none; }
+hr { border: 0; border-top: 1px solid var(--line); margin: var(--s-5) 0; }
+pre, code, kbd, samp { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.85em; }
+pre { overflow-x: auto; padding: var(--s-3); border-radius: var(--r-sm); background: var(--surface); border: 1px solid var(--line); }
+
+table {
+  display: block; overflow-x: auto; max-width: 100%;
+  border-collapse: collapse;
+  font: 400 var(--fs-meta)/var(--lh-meta) var(--sans);
+}
+th, td { padding: var(--s-1) var(--s-2); border: 1px solid var(--line); vertical-align: top; text-align: left; }
+caption { padding: var(--s-1) 0; color: var(--muted); text-align: left; }
+
+img { display: block; max-width: 100%; height: auto; border-radius: var(--r-md); }
+td img, th img { display: inline-block; }
+figure {
+  margin: 0 0 var(--s-4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+figure img { width: 100%; border-radius: 0; background: var(--preview); }
+figure > a { display: block; }
+figcaption {
+  display: flex; justify-content: space-between; align-items: baseline; gap: var(--s-3);
+  padding: 10px var(--s-3);
+  font: 400 var(--fs-label)/var(--lh-label) var(--sans);
+}
+.co-full { flex-shrink: 0; font-size: var(--fs-meta); color: var(--muted); }
+
+.co-placeholder {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-1);
+  min-height: 120px; padding: var(--s-4);
+  border: 1.5px dashed var(--line); border-radius: var(--r-md);
+  font: 400 var(--fs-meta)/var(--lh-meta) var(--sans); color: var(--muted); text-align: center;
+}
+figure .co-placeholder { border-width: 0 0 1.5px; border-radius: 0; }
+.co-placeholder::before {
+  content: ""; width: 24px; height: 24px; margin-bottom: var(--s-1);
+  border: 2px solid currentColor; border-radius: 4px;
+}
+
+.co-video > a { position: relative; display: block; aspect-ratio: 16 / 9; background: var(--video); }
+.co-video img { height: 100%; object-fit: cover; }
+.co-play {
+  position: absolute; left: 50%; top: 50%;
+  width: 56px; height: 56px; margin: -28px 0 0 -28px;
+  border-radius: var(--r-full); background: var(--scrim);
+}
+.co-play::after {
+  content: ""; position: absolute; left: 21px; top: 17px;
+  width: 18px; height: 22px; background: var(--on-video);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+.offline .co-play { opacity: 0.5; }
+.co-video figcaption { flex-direction: column; align-items: flex-start; gap: 2px; }
+.co-video-title { font-weight: 500; }
+.co-video-note { font-size: var(--fs-meta); color: var(--muted); }
+
+.co-licence {
+  margin-top: var(--s-6); padding-top: var(--s-2);
+  border-top: 1px solid var(--line);
+  font: 400 var(--fs-meta)/1.5 var(--sans); color: var(--muted);
+}

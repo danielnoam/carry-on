@@ -7,10 +7,11 @@
   <title>Carry-on</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="src/styles.css?v=0.1.0">
+  <link rel="stylesheet" href="src/fonts.css?v=0.2.0">
+  <link rel="stylesheet" href="src/styles.css?v=0.2.0">
 </head>
 <body>
-  <div class="app">
+  <div class="app" id="libraryView">
     <header class="top">
       <div class="top-row">
         <h1 class="screen-title">Library</h1>
@@ -28,14 +29,36 @@
     <footer class="save-bar">
       <form id="saveForm" class="save-form">
         <label for="saveUrl" class="visually-hidden">Page link</label>
-        <input id="saveUrl" type="url" inputmode="url" autocomplete="off" placeholder="Paste a link to save" required>
+        <input id="saveUrl" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="go" placeholder="Paste a link to save" required>
         <button class="btn-primary" type="submit">Save</button>
       </form>
     </footer>
   </div>
+
+  <section class="reader" id="readerView" hidden aria-label="Saved page">
+    <header class="reader-bar">
+      <button class="icon-btn" id="readerBack" type="button" aria-label="Back to library">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg>
+      </button>
+      <div class="reader-actions">
+        <span class="pill" id="offlinePill" hidden>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 12h20M12 2l3 10-3 10"></path></svg>Offline
+        </span>
+        <a class="bar-link" id="readerOriginal" href="#" target="_blank" rel="noopener">Original<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 17L17 7M9 7h8v8"></path></svg></a>
+        <button class="icon-btn" id="readerDelete" type="button" aria-label="Delete this page">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"></path></svg>
+        </button>
+      </div>
+    </header>
+    <iframe class="reader-frame" id="readerFrame" sandbox="allow-same-origin" title="Saved page"></iframe>
+  </section>
   <div class="toast" id="toast" role="status" hidden></div>
 
-  <script src="src/platform.js?v=0.1.0"></script>
-  <script src="src/app.js?v=0.1.0"></script>
+  <script src="src/platform.js?v=0.2.0"></script>
+  <script src="src/vendor/Readability.js?v=0.2.0"></script>
+  <script src="src/store.js?v=0.2.0"></script>
+  <script src="src/save.js?v=0.2.0"></script>
+  <script src="src/reader.js?v=0.2.0"></script>
+  <script src="src/app.js?v=0.2.0"></script>
 </body>
 </html>

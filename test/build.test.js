@@ -25,11 +25,21 @@ test("every file index.html loads is in the bundle", () => {
   for (const f of referencedByIndex()) assert.ok(fs.existsSync(path.join(out, f)), f + " missing");
 });
 
-test("every font styles.css loads is in sw.js's ASSETS", () => {
-  const css = fs.readFileSync(path.join(ROOT, "src", "styles.css"), "utf8");
+test("every file a stylesheet in src/ loads is in sw.js's ASSETS", () => {
   const assets = assetList();
-  for (const [, url] of css.matchAll(/url\("([^"]+)"\)/g)) {
-    assert.ok(assets.includes("src/" + url), "src/" + url + " not in ASSETS");
+  for (const f of fs.readdirSync(path.join(ROOT, "src")).filter((n) => n.endsWith(".css"))) {
+    assert.ok(assets.includes("src/" + f), "src/" + f + " not in ASSETS");
+    const css = fs.readFileSync(path.join(ROOT, "src", f), "utf8");
+    for (const [, url] of css.matchAll(/url\("([^"]+)"\)/g)) {
+      assert.ok(assets.includes("src/" + url), "src/" + url + " (from " + f + ") not in ASSETS");
+    }
+  }
+});
+
+test("every script in src/ is in sw.js's ASSETS", () => {
+  const assets = assetList();
+  for (const f of fs.readdirSync(path.join(ROOT, "src")).filter((n) => n.endsWith(".js"))) {
+    assert.ok(assets.includes("src/" + f), "src/" + f + " not in ASSETS");
   }
 });
 

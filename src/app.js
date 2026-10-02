@@ -1,10 +1,12 @@
-// Carry-on: the shell. Version, theme, and the library view.
+// Carry-on: the shell. Version, theme, the library, saving and the reader.
 (function () {
-  const APP_VERSION = "0.1.0";
+  const APP_VERSION = "0.2.0";
+  window.CarryOn.version = APP_VERSION;
 
+  const C = window.CarryOn;
   const THEMES = ["paper", "sepia", "night"];
   const THEME_KEY = "carryon.theme";
-  const LIBRARY_KEY = "carryon.library";
+  const IMAGES_KEY = "carryon.images";
 
   const $ = (id) => document.getElementById(id);
 
@@ -42,6 +44,7 @@
     document.documentElement.dataset.theme = theme;
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.content = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();
+    if (C.reader) C.reader.applyTheme();
     return theme;
   }
 
@@ -51,8 +54,11 @@
 
   const state = {
     theme: applyTheme(load(THEME_KEY, defaultTheme())),
-    // [{ id, url, title, site, savedAt, bytes }] once saving exists.
-    pages: load(LIBRARY_KEY, []),
+    // Library index entries: the meta each saved page's meta.json holds.
+    pages: [],
+    // Saves in flight: { key, url, site, done, total }.
+    saving: [],
+    open: null,
   };
 
   function formatSize(bytes) {
@@ -60,20 +66,137 @@
     return Math.max(1, Math.round(bytes / 1e3)) + " KB";
   }
 
+  function thumbUrl(p) {
+    if (!p.thumb) return null;
+    if (/^https?:/.test(p.thumb)) return p.thumb;
+    const base = C.store.folderUrl(p.id);
+    return base ? base + p.thumb : null;
+  }
+
+  function savingCard(s) {
+    const pct = s.total ? Math.round((s.done / s.total) * 100) : 0;
+    const status = s.total == null ? "Saving · text" : "Saving · " + s.done + " of " + s.total + " image previews";
+    return el("div", { class: "card saving", role: "group", "aria-label": "Saving " + s.site },
+      el("span", { class: "card-body" },
+        el("span", { class: "card-site" }, s.site),
+        el("span", { class: "card-title" }, s.url),
+        el("span", { class: "progress", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": String(pct) },
+          el("span", { class: "progress-fill", style: "width: " + pct + "%" })),
+        el("span", { class: "card-status accent" }, status)));
+  }
+
+  function pageCard(p) {
+    const thumb = thumbUrl(p);
+    const facts = [p.minutes + " min", formatSize(p.bytes || 0)].join(" · ") + " · ";
+    const status = p.missing
+      ? el("span", { class: "warn" }, "Text saved · " + p.missing + (p.missing === 1 ? " preview" : " previews") + " missing")
+      : p.mode === "links"
+        ? el("span", null, "Text offline · images online")
+        : el("span", { class: "ok" }, "Offline ready");
+    return el("button", { class: "card", type: "button", onclick: () => openPage(p.id) },
+      thumb ? el("img", { class: "card-thumb", src: thumb, alt: "", loading: "lazy" }) : null,
+      el("span", { class: "card-body" },
+        el("span", { class: "card-site" }, p.site),
+        el("span", { class: "card-title" }, p.title),
+        el("span", { class: "card-status" }, facts, status)));
+  }
+
   function renderLibrary() {
     const root = $("library");
     root.replaceChildren();
     const n = state.pages.length;
     const total = state.pages.reduce((sum, p) => sum + (p.bytes || 0), 0);
+    const allOffline = state.pages.every((p) => !p.missing && p.mode !== "links");
     $("libraryMeta").textContent = n
-      ? n + (n === 1 ? " page · " : " pages · ") + formatSize(total)
+      ? n + (n === 1 ? " page · " : " pages · ") + formatSize(total) + (allOffline ? " · all readable offline" : "")
       : "Nothing saved yet";
-    if (!n) {
+    for (const s of state.saving) root.append(savingCard(s));
+    for (const p of state.pages) root.append(pageCard(p));
+    if (!n && !state.saving.length) {
       root.append(el("div", { class: "empty" },
         el("h2", { class: "empty-title" }, "Pages you take with you"),
         el("p", { class: "empty-text" },
           "Share a page to Carry-on, or paste its link below. It stays readable with no connection, with a link back to the original.")));
     }
+  }
+
+  // The first link in whatever was pasted ("Read this: https://…"), or the
+  // text itself as a link when it looks like one without its https://.
+  function linkFrom(text) {
+    const t = String(text).trim();
+    const m = t.match(/https?:\/\/[^\s<>"]+/i);
+    if (m) return m[0].replace(/[).,;!?]+$/, "");
+    if (/^[\w-]+(\.[\w-]+)+(\/\S*)?$/.test(t)) return "https://" + t;
+    return null;
+  }
+
+  const sameUrl = (a, b) => a && b && a.split("#")[0].replace(/\/$/, "") === b.split("#")[0].replace(/\/$/, "");
+
+  async function savePage(url) {
+    const existing = state.pages.find((p) => sameUrl(p.url, url) || sameUrl(p.requested, url));
+    if (existing) { toast("Already in your library"); openPage(existing.id); return; }
+    if (state.saving.some((s) => sameUrl(s.url, url))) return;
+    const job = { key: url, url, site: C.save.siteName(url), done: 0, total: null };
+    state.saving.unshift(job);
+    renderLibrary();
+    try {
+      const meta = await C.save.save(url, {
+        mode: load(IMAGES_KEY, "previews"),
+        onProgress: (p) => {
+          if (p.stage === "images") { job.done = p.done; job.total = p.total; }
+          renderLibrary();
+        },
+      });
+      meta.requested = url;
+      state.pages.unshift(meta);
+      await C.store.writeIndex(state.pages);
+      toast(meta.missing ? "Saved. Some previews are missing." : "Saved for offline reading");
+    } catch (e) {
+      toast(e instanceof C.save.SaveError ? e.message : "Couldn't save this page. Try again.");
+      if (!(e instanceof C.save.SaveError)) console.error(e);
+    } finally {
+      state.saving = state.saving.filter((s) => s !== job);
+      renderLibrary();
+    }
+  }
+
+  function showOffline() {
+    $("offlinePill").hidden = navigator.onLine;
+  }
+
+  async function openPage(id, fromHistory) {
+    const p = state.pages.find((x) => x.id === id);
+    if (!p) return;
+    let html;
+    try { html = await C.store.readPage(id); } catch (e) { html = null; }
+    if (!html) { toast("This page's file is missing. Delete it and save it again."); return; }
+    state.open = p;
+    $("readerOriginal").href = p.url;
+    showOffline();
+    $("libraryView").hidden = true;
+    $("readerView").hidden = false;
+    if (!fromHistory) history.pushState({ page: id }, "");
+    await C.reader.open($("readerFrame"), html, p);
+    $("readerFrame").focus();
+  }
+
+  function closeReader() {
+    if (!state.open) return;
+    state.open = null;
+    C.reader.close();
+    $("readerView").hidden = true;
+    $("libraryView").hidden = false;
+  }
+
+  async function deleteOpen() {
+    const p = state.open;
+    if (!p || !confirm("Delete “" + p.title + "” from this phone?")) return;
+    await C.store.removePage(p.id);
+    state.pages = state.pages.filter((x) => x.id !== p.id);
+    await C.store.writeIndex(state.pages);
+    history.back();
+    renderLibrary();
+    toast("Deleted");
   }
 
   $("themeBtn").addEventListener("click", () => {
@@ -84,14 +207,32 @@
 
   $("saveForm").addEventListener("submit", (e) => {
     e.preventDefault();
-    toast("Saving pages comes in the next version.");
+    const url = linkFrom($("saveUrl").value);
+    if (!url) { toast("That doesn't look like a link. Paste the page's address."); return; }
+    $("saveUrl").value = "";
+    $("saveUrl").blur();
+    savePage(url);
   });
 
-  renderLibrary();
+  $("readerBack").addEventListener("click", () => history.back());
+  $("readerDelete").addEventListener("click", deleteOpen);
+  addEventListener("popstate", (e) => {
+    if (e.state && e.state.page) openPage(e.state.page, true);
+    else closeReader();
+  });
+  addEventListener("online", showOffline);
+  addEventListener("offline", showOffline);
 
-  if (!window.CarryOn.platform.native && "serviceWorker" in navigator && location.protocol === "https:") {
+  renderLibrary();
+  Promise.all([C.platform.ready, C.store.ready]).then(() => C.store.readIndex()).then((pages) => {
+    state.pages = Array.isArray(pages) ? pages : [];
+    renderLibrary();
+    if (history.state && history.state.page) history.replaceState(null, "");
+  });
+
+  if (!C.platform.native && "serviceWorker" in navigator && location.protocol === "https:") {
     navigator.serviceWorker.register("sw.js").catch(() => {});
   }
 
-  window.CarryOn.version = APP_VERSION;
+  C.linkFrom = linkFrom;
 })();

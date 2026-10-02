@@ -3,6 +3,30 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **The reader's iframe keeps allow-same-origin (0.2.0).** Without
+  `allow-scripts` nothing in the page can run, so same-origin only lets
+  src/reader.js reach in: copy the theme tokens onto it, catch taps on
+  links (an in-page `#ref` scrolls, anything else opens in the phone's
+  browser via AppLauncher; a link must never navigate the iframe), and
+  swap previews for full images. The page's own CSP is `default-src
+  'none'` plus images, the app's stylesheets and fonts. The two are only
+  dangerous together; test/save.test.js fails if `allow-scripts` appears.
+- **Cleaning is an allowlist that rebuilds the page (0.2.0).** src/save.js
+  never copies the fetched DOM: it creates each kept element afresh with
+  only the attributes named in `ATTRS`, so an `on*` handler, `style`,
+  `srcdoc` or a `javascript:` link can't come through by being forgotten.
+  `style` goes entirely (along with anything it hid), which is why
+  Wikipedia infoboxes lose their colours.
+- **Wikimedia thumbnails at 500 and 1280 px, not 480 (0.2.0).** Wikimedia
+  pre-renders and caches a fixed set of widths and rate-limits tools that
+  ask for others, so the preview is the 500 px step and the full image the
+  1280 px step, capped at the file's own width.
+- **Page titles prefer og:title or the page's one h1 (0.2.0).**
+  Readability keeps "Headline | Site" for short headlines.
+- **Saved pages in a browser go to IndexedDB, images stay links (0.2.0).**
+  The web copy can save Wikipedia (its API allows CORS) but has no folder
+  for images; its cards say "Text offline · images online".
+
 - **Started from LifeLog (0.1.0).** The build tooling (tools/build-www.js,
   android-version.js, sign-apk.sh, ios-project.js and both workflows) and
   `src/platform.js`'s app-vs-browser handling come from
