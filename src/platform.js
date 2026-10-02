@@ -107,6 +107,49 @@
     return true;
   }
 
+  // ---- updating the app in place (0.2.0, from LifeLog's 0.179.0) ----
+  // Downloads the release's APK into the app's cache, reporting progress, and
+  // hands it to Android's installer: no browser tab, no Downloads folder.
+  // Android asks once whether Carry-on may install apps, then to install.
+  // Signed with the same key (alias carryon), it installs over the top and
+  // keeps every saved page. The download names the tag, not `latest`, so a
+  // release published mid-download can't swap the file. Resolves to the
+  // file's uri so a dismissed installer can be reopened without downloading
+  // again; null where there's no in-app installer (iOS, a browser).
+  const APK_MIME = "application/vnd.android.package-archive";
+  const repo = () => (build && build.repo) || null;
+  async function downloadUpdate(version, onProgress) {
+    const FS = plugin("Filesystem");
+    if (os !== "android" || !FS || !plugin("FileOpener") || !repo()) return null;
+    const url = "https://github.com/" + repo() + "/releases/download/app-v" + version + "/CarryOn.apk";
+    const path = "CarryOn-" + version + ".apk";
+    const listener = await FS.addListener("progress", (p) => {
+      if (onProgress && p && p.contentLength > 0) onProgress(Math.min(1, p.bytes / p.contentLength));
+    });
+    try {
+      await FS.downloadFile({ url, path, directory: "CACHE", progress: true });
+    } finally {
+      if (listener && listener.remove) listener.remove();
+    }
+    return (await FS.getUri({ path, directory: "CACHE" })).uri;
+  }
+  function openInstaller(uri) {
+    return plugin("FileOpener").openFile({ path: uri, mimeType: APK_MIME });
+  }
+  // APKs for versions already installed have done their job.
+  async function clearOldUpdates(currentVersion, isNewer) {
+    const FS = plugin("Filesystem");
+    if (!FS) return;
+    try {
+      const { files } = await FS.readdir({ path: "", directory: "CACHE" });
+      for (const f of files || []) {
+        const name = typeof f === "string" ? f : f.name;
+        const m = /^CarryOn-(\d+\.\d+\.\d+)\.apk$/.exec(name || "");
+        if (m && !isNewer(m[1], currentVersion)) await FS.deleteFile({ path: name, directory: "CACHE" });
+      }
+    } catch (e) { /* nothing to tidy */ }
+  }
+
   window.CarryOn = window.CarryOn || {};
   window.CarryOn.platform = {
     native,
@@ -123,5 +166,10 @@
     downloadTo,
     openOutside,
     saveAndShare,
+    downloadUpdate,
+    openInstaller,
+    clearOldUpdates,
+    releasesUrl() { return repo() ? "https://github.com/" + repo() + "/releases/latest" : null; },
+    apkUrl() { return repo() ? "https://github.com/" + repo() + "/releases/latest/download/CarryOn.apk" : null; },
   };
 })();

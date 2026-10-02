@@ -22,7 +22,8 @@ todo:
 
 ## Capture
 
-- Android share target (intent filter via a tools/android-manifest.js like LifeLog's, added to android.yml after `cap add android`).
+- Android share target: an intent filter added by tools/android-manifest.js
+  (which exists since 0.2.0, for the updater).
 - iOS share extension, with the Safari JavaScript preprocessing file to
   hand over the rendered HTML.
 

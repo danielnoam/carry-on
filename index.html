@@ -27,6 +27,10 @@
     <main class="library" id="library" aria-live="polite"></main>
 
     <footer class="save-bar">
+      <div class="update-bar" id="updateBar" role="status" hidden>
+        <span class="update-text" id="updateText"></span>
+        <button class="btn-small" id="updateBtn" type="button">Update</button>
+      </div>
       <form id="saveForm" class="save-form">
         <label for="saveUrl" class="visually-hidden">Page link</label>
         <input id="saveUrl" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="go" placeholder="Paste a link to save" required>
