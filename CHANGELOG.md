@@ -2,6 +2,13 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.6.0] - 2026-10-02
+
+### Added
+- Retry on a library card whose previews are missing: it downloads them
+  again into the page, and the card turns "Offline ready" once they're
+  all there. Shown only when you're online.
+
 ## [0.5.0] - 2026-10-02
 
 ### Added

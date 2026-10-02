@@ -3,6 +3,13 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **A library card is a div with a stretched button (0.6.0).** Retry has
+  to sit on the card, and a button can't hold another, so `.card-open`
+  is an empty button covering the card (labelled with the title) and
+  Retry is raised above it. Missing images now keep the preview address
+  they failed on (`data-preview`); pages saved earlier retry with the full
+  image's, narrowed to 500 px when it's Wikimedia's.
+
 - **Reading position lives in the library index (0.5.0).** Each entry
   gets `at` (0 to 1, how far down the page) and `finished` (read to the
   end once, sticky). A fraction, not pixels, so a change of text size or
