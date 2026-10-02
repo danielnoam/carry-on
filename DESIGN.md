@@ -106,6 +106,12 @@ Source Serif 4 and Instrument Sans (Now).
 - **Next in a folder (Now):** at the end of the page, after the licence,
   a bordered block "Next in Novel" over the title in the accent serif. In
   ⋯, Previous and Next side by side, dimmed when there's none.
+- **Save several (Now):** a pushed screen. "Links" with the links one a
+  line in an editable box and a count under it, "Folder" with None and
+  each folder as chips plus a "New folder" field, a note that pages keep
+  the links' order, then a full-width "Save 4 pages into Novel". Saving
+  goes back to the library, where the queued cards say "Waiting · into
+  Novel" until their turn.
 - **Filter chips (Now):** under the library's meta line, scrolling edge
   to edge: All, Unread, Finished, then #tags. The chosen one is filled
   with the accent; tapping it again goes back to All. Hidden while the
