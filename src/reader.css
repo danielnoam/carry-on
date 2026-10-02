@@ -23,8 +23,8 @@ h1 { margin: 0 0 var(--s-4); font: 700 var(--fs-title)/var(--lh-title) var(--ser
 h2 { margin: var(--s-6) 0 var(--s-3); font: 600 var(--fs-heading)/var(--lh-heading) var(--serif); }
 h3, h4, h5, h6 { margin: var(--s-5) 0 var(--s-2); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 600; }
 p, ul, ol, dl, blockquote, pre, table, details { margin: 0 0 var(--s-4); }
-ul, ol { padding-left: var(--s-5); }
-blockquote { padding-left: var(--s-4); border-left: 3px solid var(--line); }
+ul, ol { padding-inline-start: var(--s-5); }
+blockquote { padding-inline-start: var(--s-4); border-inline-start: 3px solid var(--line); }
 sup, sub { line-height: 0; }
 sup a { text-decoration: none; }
 hr { border: 0; border-top: 1px solid var(--line); margin: var(--s-5) 0; }
@@ -36,8 +36,8 @@ table {
   border-collapse: collapse;
   font: 400 var(--fs-meta)/var(--lh-meta) var(--sans);
 }
-th, td { padding: var(--s-1) var(--s-2); border: 1px solid var(--line); vertical-align: top; text-align: left; }
-caption { padding: var(--s-1) 0; color: var(--muted); text-align: left; }
+th, td { padding: var(--s-1) var(--s-2); border: 1px solid var(--line); vertical-align: top; text-align: start; }
+caption { padding: var(--s-1) 0; color: var(--muted); text-align: start; }
 
 img { display: block; max-width: 100%; height: auto; border-radius: var(--r-md); }
 td img, th img { display: inline-block; }

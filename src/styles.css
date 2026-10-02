@@ -177,9 +177,17 @@ html.native .app { padding-top: env(safe-area-inset-top); }
   width: 100%; padding: 14px;
   background: var(--surface); color: var(--ink);
   border: 1px solid var(--line); border-radius: var(--r-lg);
-  text-align: left; cursor: pointer;
+  text-align: start; cursor: pointer;
 }
 .card.saving { cursor: default; }
+.card.saving:active { transform: none; }
+.card-actions { display: flex; gap: var(--s-2); margin-top: var(--s-1); }
+.btn-quiet {
+  height: var(--tap); padding: 0 var(--s-4); flex-shrink: 0;
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  background: transparent; color: var(--ink);
+  font-weight: 500; cursor: pointer;
+}
 .card-thumb {
   width: 76px; height: 76px; flex-shrink: 0;
   border-radius: 10px; object-fit: cover;
@@ -309,11 +317,11 @@ html.native .reader-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top
 }
 
 /* Presses answer on the small-control spring. */
-.card, .btn-primary, .btn-small, .icon-btn, .choice, .row, .bar-link {
+.card, .btn-primary, .btn-small, .btn-quiet, .icon-btn, .choice, .row, .bar-link {
   transition: transform var(--spring-control-ms, 300ms) var(--spring-control, ease-out), background-color 120ms linear;
   -webkit-tap-highlight-color: transparent;
 }
-.card:active, .btn-primary:active, .btn-small:active, .icon-btn:active { transform: scale(0.97); }
+.card:active, .btn-primary:active, .btn-small:active, .btn-quiet:active, .icon-btn:active { transform: scale(0.97); }
 .choice:active, .row:active { background: var(--bg); }
 .icon-btn:active { background: var(--line); }
 

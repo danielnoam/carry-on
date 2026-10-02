@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.3.0";
+  const APP_VERSION = "0.3.1";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -41,7 +41,8 @@
     t.hidden = false;
     if (wasHidden) M.arrive(t, 16);
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { M.leave(t).then(() => { t.hidden = true; }); }, 3200);
+    const shown = text;
+    toastTimer = setTimeout(() => { M.leave(t).then(() => { if (t.textContent === shown) t.hidden = true; }); }, 3200);
   }
 
   // ---- Theme ----
@@ -97,11 +98,29 @@
     return s.total == null ? "Saving · text" : "Saving · " + s.done + " of " + s.total + " image previews";
   }
 
+  // A save that failed stays in the list with the reason until it's retried
+  // or removed: a toast alone is gone before anyone looks back at the phone.
+  function failedCard(s) {
+    return el("div", { class: "card saving failed", role: "group", "aria-label": "Couldn't save " + s.site },
+      el("span", { class: "card-body" },
+        el("span", { class: "card-site" }, s.site),
+        el("span", { class: "card-title", dir: "auto" }, s.url),
+        el("span", { class: "card-status" }, el("span", { class: "warn" }, s.error)),
+        el("span", { class: "card-actions" },
+          el("button", { class: "btn-small", type: "button", onclick: () => { dropFailed(s); savePage(s.url); } }, "Try again"),
+          el("button", { class: "btn-quiet", type: "button", onclick: () => dropFailed(s) }, "Remove"))));
+  }
+
+  function dropFailed(s) {
+    state.saving = state.saving.filter((x) => x !== s);
+    renderLibrary();
+  }
+
   function savingCard(s) {
     return el("div", { class: "card saving", role: "group", "aria-label": "Saving " + s.site },
       el("span", { class: "card-body" },
         el("span", { class: "card-site" }, s.site),
-        el("span", { class: "card-title" }, s.url),
+        el("span", { class: "card-title", dir: "auto" }, s.url),
         el("span", { class: "progress", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": "0" },
           el("span", { class: "progress-fill" })),
         el("span", { class: "card-status accent" }, savingStatus(s))));
@@ -111,7 +130,7 @@
   // its spring instead of being redrawn at each image.
   function updateSavingCard(s) {
     const card = $("library").querySelector('[data-key="' + CSS.escape("s:" + s.key) + '"]');
-    if (!card) return;
+    if (!card || s.error) return;
     const pct = s.total ? Math.round((s.done / s.total) * 100) : 0;
     card.querySelector(".progress").setAttribute("aria-valuenow", String(pct));
     card.querySelector(".progress-fill").style.transform = "scaleX(" + pct / 100 + ")";
@@ -129,8 +148,8 @@
     return el("button", { class: "card", type: "button", onclick: () => openPage(p.id) },
       thumb ? el("img", { class: "card-thumb", src: thumb, alt: "", loading: "lazy" }) : null,
       el("span", { class: "card-body" },
-        el("span", { class: "card-site" }, p.site),
-        el("span", { class: "card-title" }, p.title),
+        el("span", { class: "card-site", dir: "auto" }, p.site),
+        el("span", { class: "card-title", dir: "auto" }, p.title),
         el("span", { class: "card-status" }, facts, status)));
   }
 
@@ -150,7 +169,7 @@
       if (!node) { node = make(); node.dataset.key = key; fresh.push(node); }
       nodes.push(node);
     };
-    for (const s of state.saving) keep("s:" + s.key, () => savingCard(s));
+    for (const s of state.saving) keep((s.error ? "f:" : "s:") + s.key, () => (s.error ? failedCard(s) : savingCard(s)));
     for (const p of state.pages) keep("p:" + p.id, () => pageCard(p));
     if (!n && !state.saving.length) {
       keep("empty", () => el("div", { class: "empty" },
@@ -180,8 +199,9 @@
   async function savePage(url) {
     const existing = state.pages.find((p) => sameUrl(p.url, url) || sameUrl(p.requested, url));
     if (existing) { toast("Already in your library"); openPage(existing.id); return; }
-    if (state.saving.some((s) => sameUrl(s.url, url))) return;
-    const job = { key: url, url, site: C.save.siteName(url), done: 0, total: null };
+    if (state.saving.some((s) => !s.error && sameUrl(s.url, url))) return;
+    state.saving = state.saving.filter((s) => !(s.error && sameUrl(s.url, url)));
+    const job = { key: url, url, site: C.save.siteName(url), done: 0, total: null, error: null };
     state.saving.unshift(job);
     renderLibrary();
     try {
@@ -196,13 +216,12 @@
       state.pages.unshift(meta);
       await C.store.writeIndex(state.pages);
       toast(meta.missing ? "Saved. Some previews are missing." : "Saved for offline reading");
-    } catch (e) {
-      toast(e instanceof C.save.SaveError ? e.message : "Couldn't save this page. Try again.");
-      if (!(e instanceof C.save.SaveError)) console.error(e);
-    } finally {
       state.saving = state.saving.filter((s) => s !== job);
-      renderLibrary();
+    } catch (e) {
+      job.error = e instanceof C.save.SaveError ? e.message : "Couldn't save this page. Try again.";
+      if (!(e instanceof C.save.SaveError)) console.error(e);
     }
+    renderLibrary();
   }
 
   // ---- Screens ----

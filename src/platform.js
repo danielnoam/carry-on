@@ -56,7 +56,23 @@
     }, true);
   }
 
-  const USER_AGENT = "Carry-on (offline reader; https://github.com/danielnoam/carry-on)";
+  // The WebView's own browser string with the app named after it: some news
+  // sites (ynet among them) never answer a request that doesn't look like a
+  // browser, and Wikipedia's rule is only that the app is named.
+  const USER_AGENT = (navigator.userAgent ? navigator.userAgent + " " : "") +
+    "Carry-on (offline reader; https://github.com/danielnoam/carry-on)";
+
+  // Native requests have no deadline of their own, so a site that holds the
+  // connection open would leave "Saving" up for good.
+  const PAGE_TIMEOUT = 30000;
+  const FILE_TIMEOUT = 20000;
+  function deadline(promise, ms) {
+    let timer;
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new TypeError("Timed out")), ms); }),
+    ]).finally(() => clearTimeout(timer));
+  }
 
   // A page's HTML as text, plus the final URL after redirects. Throws a
   // TypeError on a network failure, like fetch does, so callers handle both
@@ -67,7 +83,8 @@
     if (http) {
       let res;
       try {
-        res = await http.request({ url, method: "GET", headers, responseType: "text" });
+        res = await deadline(http.request({ url, method: "GET", headers, responseType: "text",
+          connectTimeout: PAGE_TIMEOUT / 2, readTimeout: PAGE_TIMEOUT }), PAGE_TIMEOUT + 5000);
       } catch (e) {
         throw new TypeError("Failed to fetch (" + ((e && e.message) || e) + ")");
       }
@@ -75,7 +92,7 @@
       return { status: res.status, url: res.url || url, text: body };
     }
     delete headers["User-Agent"];
-    const res = await fetch(url, { headers });
+    const res = await deadline(fetch(url, { headers }), PAGE_TIMEOUT);
     return { status: res.status, url: res.url || url, text: await res.text() };
   }
 
@@ -86,7 +103,8 @@
   async function downloadTo(url, path) {
     const FS = plugin("Filesystem");
     if (!FS) return null;
-    await FS.downloadFile({ url, path, directory: "DATA", recursive: true, headers: { "User-Agent": USER_AGENT } });
+    await deadline(FS.downloadFile({ url, path, directory: "DATA", recursive: true, headers: { "User-Agent": USER_AGENT },
+      connectTimeout: FILE_TIMEOUT / 2, readTimeout: FILE_TIMEOUT }), FILE_TIMEOUT + 5000);
     const { uri } = await FS.getUri({ path, directory: "DATA" });
     return cap.convertFileSrc ? cap.convertFileSrc(uri) : uri;
   }
