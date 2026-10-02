@@ -206,6 +206,8 @@ html.native .app { padding-top: env(safe-area-inset-top); }
 .card-status .warn { color: var(--warn); }
 .card-status.accent { color: var(--accent); }
 .progress { display: block; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.progress.thin { height: 3px; margin-top: 2px; }
+.progress.thin .progress-fill { transition: none; }
 .progress-fill {
   display: block; height: 100%; background: var(--accent);
   transform: scaleX(0); transform-origin: left;

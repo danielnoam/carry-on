@@ -28,9 +28,6 @@ todo:
 - Retry for missing previews (the card says how many are missing).
 - Reader top bar: hide on scroll down, back on scroll up; tapping an image
   opens it full screen.
-- Reading progress: remember where each page was left, and show how much
-  is left under each library card (e.g. "6 min left", a thin progress
-  line), "Finished" once read to the end.
 - Categories: give a page one or more categories, filter the library by
   them (with the chips below).
 - Batch saving: paste several links at once (or share several); they save

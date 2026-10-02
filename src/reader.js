@@ -119,8 +119,18 @@
     if (/^(https?|mailto):/.test(a.href)) C.platform.openOutside(a.href);
   }
 
-  // Renders `html` (a page.html) into `iframe`; resolves once it's shown.
-  function open(iframe, html, meta) {
+  // How far down the page the reader is, 0 to 1; a page shorter than the
+  // screen counts as read to the end.
+  function position() {
+    const w = frame && frame.contentWindow;
+    if (!w || !doc) return 0;
+    const room = doc.documentElement.scrollHeight - w.innerHeight;
+    return room <= 0 ? 1 : Math.min(1, Math.max(0, w.scrollY / room));
+  }
+
+  // Renders `html` (a page.html) into `iframe`, scrolled to `at` (0 to 1),
+  // and reports the position as the reader scrolls; resolves once it's shown.
+  function open(iframe, html, meta, { at = 0, onPosition } = {}) {
     frame = iframe;
     doc = null;
     placeholders = new WeakMap();
@@ -134,8 +144,20 @@
         doc.addEventListener("click", onClick);
         iframe.contentWindow.addEventListener("scroll", () => {
           clearTimeout(scrollTimer);
-          scrollTimer = setTimeout(swapNearImages, 150);
+          scrollTimer = setTimeout(() => {
+            swapNearImages();
+            if (onPosition) onPosition(position());
+          }, 150);
         }, { passive: true });
+        // Back to where the page was left, once the fonts have set the
+        // text's height; the end of a finished page isn't worth returning to.
+        const ready = doc.fonts && doc.fonts.ready ? doc.fonts.ready : Promise.resolve();
+        ready.then(() => {
+          if (!doc) return;
+          const w = iframe.contentWindow;
+          if (at > 0.01 && at < 0.97) w.scrollTo(0, at * (doc.documentElement.scrollHeight - w.innerHeight));
+          else if (onPosition && position() === 1) onPosition(1);
+        });
         resolve();
       };
       iframe.srcdoc = srcdoc(html, C.store.folderUrl(meta.id));
@@ -151,5 +173,5 @@
   addEventListener("online", applyConnection);
   addEventListener("offline", applyConnection);
 
-  C.reader = { open, close, applyTheme, applyConnection, srcdoc, CSP };
+  C.reader = { open, close, position, applyTheme, applyConnection, srcdoc, CSP };
 })();

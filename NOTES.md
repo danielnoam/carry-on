@@ -3,6 +3,14 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Reading position lives in the library index (0.5.0).** Each entry
+  gets `at` (0 to 1, how far down the page) and `finished` (read to the
+  end once, sticky). A fraction, not pixels, so a change of text size or
+  phone still lands near the same place. Written 1.5 s after scrolling
+  stops and when the reader closes, so a page isn't rewritten on every
+  scroll. A card whose line changes is rebuilt in place rather than
+  re-animated.
+
 - **Direction falls back to the letters (0.4.0).** `textDir` in
   src/save.js takes `dir="rtl"` on <html> or <body>, then a right-to-left
   `lang`, then counts Hebrew and Arabic letters against Latin and Cyrillic
