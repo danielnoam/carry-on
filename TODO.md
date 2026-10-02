@@ -24,46 +24,6 @@ asks from Daniel.
 
 ---
 
-## 0.18.0: Export and import, one page and the whole library
-
-**Goal:** a page can leave the app, and the library survives a new phone
-or an uninstall.
-
-**Items**
-- Share from the reader through the share sheet: the link, or the page
-  as a file.
-- Export a page as a self-contained HTML file (images inlined as data
-  URLs), which Carry-on can import back.
-- **(new)** Back up the whole library to one file and restore it.
-  DROPPED.md says v1 is "per device with export and import", but neither
-  exists yet: today an uninstall loses everything. This also defines the
-  format sync (0.23.0) reuses.
-- PDF: the phone's print to PDF. **Check first:** Android's WebView
-  ignores `window.print()`, so this needs a small native call to
-  `PrintManager` in native/share (and `UIPrintInteractionController` on
-  iOS). If that's more than a day, move PDF after EPUB.
-
-**Steps**
-1. Self-contained HTML: page.html with previews as data URLs, plus a
-   `<meta>` block with the index entry (title, url, savedAt, tags, folder
-   name and place). Import reads only that block and the body, then runs
-   the body through the same allowlist cleaning as a fetched page.
-2. Library backup: a zip (store-only, written by a ~100-line helper, no
-   library) of `library.json` and every page directory. Restore merges by
-   URL, never overwrites a newer copy. Save it with Filesystem and hand
-   it to the share sheet.
-3. Share sheet: @capacitor/share, already in package.json.
-4. PDF via the native print call, if step 0 says it's small.
-
-**Daniel's phone:** export a page, send it to himself, import it back;
-back up the library, uninstall, reinstall, restore, and check reading
-positions, tags and folder order came back.
-
-**Depends on:** nothing left (the 0.14.0 glossary in NOTES.md names
-the format's fields).
-
----
-
 ## 0.19.0: EPUB of one page (after the WebToEpub research)
 
 **Goal:** a saved page reads on an e-reader.
@@ -75,6 +35,12 @@ the format's fields).
   saying what Carry-on borrows, and a yes or no on "Save all chapters" for
   0.20.0. No code ships from the research alone.
 - Export a page as EPUB 3 from the reader's ⋯.
+- **(moved from 0.18.0)** PDF through the phone's print. Android's
+  WebView ignores `window.print()`, so this needs a native call:
+  `PrintManager` with a WebView's `createPrintDocumentAdapter` in
+  native/share, and `UIPrintInteractionController` on iOS. It was left
+  out of 0.18.0 because both plugins can only be tested on the phones,
+  and EPUB covers reading elsewhere better than a PDF does.
 
 **Steps**
 1. Read WebToEpub's parser and packer code; write the NOTES entry.
@@ -89,7 +55,8 @@ the format's fields).
 **Daniel's phone:** open the EPUB in an e-reader app (and on a Kindle via
 Send to Kindle, which accepts EPUB) with Hebrew and with images.
 
-**Depends on:** 0.18.0 (zip helper, share sheet).
+**Depends on:** 0.18.0 (zip helper `C.backup.zipWriter`, share sheet
+`C.platform.shareFile`).
 
 ---
 

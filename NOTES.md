@@ -9,6 +9,38 @@ bold title and its version so a search finds it.
   `Filesystem.downloadFile`) and the share target are proven. Pages that
   build themselves with JavaScript still fail; that's its own TODO item.
 
+- **A backup is a plain zip (0.18.0).** It holds `carry-on.json`
+  (format 1, the app version, the date), `library.json`, and every
+  `pages/<id>/` directory as it is on disk. Entries are stored, not
+  compressed, since pictures are already compressed and stored entries
+  are simpler to write and read. The writer streams to the app's cache
+  with `Filesystem.appendFile` about 1 MB at a time, and restore reads the
+  picked file through `Blob.slice` from its central directory. So a
+  library of hundreds of megabytes is never held in memory or sent across
+  the bridge whole. A zip re-made with a computer's own tool (deflated)
+  still restores where `DecompressionStream` exists. Sync (0.23.0)
+  reuses this format.
+- **Restore never trusts the file (0.18.0).** Index entries go through
+  `backup.cleanMeta`, which keeps only the fields Carry-on writes, with
+  their types. Page ids must look like ours, file names must be
+  page.html, text.txt or `images/<name>`, and meta.json is rewritten from
+  the cleaned entry. A page already in the library is replaced only by a
+  copy saved later (`savedAt`), and the old directory is deleted first,
+  so a reused id can't lose the new files.
+- **A sent page is HTML with its entry in a `<meta>` (0.18.0).** It opens
+  in any browser, which is the point of sending it. Back in Carry-on,
+  only that `<meta>` and the article body are read, and the body goes
+  through `save.cleanSaved`: the fetch allowlist plus Carry-on's own
+  `co-` classes and image attributes. Pictures must be `data:` PNG, JPEG,
+  GIF or WebP (no SVG) or https. The header and licence line are written
+  again from the entry, not taken from the file.
+- **Import uses a plain file input (0.18.0).** Capacitor's WebView
+  answers `<input type="file">` with the system picker on Android and iOS,
+  so no plugin is needed. It has no `accept`, because Android filters by
+  MIME type and phones disagree about a zip's type.
+- **PDF moved to 0.19.0 (0.18.0).** It needs native print calls on both
+  platforms that can only be tested on the phones (TODO.md, 0.19.0).
+
 - **Previews are redrawn on the phone (0.17.0).** Sites other than
   Wikipedia often serve one huge image with no smaller size. After it
   downloads, `store.shrink` draws it on a canvas at 480 px and keeps the

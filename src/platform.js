@@ -129,15 +129,37 @@
   // caller falls back to a download link.
   async function saveAndShare(filename, text) {
     const FS = plugin("Filesystem");
-    const SH = plugin("Share");
-    if (!FS || !SH) return false;
+    if (!FS || !plugin("Share")) return false;
     const { uri } = await FS.writeFile({ path: filename, data: text, directory: "CACHE", encoding: "utf8" });
+    return shareFile(uri, filename);
+  }
+
+  // The share sheet, with a file already on disk or with a link. Putting
+  // the sheet away isn't an error. false where there's no share sheet.
+  async function share(what) {
+    const SH = plugin("Share");
     try {
-      await SH.share({ title: filename, files: [uri], dialogTitle: "Save or send " + filename });
+      if (SH) await SH.share(what);
+      else if (navigator.share) await navigator.share({ title: what.title, url: what.url });
+      else return false;
     } catch (e) {
-      if (!/cancel/i.test(String(e && e.message || e))) throw e;
+      if (!/cancel|abort/i.test(String(e && (e.name + " " + e.message) || e))) throw e;
     }
     return true;
+  }
+  const shareFile = (uri, name) => share({ title: name, files: [uri], dialogTitle: "Save or send " + name });
+  const shareLink = (title, url) => share({ title, url, dialogTitle: "Share " + title });
+
+  // A file handed to a browser's downloads (the web copy has no share sheet
+  // for files).
+  function download(name, blob) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
   }
 
   // ---- updating the app in place (0.2.0, from LifeLog's 0.179.0) ----
@@ -201,6 +223,9 @@
     downloadTo,
     openOutside,
     saveAndShare,
+    shareFile,
+    shareLink,
+    download,
     downloadUpdate,
     openInstaller,
     clearOldUpdates,

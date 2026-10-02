@@ -97,8 +97,15 @@ Source Serif 4 and Instrument Sans (Now).
   round chips (accent fill, × to remove), an "Add a tag" field, then
   "+ tag" chips for tags used elsewhere, most used first. Then "Save
   full images" with a muted note under it, for pages saved without them,
-  counting "Saving full images, 3 of 12" while it works. "Delete this
-  page" last, as a full-width row in the warn colour.
+  counting "Saving full images, 3 of 12" while it works. "Share link" and
+  "Send as a file" side by side as two bordered rows. "Delete this page"
+  last, as a full-width row in the warn colour.
+- **Backup (Now):** a Settings section between Storage and Updates: two
+  accent rows, "Back up the library" (counting "Backing up, 12 of 80")
+  and "Restore or open a file" (opening the system picker), then a
+  footnote saying what a backup holds and that the copy saved last wins.
+  The result is a toast, such as "Restored 12 pages. 3 already here were
+  kept."
 - **Folder card (Now):** the first page's picture with two sheets
   peeking behind it, "Folder · 12 pages · 3 read · 4.2 MB", the folder's name as
   the title, then "Start:", "Continue:" or "Next:" and the page, or "All

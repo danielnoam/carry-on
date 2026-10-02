@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.17.0";
+  const APP_VERSION = "0.18.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -1195,11 +1195,102 @@
         folderRow(p, draw),
         neighbours(p),
         neighbour(p, 1) ? null : followControls(p),
+        el("div", { class: "share-rows" },
+          el("button", { class: "sheet-row", type: "button", onclick: () => shareLink(p) }, "Share link"),
+          el("button", { class: "sheet-row", type: "button", onclick: (e) => sendPage(p, e.currentTarget) }, "Send as a file")),
         fullImagesRow(p),
         el("button", { class: "sheet-row danger", type: "button", onclick: deleteOpen }, "Delete this page"));
     };
     draw();
     return box;
+  }
+
+  // ---- Pages leaving the app, and coming back (backup.js) ----
+
+  async function shareLink(p) {
+    try {
+      if (await C.platform.shareLink(p.title, p.url)) return;
+      await navigator.clipboard.writeText(p.url);
+      toast("Link copied");
+    } catch (e) { toast("Couldn't share the link. Try again."); }
+  }
+
+  // The page as one HTML file that opens in any browser, and in Carry-on
+  // through Settings, Restore or open.
+  async function sendPage(p, btn) {
+    btn.disabled = true;
+    try {
+      const { name, html } = await C.backup.exportPage(p);
+      if (!(await C.platform.saveAndShare(name, html))) C.platform.download(name, new Blob([html], { type: "text/html" }));
+    } catch (e) {
+      console.error(e);
+      toast("Couldn't make the file. Try again.");
+    }
+    btn.disabled = false;
+  }
+
+  async function backUp(btn) {
+    if (!state.pages.length) { toast("There's nothing to back up yet."); return; }
+    btn.disabled = true;
+    const label = btn.querySelector(".row-label");
+    label.textContent = "Backing up…";
+    try {
+      const out = await C.backup.exportLibrary(state.pages, (done, total) => { label.textContent = "Backing up, " + done + " of " + total; });
+      if (out.uri) await C.platform.shareFile(out.uri, out.name);
+      else C.platform.download(out.name, out.blob);
+    } catch (e) {
+      console.error(e);
+      toast("Couldn't write the backup. Free some space and try again.");
+    }
+    btn.disabled = false;
+    label.textContent = "Back up the library";
+  }
+
+  // A backup (a zip) or one page's file, picked from the phone.
+  async function openFile(file, btn) {
+    if (!file) return;
+    const label = btn.querySelector(".row-label");
+    btn.disabled = true;
+    label.textContent = "Opening…";
+    try {
+      const head = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+      if (head[0] === 0x50 && head[1] === 0x4b) {
+        const res = await C.backup.restoreLibrary(file, state.pages, sameUrl, (done, total) => { label.textContent = "Restoring, " + done + " of " + total; });
+        state.pages = res.pages;
+        await C.store.writeIndex(state.pages);
+        texts.clear();
+        const n = res.added + res.replaced;
+        toast((n ? "Restored " + countLine(n) : "Nothing new to restore") + (res.kept ? ". " + res.kept + " already here" + (res.kept === 1 ? " was" : " were") + " kept." : "."));
+      } else {
+        const meta = await C.backup.importPage(await file.text(), (url) => !!savedAs(url));
+        if (meta.already) {
+          toast("Already in your library");
+        } else {
+          state.pages.unshift(meta);
+          await C.store.writeIndex(state.pages);
+          toast("Added “" + meta.title + "”");
+        }
+      }
+      renderLibrary();
+    } catch (e) {
+      if (!/Carry-on|empty/.test(e.message)) console.error(e);
+      toast(/Carry-on|empty/.test(e.message) ? e.message : "Couldn't open that file. Try again.");
+    }
+    if (state.settings) renderSettings();
+  }
+
+  function backupGroup() {
+    const input = el("input", { type: "file", class: "visually-hidden", tabindex: "-1", "aria-hidden": "true" });
+    const open = el("button", { class: "row", type: "button", onclick: () => input.click() },
+      el("span", { class: "row-label accent" }, "Restore or open a file"));
+    input.addEventListener("change", () => { const f = input.files[0]; input.value = ""; openFile(f, open); });
+    return el("section", { class: "settings-section", id: "backupSection" },
+      el("h2", { class: "overline" }, "Backup"),
+      el("div", { class: "group" },
+        el("button", { class: "row", type: "button", onclick: (e) => backUp(e.currentTarget) },
+          el("span", { class: "row-label accent" }, "Back up the library")),
+        open, input),
+      el("p", { class: "footnote" }, "One file with every page, its pictures, tags, folders and where you were. Keep it off the phone. Restoring keeps whichever copy of a page was saved last. A page sent as a file opens here too."));
   }
 
   // "Save full images" for a page saved with previews or links only.
@@ -1540,7 +1631,7 @@
 
   function renderSettings() {
     const [appearance, saving] = SETTINGS.map(choiceGroup);
-    $("settingsBody").replaceChildren(appearance, readingGroup(), saving, storageGroup(), updatesGroup(), aboutGroup());
+    $("settingsBody").replaceChildren(appearance, readingGroup(), saving, storageGroup(), backupGroup(), updatesGroup(), aboutGroup());
   }
 
   // `at` names a section to scroll to (the update bar opens at Updates).
