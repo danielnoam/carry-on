@@ -9,6 +9,19 @@ bold title and its version so a search finds it.
   `Filesystem.downloadFile`) and the share target are proven. Pages that
   build themselves with JavaScript still fail; that's its own TODO item.
 
+- **The reader bar floats; the page makes room for it (0.13.0).** The
+  bar is absolutely placed over the iframe, which now fills the screen,
+  and reader.js sets `--co-top` (the bar's height) on the page, which
+  reader.css adds to the body's top padding and to `scroll-padding-top`.
+  Shrinking the iframe instead would reflow the page on every hide.
+  Scrolling reports twice: `onScroll` every frame (the progress line and
+  the bar), `onPosition` after 150 ms still (the saved place, as
+  before). The bar hides after 12 px down past its own height and comes
+  back after 12 px up, at the end (≥ 99.9%), and whenever a sheet opens.
+  On a phone a strip the colour of the page stays over the status bar.
+  Reduced motion: the global 1 ms rule makes it appear and disappear
+  without sliding.
+
 - **Script-built pages are drawn in a hidden WebView (0.12.0).** When
   Readability finds under 250 characters, or the title is a browser
   check, save.js asks native/share's PageRender plugin to draw the page:

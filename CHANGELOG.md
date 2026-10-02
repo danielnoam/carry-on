@@ -2,6 +2,17 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.13.0] - 2026-10-02
+
+### Added
+- A thin line along the bottom of the reader shows how far through the
+  page you are. It fills from the right on Hebrew and Arabic pages.
+
+### Changed
+- The reader's top bar slides away while you read on down, and comes
+  back when you scroll up a little, reach the top or the end, or open Aa
+  or ⋯.
+
 ## [0.12.0] - 2026-10-02
 
 ### Added

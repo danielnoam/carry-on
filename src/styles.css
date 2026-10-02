@@ -336,7 +336,30 @@ html.native .reader-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top
    each change shows on the text above it as it's made. */
 .sheet-catch { position: absolute; inset: 0; z-index: 1; }
 /* The bar stays live over the catch, so Aa and ⋯ swap or close their sheet. */
-.reader-bar { position: relative; z-index: 3; }
+.reader-bar {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 3;
+  background: var(--bg);
+  transition: transform var(--spring-control-ms, 300ms) var(--spring-control, ease-out);
+}
+/* Reading on down: the bar slides up out of the way, back on a scroll up
+   or when anything in it takes focus. The status bar's strip stays. */
+.reader.bar-away .reader-bar:not(:focus-within) { transform: translateY(-100%); }
+html.native .reader::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; z-index: 4;
+  height: env(safe-area-inset-top); background: var(--bg);
+}
+/* How far through the page: a line along the bottom, filling in the
+   page's own direction. */
+.read-progress {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 1;
+  height: 3px; pointer-events: none;
+}
+.read-progress span {
+  display: block; height: 100%;
+  background: var(--accent);
+  transform: scaleX(0); transform-origin: left;
+}
+.read-progress[dir="rtl"] span { transform-origin: right; }
 .sheet-catch[hidden], .sheet[hidden] { display: none; }
 .sheet {
   position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;

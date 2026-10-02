@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.12.0";
+  const APP_VERSION = "0.13.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -486,7 +486,31 @@
     state.open = p;
     $("readerOriginal").href = p.url;
     showOffline();
-    return C.reader.open($("readerFrame"), html, p, { at: p.at || 0, onPosition: (f) => notePosition(p, f), next: endLink(p) });
+    $("readProgress").dir = p.dir || "ltr";
+    readerScrolled(p.at || 0, 0);
+    return C.reader.open($("readerFrame"), html, p, {
+      at: p.at || 0, next: endLink(p),
+      onPosition: (f) => notePosition(p, f),
+      onScroll: readerScrolled,
+      top: () => $("readerView").querySelector(".reader-bar").offsetHeight,
+    });
+  }
+
+  // The bar along the bottom fills as the page is read. The top bar slides
+  // away while reading on down and comes back on any scroll up, at the top
+  // and at the end, and while a sheet is up.
+  let lastY = 0;
+  function readerScrolled(at, y) {
+    $("readProgress").firstElementChild.style.transform = "scaleX(" + at + ")";
+    const bar = $("readerView").querySelector(".reader-bar").offsetHeight;
+    const dy = y - lastY;
+    let away = $("readerView").classList.contains("bar-away");
+    if (y <= bar || at >= 0.999 || state.sheet) away = false;
+    else if (dy > 12) away = true;
+    else if (dy < -12) away = false;
+    else return;
+    lastY = y;
+    $("readerView").classList.toggle("bar-away", away);
   }
 
   // What the end of a page offers: the next page in its folder, else the
@@ -632,6 +656,7 @@
     $("readingSheet").setAttribute("aria-label", s.label);
     if (!fromHistory) history.pushState(readerState(state.open, kind), "");
     $(s.button).setAttribute("aria-expanded", "true");
+    $("readerView").classList.remove("bar-away");
     $("sheetCatch").hidden = false;
     $("readingSheet").hidden = false;
     M.rise($("readingSheet"));

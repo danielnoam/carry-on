@@ -117,6 +117,12 @@ Source Serif 4 and Instrument Sans (Now).
   and fills as images land, and "Getting the page · 12 s" once it passes
   five seconds. A page that builds itself says "Letting the page draw
   itself" while it's drawn. Reduced motion: both breathe instead.
+- **Reader bar and progress (Now):** the bar slides up out of the way
+  while reading on down (control spring), and back on a scroll up, at the
+  top or the end, or with a sheet up. A 3 px accent line along the bottom
+  fills with the position, from the page's start side; it's decoration
+  (aria-hidden), the page itself being the content. Reduced motion: the
+  bar appears and disappears without sliding.
 - **Save next (Now):** "Save next" with 1, 5 and 10 as chips, in ⋯ and
   at the end of a folder's list, when the last page has a next link.
 - **Updates (Now):** a Settings section: "This version", a status row
