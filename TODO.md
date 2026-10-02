@@ -27,10 +27,8 @@ todo:
 
 - Reader top bar: hide on scroll down, back on scroll up; tapping an image
   opens it full screen.
-- Folders: an ordered collection, at most one per page, e.g. the chapters
-  of a web novel read in sequence. The folder shows its pages in order with
-  progress across the whole folder; the reader gets next and previous
-  chapter. Decided by Daniel on 2 Oct 2026.
+- Folders, next steps: rename a folder, reorder its pages (drag, or move
+  up and down), and delete a whole folder at once.
 - Batch saving: paste several links at once (or share several); they save
   one after another, in order, optionally into a folder (new or existing)
   and with tags chosen up front.

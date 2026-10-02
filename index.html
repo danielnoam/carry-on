@@ -7,8 +7,8 @@
   <title>Carry-on</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="src/fonts.css?v=0.7.0">
-  <link rel="stylesheet" href="src/styles.css?v=0.7.0">
+  <link rel="stylesheet" href="src/fonts.css?v=0.8.0">
+  <link rel="stylesheet" href="src/styles.css?v=0.8.0">
 </head>
 <body>
   <div class="app" id="libraryView">
@@ -63,6 +63,16 @@
       <div class="sheet-body" id="readingBody"></div>
     </div>
   </section>
+  <section class="screen" id="folderView" hidden aria-label="Folder">
+    <header class="screen-bar">
+      <button class="icon-btn" id="folderBack" type="button" aria-label="Back to library">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg>
+      </button>
+      <h1 class="bar-title" id="folderTitle" dir="auto"></h1>
+      <span class="bar-spacer" aria-hidden="true"></span>
+    </header>
+    <div class="screen-body" id="folderBody"></div>
+  </section>
   <section class="screen" id="settingsView" hidden aria-label="Settings">
     <header class="screen-bar">
       <button class="icon-btn" id="settingsBack" type="button" aria-label="Back to library">
@@ -75,12 +85,12 @@
   </section>
   <div class="toast" id="toast" role="status" hidden></div>
 
-  <script src="src/platform.js?v=0.7.0"></script>
-  <script src="src/motion.js?v=0.7.0"></script>
-  <script src="src/vendor/Readability.js?v=0.7.0"></script>
-  <script src="src/store.js?v=0.7.0"></script>
-  <script src="src/save.js?v=0.7.0"></script>
-  <script src="src/reader.js?v=0.7.0"></script>
-  <script src="src/app.js?v=0.7.0"></script>
+  <script src="src/platform.js?v=0.8.0"></script>
+  <script src="src/motion.js?v=0.8.0"></script>
+  <script src="src/vendor/Readability.js?v=0.8.0"></script>
+  <script src="src/store.js?v=0.8.0"></script>
+  <script src="src/save.js?v=0.8.0"></script>
+  <script src="src/reader.js?v=0.8.0"></script>
+  <script src="src/app.js?v=0.8.0"></script>
 </body>
 </html>

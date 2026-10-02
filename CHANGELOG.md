@@ -2,6 +2,21 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.8.0] - 2026-10-02
+
+### Added
+- Folders, for pages read in order like a web novel's chapters. In ⋯,
+  put a page in a new folder or one you already have; a page is in one
+  folder at most, in the order you added it.
+- The library shows a folder as one card, with how many pages are read
+  and which is next. Its screen lists the pages in order with a Start or
+  Continue button.
+- Next and previous inside a folder: a "Next in …" link at the end of
+  the page, and both directions in ⋯. The page changes in place, so back
+  still returns to the folder.
+- Unread, Finished and tag filters list a folder's pages one by one,
+  each card naming its folder.
+
 ## [0.7.0] - 2026-10-02
 
 ### Added

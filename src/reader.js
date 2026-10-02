@@ -15,6 +15,9 @@
   const NEAR = 2;
 
   let frame = null, doc = null, scrollTimer = null;
+  // The "Next" link this file adds at the end of a page in a folder; only
+  // that element (not a look-alike in the page) moves on.
+  let nextLink = null, onNext = null;
   // Each missing image's placeholder, which sits before the image's link
   // when it has one, so the link's underline doesn't run through it.
   let placeholders = new WeakMap();
@@ -108,6 +111,7 @@
     const a = e.target.closest && e.target.closest("a[href]");
     if (!a) return;
     e.preventDefault();
+    if (a === nextLink) { onNext(); return; }
     const href = a.getAttribute("href");
     if (href.startsWith("#")) {
       let id = href.slice(1);
@@ -130,9 +134,12 @@
 
   // Renders `html` (a page.html) into `iframe`, scrolled to `at` (0 to 1),
   // and reports the position as the reader scrolls; resolves once it's shown.
-  function open(iframe, html, meta, { at = 0, onPosition } = {}) {
+  // `next` ({ over, title, go }) adds a link to the next page at the end.
+  function open(iframe, html, meta, { at = 0, onPosition, next } = {}) {
     frame = iframe;
     doc = null;
+    nextLink = null;
+    onNext = next ? next.go : null;
     placeholders = new WeakMap();
     return new Promise((resolve) => {
       iframe.onload = () => {
@@ -141,6 +148,20 @@
         if (!doc.documentElement.hasAttribute("dir") && C.save.textDir(doc) === "rtl") doc.documentElement.dir = "rtl";
         applyTheme();
         applyConnection();
+        if (next) {
+          nextLink = doc.createElement("a");
+          nextLink.href = "#";
+          nextLink.className = "co-next";
+          const over = doc.createElement("span");
+          over.className = "co-next-over";
+          over.textContent = next.over;
+          const title = doc.createElement("span");
+          title.className = "co-next-title";
+          title.dir = "auto";
+          title.textContent = next.title;
+          nextLink.append(over, title);
+          doc.body.append(nextLink);
+        }
         doc.addEventListener("click", onClick);
         iframe.contentWindow.addEventListener("scroll", () => {
           clearTimeout(scrollTimer);
@@ -168,6 +189,8 @@
     if (frame) { frame.onload = null; frame.srcdoc = ""; }
     frame = null;
     doc = null;
+    nextLink = null;
+    onNext = null;
   }
 
   addEventListener("online", applyConnection);

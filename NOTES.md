@@ -3,6 +3,19 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Folders are a name on the page, not a record of their own (0.8.0).**
+  Each index entry may carry `folder` (its name) and `folderAt` (when it
+  joined); a folder's order is `folderAt`, falling back to `savedAt`, so
+  batch saving will order chapters just by saving them in turn. No
+  separate folders file means nothing to keep in step: a folder exists
+  while a page names it. Names match ignoring case, like tags. "Folder"
+  in store.js (`folderUrl`) still means a page's directory on disk; the
+  naming pass should split the two. Next and previous replace the
+  reader's history entry rather than pushing one, so back leaves for the
+  folder however many chapters were read. The "Next in …" link is added
+  by reader.js after the page loads and only that element is honoured,
+  so a saved page can't fake one.
+
 - **Tags and filters (0.7.0).** Tags live in the library index as
   `tags` (an array of strings) on each entry, so filtering never opens a
   page's folder. Matching is case-insensitive, and a new tag takes the

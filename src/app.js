@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.7.0";
+  const APP_VERSION = "0.8.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -77,6 +77,8 @@
     open: null,
     settings: false,
     sheet: false,
+    // The folder whose screen is up (its name), under the reader if a page is open.
+    folder: null,
     // Which pages the library shows: "all", "unread", "finished" or "#tag".
     filter: load(FILTER_KEY, "all"),
   };
@@ -122,7 +124,8 @@
     return Math.max(1, Math.round(bytes / 1e3)) + " KB";
   }
   const totalBytes = () => state.pages.reduce((sum, p) => sum + (p.bytes || 0), 0);
-  const pagesLine = (n) => n + (n === 1 ? " page · " : " pages · ") + formatSize(totalBytes());
+  const countLine = (n) => n + (n === 1 ? " page" : " pages");
+  const pagesLine = (n) => countLine(n) + " · " + formatSize(totalBytes());
 
   function thumbUrl(p) {
     if (!p.thumb) return null;
@@ -201,7 +204,7 @@
       el("button", { class: "card-open", type: "button", "aria-label": p.title, onclick: () => openPage(p.id) }),
       thumb ? el("img", { class: "card-thumb", src: thumb, alt: "", loading: "lazy" }) : null,
       el("span", { class: "card-body" },
-        el("span", { class: "card-site", dir: "auto" }, p.site, ...(p.tags || []).map((t) => el("span", { class: "card-tag" }, " · #" + t))),
+        el("span", { class: "card-site", dir: "auto" }, p.site, p.folder ? " · " + p.folder : null, ...(p.tags || []).map((t) => el("span", { class: "card-tag" }, " · #" + t))),
         el("span", { class: "card-title", dir: "auto" }, p.title),
         el("span", { class: "card-status" }, facts, status, retry ? " · " : null, retry),
         started ? el("span", { class: "progress thin", role: "progressbar", "aria-label": "Read so far",
@@ -285,7 +288,19 @@
     };
     for (const s of state.saving) keep((s.error ? "f:" : "s:") + s.key, () => (s.error ? failedCard(s) : savingCard(s)));
     const pages = state.pages.filter(shown);
-    for (const p of pages) keep("p:" + p.id, () => pageCard(p), [p.title, readingLine(p), p.missing, p.thumb, Math.round((p.at || 0) * 50), navigator.onLine, (p.tags || []).join(",")].join("|"));
+    // Under All, a folder's pages are one card, where its newest page would be.
+    const grouped = new Set();
+    for (const p of pages) {
+      if (p.folder && state.filter === "all") {
+        const k = p.folder.toLocaleLowerCase();
+        if (grouped.has(k)) continue;
+        grouped.add(k);
+        const list = folderPages(p.folder);
+        keep("d:" + k, () => folderCard(p.folder), [p.folder, ...list.map((x) => x.id + readingLine(x) + (x.thumb || ""))].join("|"));
+        continue;
+      }
+      keep("p:" + p.id, () => pageCard(p), [p.title, readingLine(p), p.missing, p.thumb, Math.round((p.at || 0) * 50), navigator.onLine, (p.tags || []).join(","), p.folder].join("|"));
+    }
     if (n && !pages.length) {
       keep("none:" + state.filter, () => el("div", { class: "empty" },
         el("p", { class: "empty-text" }, state.filter === "unread" ? "You've started everything you saved."
@@ -350,16 +365,21 @@
   // out underneath (inert, not hidden) so its scroll position survives. Each
   // push is a history entry, so Android's back gesture pops it.
 
+  // The reader can open over a folder's screen; everything else is over the library.
+  const below = (screen) => (screen.id === "readerView" && state.folder ? $("folderView") : $("libraryView"));
+
   function cover(screen) {
-    $("libraryView").inert = true;
+    const under = below(screen);
+    under.inert = true;
     screen.hidden = false;
-    M.under($("libraryView"), true);
+    M.under(under, true);
     return M.pushIn(screen);
   }
 
   function uncover(screen) {
-    $("libraryView").inert = false;
-    M.under($("libraryView"), false);
+    const under = below(screen);
+    under.inert = false;
+    M.under(under, false);
     return M.popOut(screen).then(() => { screen.hidden = true; });
   }
 
@@ -373,13 +393,35 @@
     let html;
     try { html = await C.store.readPage(id); } catch (e) { html = null; }
     if (!html) { toast("This page's file is missing. Delete it and save it again."); return; }
+    if (!fromHistory) history.pushState(readerState(p), "");
+    const shown = show(p, html);
+    cover($("readerView"));
+    await shown;
+    $("readerFrame").focus();
+  }
+
+  // The history entry for a page in the reader (and the sheet over it).
+  const readerState = (p, sheet) => ({ view: "reader", page: p.id, folder: state.folder || undefined, sheet: sheet || undefined });
+
+  function show(p, html) {
     state.open = p;
     $("readerOriginal").href = p.url;
     showOffline();
-    if (!fromHistory) history.pushState({ view: "reader", page: id }, "");
-    const shown = C.reader.open($("readerFrame"), html, p, { at: p.at || 0, onPosition: (f) => notePosition(p, f) });
-    cover($("readerView"));
-    await shown;
+    const next = neighbour(p, 1);
+    return C.reader.open($("readerFrame"), html, p, { at: p.at || 0, onPosition: (f) => notePosition(p, f),
+      next: next && { over: "Next in " + p.folder, title: next.title, go: () => goTo(next) } });
+  }
+
+  // Next or previous in a folder: the reader stays and its page changes,
+  // in the same history entry, so back still leaves the reader.
+  async function goTo(p) {
+    let html;
+    try { html = await C.store.readPage(p.id); } catch (e) { html = null; }
+    if (!html) { toast("This page's file is missing. Delete it and save it again."); return; }
+    if (state.sheet) await new Promise((resolve) => { addEventListener("popstate", () => resolve(), { once: true }); history.back(); });
+    if (positionTimer) savePositions();
+    history.replaceState(readerState(p), "");
+    await show(p, html);
     $("readerFrame").focus();
   }
 
@@ -403,6 +445,7 @@
     if (!state.open) return;
     if (positionTimer) savePositions();
     renderLibrary();
+    if (state.folder) renderFolder();
     closeSheet(true);
     state.open = null;
     uncover($("readerView")).then(() => { if (!state.open) C.reader.close(); });
@@ -492,7 +535,7 @@
     const s = SHEETS[kind];
     $("readingBody").replaceChildren(s.build());
     $("readingSheet").setAttribute("aria-label", s.label);
-    if (!fromHistory) history.pushState({ view: "reader", page: state.open.id, sheet: kind }, "");
+    if (!fromHistory) history.pushState(readerState(state.open, kind), "");
     $(s.button).setAttribute("aria-expanded", "true");
     $("sheetCatch").hidden = false;
     $("readingSheet").hidden = false;
@@ -535,6 +578,110 @@
     renderLibrary();
   }
 
+  // ---- Folders ----
+  // An ordered run of pages, like a web novel's chapters. A page is in at
+  // most one, named by `folder` on its index entry, in the order it joined
+  // (`folderAt`). Names match like tags, ignoring case.
+
+  function folderPages(name) {
+    return state.pages.filter((p) => p.folder && sameTag(p.folder, name))
+      .sort((a, b) => (a.folderAt || a.savedAt || 0) - (b.folderAt || b.savedAt || 0));
+  }
+
+  function allFolders() {
+    const names = [];
+    for (const p of state.pages) if (p.folder && !names.some((n) => sameTag(n, p.folder))) names.push(p.folder);
+    return names;
+  }
+
+  // The page to carry on with: the first one not finished, else the first.
+  function folderNext(list) {
+    return list.find((p) => !p.finished) || list[0];
+  }
+
+  async function setFolder(p, name) {
+    const clean = name && cleanTag(name);
+    if (clean) {
+      if (p.folder && sameTag(p.folder, clean)) return;
+      p.folder = allFolders().find((n) => sameTag(n, clean)) || clean;
+      p.folderAt = Date.now();
+    } else {
+      delete p.folder;
+      delete p.folderAt;
+    }
+    await C.store.writeIndex(state.pages);
+    renderLibrary();
+    if (state.folder) renderFolder();
+  }
+
+  function folderCard(name) {
+    const list = folderPages(name);
+    const done = list.filter((p) => p.finished).length;
+    const next = folderNext(list);
+    const withThumb = list.find((p) => thumbUrl(p));
+    const thumb = withThumb ? thumbUrl(withThumb) : null;
+    const line = done === list.length ? "All read"
+      : (next.at > 0.02 ? "Continue: " : done ? "Next: " : "Start: ") + next.title;
+    return el("div", { class: "card folder-card" },
+      el("button", { class: "card-open", type: "button", "aria-label": name + ", folder, " + list.length + " pages, " + done + " read",
+        onclick: () => openFolder(name) }),
+      el("span", { class: "card-thumb stack" + (thumb ? "" : " blank"), "aria-hidden": "true" },
+        thumb ? el("img", { src: thumb, alt: "", loading: "lazy" }) : null),
+      el("span", { class: "card-body" },
+        el("span", { class: "card-site" }, "Folder · " + countLine(list.length) + " · " + done + " read"),
+        el("span", { class: "card-title", dir: "auto" }, name),
+        el("span", { class: "card-status", dir: "auto" }, line),
+        done && done < list.length ? el("span", { class: "progress thin", role: "progressbar", "aria-label": "Pages read",
+          "aria-valuemin": "0", "aria-valuemax": String(list.length), "aria-valuenow": String(done) },
+          el("span", { class: "progress-fill", style: "transform: scaleX(" + done / list.length + ")" })) : null));
+  }
+
+  function openFolder(name, fromHistory) {
+    if (state.folder && sameTag(state.folder, name)) return;
+    if (!folderPages(name).length) return;
+    state.folder = folderPages(name)[0].folder;
+    renderFolder();
+    if (!fromHistory) history.pushState({ view: "folder", folder: state.folder }, "");
+    $("folderBody").scrollTop = 0;
+    cover($("folderView")).then(() => $("folderBack").focus());
+  }
+
+  function closeFolder() {
+    if (!state.folder) return;
+    state.folder = null;
+    uncover($("folderView"));
+  }
+
+  function renderFolder() {
+    const list = folderPages(state.folder);
+    $("folderTitle").textContent = state.folder;
+    if (!list.length) {
+      $("folderBody").replaceChildren(el("p", { class: "empty-text" }, "This folder is empty."));
+      return;
+    }
+    const next = folderNext(list);
+    const done = list.filter((p) => p.finished).length;
+    const go = done === list.length ? "Read again from the start" : (next.at > 0.02 || done ? "Continue: " : "Start: ") + next.title;
+    $("folderBody").replaceChildren(
+      el("p", { class: "meta folder-meta" }, countLine(list.length) + " · " + done + " read"),
+      el("button", { class: "btn-primary folder-go", type: "button", dir: "auto",
+        onclick: () => openPage(done === list.length ? list[0].id : next.id) }, go),
+      el("ol", { class: "group folder-list" },
+        ...list.map((p, i) => el("li", null,
+          el("button", { class: "row chapter" + (p === next && done < list.length ? " now" : ""), type: "button", onclick: () => openPage(p.id) },
+            el("span", { class: "chapter-n", "aria-hidden": "true" }, String(i + 1)),
+            el("span", { class: "choice-text" },
+              el("span", { class: "row-label", dir: "auto" }, p.title),
+              el("span", { class: "choice-note" + (p.finished ? "" : p.at > 0.02 ? " accent" : "") }, readingLine(p))))))));
+  }
+
+  // The page before or after `p` in its folder, if any.
+  function neighbour(p, step) {
+    if (!p || !p.folder) return null;
+    const list = folderPages(p.folder);
+    return list[list.indexOf(p) + step] || null;
+  }
+
   function pageControls(p) {
     const box = el("div", { class: "page-controls" });
     const draw = () => {
@@ -550,7 +697,7 @@
       };
       input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); add(input.value); } });
       box.replaceChildren(
-        el("div", { class: "rc-row top" }, el("span", { class: "rc-label" }, "Tags"),
+        el("div", { class: "rc-row tall" }, el("span", { class: "rc-label" }, "Tags"),
           el("div", { class: "tag-edit" },
             el("div", { class: "chips" },
               ...tags.map((t) => el("button", { class: "chip on", type: "button", "aria-label": "Remove tag " + t,
@@ -558,10 +705,44 @@
               input),
             others.length ? el("div", { class: "chips" },
               ...others.slice(0, 12).map((t) => el("button", { class: "chip", type: "button", "aria-label": "Add tag " + t, onclick: () => add(t) }, "+ " + t))) : null)),
+        folderRow(p, draw),
+        neighbours(p),
         el("button", { class: "sheet-row danger", type: "button", onclick: deleteOpen }, "Delete this page"));
     };
     draw();
     return box;
+  }
+
+  function folderRow(p, redraw) {
+    const others = allFolders().filter((n) => !(p.folder && sameTag(n, p.folder)));
+    const input = el("input", { class: "tag-input", type: "text", "aria-label": p.folder ? "Move to a new folder" : "Add to a new folder",
+      placeholder: p.folder ? "New folder" : "Add to a new folder", maxlength: "32", enterkeyhint: "done", autocapitalize: "sentences" });
+    input.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      if (cleanTag(input.value)) setFolder(p, input.value).then(redraw);
+    });
+    return el("div", { class: "rc-row tall" }, el("span", { class: "rc-label" }, "Folder"),
+      el("div", { class: "tag-edit" },
+        el("div", { class: "chips" },
+          p.folder ? el("button", { class: "chip on", type: "button", "aria-label": "Take out of " + p.folder,
+            onclick: () => setFolder(p, null).then(redraw) }, p.folder, el("span", { class: "chip-x", "aria-hidden": "true" }, "×")) : null,
+          input),
+        others.length ? el("div", { class: "chips" },
+          ...others.slice(0, 8).map((n) => el("button", { class: "chip", type: "button", "aria-label": (p.folder ? "Move to " : "Add to ") + n,
+            onclick: () => setFolder(p, n).then(redraw) }, (p.folder ? "→ " : "+ ") + n))) : null));
+  }
+
+  function neighbours(p) {
+    const prev = neighbour(p, -1), next = neighbour(p, 1);
+    if (!prev && !next) return null;
+    const step = (q, label) => {
+      const b = el("button", { class: "sheet-row step-row", type: "button", onclick: () => q && goTo(q) },
+        el("span", { class: "step-over" }, label), el("span", { class: "step-title", dir: "auto" }, q ? q.title : "None"));
+      b.disabled = !q;
+      return b;
+    };
+    return el("div", { class: "step-rows" }, step(prev, "Previous"), step(next, "Next"));
   }
 
   // ---- Settings ----
@@ -691,6 +872,9 @@
     const view = s && s.view;
     if (view !== "reader") closeReader();
     if (view !== "settings") closeSettings();
+    const folder = (view === "folder" || view === "reader") && s.folder;
+    if (!folder) closeFolder();
+    else if (!state.folder) openFolder(folder, true);
     if (view === "reader" && (!state.open || state.open.id !== s.page)) openPage(s.page, true);
     if (view === "reader" && s.sheet !== state.sheet) closeSheet();
     if (view === "reader" && s.sheet && state.open && state.open.id === s.page) openSheet(s.sheet, true);
@@ -703,12 +887,13 @@
     if (!(history.state && history.state.view)) return Promise.resolve();
     return new Promise((resolve) => {
       addEventListener("popstate", () => resolve(), { once: true });
-      history.back();
+      history.go(-[state.folder, state.open, state.sheet, state.settings].filter(Boolean).length || -1);
     });
   }
 
   $("settingsBtn").addEventListener("click", () => openSettings());
   $("settingsBack").addEventListener("click", () => history.back());
+  $("folderBack").addEventListener("click", () => history.back());
 
   $("saveForm").addEventListener("submit", (e) => {
     e.preventDefault();
@@ -724,7 +909,7 @@
   // history entry for whichever sheet is up).
   function toggleSheet(kind) {
     if (state.sheet === kind) { history.back(); return; }
-    if (state.sheet) history.replaceState({ view: "reader", page: state.open.id, sheet: kind }, "");
+    if (state.sheet) history.replaceState(readerState(state.open, kind), "");
     openSheet(kind, !!state.sheet);
   }
   $("readerMore").addEventListener("click", () => toggleSheet("page"));

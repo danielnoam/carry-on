@@ -96,6 +96,16 @@ Source Serif 4 and Instrument Sans (Now).
   round chips (accent fill, × to remove), an "Add a tag" field, then
   "+ tag" chips for tags used elsewhere, most used first. "Delete this
   page" last, as a full-width row in the warn colour.
+- **Folder card (Now):** the first page's picture with two sheets
+  peeking behind it, "Folder · 12 pages · 3 read", the folder's name as
+  the title, then "Start:", "Continue:" or "Next:" and the page, or "All
+  read". The thin accent line shows pages read out of the folder.
+- **Folder screen (Now):** pushed like Settings. The count, a full-width
+  primary button to carry on, then the pages as a numbered group; the
+  next one's number is in the accent.
+- **Next in a folder (Now):** at the end of the page, after the licence,
+  a bordered block "Next in Novel" over the title in the accent serif. In
+  ⋯, Previous and Next side by side, dimmed when there's none.
 - **Filter chips (Now):** under the library's meta line, scrolling edge
   to edge: All, Unread, Finished, then #tags. The chosen one is filled
   with the accent; tapping it again goes back to All. Hidden while the
