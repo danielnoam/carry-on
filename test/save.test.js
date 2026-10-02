@@ -75,6 +75,11 @@ test("reading time rounds to whole minutes, at least one", () => {
   assert.strictEqual(S.readingMinutes("short"), 1);
 });
 
+test("links worded as the next chapter are recognised, other links aren't", () => {
+  for (const t of ["Next", "Next chapter", "  Next Chapter »", "Next ›", "next page →", "הפרק הבא", "Siguiente", "下一章"]) assert.ok(S.isNextText(t), t);
+  for (const t of ["Previous", "Next week's issue", "Chapter 2", "Read next: ten more", "", null]) assert.ok(!S.isNextText(t), String(t));
+});
+
 test("the reader's CSP allows no scripts, frames, forms or connections", () => {
   assert.ok(/default-src 'none'/.test(R.CSP));
   assert.ok(!/script-src|unsafe-eval|connect-src|frame-src|child-src/.test(R.CSP));

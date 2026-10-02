@@ -2,6 +2,24 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.10.0] - 2026-10-02
+
+### Added
+- Follow a site's "next chapter" link. Pages now remember their next
+  link when saved (rel="next", or a link worded Next, Next chapter, הפרק
+  הבא and the like, on the same site). At the end of such a page, "Next
+  on …" saves the next page and opens it.
+- "Save next 1 · 5 · 10" in ⋯ and on a folder's screen follows the chain,
+  saving each page into the folder in order, and says when it reached
+  the last one. A page not yet in a folder starts one named after the
+  series ("The Long Road - Chapter 1" makes "The Long Road").
+- Rename a folder, from the bottom of its screen.
+
+### Changed
+- A saving card now shows it's working: a turning spinner, a bar that
+  sweeps while the page downloads and then fills as images are saved, and
+  the seconds it has taken once past five ("Getting the page · 12 s").
+
 ## [0.9.0] - 2026-10-02
 
 ### Added
