@@ -24,40 +24,6 @@ asks from Daniel.
 
 ---
 
-## 0.17.0: Better images
-
-**Goal:** previews are small on every site, credits are kept, and a page
-can be saved with full-size images whatever the setting (comics need it).
-
-**Items**
-- Resize big previews on the device: pages other than Wikipedia take the
-  srcset width nearest 480 px or the original; anything wider than 480 px
-  is redrawn on a canvas to 480 px JPEG.
-- Commons images keep their own credit line (author, licence).
-- **(new)** A per-save image choice ("Save with full images" in ⋯ for
-  this page, and as an option in Save several), not only the global
-  setting. Comics use this.
-- **(new)** Size per folder on its card and screen (Settings already
-  shows size per page).
-- Follow next links on pages saved before 0.10.0: on "Save next", if the
-  page has no `next`, fetch the original once to read it.
-
-**Steps**
-1. Resize: after `downloadFile`, load the local file (same origin through
-   Capacitor's file server, so the canvas isn't tainted), draw, write the
-   JPEG back, keep the original only if it's smaller.
-2. Credits: read Commons' `extmetadata` (Artist, LicenseShortName) for
-   each image in the Wikipedia path and put it in the figcaption.
-3. Per-save image mode: pass the mode through `savePage` instead of
-   reading the setting inside save.js.
-
-**Daniel's phone:** save a news site with huge images and compare the
-page size before and after; storage figures in Settings still add up.
-
-**Depends on:** nothing. **Blocks:** comics (0.21.0).
-
----
-
 ## 0.18.0: Export and import, one page and the whole library
 
 **Goal:** a page can leave the app, and the library survives a new phone

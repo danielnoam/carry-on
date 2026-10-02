@@ -9,6 +9,33 @@ bold title and its version so a search finds it.
   `Filesystem.downloadFile`) and the share target are proven. Pages that
   build themselves with JavaScript still fail; that's its own TODO item.
 
+- **Previews are redrawn on the phone (0.17.0).** Sites other than
+  Wikipedia often serve one huge image with no smaller size. After it
+  downloads, `store.shrink` draws it on a canvas at 480 px and keeps the
+  result only if it's smaller. That's JPEG at 0.82, or PNG when any pixel
+  is see-through, since JPEG would put a black box behind a logo. Only
+  images wider than 600 px are redrawn, so Wikimedia's 500 px thumbnails
+  aren't encoded twice. GIFs (they may be animated) and SVGs are left
+  alone. The file is read through Capacitor's file server, which is the
+  app's own origin, so the canvas isn't tainted. One image is drawn at a
+  time, so four big photos are never decoded at once.
+- **Commons credits come from the page's own wiki (0.17.0).** One
+  `action=query&prop=imageinfo&iiprop=extmetadata` call per 50 files, on
+  the article's wiki, which also knows files hosted locally rather than
+  on Commons. Images under 100 px wide (flags, icons) are skipped. If the
+  call fails, the page saves without credits, never with an error.
+  Credits are kept out of text.txt, so a search for a photographer
+  doesn't match every page with their photo.
+- **"Save full images" keeps the card's preview (0.17.0).** It replaces
+  every other preview it upgrades, so the library doesn't decode a
+  1280 px image for a 64 px thumbnail. A page saved with full images is
+  never swapped to the online copy, which is the same file.
+- **Old pages learn their next link on first use (0.17.0).** A page
+  saved before 0.10.0 has no `next` at all, while a newer page with none
+  has `""`. So `follow()` reads the original once when `next` is
+  undefined and records what it finds, `""` included, so it never asks
+  again.
+
 - **Search keeps each page's words in text.txt (0.16.0).** Saving
   writes `pages/<id>/text.txt` (IndexedDB key `<id>:text` in a browser)
   beside page.html: the article only, a line per block (`save.plainText`).

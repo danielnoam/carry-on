@@ -95,10 +95,12 @@ Source Serif 4 and Instrument Sans (Now).
   back closes it.
 - **Page sheet (Now):** ⋯ opens it in the Aa sheet's place. Tags as
   round chips (accent fill, × to remove), an "Add a tag" field, then
-  "+ tag" chips for tags used elsewhere, most used first. "Delete this
+  "+ tag" chips for tags used elsewhere, most used first. Then "Save
+  full images" with a muted note under it, for pages saved without them,
+  counting "Saving full images, 3 of 12" while it works. "Delete this
   page" last, as a full-width row in the warn colour.
 - **Folder card (Now):** the first page's picture with two sheets
-  peeking behind it, "Folder · 12 pages · 3 read", the folder's name as
+  peeking behind it, "Folder · 12 pages · 3 read · 4.2 MB", the folder's name as
   the title, then "Start:", "Continue:" or "Next:" and the page, or "All
   read". The thin accent line shows pages read out of the folder.
 - **Folder screen (Now):** pushed like Settings. The count, a full-width
@@ -110,7 +112,9 @@ Source Serif 4 and Instrument Sans (Now).
 - **Save several (Now):** a pushed screen. "Links" with the links one a
   line in an editable box and a count under it, "Folder" with None and
   each folder as chips plus a "New folder" field, a note that pages keep
-  the links' order, then a full-width "Save 4 pages into Novel". Saving
+  the links' order, "Tags", then "Images" as a Previews / Full / Links
+  segmented control set to the Settings choice (app only), then a
+  full-width "Save 4 pages into Novel". Saving
   goes back to the library, where the queued cards say "Waiting · into
   Novel" until their turn.
 - **Saving card (Now):** a 12 px ring turning (accent arc on the line
@@ -159,8 +163,10 @@ Source Serif 4 and Instrument Sans (Now).
   to edge: All, Unread, Finished, then #tags. The chosen one is filled
   with the accent; tapping it again goes back to All. Hidden while the
   library is empty. Chips are 36 px to the eye and 44 px to the touch.
-- **Image figure (Now):** saved preview, caption, "Full size online" on the
-  right. Online, the full image replaces the preview in place; a tap opens
+- **Image figure (Now):** saved preview, caption, "Full size online"
+  floated to the end of the caption's first line. A credit, when the
+  source gives one, goes on its own line under the caption, in meta size
+  and muted. Online, the full image replaces the preview in place; a tap opens
   it full screen. No preview saved: dashed border, image glyph, the page's
   alt text, "Image loads when you're online".
 - **Video figure (Now):** local thumbnail, play glyph (dimmed offline), title and

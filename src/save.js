@@ -198,6 +198,7 @@
         img.setAttribute("data-co-full", wikimediaThumb(src, WIKI_FULL, fw));
       }
     });
+    await credits(doc, page.host);
     doc.querySelectorAll("video").forEach((v) => {
       const file = v.getAttribute("resource");
       if (file) v.setAttribute("data-co-link", absolute(file, url) || "");
@@ -209,6 +210,47 @@
       body: doc.body, base: url,
       licence: "wikipedia", dir: textDir(doc),
     };
+  }
+
+  // Each image's author and licence from the file's page ("Jane Doe,
+  // CC BY-SA 4.0"), as data-co-credit; rebuild() puts it under the image.
+  // Icons and flags are left out, and so is everything if the API fails.
+  async function credits(doc, host) {
+    const files = new Map();
+    for (const img of doc.querySelectorAll("img[resource]")) {
+      if ((parseInt(img.getAttribute("width"), 10) || 0) < 100) continue;
+      let name;
+      try { name = decodeURIComponent(img.getAttribute("resource").replace(/^.*?\/(?=[^/]+:)/, "")).replace(/_/g, " "); } catch (e) { continue; }
+      if (!files.has(name)) files.set(name, []);
+      files.get(name).push(img);
+    }
+    const names = [...files.keys()];
+    for (let i = 0; i < names.length; i += 50) {
+      const titles = names.slice(i, i + 50);
+      let data;
+      try {
+        const res = await get("https://" + host + "/w/api.php?action=query&format=json&formatversion=2&prop=imageinfo&iiprop=extmetadata" +
+          "&iiextmetadatafilter=Artist%7CLicenseShortName&origin=*&titles=" + encodeURIComponent(titles.join("|")),
+        { "Api-User-Agent": "Carry-on (https://github.com/danielnoam/carry-on)" });
+        data = JSON.parse(res.text).query;
+      } catch (e) { return; }
+      const renamed = new Map(((data && data.normalized) || []).map((n) => [n.to, n.from]));
+      for (const pg of (data && data.pages) || []) {
+        const meta = pg.imageinfo && pg.imageinfo[0] && pg.imageinfo[0].extmetadata;
+        const imgs = files.get(pg.title) || files.get(renamed.get(pg.title));
+        if (!meta || !imgs) continue;
+        const credit = creditLine(meta.Artist && meta.Artist.value, meta.LicenseShortName && meta.LicenseShortName.value);
+        if (credit) imgs.forEach((img) => img.setAttribute("data-co-credit", credit));
+      }
+    }
+  }
+
+  // "Jane Doe, CC BY-SA 4.0" from Commons' Artist (HTML) and licence.
+  function creditLine(artistHtml, licence) {
+    const text = (h) => new DOMParser().parseFromString(String(h || ""), "text/html").body.textContent.replace(/\s+/g, " ").trim();
+    let artist = text(artistHtml);
+    if (artist.length > 80) artist = artist.slice(0, 79).trimEnd() + "…";
+    return [artist, text(licence)].filter(Boolean).join(", ");
   }
 
   const CHECK_TITLE = /^(just a moment|attention required|access denied|are you a robot)/i;
@@ -362,6 +404,8 @@
         const v = node.getAttribute(a);
         if (v != null && (a === "alt" || /^\d+$/.test(v))) img.setAttribute(a, v);
       }
+      const credit = node.getAttribute("data-co-credit");
+      if (credit) img.setAttribute("data-credit", credit);
       media.push({ el: img, preview, full });
       return img;
     }
@@ -402,6 +446,19 @@
     const root = out.createElement("div");
     root.className = "co-body";
     walk(body, root);
+    // A credit goes under the image's caption; one outside a figure stays
+    // on the image, for the image viewer.
+    root.querySelectorAll("figure:not(.co-video) img[data-credit]").forEach((img) => {
+      const fig = img.closest("figure");
+      if (fig.querySelector(".co-credit")) { img.removeAttribute("data-credit"); return; }
+      let cap = fig.querySelector("figcaption");
+      if (!cap) { cap = out.createElement("figcaption"); fig.append(cap); }
+      const line = out.createElement("small");
+      line.className = "co-credit";
+      line.textContent = img.getAttribute("data-credit");
+      cap.append(line);
+      img.removeAttribute("data-credit");
+    });
     // Wrappers left empty once their media or chrome is gone.
     root.querySelectorAll("p, div, span:not(.co-play), section, figure, li").forEach((n) => {
       if (!n.textContent.trim() && !n.querySelector("img, figure, br, hr, table")) n.remove();
@@ -410,6 +467,14 @@
   }
 
   // ---- Media ----
+
+  // Downloads one image into the page's directory; a preview much wider
+  // than the screen needs is redrawn smaller (store.shrink). Resolves to
+  // { rel, bytes } of the file kept.
+  async function keep(id, rel, url, mode) {
+    const size = await C.store.download(id, rel, url);
+    return mode === "full" ? { rel, bytes: size } : C.store.shrink(id, rel, size, PREVIEW_WIDTH);
+  }
 
   // Downloads previews (or full images, or nothing, per the image setting)
   // into images/ beside page.html. A failed one keeps its link and is
@@ -428,9 +493,10 @@
       if (mode === "links") { m.el.setAttribute("data-full", fallback); m.el.className = "co-missing"; return; }
       const rel = "images/" + m.i + "." + extOf(url);
       try {
-        bytes += await C.store.download(id, rel, url);
-        m.el.setAttribute("src", rel);
-        if (!thumb && !m.video) thumb = rel;
+        const got = await keep(id, rel, url, mode);
+        bytes += got.bytes;
+        m.el.setAttribute("src", got.rel);
+        if (!thumb && !m.video) thumb = got.rel;
       } catch (e) {
         missing++;
         m.el.setAttribute("data-full", fallback);
@@ -492,7 +558,7 @@
   const BLOCKS = "p, li, h1, h2, h3, h4, h5, h6, figcaption, blockquote, pre, td, th, dt, dd, div, section, article";
   function plainText(root) {
     const copy = root.cloneNode(true);
-    copy.querySelectorAll(".co-head, .co-licence, .co-next, script, style").forEach((n) => n.remove());
+    copy.querySelectorAll(".co-head, .co-licence, .co-next, .co-credit, script, style").forEach((n) => n.remove());
     copy.querySelectorAll(BLOCKS).forEach((n) => n.append("\n"));
     return copy.textContent.split("\n").map((l) => l.replace(/\s+/g, " ").trim()).filter(Boolean).join("\n");
   }
@@ -558,11 +624,12 @@
       if (!/^https?:/.test(url)) continue;
       const rel = "images/r" + stamp + "-" + i + "." + extOf(url);
       try {
-        bytes += await C.store.download(meta.id, rel, url);
-        img.setAttribute("src", rel);
+        const kept = await keep(meta.id, rel, url, meta.mode);
+        bytes += kept.bytes;
+        img.setAttribute("src", kept.rel);
         img.removeAttribute("class");
         img.removeAttribute("data-preview");
-        if (!thumb && !img.closest(".co-video")) thumb = rel;
+        if (!thumb && !img.closest(".co-video")) thumb = kept.rel;
         got++;
       } catch (e) { /* still missing */ }
       if (onProgress) onProgress(++done, imgs.length);
@@ -575,8 +642,45 @@
     return { got, missing, bytes, thumb };
   }
 
+  // Swaps every image on a saved page for its full-size one ("Save full
+  // images" in ⋯), deleting the preview each replaces. One that can't be
+  // fetched keeps its preview. Resolves to { got, failed, bytes } where
+  // bytes is the change in the page's size.
+  async function saveFullImages(meta, onProgress) {
+    const html = await C.store.readPage(meta.id);
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const imgs = [...doc.querySelectorAll("img[data-full]")].filter((img) => !img.closest(".co-video") && /^https?:/.test(img.getAttribute("data-full")));
+    let got = 0, failed = 0, bytes = 0, done = 0;
+    const stamp = Date.now().toString(36);
+    for (const [i, img] of imgs.entries()) {
+      const url = img.getAttribute("data-full");
+      const rel = "images/f" + stamp + "-" + i + "." + extOf(url);
+      try {
+        bytes += await C.store.download(meta.id, rel, url);
+        // The library card keeps its small preview.
+        const old = img.getAttribute("src") || "";
+        if (/^images\//.test(old) && old !== meta.thumb) bytes -= await C.store.removeFile(meta.id, old);
+        img.setAttribute("src", rel);
+        img.removeAttribute("class");
+        img.removeAttribute("data-preview");
+        got++;
+      } catch (e) { failed++; }
+      if (onProgress) onProgress(++done, imgs.length);
+    }
+    const out = { ...meta, mode: "full", missing: doc.querySelectorAll("img.co-missing").length };
+    await C.store.writePage(meta.id, "<!doctype html>\n" + doc.documentElement.outerHTML, out);
+    return { got, failed, bytes, missing: out.missing };
+  }
+
+  // A page's next link, read from the original: for pages saved before
+  // 0.10.0, which didn't keep one. "" when it has none.
+  async function findNext(url) {
+    const res = await get(url);
+    return nextLink(parse(res.text, res.url || url), res.url || url);
+  }
+
   C.save = {
-    save, SaveError, retryMissing, textDir, isNextText, plainText,
+    save, SaveError, retryMissing, saveFullImages, findNext, creditLine, textDir, isNextText, plainText,
     wikipediaPage, wikimediaThumb, parseSrcset, pickWidth, youtubeId, vimeoId, extOf, isTrackingPixel, readingMinutes, siteName,
   };
 })();

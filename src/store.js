@@ -116,10 +116,73 @@
     return size;
   }
 
+  // Deletes one file in a page's directory; resolves to the bytes freed.
+  async function removeFile(id, rel) {
+    if (!FS()) return 0;
+    const path = "pages/" + id + "/" + rel;
+    try {
+      const { size } = await FS().stat({ path, directory: DIR });
+      await FS().deleteFile({ path, directory: DIR });
+      return size || 0;
+    } catch (e) { return 0; }
+  }
+
+  // Redraws a downloaded image that's much wider than `max` at `max` px:
+  // JPEG, or PNG when it has see-through parts (a logo, a diagram). Keeps
+  // whichever file is smaller. Animated GIFs and SVGs are left alone. The
+  // file is served from the app's own origin, so the canvas can be read.
+  // Resolves to { rel, bytes } of the file kept. One at a time, so four
+  // big photos aren't decoded at once.
+  let drawing = Promise.resolve();
+  function shrink(id, rel, size, max) {
+    const turn = drawing.then(() => shrinkNow(id, rel, size, max));
+    drawing = turn;
+    return turn;
+  }
+  async function shrinkNow(id, rel, size, max) {
+    const dir = pageDirUrl(id);
+    const same = { rel, bytes: size };
+    if (!dir || /\.(gif|svg)$/i.test(rel)) return same;
+    try {
+      const img = new Image();
+      img.src = dir + rel;
+      await img.decode();
+      if (img.naturalWidth <= max * 1.25) return same;
+      const w = max, h = Math.max(1, Math.round(img.naturalHeight * max / img.naturalWidth));
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(img, 0, 0, w, h);
+      const clear = !/\.jpe?g$/i.test(rel) && seeThrough(ctx.getImageData(0, 0, w, h).data);
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, clear ? "image/png" : "image/jpeg", 0.82));
+      if (!blob || blob.size >= size) return same;
+      const out = rel.replace(/\.[^./]*$/, "") + "s." + (clear ? "png" : "jpg");
+      await FS().writeFile({ path: "pages/" + id + "/" + out, data: await base64(blob), directory: DIR, recursive: true });
+      await removeFile(id, rel);
+      return { rel: out, bytes: blob.size };
+    } catch (e) { return same; }
+  }
+
+  function seeThrough(px) {
+    for (let i = 3; i < px.length; i += 4) if (px[i] < 255) return true;
+    return false;
+  }
+
+  function base64(blob) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result).split(",")[1]);
+      r.onerror = () => reject(r.error);
+      r.readAsDataURL(blob);
+    });
+  }
+
   // The URL a page's relative paths (images/3.jpg) resolve against.
   function pageDirUrl(id) {
     return dataUrl ? dataUrl + "pages/" + id + "/" : null;
   }
 
-  window.CarryOn.store = { ready, readIndex, writeIndex, writePage, readPage, removePage, writeText, readText, download, pageDirUrl, bytesOf };
+  window.CarryOn.store = { ready, readIndex, writeIndex, writePage, readPage, removePage, writeText, readText, download, removeFile, shrink, pageDirUrl, bytesOf };
 })();
