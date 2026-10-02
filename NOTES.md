@@ -3,6 +3,39 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **The UI rework follows sketches Daniel picked (0.19.0).** The design
+  canvas has the 0.19.0 rows: library A (sections) over B (tabs), the
+  grouped ⋯ and the Settings menu. Daniel's AI design guide was checked
+  against them: its Apple HIG, spring motion, 8-point spacing and WCAG
+  AA rules were already DESIGN.md's; its React, Tailwind, shadcn and
+  Framer Motion defaults don't apply under the no-build rule.
+- **Picking several is a history entry, and so is the library's sheet
+  (0.19.0).** Back leaves picking, and a sheet over picking is its own
+  entry with `select: true`, so back from Tags lands on picking, not the
+  library. Picks are painted onto the cards already there (`paintPicks`)
+  instead of re-rendering, so focus stays on the card that was tapped.
+  Going forward in history onto a sheet steps back off it, as the image
+  viewer does, since its contents can't be rebuilt from the entry.
+- **A long press is our own timer, plus `contextmenu` (0.19.0).**
+  Android's WebView fires `contextmenu` on a long press, iOS's doesn't,
+  and a mouse fires it on right-click. A 480 ms timer that a 10 px move
+  cancels covers touch everywhere; whichever of the two comes first
+  opens the menu and the click that follows is swallowed. Cards can't be
+  text-selected or called out, so the press doesn't select the title.
+- **"Last read" needs `readAt` (0.19.0).** Opening a page stamps
+  `readAt`, which Continue reading, the "Last read" order and the
+  folders' order use. Pages read before 0.19.0 don't have it, so they
+  sort by when they were saved until they're opened again. Backups keep
+  it.
+- **Tapping the page toggles the bar, scrolling still moves it (0.19.0).**
+  A tap on text (not a link, an image or a selection) hides or shows the
+  bar; scrolling down still hides it and up brings it back. Jumping to a
+  heading counts as scrolling down, so the bar is away after a jump.
+- **On a desktop, Settings' section sits beside its menu (0.19.0).** At
+  900 px and wider the section screen starts 360 px in and the menu stays
+  usable; picking another entry swaps the section in place (one history
+  entry) instead of pushing another.
+
 - **The core works on a phone (2 Oct 2026).** Daniel saved Wikipedia
   and ynet on the Android build and shared pages into the app from
   Chrome, so the on-device fetch (CapacitorHttp, Readability,
