@@ -3,6 +3,13 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Direction falls back to the letters (0.4.0).** `textDir` in
+  src/save.js takes `dir="rtl"` on <html> or <body>, then a right-to-left
+  `lang`, then counts Hebrew and Arabic letters against Latin and Cyrillic
+  in the article's text. ynet's markup carries no direction, so 0.3.1
+  saved it left to right. The reader runs the same check on a page with no
+  `dir`, which covers pages saved before.
+
 - **Reading settings are tokens too (0.4.0).** Text size, spacing and font
   are `--reader-fs`, `--reader-lh` and `--reader-font` on the app's :root,
   copied into the sandboxed page with the theme's colours, so the reader

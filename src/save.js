@@ -124,11 +124,19 @@
     return res;
   }
 
-  // Hebrew and Arabic pages say so on <html> or <body>; the saved page keeps
-  // it, or the reader lays them out left to right.
-  function textDir(doc) {
-    const d = (doc.documentElement.getAttribute("dir") || (doc.body && doc.body.getAttribute("dir")) || "").toLowerCase();
-    return d === "rtl" ? "rtl" : "";
+  // Hebrew and Arabic pages usually say so on <html> or <body>, or by their
+  // language; when they don't (ynet's article markup), the letters decide.
+  // The saved page keeps it, or the reader lays it out left to right.
+  const RTL_LANGS = /^(he|iw|yi|ar|fa|ur|ps|sd|ckb|dv)\b/i;
+  function textDir(doc, text) {
+    const root = doc.documentElement;
+    const d = (root.getAttribute("dir") || (doc.body && doc.body.getAttribute("dir")) || "").toLowerCase();
+    if (d === "rtl") return "rtl";
+    if (RTL_LANGS.test(root.getAttribute("lang") || "")) return "rtl";
+    const sample = String(text != null ? text : (doc.body && doc.body.textContent) || "").slice(0, 4000);
+    const rtl = (sample.match(/[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/g) || []).length;
+    const ltr = (sample.match(/[A-Za-z\u00C0-\u024F\u0400-\u04FF]/g) || []).length;
+    return rtl > ltr ? "rtl" : "";
   }
 
   function parse(html, base) {
@@ -195,7 +203,7 @@
       byline: (article.byline || "").trim(),
       body, base: finalUrl, licence: null,
       lang: (doc.documentElement.getAttribute("lang") || article.lang || "").trim(),
-      dir: article.dir === "rtl" || textDir(doc) === "rtl" ? "rtl" : "",
+      dir: article.dir === "rtl" || textDir(doc, article.textContent) === "rtl" ? "rtl" : "",
     };
   }
 

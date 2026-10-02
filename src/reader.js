@@ -127,6 +127,8 @@
     return new Promise((resolve) => {
       iframe.onload = () => {
         doc = iframe.contentDocument;
+        // Pages saved before 0.4.0 may not carry their direction.
+        if (!doc.documentElement.hasAttribute("dir") && C.save.textDir(doc) === "rtl") doc.documentElement.dir = "rtl";
         applyTheme();
         applyConnection();
         doc.addEventListener("click", onClick);

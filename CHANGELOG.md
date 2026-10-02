@@ -12,6 +12,11 @@ All notable changes to Carry-on. Newest first.
 - Settings has a Reading section with the same text size, spacing and
   font, and a sample line to judge them by.
 
+### Fixed
+- Hebrew pages that don't label their own direction (ynet) are now saved
+  right to left, judged by their letters. Pages already saved without it
+  open right to left too.
+
 ## [0.3.1] - 2026-10-02
 
 ### Fixed
