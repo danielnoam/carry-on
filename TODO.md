@@ -6,6 +6,18 @@ todo:
   nearest 480 px, or the original when there's no srcset; resize big ones
   on the device.
 - Commons images: keep each image's own credit line (author, licence).
+- Comics and manga (Daniel, 2 Oct 2026). Today they fail: a chapter is
+  a column of images with almost no text, so Readability finds "nothing
+  readable", and the 480 px previews would be unreadable anyway. Needs:
+  an image-chapter mode (spot pages that are mostly one column of large
+  images, keep them in order, drop the rest), full-size images for those
+  pages whatever the image setting, a reader that shows them edge to
+  edge with no gaps (and pinch zoom), and the existing next-chapter
+  following and folders for series. Watch: a chapter is often 10-50 MB,
+  so the library needs to show size per folder and warn before "Save
+  next 10"; many manga sites lazy-load images with scripts (the 0.12.0
+  drawing helps) or block hotlinking by Referer; and most aggregator
+  sites host pirated scans, so the store listing must never name them.
 
 ## Capture
 
