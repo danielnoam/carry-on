@@ -43,9 +43,11 @@ src/store.js        page folders and the library index (IndexedDB in a browser)
 src/save.js         link to saved page: Wikipedia adapter, Readability,
                     the allowlist cleaner, image previews, video cards
 src/reader.js       shows a saved page in the sandboxed iframe
-src/app.js          version, state, the library and reader views
+src/motion.js       the springs from DESIGN.md, for screens, cards and bars
+src/app.js          version, state, the library, reader and Settings
 src/vendor/         Mozilla Readability 0.6.0 (Apache-2.0)
 src/fonts/          Source Serif 4, Instrument Sans (OFL)
+native/share/       Capacitor plugin: Android's share sheet into the app
 sw.js               offline cache for the web copy; its ASSETS list is
                     also what goes into the app
 tools/              build-www (copies the app into www/), Android and iOS

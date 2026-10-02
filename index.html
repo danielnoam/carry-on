@@ -7,8 +7,8 @@
   <title>Carry-on</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="src/fonts.css?v=0.2.0">
-  <link rel="stylesheet" href="src/styles.css?v=0.2.0">
+  <link rel="stylesheet" href="src/fonts.css?v=0.3.0">
+  <link rel="stylesheet" href="src/styles.css?v=0.3.0">
 </head>
 <body>
   <div class="app" id="libraryView">
@@ -16,8 +16,8 @@
       <div class="top-row">
         <h1 class="screen-title">Library</h1>
         <div class="top-actions">
-          <button class="icon-btn" id="themeBtn" type="button" aria-label="Change theme">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8"></circle><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"></path></svg>
+          <button class="icon-btn" id="settingsBtn" type="button" aria-label="Settings">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"></path><circle cx="16" cy="7" r="2"></circle><circle cx="10" cy="17" r="2"></circle></svg>
           </button>
         </div>
       </div>
@@ -39,7 +39,7 @@
     </footer>
   </div>
 
-  <section class="reader" id="readerView" hidden aria-label="Saved page">
+  <section class="reader screen" id="readerView" hidden aria-label="Saved page">
     <header class="reader-bar">
       <button class="icon-btn" id="readerBack" type="button" aria-label="Back to library">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg>
@@ -56,13 +56,24 @@
     </header>
     <iframe class="reader-frame" id="readerFrame" sandbox="allow-same-origin" title="Saved page"></iframe>
   </section>
+  <section class="screen" id="settingsView" hidden aria-label="Settings">
+    <header class="screen-bar">
+      <button class="icon-btn" id="settingsBack" type="button" aria-label="Back to library">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg>
+      </button>
+      <h1 class="bar-title">Settings</h1>
+      <span class="bar-spacer" aria-hidden="true"></span>
+    </header>
+    <div class="screen-body" id="settingsBody"></div>
+  </section>
   <div class="toast" id="toast" role="status" hidden></div>
 
-  <script src="src/platform.js?v=0.2.0"></script>
-  <script src="src/vendor/Readability.js?v=0.2.0"></script>
-  <script src="src/store.js?v=0.2.0"></script>
-  <script src="src/save.js?v=0.2.0"></script>
-  <script src="src/reader.js?v=0.2.0"></script>
-  <script src="src/app.js?v=0.2.0"></script>
+  <script src="src/platform.js?v=0.3.0"></script>
+  <script src="src/motion.js?v=0.3.0"></script>
+  <script src="src/vendor/Readability.js?v=0.3.0"></script>
+  <script src="src/store.js?v=0.3.0"></script>
+  <script src="src/save.js?v=0.3.0"></script>
+  <script src="src/reader.js?v=0.3.0"></script>
+  <script src="src/app.js?v=0.3.0"></script>
 </body>
 </html>

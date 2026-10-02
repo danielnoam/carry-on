@@ -10,23 +10,42 @@
 //   approves each install on Android's own screen, and once, in Settings,
 //   whether Carry-on may install apps at all.
 //
+// - An intent filter on MainActivity for text shared from another app
+//   (0.3.0): it's what puts Carry-on in Chrome's share sheet. A share
+//   arrives as ACTION_SEND with the link in EXTRA_TEXT, which
+//   native/share's ShareTarget plugin hands to the page.
+//
 // Idempotent, and fails loudly if a tag it needs can't be found.
 const fs = require("fs");
 const path = require("path");
 
 const ENTRIES = [
   { inside: "manifest", xml: '<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />' },
+  {
+    inside: "main-activity",
+    xml: '<intent-filter>\n' +
+      '                <action android:name="android.intent.action.SEND" />\n' +
+      '                <category android:name="android.intent.category.DEFAULT" />\n' +
+      '                <data android:mimeType="text/plain" />\n' +
+      '            </intent-filter>',
+  },
 ];
+const TAGS = {
+  manifest: /<manifest\b[^>]*>/,
+  application: /<application\b[^>]*>/,
+  "main-activity": /<activity\b[^>]*android:name="\.MainActivity"[^>]*>/,
+};
+const INDENT = { manifest: "    ", application: "        ", "main-activity": "            " };
 
 function patch(xml) {
   let out = xml;
   for (const { inside, xml: entry } of ENTRIES) {
     const name = entry.match(/android:name="([^"]+)"/)[1];
     if (out.includes('android:name="' + name + '"')) continue;
-    const at = out.search(inside === "application" ? /<application\b[^>]*>/ : /<manifest\b[^>]*>/);
-    if (at < 0) throw new Error("no <" + inside + "> tag in AndroidManifest.xml");
-    const end = out.indexOf(">", at) + 1;
-    out = out.slice(0, end) + "\n    " + (inside === "application" ? "    " : "") + entry + out.slice(end);
+    const m = TAGS[inside].exec(out);
+    if (!m) throw new Error("no <" + inside + "> tag in AndroidManifest.xml");
+    const end = m.index + m[0].length;
+    out = out.slice(0, end) + "\n" + INDENT[inside] + entry + out.slice(end);
   }
   return out;
 }

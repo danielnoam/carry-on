@@ -75,12 +75,27 @@ test("versionCode goes up with every version", () => {
   assert.throws(() => versionCode("0.1"));
 });
 
-test("the manifest gains REQUEST_INSTALL_PACKAGES for the updater, once", () => {
-  const xml = '<?xml version="1.0" encoding="utf-8"?>\n<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <application android:label="Carry-on">\n    </application>\n</manifest>\n';
+test("the manifest gains the updater's permission and the share target, once", () => {
+  const xml = '<?xml version="1.0" encoding="utf-8"?>\n<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n' +
+    '    <application android:label="Carry-on">\n' +
+    '        <activity\n            android:name=".MainActivity"\n            android:launchMode="singleTask"\n            android:exported="true">\n' +
+    '            <intent-filter>\n                <action android:name="android.intent.action.MAIN" />\n            </intent-filter>\n' +
+    '        </activity>\n    </application>\n</manifest>\n';
   const once = manifest.patch(xml);
   assert.ok(/<manifest[^>]*>\s*<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" \/>/.test(once));
+  const activity = once.slice(once.indexOf("<activity"), once.indexOf("</activity>"));
+  assert.ok(/android.intent.action.SEND"[\s\S]*android.intent.category.DEFAULT"[\s\S]*android:mimeType="text\/plain"/.test(activity));
   assert.strictEqual(manifest.patch(once), once);
-  assert.throws(() => manifest.patch("<nothing/>"));
+  assert.throws(() => manifest.patch("<manifest><application></application></manifest>"));
+});
+
+test("the share target plugin is a local Capacitor plugin the app depends on", () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
+  assert.strictEqual(pkg.devDependencies["carryon-share"], "file:native/share");
+  const plugin = JSON.parse(fs.readFileSync(path.join(ROOT, "native", "share", "package.json"), "utf8"));
+  assert.strictEqual(plugin.capacitor.android.src, "android");
+  const java = fs.readFileSync(path.join(ROOT, "native", "share", "android", "src", "main", "java", "io", "github", "danielnoam", "carryon", "share", "ShareTargetPlugin.java"), "utf8");
+  assert.ok(/@CapacitorPlugin\(name = "ShareTarget"\)/.test(java));
 });
 
 test("android.yml patches the manifest and the updater's plugin is installed", () => {

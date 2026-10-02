@@ -6,10 +6,6 @@ todo:
   Readability and `Filesystem.downloadFile`: a Wikipedia article, a news
   site behind Cloudflare, a Medium post, a JavaScript-only page, and a page
   with YouTube embeds. Record what fails in NOTES.md before building on it.
-- Check on a phone what 0.2.0 could only check in a desktop browser with
-  Capacitor mocked: `Filesystem.downloadFile` into `pages/<id>/images/`,
-  the page folder as the reader's `<base>` under its CSP, and links
-  leaving through AppLauncher.
 
 ## Saving
 
@@ -22,20 +18,39 @@ todo:
 
 ## Capture
 
-- Android share target: an intent filter added by tools/android-manifest.js
-  (which exists since 0.2.0, for the updater).
+- Check the Android share target on a phone (Chrome, and an app that
+  shares "Title https://…").
 - iOS share extension, with the Safari JavaScript preprocessing file to
   hand over the rendered HTML.
 
 ## Library and reader
 
 - Retry for missing previews (the card says how many are missing).
-- Reader top bar: Aa (text size steps, theme), hide on scroll down;
-  tapping an image opens it full screen.
+- Reader top bar: an Aa button for quick changes while reading: font,
+  theme, text size and line spacing, the same settings also in Settings
+  (Reading section). Hide the bar on scroll down; tapping an image opens
+  it full screen.
+- Reading progress: remember where each page was left, and show how much
+  is left under each library card (e.g. "6 min left", a thin progress
+  line), "Finished" once read to the end.
+- Categories: give a page one or more categories, filter the library by
+  them (with the chips below).
+- Batch saving: paste several links at once (or share several); they save
+  one after another in the library's saving cards, and can all go into a
+  category or folder chosen up front. Decide first whether folders and
+  categories are one thing: if a page can have several categories, a
+  folder is just a category, and two systems would confuse.
+- Naming pass: one vocabulary for what the app holds, used the same way in
+  the code, the UI and the docs (a saved page, its previews, a capture, the
+  library, a category or folder). Write it as a glossary in NOTES.md, then
+  rename functions and labels that don't match it (save.js `clean`,
+  `localise`, `pageHtml`; app.js `takeShared`, `cover`).
+- Read aloud: a player in the reader that reads the page with the phone's
+  text-to-speech (works offline), following along in the text, with
+  play/pause, speed and skip by paragraph. On Android the WebView's
+  speechSynthesis is unreliable, so likely a small native TTS plugin in
+  native/ beside the share target.
 - Library chips (All, Unread, Wikipedia, Articles) and search.
-- Settings: theme, save setting (stored as `carryon.images`: previews,
-  full, links; saving already honours it), storage used per page and in
-  total.
 - Export one page as a self-contained HTML file; import it back.
 
 ## Sync

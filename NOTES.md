@@ -3,6 +3,31 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Sharing into the app is a small local plugin (0.3.0).** native/share
+  follows LifeLog's native/widgets: a Capacitor plugin in this repo,
+  installed with a `file:` dependency, so `cap sync` picks it up with no
+  generated project to edit. tools/android-manifest.js adds the SEND
+  `text/plain` intent filter to MainActivity in CI. The plugin keeps one
+  pending share, from the launch intent or `onNewIntent`, until the app
+  asks with `take()`, so a share that arrives before the library has
+  loaded isn't lost; it then clears the intent so a rotation doesn't
+  save it twice.
+- **Springs are pre-sampled `linear()` curves (0.3.0).** No animation
+  library, per "no dependencies": src/motion.js holds DESIGN.md's two
+  springs sampled into CSS `linear()` and runs them with the Web
+  Animations API, with a cubic-bezier for WebViews without `linear()`.
+  Under prefers-reduced-motion every animation is a 120 ms fade. Screens
+  are a history stack (`{view: "reader"}`, `{view: "settings"}`) so
+  Android's back button pops them; the library under a screen is
+  `inert`, not hidden, so it can drift back as the screen leaves.
+- **Settings are built from data (0.3.0).** `SETTINGS` in src/app.js
+  lists each group and its options; adding a later setting (reading
+  font, text size) is an entry there, not new markup.
+- **"System" is the default theme (0.3.0).** Paper by day and Night by
+  night, following the phone, until a theme is picked. Reading at night
+  on a plane is the main case, and a white page is the worst thing to
+  open there.
+
 - **The app updates itself, as LifeLog does (0.2.0).** On launch the app
   asks GitHub for the latest `app-v*` release; if it's newer, "Update"
   downloads that tag's CarryOn.apk into the cache with
