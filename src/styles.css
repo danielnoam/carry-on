@@ -16,6 +16,7 @@
   --video: #3A4048;
   --on-video: #FFFFFF;
   --scrim: rgba(0, 0, 0, 0.55);
+  --shadow: rgba(0, 0, 0, 0.08);
   color-scheme: light;
 }
 [data-theme="sepia"] {
@@ -32,6 +33,7 @@
   --video: #4A3F33;
   --on-video: #FFFFFF;
   --scrim: rgba(0, 0, 0, 0.55);
+  --shadow: rgba(43, 33, 24, 0.1);
   color-scheme: light;
 }
 [data-theme="night"] {
@@ -48,6 +50,7 @@
   --video: #262C34;
   --on-video: #FFFFFF;
   --scrim: rgba(0, 0, 0, 0.55);
+  --shadow: rgba(0, 0, 0, 0.45);
   color-scheme: dark;
 }
 
@@ -195,20 +198,88 @@ html.native .app { padding-top: env(safe-area-inset-top); }
 .card-status .warn { color: var(--warn); }
 .card-status.accent { color: var(--accent); }
 .progress { display: block; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
-.progress-fill { display: block; height: 100%; background: var(--accent); transition: width 240ms cubic-bezier(0.2, 0.9, 0.3, 1); }
+.progress-fill {
+  display: block; height: 100%; background: var(--accent);
+  transform: scaleX(0); transform-origin: left;
+  transition: transform var(--spring-sheet-ms, 400ms) var(--spring-sheet, ease-out);
+}
 
-.reader {
-  position: fixed; inset: 0;
+.screen {
+  position: fixed; inset: 0; z-index: 10;
   display: flex; flex-direction: column;
   background: var(--bg);
+  box-shadow: -8px 0 24px var(--shadow);
 }
-.reader[hidden] { display: none; }
+.screen[hidden] { display: none; }
+.screen-bar {
+  display: grid; grid-template-columns: var(--tap) 1fr var(--tap); align-items: center;
+  padding: var(--s-2);
+  border-bottom: 1px solid var(--line);
+}
+html.native .screen-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top)); }
+.bar-title { margin: 0; text-align: center; font: 600 var(--fs-label)/var(--lh-label) var(--sans); }
+.screen-body {
+  flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: var(--s-4) var(--gutter) calc(var(--s-7) + env(safe-area-inset-bottom));
+}
+.screen-body > * { max-width: 40rem; margin-left: auto; margin-right: auto; }
+
+.settings-section + .settings-section { margin-top: var(--s-6); }
+.overline {
+  margin: 0 0 var(--s-2) var(--s-1);
+  font: 600 var(--fs-meta)/var(--lh-meta) var(--sans);
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+}
+.section-lead { margin: 0 0 var(--s-2) var(--s-1); color: var(--muted); font-size: var(--fs-meta); line-height: var(--lh-meta); }
+.footnote { margin: var(--s-2) var(--s-1) 0; color: var(--muted); font-size: var(--fs-meta); line-height: var(--lh-meta); }
+.group {
+  background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--r-lg);
+  overflow: hidden;
+}
+.choice, .row {
+  display: flex; align-items: center; gap: var(--s-3);
+  width: 100%; min-height: 52px; padding: var(--s-2) var(--s-4);
+  background: transparent; color: var(--ink); border: 0;
+  font: inherit; text-align: left; text-decoration: none;
+  cursor: pointer;
+}
+.choice + .choice, .row + .row { border-top: 1px solid var(--line); }
+.choice:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+.choice-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.choice-label { font-weight: 500; }
+.choice-note { font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--muted); }
+.choice-check {
+  display: inline-flex; color: var(--accent);
+  opacity: 0; transform: scale(0.6);
+  transition: opacity var(--spring-control-ms, 300ms) var(--spring-control, ease-out), transform var(--spring-control-ms, 300ms) var(--spring-control, ease-out);
+}
+.choice input:checked ~ .choice-check { opacity: 1; transform: none; }
+.row-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-value { flex-shrink: 0; color: var(--muted); font-size: var(--fs-meta); }
+.accent { color: var(--accent); font-weight: 500; }
+.muted { color: var(--muted); }
+
+.swatch {
+  display: inline-flex; flex-shrink: 0;
+  width: 32px; height: 32px; border-radius: var(--r-full); overflow: hidden;
+  border: 1px solid var(--line);
+}
+.swatch-half {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  background: var(--bg);
+}
+.swatch-dot { width: 8px; height: 8px; border-radius: var(--r-full); background: var(--accent); }
+.swatch-half + .swatch-half .swatch-dot { display: none; }
+.swatch-half:first-child:not(:only-child) .swatch-dot { display: none; }
+
 .reader-bar {
   display: flex; align-items: center; justify-content: space-between;
   padding: var(--s-2);
   border-bottom: 1px solid var(--line);
 }
 html.native .reader-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top)); }
+.reader { z-index: 11; }
 .reader-actions { display: flex; align-items: center; gap: var(--s-1); }
 .pill {
   height: 28px; padding: 0 10px;
@@ -226,15 +297,27 @@ html.native .reader-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top
 .reader-frame { flex: 1; width: 100%; border: 0; background: var(--bg); }
 .app[hidden] { display: none; }
 
+.toast[hidden] { display: none; }
 .toast {
-  position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom));
-  transform: translateX(-50%);
+  position: fixed; left: 0; right: 0; bottom: calc(96px + env(safe-area-inset-bottom)); z-index: 20;
+  width: fit-content; margin: 0 auto;
   max-width: calc(100% - 2 * var(--gutter));
   padding: var(--s-3) var(--s-4);
   border-radius: var(--r-md);
   background: var(--ink); color: var(--bg);
   font-size: var(--fs-label);
 }
+
+/* Presses answer on the small-control spring. */
+.card, .btn-primary, .btn-small, .icon-btn, .choice, .row, .bar-link {
+  transition: transform var(--spring-control-ms, 300ms) var(--spring-control, ease-out), background-color 120ms linear;
+  -webkit-tap-highlight-color: transparent;
+}
+.card:active, .btn-primary:active, .btn-small:active, .icon-btn:active { transform: scale(0.97); }
+.choice:active, .row:active { background: var(--bg); }
+.icon-btn:active { background: var(--line); }
+
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 260ms; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 1ms !important; animation-duration: 1ms !important; }

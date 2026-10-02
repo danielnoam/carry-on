@@ -28,6 +28,7 @@ Every color is a token on `:root`, redefined per theme on
 | `--video` | #3A4048 | #4A3F33 | #262C34 | Video card ground behind the thumbnail |
 | `--on-video` | #FFFFFF | #FFFFFF | #FFFFFF | Play glyph |
 | `--scrim` | black 55% | black 55% | black 55% | Play button disc |
+| `--shadow` | black 8% | brown 10% | black 45% | The one soft shadow: a screen pushed over the library |
 
 Night is for a dim cabin: no pure white text, no pure black ground.
 "System" follows the phone's light or dark setting (Paper or Night).

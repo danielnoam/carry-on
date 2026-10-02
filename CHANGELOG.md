@@ -2,6 +2,23 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.3.0] - 2026-10-02
+
+### Added
+- Share to Carry-on (Android): share a page from Chrome or any app and it
+  is saved straight away. Sharing a page you already saved opens it.
+- Settings, from the button at the top of the library: theme, how images
+  are saved (previews, full images, links only), storage used by each
+  page, the version and "Check for updates".
+- Motion: the reader and Settings slide in over the library on a spring,
+  new cards and the update bar settle into place, save progress fills
+  smoothly, and changing theme cross-fades. With Reduce Motion on, all of
+  it becomes a short fade.
+
+### Changed
+- The theme now follows the phone's light or dark setting until you pick
+  one in Settings ("System", Paper by day and Night by night).
+
 ## [0.2.0] - 2026-10-02
 
 ### Added
