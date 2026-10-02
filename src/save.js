@@ -100,6 +100,39 @@
     return Math.max(1, Math.round(words / WORDS_PER_MINUTE));
   }
 
+  // Words a site uses on its link to the next chapter or page.
+  const NEXT_WORDS = /^(next|next (chapter|page|part|episode|post)|הבא|הפרק הבא|לפרק הבא|לעמוד הבא|siguiente|suivant|weiter|nächste|下一章|下一页|次へ|次の話)$/i;
+
+  function isNextText(text) {
+    const t = String(text || "").replace(/[›»→>\s]+$/u, "").replace(/^[‹«←<\s]+/u, "").replace(/\s+/g, " ").trim();
+    return NEXT_WORDS.test(t);
+  }
+
+  // The page's link to what comes next (rel="next", or a link worded like
+  // "Next chapter"), on the same site and not the page itself; "" if none.
+  // Read before Readability, which strips navigation.
+  function nextLink(doc, pageUrl) {
+    let host;
+    try { host = new URL(pageUrl).host; } catch (e) { return ""; }
+    const ok = (href) => {
+      const u = absolute(href, pageUrl);
+      try {
+        const x = new URL(u);
+        return /^https?:$/.test(x.protocol) && x.host === host && u.split("#")[0] !== pageUrl.split("#")[0] ? u.split("#")[0] : "";
+      } catch (e) { return ""; }
+    };
+    for (const l of doc.querySelectorAll('link[rel~="next"][href], a[rel~="next"][href]')) {
+      const u = ok(l.getAttribute("href"));
+      if (u) return u;
+    }
+    for (const a of doc.querySelectorAll("a[href]")) {
+      if (!isNextText(a.textContent) && !isNextText(a.getAttribute("aria-label")) && !isNextText(a.getAttribute("title"))) continue;
+      const u = ok(a.getAttribute("href"));
+      if (u) return u;
+    }
+    return "";
+  }
+
   function siteName(url) {
     try { return new URL(url).hostname.replace(/^www\./, ""); } catch (e) { return ""; }
   }
@@ -189,6 +222,7 @@
     const og = doc.querySelector('meta[property="og:title"]');
     const h1s = doc.querySelectorAll("h1");
     const headline = (og && og.content) || (h1s.length === 1 ? h1s[0].textContent : "");
+    const next = nextLink(doc, finalUrl);
     resolveLazyImages(doc, finalUrl);
     if (typeof window.Readability !== "function") throw new SaveError("The reader part of the app didn't load. Restart Carry-on.");
     const article = new window.Readability(doc, { charThreshold: 500, keepClasses: false }).parse();
@@ -204,6 +238,7 @@
       body, base: finalUrl, licence: null,
       lang: (doc.documentElement.getAttribute("lang") || article.lang || "").trim(),
       dir: article.dir === "rtl" || textDir(doc, article.textContent) === "rtl" ? "rtl" : "",
+      next,
     };
   }
 
@@ -455,6 +490,7 @@
       id, url: got.url, title: got.title, site: got.site, byline: got.byline,
       licence: got.licence, savedAt: Date.now(), minutes: readingMinutes(root.textContent),
       lang: wiki ? wiki.host.split(".")[0] : got.lang || "", dir: got.dir || "", mode: C.platform.native ? mode : "links",
+      next: got.next || "",
     };
     if (onProgress) onProgress({ stage: "images", done: 0, total: media.length });
     const res = await localise(id, media, mode, (done, total) => onProgress && onProgress({ stage: "images", done, total }));
@@ -504,7 +540,7 @@
   }
 
   C.save = {
-    save, SaveError, retryMissing, textDir,
+    save, SaveError, retryMissing, textDir, isNextText,
     wikipediaPage, wikimediaThumb, parseSrcset, pickWidth, youtubeId, vimeoId, extOf, isTrackingPixel, readingMinutes, siteName,
   };
 })();

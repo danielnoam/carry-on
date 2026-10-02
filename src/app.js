@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.9.0";
+  const APP_VERSION = "0.10.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -137,10 +137,20 @@
 
   // ---- Library ----
 
+  // What a save is doing, with the seconds it has taken once that's long
+  // enough to wonder, so a slow site doesn't look stuck.
   function savingStatus(s) {
     if (s.waiting) return "Waiting" + (s.folder ? " · into " + s.folder : "");
-    return s.total == null ? "Saving · text" : "Saving · " + s.done + " of " + s.total + " image previews";
+    const secs = s.started ? Math.floor((Date.now() - s.started) / 1000) : 0;
+    const took = secs >= 5 ? " · " + secs + " s" : "";
+    if (s.total == null) return "Getting the page" + took;
+    if (!s.total) return "Writing it to the phone" + took;
+    return "Saving " + s.done + " of " + s.total + (s.total === 1 ? " image" : " images") + took;
   }
+
+  // The bar: sweeping while the page itself downloads (no size known yet),
+  // then a tenth for the text and the rest by images saved.
+  const savingShare = (s) => (s.total == null ? null : s.total ? 0.1 + 0.9 * (s.done / s.total) : 1);
 
   // A save that failed stays in the list with the reason until it's retried
   // or removed: a toast alone is gone before anyone looks back at the phone.
@@ -167,7 +177,9 @@
         el("span", { class: "card-title", dir: "auto" }, s.url),
         el("span", { class: "progress", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": "0" },
           el("span", { class: "progress-fill" })),
-        el("span", { class: "card-status accent" }, savingStatus(s))));
+        el("span", { class: "card-status accent" },
+          s.waiting ? null : el("span", { class: "spinner", "aria-hidden": "true" }),
+          el("span", { class: "status-text" }, savingStatus(s)))));
   }
 
   // Progress lands in the card that's already there, so the bar grows on
@@ -175,11 +187,19 @@
   function updateSavingCard(s) {
     const card = $("library").querySelector('[data-key="' + CSS.escape("s:" + s.key) + '"]');
     if (!card || s.error) return;
-    const pct = s.total ? Math.round((s.done / s.total) * 100) : 0;
-    card.querySelector(".progress").setAttribute("aria-valuenow", String(pct));
-    card.querySelector(".progress-fill").style.transform = "scaleX(" + pct / 100 + ")";
-    card.querySelector(".card-status").textContent = savingStatus(s);
+    const share = savingShare(s);
+    const bar = card.querySelector(".progress");
+    bar.classList.toggle("busy", share == null && !s.waiting);
+    if (share == null) bar.removeAttribute("aria-valuenow");
+    else bar.setAttribute("aria-valuenow", String(Math.round(share * 100)));
+    card.querySelector(".progress-fill").style.transform = "scaleX(" + (share || 0) + ")";
+    const status = card.querySelector(".card-status");
+    if (!s.waiting && !status.querySelector(".spinner")) status.prepend(el("span", { class: "spinner", "aria-hidden": "true" }));
+    status.querySelector(".status-text").textContent = savingStatus(s);
   }
+
+  // The seconds on a slow save tick on their own.
+  setInterval(() => { for (const s of state.saving) if (!s.error && !s.waiting) updateSavingCard(s); }, 1000);
 
   // "Finished" once read to the end, "6 min left" part way, else the length.
   function readingLine(p) {
@@ -391,6 +411,7 @@
   // Saves one queued link; resolves to its meta, or null when it failed
   // (the card then says why and offers Try again).
   async function runJob(job) {
+    job.started = Date.now();
     try {
       const meta = await C.save.save(job.url, {
         mode: load(IMAGES_KEY, "previews"),
@@ -461,9 +482,25 @@
     state.open = p;
     $("readerOriginal").href = p.url;
     showOffline();
+    return C.reader.open($("readerFrame"), html, p, { at: p.at || 0, onPosition: (f) => notePosition(p, f), next: endLink(p) });
+  }
+
+  // What the end of a page offers: the next page in its folder, else the
+  // site's next page (saved already, or to save now and open).
+  function endLink(p) {
     const next = neighbour(p, 1);
-    return C.reader.open($("readerFrame"), html, p, { at: p.at || 0, onPosition: (f) => notePosition(p, f),
-      next: next && { over: "Next in " + p.folder, title: next.title, go: () => goTo(next) } });
+    if (next) return { over: "Next in " + p.folder, title: next.title, go: () => goTo(next) };
+    if (!p.next) return null;
+    const had = savedAs(p.next);
+    if (had) return { over: "Next on " + p.site, title: had.title, go: () => goTo(had) };
+    return { over: "Next on " + p.site, title: "Save it and read on", go: () => followAndOpen(p) };
+  }
+
+  async function followAndOpen(p) {
+    if (!navigator.onLine) { toast("You're offline. The next page saves when you're back online."); return; }
+    toast("Saving the next page…");
+    const got = await follow(p, 1, true);
+    if (got && state.open === p) goTo(got);
   }
 
   // Next or previous in a folder: the reader stays and its page changes,
@@ -729,7 +766,9 @@
             el("span", { class: "chapter-n", "aria-hidden": "true" }, String(i + 1)),
             el("span", { class: "choice-text" },
               el("span", { class: "row-label", dir: "auto" }, p.title),
-              el("span", { class: "choice-note" + (p.finished ? "" : p.at > 0.02 ? " accent" : "") }, readingLine(p))))))));
+              el("span", { class: "choice-note" + (p.finished ? "" : p.at > 0.02 ? " accent" : "") }, readingLine(p))))))),
+      followControls(list[list.length - 1]),
+      el("button", { class: "btn-quiet folder-rename", type: "button", onclick: renameFolder }, "Rename folder"));
   }
 
   // The page before or after `p` in its folder, if any.
@@ -764,6 +803,7 @@
               ...others.slice(0, 12).map((t) => el("button", { class: "chip", type: "button", "aria-label": "Add tag " + t, onclick: () => add(t) }, "+ " + t))) : null)),
         folderRow(p, draw),
         neighbours(p),
+        neighbour(p, 1) ? null : followControls(p),
         el("button", { class: "sheet-row danger", type: "button", onclick: deleteOpen }, "Delete this page"));
     };
     draw();
@@ -863,6 +903,85 @@
     });
     $("batchBody").replaceChildren(form);
     sync();
+  }
+
+  // ---- Following a site's next links ----
+  // A page saved with a next link (save.js) can bring its next pages in
+  // after it, into its folder: one link at a time, each saved page giving
+  // the next. A page not yet in a folder starts one, named after it.
+
+  // "The Wandering Inn - Chapter 1.01" → "The Wandering Inn".
+  function seriesName(p) {
+    const t = p.title.replace(/[\s\-–—:|,·]*(chapter|ch\.?|part|episode|ep\.?|book|vol\.?|פרק|capítulo|chapitre|kapitel)\s*[\d.ivxl]+\b.*$/iu, "").trim();
+    return cleanTag(t && t !== p.title ? t : p.title) || p.site;
+  }
+
+  // Saves up to `n` pages following `from`'s next links; resolves to the
+  // first one saved (or already there), or null. Quiet when asked.
+  async function follow(from, n, quiet) {
+    if (!from.folder) { from.folder = folderName(seriesName(from)); from.folderAt = Date.now(); }
+    const name = from.folder;
+    const seen = new Set([from.url]);
+    let url = from.next, saved = 0, first = null, failed = false;
+    while (url && saved < n && !seen.has(url)) {
+      seen.add(url);
+      const had = savedAs(url);
+      if (had) {
+        if (!had.folder) { had.folder = name; had.folderAt = Date.now(); }
+        first = first || had;
+        url = had.next;
+        continue;
+      }
+      if (state.saving.some((s) => !s.error && sameUrl(s.url, url))) break;
+      state.saving = state.saving.filter((s) => !(s.error && sameUrl(s.url, url)));
+      const job = newJob(url, name);
+      state.saving.unshift(job);
+      renderLibrary();
+      const meta = await runJob(job);
+      if (!meta) { failed = true; break; }
+      saved++;
+      first = first || meta;
+      url = meta.next;
+      if (state.folder) renderFolder();
+    }
+    await C.store.writeIndex(state.pages);
+    renderLibrary();
+    if (state.folder) renderFolder();
+    if (!quiet || failed) {
+      toast(saved ? "Saved " + countLine(saved) + " into " + name + (failed ? ". The next one couldn't be saved." : !url ? ". That's the last one." : ".")
+        : failed ? "Couldn't save the next page." : first ? "The next page is already saved." : "There's no next page.");
+    }
+    return first;
+  }
+
+  // "Save the next 1 · 5 · 10" for the last page of a run with a next link.
+  function followControls(p) {
+    if (!p || !p.next || savedAs(p.next)) return null;
+    const busy = () => state.saving.some((s) => !s.error && s.folder && p.folder && sameTag(s.folder, p.folder));
+    return el("div", { class: "rc-row follow" }, el("span", { class: "rc-label" }, "Save next"),
+      el("div", { class: "chips" }, ...[1, 5, 10].map((n) => el("button", { class: "chip", type: "button",
+        "aria-label": "Save the next " + countLine(n) + " from " + p.site,
+        onclick: (e) => {
+          if (busy()) return;
+          if (!navigator.onLine) { toast("You're offline. Try again when you're back online."); return; }
+          e.currentTarget.closest(".follow").querySelectorAll("button").forEach((b) => { b.disabled = true; });
+          follow(p, n).then(() => { if (state.sheet === "page" && state.open) $("readingBody").replaceChildren(SHEETS.page.build()); });
+        } }, String(n)))));
+  }
+
+  async function renameFolder() {
+    const old = state.folder;
+    const raw = prompt("Rename “" + old + "”", old);
+    const name = raw && cleanTag(raw);
+    if (!name || name === old) return;
+    const clash = allFolders().find((n) => sameTag(n, name) && !sameTag(n, old));
+    if (clash) { toast("There's already a folder called " + clash + "."); return; }
+    for (const p of folderPages(old)) p.folder = name;
+    await C.store.writeIndex(state.pages);
+    state.folder = name;
+    history.replaceState({ view: "folder", folder: name }, "");
+    renderFolder();
+    renderLibrary();
   }
 
   // ---- Settings ----

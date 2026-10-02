@@ -3,6 +3,21 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Next links are found at save time (0.10.0).** save.js reads the
+  page's next link before Readability strips navigation: `rel="next"`
+  first, then a link whose words are a "next" phrase in a few languages
+  (`isNextText`), always on the same host and never the page itself, so a
+  sponsor's "Next" doesn't count. Stored as `next` in the index. Following
+  saves one page at a time and reads each new page's `next`, stopping at
+  a page with none, one already seen, or a failure. Pages saved earlier
+  have no `next`.
+
+- **Saving progress shows it's alive (0.10.0).** The page download has no
+  size to measure, so the bar sweeps (indeterminate) until the text is in,
+  then counts a tenth for the text and the rest by images. The status
+  adds the seconds after five, ticking each second. Under reduced motion
+  the spinner and bar breathe (opacity) instead of moving.
+
 - **Saving several runs one page at a time (0.9.0).** In order, so a
   folder's pages get rising `folderAt` and the folder reads in the order
   of the links, and so a phone on a weak connection isn't fetching ten

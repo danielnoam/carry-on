@@ -112,6 +112,12 @@ Source Serif 4 and Instrument Sans (Now).
   the links' order, then a full-width "Save 4 pages into Novel". Saving
   goes back to the library, where the queued cards say "Waiting · into
   Novel" until their turn.
+- **Saving card (Now):** a 12 px ring turning (accent arc on the line
+  colour) before the status, a bar that sweeps while the page downloads
+  and fills as images land, and "Getting the page · 12 s" once it passes
+  five seconds. Reduced motion: both breathe instead.
+- **Save next (Now):** "Save next" with 1, 5 and 10 as chips, in ⋯ and
+  at the end of a folder's list, when the last page has a next link.
 - **Filter chips (Now):** under the library's meta line, scrolling edge
   to edge: All, Unread, Finished, then #tags. The chosen one is filled
   with the accent; tapping it again goes back to All. Hidden while the

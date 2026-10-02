@@ -9,8 +9,12 @@ todo:
 
 ## Saving
 
-- Hidden WebView render for pages that build themselves with JavaScript
-  (empty shells are detected and refused with a message since 0.2.0).
+- Save pages that build themselves with JavaScript (Daniel asked again
+  on 2 Oct 2026). Plan: load the page in a hidden WebView with scripts
+  on, wait for its text to settle, then take the rendered HTML through the
+  same Readability and cleaning as now. Only the capture runs scripts;
+  the saved copy stays script-free. Today these are refused with "This
+  page builds itself with JavaScript".
 - Previews from pages other than Wikipedia are whatever srcset width is
   nearest 480 px, or the original when there's no srcset; resize big ones
   on the device.
@@ -27,14 +31,13 @@ todo:
 
 - Reader top bar: hide on scroll down, back on scroll up; tapping an image
   opens it full screen.
-- Folders, next steps: rename a folder, reorder its pages (drag, or move
-  up and down), and delete a whole folder at once.
+- Folders, next steps: reorder its pages (drag, or move up and down), and
+  delete a whole folder at once.
+- Follow next links on pages saved before 0.10.0 (they have no `next`
+  yet; reading it means fetching the original once).
 - Saving several, next steps: tags chosen up front, an "Add pages" button
   on a folder's screen that opens Save several with that folder picked,
   and a way in without pasting (a button by the save field).
-- Follow "next chapter": from one saved chapter, offer to save the next N
-  by following the page's next link (rel="next", or a link named Next or
-  Next chapter) into the same folder. Only for sites that link chapters.
 - Naming pass: one vocabulary for what the app holds, used the same way in
   the code, the UI and the docs (a saved page, its previews, a capture, the
   library, a tag, a folder). Write it as a glossary in NOTES.md, then
