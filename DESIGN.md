@@ -124,6 +124,14 @@ Source Serif 4 and Instrument Sans (Now).
   fills with the position, from the page's start side; it's decoration
   (aria-hidden), the page itself being the content. Reduced motion: the
   bar appears and disappears without sliding.
+- **Folder screen actions (Now):** quiet buttons under the list: Add
+  pages, Reorder, Rename, Remove folder (warn colour). Reorder shows a
+  chevron up and down (44 px, accent; disabled ones in `--line`) on each
+  row and a full-width Done. Remove folder asks in place: "Remove the
+  folder, keep its N pages", "Delete the folder and its N pages" (warn,
+  then a system confirm), Cancel.
+- **Save several button (Now):** a list icon (44 px) after Save in the
+  save bar.
 - **Image viewer (Now):** a tapped image fills the screen on `--viewer`,
   growing from where it sat (sheet spring), its caption below in
   `--on-video`, × top right on a `--scrim` disc (44 px). Pinch or double
