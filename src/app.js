@@ -230,9 +230,82 @@
     if (history.state && history.state.page) history.replaceState(null, "");
   });
 
+  // ---- The app updating itself (from LifeLog's 0.179.0) ----
+  // A newer build is a newer APK on this repo's Releases, tagged
+  // app-v<APP_VERSION> by .github/workflows/android.yml. Asked once per
+  // launch, unauthenticated: the Releases are public.
+  function isNewerVersion(a, b) {
+    const pa = String(a).split(".").map(Number), pb = String(b).split(".").map(Number);
+    for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
+    return false;
+  }
+
+  async function checkForNewerApp() {
+    const build = await C.platform.ready;
+    if (!C.platform.native || !build || !build.repo) return;
+    C.platform.clearOldUpdates(APP_VERSION, isNewerVersion);
+    try {
+      const res = await C.platform.fetchText("https://api.github.com/repos/" + build.repo + "/releases/latest",
+        { headers: { Accept: "application/vnd.github+json" } });
+      if (res.status !== 200) return;
+      const latest = String(JSON.parse(res.text).tag_name || "").replace(/^app-v/, "");
+      if (/^\d+\.\d+\.\d+$/.test(latest) && isNewerVersion(latest, APP_VERSION)) offerUpdate(latest);
+    } catch (e) { /* offline: ask again next launch */ }
+  }
+
+  // "Update" downloads the APK with its progress on the button, then opens
+  // Android's installer; if that's dismissed, "Install" reopens it from the
+  // same file. iOS installs nothing an app hands it: a sideloaded build is
+  // updated from AltStore or SideStore, so there the bar opens the release.
+  function offerUpdate(version) {
+    const text = $("updateText");
+    const btn = $("updateBtn");
+    let apk = null;
+    const say = (msg, label, busy) => {
+      text.textContent = msg;
+      btn.textContent = label;
+      btn.disabled = !!busy;
+    };
+    const install = async () => {
+      say("Opening the installer…", "Install", true);
+      try {
+        await C.platform.openInstaller(apk);
+        say("Carry-on " + version + " is ready to install", "Install");
+      } catch (e) {
+        say("Couldn't open the installer", "Try again");
+      }
+    };
+    btn.onclick = async () => {
+      if (apk) return install();
+      say("Downloading Carry-on " + version + "…", "0%", true);
+      try {
+        apk = await C.platform.downloadUpdate(version, (f) => { btn.textContent = Math.round(f * 100) + "%"; });
+      } catch (e) {
+        say("The download didn't finish", "Retry");
+        return;
+      }
+      if (!apk) {
+        say("Carry-on " + version + " is out", "Download");
+        C.platform.openOutside(C.platform.apkUrl());
+        return;
+      }
+      install();
+    };
+    if (C.platform.ios) {
+      btn.onclick = () => C.platform.openOutside(C.platform.releasesUrl());
+      say("Carry-on " + version + " is out", "Get it");
+    } else {
+      say("Carry-on " + version + " is out", "Update");
+    }
+    $("updateBar").hidden = false;
+  }
+
+  checkForNewerApp();
+
   if (!C.platform.native && "serviceWorker" in navigator && location.protocol === "https:") {
     navigator.serviceWorker.register("sw.js").catch(() => {});
   }
 
   C.linkFrom = linkFrom;
+  C.isNewerVersion = isNewerVersion;
 })();

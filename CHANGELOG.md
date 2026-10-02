@@ -18,6 +18,9 @@ All notable changes to Carry-on. Newest first.
   open the page in your browser, and Delete.
 - Library cards with save progress, reading time, size and whether the
   page is fully offline.
+- The Android app updates itself: when a newer version is released, a bar
+  above the link box offers to download it and opens Android's installer.
+  On iPhone the bar opens the release page for AltStore or SideStore.
 
 ### Changed
 - An Android build signed with a keystore that has no "carryon" key now

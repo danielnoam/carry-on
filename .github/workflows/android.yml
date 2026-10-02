@@ -1,6 +1,6 @@
 # Builds the Android app from the same files GitHub Pages serves, and
 # publishes it as a release when APP_VERSION is new. From LifeLog's
-# android.yml, without its widgets and manifest steps.
+# android.yml, without its widgets.
 name: Android app
 
 on:
@@ -47,7 +47,9 @@ jobs:
         run: node tools/build-www.js
 
       - name: Generate the Android project
-        run: npx cap add android
+        run: |
+          npx cap add android
+          node tools/android-manifest.js
 
       - name: Icon and splash
         run: >-

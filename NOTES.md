@@ -3,6 +3,17 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **The app updates itself, as LifeLog does (0.2.0).** On launch the app
+  asks GitHub for the latest `app-v*` release; if it's newer, "Update"
+  downloads that tag's CarryOn.apk into the cache with
+  `Filesystem.downloadFile` and opens Android's installer through
+  capawesome's FileOpener. The manifest needs `REQUEST_INSTALL_PACKAGES`
+  (tools/android-manifest.js) or Android refuses the hand-off. It only
+  installs over a build signed with the same key, which is why the
+  workflow publishes nothing without the `carryon` keystore. LifeLog's
+  NOTES.md (0.179.0) has the history, including why downloadFile is used
+  despite being deprecated.
+
 - **The reader's iframe keeps allow-same-origin (0.2.0).** Without
   `allow-scripts` nothing in the page can run, so same-origin only lets
   src/reader.js reach in: copy the theme tokens onto it, catch taps on
@@ -31,7 +42,7 @@ bold title and its version so a search finds it.
   android-version.js, sign-apk.sh, ios-project.js and both workflows) and
   `src/platform.js`'s app-vs-browser handling come from
   danielnoam/lifelog at 0.227.0, trimmed of LifeLog-only parts (widgets,
-  QR scanner, APK self-update, phone backup). Its NOTES.md has the history
+  QR scanner, phone backup). Its NOTES.md has the history
   behind each of them; search there before "fixing" something that looks
   arbitrary in those files.
 - **No server for the phone app (0.1.0).** `CarryOn.platform.fetchText`

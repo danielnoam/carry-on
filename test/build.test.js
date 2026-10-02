@@ -10,6 +10,7 @@ const os = require("os");
 const path = require("path");
 const { build, assetList, referencedByIndex, appVersion } = require("../tools/build-www.js");
 const { versionCode } = require("../tools/android-version.js");
+const manifest = require("../tools/android-manifest.js");
 
 const ROOT = path.resolve(__dirname, "..");
 let passed = 0;
@@ -72,6 +73,28 @@ test("versionCode goes up with every version", () => {
   assert.ok(versionCode("0.2.0") > versionCode("0.1.9"));
   assert.ok(versionCode("1.0.0") > versionCode("0.999.999"));
   assert.throws(() => versionCode("0.1"));
+});
+
+test("the manifest gains REQUEST_INSTALL_PACKAGES for the updater, once", () => {
+  const xml = '<?xml version="1.0" encoding="utf-8"?>\n<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <application android:label="Carry-on">\n    </application>\n</manifest>\n';
+  const once = manifest.patch(xml);
+  assert.ok(/<manifest[^>]*>\s*<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" \/>/.test(once));
+  assert.strictEqual(manifest.patch(once), once);
+  assert.throws(() => manifest.patch("<nothing/>"));
+});
+
+test("android.yml patches the manifest and the updater's plugin is installed", () => {
+  const yml = fs.readFileSync(path.join(ROOT, ".github", "workflows", "android.yml"), "utf8");
+  assert.ok(/npx cap add android\s+node tools\/android-manifest\.js/.test(yml));
+  const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
+  assert.ok(pkg.devDependencies["@capawesome-team/capacitor-file-opener"]);
+});
+
+test("the updater downloads the asset the workflow publishes", () => {
+  const yml = fs.readFileSync(path.join(ROOT, ".github", "workflows", "android.yml"), "utf8");
+  const platform = fs.readFileSync(path.join(ROOT, "src", "platform.js"), "utf8");
+  assert.ok(/gh release create "app-v\$V" CarryOn\.apk/.test(yml));
+  assert.ok(platform.includes('"/releases/download/app-v" + version + "/CarryOn.apk"'));
 });
 
 console.log("\n" + passed + " passed");

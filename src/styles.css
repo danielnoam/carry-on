@@ -138,6 +138,20 @@ html.native .app { padding-top: env(safe-area-inset-top); }
   background: var(--bg);
   border-top: 1px solid var(--line);
 }
+.update-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-3);
+  margin-bottom: var(--s-3); padding: var(--s-2) var(--s-2) var(--s-2) var(--s-4);
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md);
+}
+.update-bar[hidden] { display: none; }
+.update-text { min-width: 0; font-weight: 500; }
+.btn-small {
+  min-width: 72px; height: var(--tap); padding: 0 var(--s-4); flex-shrink: 0;
+  border: 0; border-radius: var(--r-md);
+  background: var(--accent); color: var(--accent-ink);
+  font-weight: 600; cursor: pointer;
+}
+.btn-small:disabled { opacity: 0.7; cursor: default; }
 .save-form { display: flex; gap: var(--s-2); }
 .save-form input {
   flex: 1; min-width: 0;
