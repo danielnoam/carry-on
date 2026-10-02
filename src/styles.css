@@ -447,6 +447,26 @@ html.native .reader::before {
   margin: var(--s-3) calc(-1 * var(--gutter)) 0; padding: 4px var(--gutter); scroll-padding-inline: var(--gutter);
 }
 .filters[hidden] { display: none; }
+.search { position: relative; margin-top: var(--s-3); }
+.search[hidden] { display: none; }
+.search input {
+  width: 100%; height: var(--tap); padding: 0 var(--tap) 0 40px;
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--surface); color: var(--ink); font: inherit;
+  -webkit-appearance: none; appearance: none;
+}
+.search input::-webkit-search-cancel-button { display: none; }
+.search input::placeholder { color: var(--muted); }
+.search input:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
+.search-icon { position: absolute; left: 12px; top: 13px; color: var(--muted); pointer-events: none; }
+.search-clear { position: absolute; right: 0; top: 0; color: var(--muted); }
+.search-clear[hidden] { display: none; }
+.search-note { margin: var(--s-2) 0 0; }
+.search-note[hidden] { display: none; }
+.card-found {
+  font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--muted);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
 .filters::-webkit-scrollbar { display: none; }
 .filters .chip { flex-shrink: 0; }
 .tag-input {

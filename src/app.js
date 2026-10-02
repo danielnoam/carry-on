@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.15.0";
+  const APP_VERSION = "0.16.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -89,6 +89,8 @@
     folder: null,
     // Which pages the library shows: "all", "unread", "finished" or "#tag".
     filter: load(FILTER_KEY, "all"),
+    // What's typed in the library's search field.
+    query: "",
   };
   paintTheme(state.theme);
 
@@ -215,7 +217,7 @@
     return p.minutes + " min";
   }
 
-  function pageCard(p) {
+  function pageCard(p, found) {
     const thumb = thumbUrl(p);
     const facts = [readingLine(p), formatSize(p.bytes || 0)].join(" · ") + " · ";
     const started = !p.finished && p.at > 0.02;
@@ -235,6 +237,7 @@
       el("span", { class: "card-body" },
         el("span", { class: "card-site", dir: "auto" }, p.site, p.folder ? " · " + p.folder : null, ...(p.tags || []).map((t) => el("span", { class: "card-tag" }, " · #" + t))),
         el("span", { class: "card-title", dir: "auto" }, p.title),
+        found ? el("span", { class: "card-found", dir: "auto" }, found) : null,
         el("span", { class: "card-status" }, facts, status, retry ? " · " : null, retry),
         started ? el("span", { class: "progress thin", role: "progressbar", "aria-label": "Read so far",
           "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": String(Math.round(p.at * 100)) },
@@ -264,6 +267,92 @@
     renderLibrary();
   }
 
+  // ---- Search ----
+  // Titles, sites, tags and folders as you type; the pages' words after a
+  // pause. Matching ignores case, accents, Hebrew niqqud and Arabic
+  // harakat, and every word typed has to be there.
+
+  const fold = (s) => String(s || "").normalize("NFKD").replace(/[\p{M}\u0640]/gu, "").toLocaleLowerCase();
+  const terms = () => fold(state.query).split(/\s+/).filter(Boolean);
+  // id → { text, folded } once read; filled the first time a search needs it.
+  const texts = new Map();
+  let reading = null, searching = false;
+
+  function metaMatch(p, ts) {
+    const hay = fold([p.title, p.site, p.folder, ...(p.tags || []).map((t) => "#" + t)].join(" "));
+    return ts.every((t) => hay.includes(t));
+  }
+
+  // The sentence the words were found in, trimmed to a line or two.
+  function snippet(p, ts) {
+    const got = texts.get(p.id);
+    if (!got) return null;
+    if (!ts.every((t) => got.folded.includes(t))) return null;
+    const lines = got.text.split("\n");
+    for (const line of lines) {
+      const f = fold(line);
+      if (!f.includes(ts[0])) continue;
+      const sentences = line.split(/(?<=[.!?\u05C3\u06D4])\s+/);
+      const s = sentences.find((x) => fold(x).includes(ts[0])) || line;
+      if (s.length <= 160) return s;
+      const at = Math.max(0, fold(s).indexOf(ts[0]) - 60);
+      return (at ? "…" : "") + s.slice(at, at + 150).trim() + "…";
+    }
+    return null;
+  }
+
+  // Reads every page's text that isn't in memory yet: text.txt, or for a
+  // page saved before 0.16.0 its page.html, writing text.txt for next time.
+  function readTexts() {
+    if (reading) return reading;
+    const todo = state.pages.filter((p) => !texts.has(p.id));
+    if (!todo.length) return Promise.resolve();
+    reading = (async () => {
+      let done = 0;
+      for (const p of todo) {
+        let text = await C.store.readText(p.id);
+        if (text == null) {
+          try {
+            const html = await C.store.readPage(p.id);
+            text = html ? C.save.plainText(new DOMParser().parseFromString(html, "text/html").body) : "";
+            if (html) C.store.writeText(p.id, text).catch(() => {});
+          } catch (e) { text = ""; }
+        }
+        texts.set(p.id, { text, folded: fold(text) });
+        done++;
+        if (todo.length > 10 && done % 5 === 0) searchNote("Searching the text of your pages · " + done + " of " + todo.length);
+      }
+    })().finally(() => { reading = null; });
+    return reading;
+  }
+
+  function searchNote(text) {
+    const note = $("searchNote");
+    note.textContent = text || "";
+    note.hidden = !text;
+  }
+
+  let searchTimer = null;
+  function onSearch() {
+    state.query = $("librarySearch").value;
+    $("searchClear").hidden = !state.query;
+    renderLibrary();
+    clearTimeout(searchTimer);
+    if (!terms().length) { searching = false; searchNote(""); return; }
+    searching = true;
+    searchTimer = setTimeout(async () => {
+      await readTexts();
+      searching = false;
+      searchNote("");
+      if (terms().length) renderLibrary();
+    }, 300);
+  }
+
+  function clearSearch() {
+    $("librarySearch").value = "";
+    onSearch();
+  }
+
   // ---- Filters ----
 
   const unread = (p) => !p.finished && !(p.at > 0.02);
@@ -274,6 +363,8 @@
     if (f.startsWith("#")) return (p.tags || []).some((t) => sameTag(t, f.slice(1)));
     return true;
   }
+
+  const filterName = () => (state.filter === "unread" ? "Unread" : state.filter === "finished" ? "Finished" : state.filter);
 
   function setFilter(f) {
     state.filter = f;
@@ -304,6 +395,7 @@
     renderFilters();
     const allOffline = state.pages.every((p) => !p.missing && p.mode !== "links");
     $("libraryMeta").textContent = n ? pagesLine(n) + (allOffline ? " · all readable offline" : "") : "Nothing saved yet";
+    $("searchBox").hidden = !n;
     const nodes = [];
     const fresh = [];
     // A kept card whose content changed (reading progress, a renamed page)
@@ -316,10 +408,24 @@
       nodes.push(node);
     };
     for (const s of state.saving) keep((s.error ? "f:" : "s:") + s.key, () => (s.error ? failedCard(s) : savingCard(s)));
-    const pages = state.pages.filter(shown);
-    // Under All, a folder's pages are one card, where its newest page would be.
+    const ts = terms();
+    const found = new Map();
+    const pages = state.pages.filter(shown).filter((p) => {
+      if (!ts.length) return true;
+      if (metaMatch(p, ts)) return found.set(p.id, null), true;
+      const s = snippet(p, ts);
+      if (s) return found.set(p.id, s), true;
+      return false;
+    });
+    // Under All, a folder's pages are one card, where its newest page would
+    // be; a search lists the pages themselves.
     const grouped = new Set();
     for (const p of pages) {
+      if (ts.length) {
+        const s = found.get(p.id);
+        keep("q:" + p.id, () => pageCard(p, s), [p.title, readingLine(p), p.missing, p.thumb, s].join("|"));
+        continue;
+      }
       if (p.folder && state.filter === "all") {
         const k = p.folder.toLocaleLowerCase();
         if (grouped.has(k)) continue;
@@ -330,7 +436,13 @@
       }
       keep("p:" + p.id, () => pageCard(p), [p.title, readingLine(p), p.missing, p.thumb, Math.round((p.at || 0) * 50), navigator.onLine, (p.tags || []).join(","), p.folder].join("|"));
     }
-    if (n && !pages.length) {
+    if (n && !pages.length && ts.length) {
+      keep("none:q", () => el("div", { class: "empty" },
+        el("p", { class: "empty-text", "data-q": "" }),
+        el("button", { class: "btn-quiet", type: "button", onclick: clearSearch }, "Clear search")));
+      nodes[nodes.length - 1].querySelector("[data-q]").textContent = searching ? "Searching…"
+        : "Nothing matches “" + state.query.trim() + "”" + (state.filter === "all" ? "." : " in " + filterName() + ".");
+    } else if (n && !pages.length) {
       keep("none:" + state.filter, () => el("div", { class: "empty" },
         el("p", { class: "empty-text" }, state.filter === "unread" ? "You've started everything you saved."
           : state.filter === "finished" ? "Nothing finished yet." : "No pages tagged " + state.filter + "."),
@@ -1442,6 +1554,9 @@
   $("folderBack").addEventListener("click", () => history.back());
   $("batchBack").addEventListener("click", () => history.back());
   $("severalBtn").addEventListener("click", () => openBatch(""));
+  $("librarySearch").addEventListener("input", onSearch);
+  $("librarySearch").addEventListener("keydown", (e) => { if (e.key === "Escape" && state.query) { e.preventDefault(); clearSearch(); } });
+  $("searchClear").addEventListener("click", () => { clearSearch(); $("librarySearch").focus(); });
   $("newsBack").addEventListener("click", () => history.back());
 
   $("saveForm").addEventListener("submit", (e) => {

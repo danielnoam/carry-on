@@ -2,6 +2,15 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.16.0] - 2026-10-02
+
+### Added
+- Search your library. Titles, sites, tags and folders match as you
+  type, and a moment later the words of every saved page too, with the
+  sentence they're in shown on the card. Every word you type has to be
+  there. Case, accents, Hebrew niqqud and Arabic harakat don't matter,
+  so "שלום" finds "שָׁלוֹם". The filter chips still apply.
+
 ## [0.15.0] - 2026-10-02
 
 ### Added
