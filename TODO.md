@@ -24,36 +24,6 @@ asks from Daniel.
 
 ---
 
-## 0.15.0: Folders, next steps
-
-**Goal:** a folder can be managed without workarounds.
-
-**Items**
-- Reorder a folder's pages: move up and down buttons on each row (drag
-  later if wanted; buttons are 44 px targets and work with reduced motion
-  and screen readers, drag doesn't by default).
-- Delete a whole folder: one sheet with "Remove folder, keep pages"
-  (default) and "Delete folder and its N pages" (destructive, confirms).
-- "Add pages" on a folder's screen: opens Save several with that folder
-  picked.
-- A way into Save several without pasting: a button by the save field.
-- Tags chosen up front in Save several, applied to every page it saves.
-
-**Steps**
-1. Reorder: swap `folderAt` between neighbours; pages with no `folderAt`
-   get one from `savedAt` the first time they move, so the order never
-   jumps.
-2. Delete: "keep pages" clears `folder`/`folderAt`; "delete" reuses the
-   page delete path in a loop, then one index write.
-3. Save several: accept a preset folder and tags; add the entry button.
-
-**Daniel's phone:** reorder a real web-novel folder and check Next and
-previous follow the new order; delete a folder both ways.
-
-**Depends on:** nothing left.
-
----
-
 ## 0.16.0: Search the library
 
 **Goal:** find a page once the library is long.
@@ -74,7 +44,7 @@ previous follow the new order; delete a folder both ways.
 **Daniel's phone:** search a library of 50+ pages, including Hebrew; time
 the first full-text search.
 
-**Depends on:** nothing new. Independent, can swap with 0.15.0.
+**Depends on:** nothing.
 
 ---
 
@@ -202,7 +172,7 @@ Send to Kindle, which accepts EPUB) with Hebrew and with images.
 **Daniel's phone:** a real web novel with 30+ chapters, from its contents
 page to an EPUB on an e-reader.
 
-**Depends on:** 0.19.0 (EPUB writer, research), 0.15.0 (folder order).
+**Depends on:** 0.19.0 (EPUB writer, research).
 
 ---
 

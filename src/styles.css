@@ -567,7 +567,15 @@ html.native .reader::before {
 .batch-go:disabled { opacity: 0.5; cursor: default; }
 .rc-row.follow .chip { min-width: var(--tap); }
 .screen-body .rc-row.follow { margin-top: var(--s-4); }
-.folder-rename { display: block; margin-top: var(--s-5); }
+.folder-list li { display: flex; align-items: center; }
+.folder-list.ordering li { padding-inline-end: var(--s-1); }
+.folder-list .move { flex-shrink: 0; color: var(--accent); }
+.folder-list .move:disabled { color: var(--line); cursor: default; }
+.folder-actions { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: var(--s-5); }
+.folder-actions.remove { flex-direction: column; align-items: stretch; }
+.folder-actions.remove .meta { margin: 0 0 var(--s-1); }
+.folder-actions .btn-primary { flex: 1; }
+.btn-quiet.danger { color: var(--warn); }
 
 /* Updates in Settings, and What's new. */
 .update-row .row-label { white-space: normal; }

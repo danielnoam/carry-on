@@ -2,6 +2,23 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.15.0] - 2026-10-02
+
+### Added
+- Reorder a folder: Reorder on its screen puts up and down buttons on
+  each page; Done puts them away. Next and Previous follow the new order.
+- Remove a folder, keeping its pages in the library, or delete it with
+  all its pages (asked once more first).
+- Add pages from a folder's screen: Save several opens with that folder
+  picked, and you're back on the folder when it's done.
+- A Save several button beside Save, so you don't need to paste a list
+  first.
+- Tags in Save several, given to every page it saves.
+
+### Fixed
+- A stray "null" under a page's controls in ⋯, and at the end of a
+  folder with no next link.
+
 ## [0.14.0] - 2026-10-02
 
 ### Added

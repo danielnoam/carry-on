@@ -9,6 +9,21 @@ bold title and its version so a search finds it.
   `Filesystem.downloadFile`) and the share target are proven. Pages that
   build themselves with JavaScript still fail; that's its own TODO item.
 
+- **Reordering hands out the folder's own places (0.15.0).** A move
+  takes the folder's `folderAt` values in order, nudges any equal ones
+  apart by a millisecond, swaps the two pages and gives the places back
+  in the new order, so no other page moves and no folders file is
+  needed. Up and down buttons rather than drag: 44 px targets that work
+  with a screen reader, a keyboard and reduced motion without extra
+  work; they only show in Reorder mode, so a folder of fifty chapters
+  isn't a column of arrows. Focus stays on the moved page's button.
+  Removing a folder only clears `folder` and `folderAt`; deleting it
+  removes each page directory, then writes the index once. Save several
+  over a folder keeps the folder in its history entry (`{view:
+  "batch", folder}`) so back returns to the folder screen.
+  `replaceChildren` turns a null into the text "null", unlike `el()`;
+  `fill()` drops them (a stray "null" had shown in ⋯ since 0.8.0).
+
 - **The image viewer lives in the app, not the page (0.14.0).** The
   saved page can't run scripts, so reader.js catches the tap on an
   `<img>` (as it does links) and hands the app its on-screen rect, its

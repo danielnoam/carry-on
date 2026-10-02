@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.14.0";
+  const APP_VERSION = "0.15.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -26,6 +26,9 @@
     for (const c of children) if (c != null) node.append(c);
     return node;
   }
+
+  // replaceChildren, skipping the nulls an optional part leaves.
+  const fill = (node, ...children) => node.replaceChildren(...children.filter((c) => c != null));
 
   // Browser storage can be missing or throw (private windows, cleared data);
   // the app has to render without it.
@@ -284,7 +287,7 @@
     if (box.hidden) return;
     const chip = (f, label) => el("button", { class: "chip" + (state.filter === f ? " on" : ""), type: "button",
       "aria-pressed": String(state.filter === f), onclick: () => setFilter(state.filter === f && f !== "all" ? "all" : f) }, label);
-    box.replaceChildren(chip("all", "All"), chip("unread", "Unread"), chip("finished", "Finished"),
+    fill(box, chip("all", "All"), chip("unread", "Unread"), chip("finished", "Finished"),
       ...allTags().map((t) => chip("#" + t, "#" + t)));
   }
 
@@ -386,9 +389,9 @@
   // Several links saved one after another, in order, optionally into a
   // folder (so its pages follow the order of the links). A link already
   // saved isn't saved again; it just joins the folder at its place.
-  async function saveAll(urls, folder) {
+  async function saveAll(urls, folder, tags = []) {
     const name = folder ? folderName(folder) : null;
-    const jobs = urls.filter((u) => !state.saving.some((s) => !s.error && sameUrl(s.url, u))).map((u) => newJob(u, name));
+    const jobs = urls.filter((u) => !state.saving.some((s) => !s.error && sameUrl(s.url, u))).map((u) => ({ ...newJob(u, name), tags }));
     state.saving = state.saving.filter((s) => !(s.error && jobs.some((j) => sameUrl(j.url, s.url))));
     const fresh = jobs.filter((j) => !savedAs(j.url));
     fresh.forEach((j) => { j.waiting = true; });
@@ -399,12 +402,15 @@
       const existing = savedAs(job.url);
       if (existing) {
         had++;
-        if (name) { existing.folder = name; existing.folderAt = Date.now(); await C.store.writeIndex(state.pages); renderLibrary(); }
+        if (name) { existing.folder = name; existing.folderAt = Date.now(); }
+        if (tags.length) existing.tags = withTags(existing.tags, tags);
+        if (name || tags.length) { await C.store.writeIndex(state.pages); renderLibrary(); if (state.folder) renderFolder(); }
         continue;
       }
       job.waiting = false;
       updateSavingCard(job);
       if (await runJob(job)) saved++; else failed++;
+      if (state.folder) renderFolder();
     }
     if (!jobs.length) return;
     toast([saved ? "Saved " + countLine(saved) + (name ? " into " + name : "") : "",
@@ -427,6 +433,7 @@
       });
       meta.requested = job.url;
       if (job.folder) { meta.folder = folderName(job.folder); meta.folderAt = Date.now(); }
+      if (job.tags && job.tags.length) meta.tags = withTags([], job.tags);
       state.pages.unshift(meta);
       await C.store.writeIndex(state.pages);
       state.saving = state.saving.filter((s) => s !== job);
@@ -446,7 +453,7 @@
   // push is a history entry, so Android's back gesture pops it.
 
   // The reader can open over a folder's screen; everything else is over the library.
-  const below = (screen) => (screen.id === "readerView" && state.folder ? $("folderView")
+  const below = (screen) => ((screen.id === "readerView" || screen.id === "batchView") && state.folder ? $("folderView")
     : screen.id === "newsView" && state.settings ? $("settingsView") : $("libraryView"));
 
   function pushScreen(screen) {
@@ -848,6 +855,13 @@
     return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([t]) => t);
   }
 
+  // `has` plus `more`, without case-insensitive repeats.
+  function withTags(has, more) {
+    const out = [...(has || [])];
+    for (const t of more) if (!out.some((x) => sameTag(x, t))) out.push(t);
+    return out;
+  }
+
   async function setTags(p, tags) {
     p.tags = tags;
     await C.store.writeIndex(state.pages);
@@ -919,6 +933,7 @@
     if (state.folder && sameTag(state.folder, name)) return;
     if (!folderPages(name).length) return;
     state.folder = folderPages(name)[0].folder;
+    folderMode = "";
     renderFolder();
     if (!fromHistory) history.pushState({ view: "folder", folder: state.folder }, "");
     $("folderBody").scrollTop = 0;
@@ -931,6 +946,10 @@
     popScreen($("folderView"));
   }
 
+  // The folder screen's mode: reading (""), "order" (move buttons on each
+  // row) or "remove" (the two ways to remove it, spelled out).
+  let folderMode = "";
+
   function renderFolder() {
     const list = folderPages(state.folder);
     $("folderTitle").textContent = state.folder;
@@ -941,19 +960,93 @@
     const next = folderNext(list);
     const done = list.filter((p) => p.finished).length;
     const go = done === list.length ? "Read again from the start" : (next.at > 0.02 || done ? "Continue: " : "Start: ") + next.title;
-    $("folderBody").replaceChildren(
+    fill($("folderBody"),
       el("p", { class: "meta folder-meta" }, countLine(list.length) + " · " + done + " read"),
       el("button", { class: "btn-primary folder-go", type: "button", dir: "auto",
         onclick: () => openPage(done === list.length ? list[0].id : next.id) }, go),
-      el("ol", { class: "group folder-list" },
-        ...list.map((p, i) => el("li", null,
+      el("ol", { class: "group folder-list" + (folderMode === "order" ? " ordering" : "") },
+        ...list.map((p, i) => el("li", { "data-id": p.id },
           el("button", { class: "row chapter" + (p === next && done < list.length ? " now" : ""), type: "button", onclick: () => openPage(p.id) },
             el("span", { class: "chapter-n", "aria-hidden": "true" }, String(i + 1)),
             el("span", { class: "choice-text" },
               el("span", { class: "row-label", dir: "auto" }, p.title),
-              el("span", { class: "choice-note" + (p.finished ? "" : p.at > 0.02 ? " accent" : "") }, readingLine(p))))))),
-      followControls(list[list.length - 1]),
-      el("button", { class: "btn-quiet folder-rename", type: "button", onclick: renameFolder }, "Rename folder"));
+              el("span", { class: "choice-note" + (p.finished ? "" : p.at > 0.02 ? " accent" : "") }, readingLine(p)))),
+          folderMode === "order" ? moveButton(p, i, -1, list.length) : null,
+          folderMode === "order" ? moveButton(p, i, 1, list.length) : null))),
+      folderMode ? null : followControls(list[list.length - 1]),
+      folderActions(list));
+  }
+
+  const CHEVRON = (d) => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + d + '"/></svg>';
+  const CHEVRON_UP = CHEVRON("M6 15l6-6 6 6"), CHEVRON_DOWN = CHEVRON("M6 9l6 6 6-6");
+
+  function moveButton(p, i, step, n) {
+    const b = el("button", { class: "icon-btn move", type: "button", "data-step": String(step),
+      "aria-label": "Move " + p.title + (step < 0 ? " up" : " down"), onclick: () => movePage(p, step) });
+    b.innerHTML = step < 0 ? CHEVRON_UP : CHEVRON_DOWN;
+    b.disabled = step < 0 ? i === 0 : i === n - 1;
+    return b;
+  }
+
+  // Swaps a page with its neighbour. The folder's places are the pages'
+  // own `folderAt`s, made distinct and handed out again in the new order,
+  // so nothing else in the folder moves.
+  async function movePage(p, step) {
+    const list = folderPages(p.folder);
+    const i = list.indexOf(p), j = i + step;
+    if (i < 0 || j < 0 || j >= list.length) return;
+    const places = list.map((q) => q.folderAt || q.savedAt || 0);
+    for (let k = 1; k < places.length; k++) if (places[k] <= places[k - 1]) places[k] = places[k - 1] + 1;
+    [list[i], list[j]] = [list[j], list[i]];
+    list.forEach((q, k) => { q.folderAt = places[k]; });
+    await C.store.writeIndex(state.pages);
+    renderFolder();
+    renderLibrary();
+    const row = $("folderBody").querySelector('li[data-id="' + p.id + '"]');
+    const again = row && row.querySelector('.move[data-step="' + step + '"]');
+    const focus = again && !again.disabled ? again : row && row.querySelector(".move:not(:disabled)");
+    if (focus) focus.focus();
+  }
+
+  function folderActions(list) {
+    const n = list.length;
+    const mode = (m) => () => { folderMode = m; renderFolder(); };
+    if (folderMode === "remove") {
+      return el("div", { class: "folder-actions remove", role: "group", "aria-label": "Remove " + state.folder },
+        el("p", { class: "meta" }, "Remove “" + state.folder + "”?"),
+        el("button", { class: "sheet-row", type: "button", onclick: () => removeFolder(false) },
+          "Remove the folder, keep its " + countLine(n)),
+        el("button", { class: "sheet-row danger", type: "button", onclick: () => removeFolder(true) },
+          "Delete the folder and its " + countLine(n)),
+        el("button", { class: "btn-quiet", type: "button", onclick: mode("") }, "Cancel"));
+    }
+    if (folderMode === "order") {
+      return el("div", { class: "folder-actions" },
+        el("button", { class: "btn-primary", type: "button", onclick: mode("") }, "Done"));
+    }
+    return el("div", { class: "folder-actions" },
+      el("button", { class: "btn-quiet", type: "button", onclick: () => openBatch("", false, state.folder) }, "Add pages"),
+      n > 1 ? el("button", { class: "btn-quiet", type: "button", onclick: mode("order") }, "Reorder") : null,
+      el("button", { class: "btn-quiet", type: "button", onclick: renameFolder }, "Rename"),
+      el("button", { class: "btn-quiet danger", type: "button", onclick: mode("remove") }, "Remove folder"));
+  }
+
+  // Takes the folder off its pages, or deletes them with it (asked once
+  // more, since that can't be undone), then goes back to the library.
+  async function removeFolder(withPages) {
+    const name = state.folder;
+    const list = folderPages(name);
+    if (withPages && !confirm("Delete “" + name + "” and its " + countLine(list.length) + " from this phone?")) return;
+    for (const p of list) {
+      if (withPages) await C.store.removePage(p.id);
+      else { delete p.folder; delete p.folderAt; }
+    }
+    if (withPages) state.pages = state.pages.filter((p) => !list.includes(p));
+    await C.store.writeIndex(state.pages);
+    folderMode = "";
+    history.back();
+    renderLibrary();
+    toast(withPages ? "Deleted " + name + " and its " + countLine(list.length) : "Removed " + name + ". Its pages are in the library.");
   }
 
   // The page before or after `p` in its folder, if any.
@@ -977,7 +1070,7 @@
         setTags(p, [...tags, known || t]).then(() => { draw(); box.querySelector(".tag-input").focus({ preventScroll: true }); });
       };
       input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); add(input.value); } });
-      box.replaceChildren(
+      fill(box,
         el("div", { class: "rc-row tall" }, el("span", { class: "rc-label" }, "Tags"),
           el("div", { class: "tag-edit" },
             el("div", { class: "chips" },
@@ -1031,11 +1124,11 @@
   // Opens when a paste or share holds more than one link: the links (one
   // a line, editable), the folder to save them into, and Save.
 
-  function openBatch(text, fromHistory) {
+  function openBatch(text, fromHistory, folder) {
     if (state.batch) return;
     state.batch = true;
-    renderBatch(linksFrom(text).join("\n"));
-    if (!fromHistory) history.pushState({ view: "batch" }, "");
+    renderBatch(linksFrom(text).join("\n"), folder || null);
+    if (!fromHistory) history.pushState({ view: "batch", folder: state.folder || undefined }, "");
     $("batchBody").scrollTop = 0;
     pushScreen($("batchView")).then(() => $("batchBack").focus());
   }
@@ -1046,8 +1139,9 @@
     popScreen($("batchView"));
   }
 
-  function renderBatch(text) {
-    let folder = null;
+  function renderBatch(text, preset) {
+    let folder = preset;
+    const tags = [];
     const area = el("textarea", { class: "batch-links", rows: "6", "aria-label": "Links, one a line", spellcheck: "false",
       autocapitalize: "off", autocomplete: "off", dir: "ltr" });
     area.value = text;
@@ -1070,6 +1164,29 @@
     const pick = (f, typed) => { folder = f; if (!typed) input.value = ""; sync(); };
     chips.append(...[null, ...allFolders()].map((f) => el("button", { class: "chip", type: "button", "data-folder": f || "",
       onclick: () => pick(f) }, f || "None")));
+    // Tags for every page this saves, chosen the same way as in ⋯.
+    const tagBox = el("div", { class: "tag-edit" });
+    const drawTags = () => {
+      const others = allTags().filter((t) => !tags.some((x) => sameTag(x, t)));
+      const tagInput = el("input", { class: "tag-input", type: "text", placeholder: "Add a tag", "aria-label": "Add a tag",
+        maxlength: "32", enterkeyhint: "done", autocapitalize: "off" });
+      const add = (raw) => {
+        const t = cleanTag(raw);
+        if (!t || tags.some((x) => sameTag(x, t))) return;
+        tags.push(allTags().find((x) => sameTag(x, t)) || t);
+        drawTags();
+        tagBox.querySelector(".tag-input").focus({ preventScroll: true });
+      };
+      tagInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); add(tagInput.value); } });
+      fill(tagBox,
+        el("div", { class: "chips" },
+          ...tags.map((t) => el("button", { class: "chip on", type: "button", "aria-label": "Remove tag " + t,
+            onclick: () => { tags.splice(tags.indexOf(t), 1); drawTags(); } }, t, el("span", { class: "chip-x", "aria-hidden": "true" }, "×"))),
+          tagInput),
+        others.length ? el("div", { class: "chips" },
+          ...others.slice(0, 12).map((t) => el("button", { class: "chip", type: "button", "aria-label": "Add tag " + t, onclick: () => add(t) }, "+ " + t))) : null);
+    };
+    drawTags();
     area.addEventListener("input", sync);
     input.addEventListener("input", () => pick(cleanTag(input.value) ? folderName(input.value) : null, true));
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); input.blur(); } });
@@ -1078,13 +1195,14 @@
       el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Folder"),
         el("div", { class: "tag-edit" }, chips, input),
         el("p", { class: "meta" }, "Pages in a folder keep the order of the links.")),
+      el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Tags"), tagBox),
       go);
     form.addEventListener("submit", (e) => {
       e.preventDefault();
       const urls = linksFrom(area.value);
       if (!urls.length) return;
       history.back();
-      saveAll(urls, folder);
+      saveAll(urls, folder, tags);
     });
     $("batchBody").replaceChildren(form);
     sync();
@@ -1296,8 +1414,8 @@
     if (view !== "news") closeNews();
     if (view !== "settings" && !(view === "news" && s.over === "settings")) closeSettings();
     if (view !== "batch") closeBatch();
-    if (view === "batch") openBatch("", true);
-    const folder = (view === "folder" || view === "reader") && s.folder;
+    if (view === "batch") openBatch("", true, s.folder);
+    const folder = (view === "folder" || view === "reader" || view === "batch") && s.folder;
     if (!folder) closeFolder();
     else if (!state.folder) openFolder(folder, true);
     if (view === "reader" && (!state.open || state.open.id !== s.page)) openPage(s.page, true);
@@ -1323,6 +1441,7 @@
   $("settingsBack").addEventListener("click", () => history.back());
   $("folderBack").addEventListener("click", () => history.back());
   $("batchBack").addEventListener("click", () => history.back());
+  $("severalBtn").addEventListener("click", () => openBatch(""));
   $("newsBack").addEventListener("click", () => history.back());
 
   $("saveForm").addEventListener("submit", (e) => {
