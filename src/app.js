@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.10.0";
+  const APP_VERSION = "0.11.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -11,6 +11,7 @@
   const IMAGES_KEY = "carryon.images";
   const READING_KEY = "carryon.reading";
   const FILTER_KEY = "carryon.filter";
+  const SEEN_KEY = "carryon.seenVersion";
 
   const $ = (id) => document.getElementById(id);
 
@@ -78,6 +79,7 @@
     settings: false,
     sheet: false,
     batch: false,
+    news: false,
     // The folder whose screen is up (its name), under the reader if a page is open.
     folder: null,
     // Which pages the library shows: "all", "unread", "finished" or "#tag".
@@ -441,7 +443,8 @@
   // push is a history entry, so Android's back gesture pops it.
 
   // The reader can open over a folder's screen; everything else is over the library.
-  const below = (screen) => (screen.id === "readerView" && state.folder ? $("folderView") : $("libraryView"));
+  const below = (screen) => (screen.id === "readerView" && state.folder ? $("folderView")
+    : screen.id === "newsView" && state.settings ? $("settingsView") : $("libraryView"));
 
   function cover(screen) {
     const under = below(screen);
@@ -1069,12 +1072,7 @@
   }
 
   function aboutGroup() {
-    const list = el("div", { class: "group" },
-      el("div", { class: "row" }, el("span", { class: "row-label" }, "Version"), el("span", { class: "row-value" }, APP_VERSION)));
-    if (C.platform.native) {
-      list.append(el("button", { class: "row", type: "button", onclick: () => checkForNewerApp(true) },
-        el("span", { class: "row-label accent" }, "Check for updates")));
-    }
+    const list = el("div", { class: "group" });
     const releases = C.platform.releasesUrl() || "https://github.com/danielnoam/carry-on/releases/latest";
     list.append(el("a", { class: "row", href: releases, target: "_blank", rel: "noopener" },
       el("span", { class: "row-label accent" }, "Releases and source"),
@@ -1087,16 +1085,19 @@
 
   function renderSettings() {
     const [appearance, saving] = SETTINGS.map(choiceGroup);
-    $("settingsBody").replaceChildren(appearance, readingGroup(), saving, storageGroup(), aboutGroup());
+    $("settingsBody").replaceChildren(appearance, readingGroup(), saving, storageGroup(), updatesGroup(), aboutGroup());
   }
 
-  function openSettings(fromHistory) {
+  // `at` names a section to scroll to (the update bar opens at Updates).
+  function openSettings(fromHistory, at) {
     if (state.settings) return;
     state.settings = true;
     renderSettings();
     if (!fromHistory) history.pushState({ view: "settings" }, "");
     $("settingsBody").scrollTop = 0;
-    cover($("settingsView")).then(() => $("settingsBack").focus());
+    const shown = cover($("settingsView"));
+    if (at && $(at)) $("settingsBody").scrollTop = $(at).offsetTop - $("settingsBody").offsetTop - 8;
+    shown.then(() => $("settingsBack").focus());
   }
 
   function closeSettings() {
@@ -1110,7 +1111,8 @@
   function route(s) {
     const view = s && s.view;
     if (view !== "reader") closeReader();
-    if (view !== "settings") closeSettings();
+    if (view !== "news") closeNews();
+    if (view !== "settings" && !(view === "news" && s.over === "settings")) closeSettings();
     if (view !== "batch") closeBatch();
     if (view === "batch") openBatch("", true);
     const folder = (view === "folder" || view === "reader") && s.folder;
@@ -1120,6 +1122,7 @@
     if (view === "reader" && s.sheet !== state.sheet) closeSheet();
     if (view === "reader" && s.sheet && state.open && state.open.id === s.page) openSheet(s.sheet, true);
     if (view === "settings") openSettings(true);
+    if (view === "news") { if (s.over === "settings") openSettings(true); openNews(true); }
   }
 
   // Back to the library from whatever screen is up, through history so the
@@ -1128,7 +1131,7 @@
     if (!(history.state && history.state.view)) return Promise.resolve();
     return new Promise((resolve) => {
       addEventListener("popstate", () => resolve(), { once: true });
-      history.go(-[state.folder, state.open, state.sheet, state.settings, state.batch].filter(Boolean).length || -1);
+      history.go(-[state.folder, state.open, state.sheet, state.settings, state.batch, state.news].filter(Boolean).length || -1);
     });
   }
 
@@ -1136,6 +1139,7 @@
   $("settingsBack").addEventListener("click", () => history.back());
   $("folderBack").addEventListener("click", () => history.back());
   $("batchBack").addEventListener("click", () => history.back());
+  $("newsBack").addEventListener("click", () => history.back());
 
   $("saveForm").addEventListener("submit", (e) => {
     e.preventDefault();
@@ -1189,6 +1193,7 @@
     state.pages = Array.isArray(pages) ? pages : [];
     if (history.state && history.state.view) history.replaceState(null, "");
     renderLibrary();
+    noteVersion();
     const share = C.platform.plugin("ShareTarget");
     if (share && share.addListener) share.addListener("shared", takeShared);
     takeShared();
@@ -1196,80 +1201,214 @@
 
   // ---- The app updating itself (from LifeLog's 0.179.0) ----
   // A newer build is a newer APK on this repo's Releases, tagged
-  // app-v<APP_VERSION> by .github/workflows/android.yml. Asked once per
-  // launch, unauthenticated: the Releases are public. Settings can ask again.
+  // app-v<APP_VERSION> by .github/workflows/android.yml, whose notes are
+  // that version's CHANGELOG.md section. Asked once per launch,
+  // unauthenticated: the Releases are public. The work lives in Settings'
+  // Updates section; the library's bar is only the nudge that leads there.
   function isNewerVersion(a, b) {
     const pa = String(a).split(".").map(Number), pb = String(b).split(".").map(Number);
     for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
     return false;
   }
 
-  async function checkForNewerApp(asked) {
+  // phase: idle, checking, current, failed, available, downloading, ready.
+  const upd = { phase: "idle", latest: null, notes: "", pct: 0, apk: null, error: "" };
+
+  function setUpd(change) {
+    Object.assign(upd, change);
+    paintUpdateBar();
+    if (state.settings && $("updatesSection")) $("updatesSection").replaceWith(updatesGroup());
+  }
+
+  async function checkForNewerApp() {
     const build = await C.platform.ready;
     if (!C.platform.native || !build || !build.repo) return;
+    if (upd.phase === "checking" || upd.phase === "downloading") return;
     C.platform.clearOldUpdates(APP_VERSION, isNewerVersion);
+    setUpd({ phase: "checking" });
     try {
       const res = await C.platform.fetchText("https://api.github.com/repos/" + build.repo + "/releases/latest",
         { headers: { Accept: "application/vnd.github+json" } });
       if (res.status !== 200) throw new Error("HTTP " + res.status);
-      const latest = String(JSON.parse(res.text).tag_name || "").replace(/^app-v/, "");
+      const release = JSON.parse(res.text);
+      const latest = String(release.tag_name || "").replace(/^app-v/, "");
       if (/^\d+\.\d+\.\d+$/.test(latest) && isNewerVersion(latest, APP_VERSION)) {
-        offerUpdate(latest);
-        if (asked) { toast("Carry-on " + latest + " is out"); history.back(); }
-      } else if (asked) toast("You have the latest version");
+        setUpd({ phase: upd.latest === latest && upd.apk ? "ready" : "available", latest, notes: String(release.body || "") });
+      } else setUpd({ phase: "current" });
     } catch (e) {
-      if (asked) toast("Couldn't check. Try again when you're online.");
+      setUpd({ phase: "failed", error: "Couldn't check. Try again when you're online." });
     }
   }
 
-  // "Update" downloads the APK with its progress on the button, then opens
-  // Android's installer; if that's dismissed, "Install" reopens it from the
-  // same file. iOS installs nothing an app hands it: a sideloaded build is
-  // updated from AltStore or SideStore, so there the bar opens the release.
-  function offerUpdate(version) {
-    const text = $("updateText");
+  // Android downloads the APK with its progress, then opens the installer;
+  // if that's dismissed, Install reopens it from the same file. iOS installs
+  // nothing an app hands it: a sideloaded build is updated from AltStore or
+  // SideStore, so there it opens the release.
+  async function startUpdate() {
+    if (C.platform.ios) { C.platform.openOutside(C.platform.releasesUrl()); return; }
+    if (upd.phase === "ready") return install();
+    setUpd({ phase: "downloading", pct: 0 });
+    let apk;
+    try {
+      apk = await C.platform.downloadUpdate(upd.latest, (f) => setUpd({ pct: Math.round(f * 100) }));
+    } catch (e) {
+      setUpd({ phase: "available", error: "The download didn't finish. Try again." });
+      return;
+    }
+    if (!apk) {
+      setUpd({ phase: "available" });
+      C.platform.openOutside(C.platform.apkUrl());
+      return;
+    }
+    setUpd({ phase: "ready", apk, error: "" });
+    install();
+  }
+
+  async function install() {
+    try {
+      await C.platform.openInstaller(upd.apk);
+    } catch (e) {
+      setUpd({ error: "Couldn't open the installer. Try again." });
+    }
+  }
+
+  // The library's bar: a newer version is out (View opens Settings at
+  // Updates), or this one just arrived (What's new). × puts it away.
+  let barDismissed = null;
+  function paintUpdateBar() {
+    const bar = $("updateBar");
+    const out = ["available", "downloading", "ready"].includes(upd.phase) && upd.latest;
+    const fresh = !out && justUpdated;
+    const key = out ? "out:" + upd.latest : fresh ? "new:" + APP_VERSION : null;
+    if (!key || barDismissed === key) {
+      bar.hidden = true;
+      return;
+    }
+    $("updateText").textContent = out
+      ? (upd.phase === "downloading" ? "Downloading " + upd.latest + " · " + upd.pct + "%" : upd.phase === "ready" ? "Carry-on " + upd.latest + " is ready to install" : "Carry-on " + upd.latest + " is out")
+      : "Updated to " + APP_VERSION;
     const btn = $("updateBtn");
-    let apk = null;
-    const say = (msg, label, busy) => {
-      text.textContent = msg;
-      btn.textContent = label;
-      btn.disabled = !!busy;
+    btn.textContent = out ? "View" : "What's new";
+    btn.onclick = () => (out ? openSettings(false, "updatesSection") : openNews());
+    $("updateClose").onclick = () => {
+      barDismissed = key;
+      if (fresh) justUpdated = false;
+      bar.hidden = true;
     };
-    const install = async () => {
-      say("Opening the installer…", "Install", true);
-      try {
-        await C.platform.openInstaller(apk);
-        say("Carry-on " + version + " is ready to install", "Install");
-      } catch (e) {
-        say("Couldn't open the installer", "Try again");
-      }
-    };
-    btn.onclick = async () => {
-      if (apk) return install();
-      say("Downloading Carry-on " + version + "…", "0%", true);
-      try {
-        apk = await C.platform.downloadUpdate(version, (f) => { btn.textContent = Math.round(f * 100) + "%"; });
-      } catch (e) {
-        say("The download didn't finish", "Retry");
-        return;
-      }
-      if (!apk) {
-        say("Carry-on " + version + " is out", "Download");
-        C.platform.openOutside(C.platform.apkUrl());
-        return;
-      }
-      install();
-    };
-    if (C.platform.ios) {
-      btn.onclick = () => C.platform.openOutside(C.platform.releasesUrl());
-      say("Carry-on " + version + " is out", "Get it");
-    } else {
-      say("Carry-on " + version + " is out", "Update");
+    if (bar.hidden) {
+      bar.hidden = false;
+      M.arrive(bar);
     }
-    if ($("updateBar").hidden) {
-      $("updateBar").hidden = false;
-      M.arrive($("updateBar"));
+  }
+
+  // Shown once after an update arrives: the version seen last is kept, and
+  // a library that existed before this was kept counts as an update.
+  let justUpdated = false;
+  function noteVersion() {
+    const seen = load(SEEN_KEY, null);
+    justUpdated = seen ? isNewerVersion(APP_VERSION, seen) : state.pages.length > 0;
+    store(SEEN_KEY, APP_VERSION);
+    paintUpdateBar();
+  }
+
+  function updatesGroup() {
+    const list = el("div", { class: "group" },
+      el("div", { class: "row" }, el("span", { class: "row-label" }, "This version"), el("span", { class: "row-value" }, APP_VERSION)));
+    if (C.platform.native) {
+      const out = ["available", "downloading", "ready"].includes(upd.phase);
+      const status = {
+        idle: "Not checked yet", checking: "Checking…", current: "You have the latest version",
+        failed: upd.error, available: "Carry-on " + upd.latest + " is out",
+        downloading: "Downloading " + upd.latest + " · " + upd.pct + "%", ready: "Carry-on " + upd.latest + " is ready to install",
+      }[upd.phase];
+      const action = out ? el("button", { class: "btn-small", type: "button", onclick: startUpdate },
+        upd.phase === "downloading" ? upd.pct + "%" : C.platform.ios ? "Get it" : upd.phase === "ready" ? "Install" : "Update") : null;
+      if (action && upd.phase === "downloading") action.disabled = true;
+      list.append(el("div", { class: "row update-row" + (out ? " out" : "") },
+        upd.phase === "checking" || upd.phase === "downloading" ? el("span", { class: "spinner", "aria-hidden": "true" }) : null,
+        el("span", { class: "row-label" + (out ? " accent" : upd.phase === "failed" ? " warn" : "") , role: "status" }, status), action));
+      if (out && upd.error) list.append(el("div", { class: "row" }, el("span", { class: "row-label warn" }, upd.error)));
+      if (out && upd.notes) list.append(el("div", { class: "update-notes" }, el("p", { class: "overline" }, "What's in " + upd.latest), ...notesView(changelogEntries("## [" + upd.latest + "]\n" + upd.notes))));
+      const check = el("button", { class: "row", type: "button", onclick: () => checkForNewerApp() },
+        el("span", { class: "row-label accent" }, "Check for updates"));
+      check.disabled = upd.phase === "checking" || upd.phase === "downloading";
+      list.append(check);
     }
+    list.append(el("button", { class: "row", type: "button", onclick: () => openNews() },
+      el("span", { class: "row-label accent" }, "What's new"), el("span", { class: "row-value", "aria-hidden": "true" }, "›")));
+    return el("section", { class: "settings-section", id: "updatesSection" }, el("h2", { class: "overline" }, "Updates"), list);
+  }
+
+  // ---- What's new ----
+  // CHANGELOG.md, bundled with the app, read into versions of headed lists.
+
+  function changelogEntries(md) {
+    const out = [];
+    let entry = null, section = null, item = null;
+    for (const line of String(md).split("\n")) {
+      let m;
+      if ((m = line.match(/^## \[([^\]]+)\](?:\s*-\s*(\S+))?/))) { entry = { version: m[1], date: m[2] || "", sections: [] }; out.push(entry); section = item = null; }
+      else if (!entry) continue;
+      else if ((m = line.match(/^### (.+)/))) { section = { title: m[1].trim(), items: [] }; entry.sections.push(section); item = null; }
+      else if ((m = line.match(/^\s*[-*] (.+)/))) {
+        if (!section) { section = { title: "", items: [] }; entry.sections.push(section); }
+        item = m[1].trim();
+        section.items.push(item);
+      } else if (line.trim() && section && section.items.length && /^\s/.test(line)) {
+        section.items[section.items.length - 1] += " " + line.trim();
+      } else if (!line.trim()) item = null;
+    }
+    // Markdown's marks aren't needed to read a line.
+    for (const e of out) for (const sec of e.sections) sec.items = sec.items.map((t) => t.replace(/\*\*|`/g, "").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1"));
+    return out;
+  }
+
+  function notesView(entries) {
+    return entries.flatMap((e) => e.sections.map((sec) => el("div", { class: "news-section" },
+      sec.title ? el("h4", { class: "news-kind" }, sec.title) : null,
+      el("ul", { class: "news-list" }, ...sec.items.map((t) => el("li", null, t))))));
+  }
+
+  let changelog = null;
+  async function readChangelog() {
+    if (changelog) return changelog;
+    try {
+      const res = await fetch("CHANGELOG.md?v=" + APP_VERSION);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      changelog = changelogEntries(await res.text());
+    } catch (e) {
+      changelog = null;
+    }
+    return changelog;
+  }
+
+  async function openNews(fromHistory) {
+    if (state.news) return;
+    state.news = true;
+    const over = state.settings ? "settings" : undefined;
+    if (!fromHistory) history.pushState({ view: "news", over }, "");
+    justUpdated = false;
+    paintUpdateBar();
+    $("newsBody").replaceChildren(el("p", { class: "meta" }, "Loading…"));
+    $("newsBody").scrollTop = 0;
+    cover($("newsView")).then(() => $("newsBack").focus());
+    const entries = await readChangelog();
+    if (!state.news) return;
+    $("newsBody").replaceChildren(...(entries && entries.length ? entries.map((e) => el("section", { class: "news-entry" + (e.version === APP_VERSION ? " now" : "") },
+      el("h2", { class: "news-version" }, e.version, e.version === APP_VERSION ? el("span", { class: "news-you" }, "You have this") : null),
+      e.date ? el("p", { class: "meta" }, formatDay(e.date)) : null,
+      ...notesView([e]))) : [el("p", { class: "empty-text" }, "The list of changes didn't load.")]));
+  }
+
+  function closeNews() {
+    if (!state.news) return;
+    state.news = false;
+    uncover($("newsView"));
+  }
+
+  function formatDay(iso) {
+    const d = new Date(iso + "T12:00:00");
+    return isNaN(d) ? iso : d.toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
   }
 
   checkForNewerApp();

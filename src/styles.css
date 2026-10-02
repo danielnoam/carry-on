@@ -147,7 +147,8 @@ html.native .app { padding-top: env(safe-area-inset-top); }
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md);
 }
 .update-bar[hidden] { display: none; }
-.update-text { min-width: 0; font-weight: 500; }
+.update-text { flex: 1; min-width: 0; font-weight: 500; }
+.update-close { flex-shrink: 0; margin-inline-start: calc(-1 * var(--s-2)); color: var(--muted); }
 .btn-small {
   min-width: 72px; height: var(--tap); padding: 0 var(--s-4); flex-shrink: 0;
   border: 0; border-radius: var(--r-md);
@@ -510,3 +511,20 @@ html.native .reader-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top
 .rc-row.follow .chip { min-width: var(--tap); }
 .screen-body .rc-row.follow { margin-top: var(--s-4); }
 .folder-rename { display: block; margin-top: var(--s-5); }
+
+/* Updates in Settings, and What's new. */
+.update-row .row-label { white-space: normal; }
+.update-row .spinner { flex-shrink: 0; margin: 0; }
+.row:disabled { cursor: default; }
+.row:disabled .row-label { color: var(--muted); }
+.warn { color: var(--warn); }
+.update-notes { padding: var(--s-2) var(--s-4) var(--s-3); border-top: 1px solid var(--line); }
+.update-notes .overline { margin: var(--s-2) 0 0; }
+.news-entry + .news-entry { margin-top: var(--s-6); padding-top: var(--s-5); border-top: 1px solid var(--line); }
+.news-version { display: flex; align-items: baseline; gap: var(--s-3); margin: 0; font: 700 var(--fs-heading)/var(--lh-heading) var(--serif); }
+.news-you { font: 600 var(--fs-meta)/var(--lh-meta) var(--sans); color: var(--accent); }
+.news-kind { margin: var(--s-4) 0 var(--s-1); font: 600 var(--fs-meta)/var(--lh-meta) var(--sans); color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.news-list { margin: 0; padding-inline-start: 1.2em; }
+.news-list li { margin: var(--s-1) 0; line-height: 1.5; }
+.news-list li::marker { color: var(--muted); }
+.update-notes + .row { border-top: 1px solid var(--line); }

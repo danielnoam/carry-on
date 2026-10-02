@@ -118,6 +118,15 @@ Source Serif 4 and Instrument Sans (Now).
   five seconds. Reduced motion: both breathe instead.
 - **Save next (Now):** "Save next" with 1, 5 and 10 as chips, in ⋯ and
   at the end of a folder's list, when the last page has a next link.
+- **Updates (Now):** a Settings section: "This version", a status row
+  (spinner while checking or downloading; "Carry-on 0.12.0 is out" in the
+  accent with Update / 42% / Install, or Get it on iOS), what's in it as
+  the release's headed lists, Check for updates, and What's new. The
+  library's bar says "Carry-on 0.12.0 is out" with View, or "Updated to
+  0.11.0" with What's new, and an × to put it away.
+- **What's new (Now):** a pushed screen; each version a serif heading
+  with its date, "You have this" by the installed one, then its Added /
+  Changed / Fixed as small overlines over bulleted sentences.
 - **Filter chips (Now):** under the library's meta line, scrolling edge
   to edge: All, Unread, Finished, then #tags. The chosen one is filled
   with the accent; tapping it again goes back to All. Hidden while the

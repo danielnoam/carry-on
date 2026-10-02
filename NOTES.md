@@ -3,6 +3,18 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Updates live in Settings; the bar only points there (0.11.0).** One
+  `upd` state (phase, latest, notes, progress, the downloaded APK) drives
+  both Settings' Updates section and the library's bar, so a download
+  started in Settings shows in the bar too. The release's notes are its
+  CHANGELOG.md section (the workflow writes them), so "What's in 0.12.0"
+  needs no second source. What's new reads the bundled CHANGELOG.md
+  (now in sw.js's ASSETS, so it's in the app and the offline web copy)
+  with a small parser: `## [x] - date`, `### Kind`, `- item` with
+  indented lines joined. "Updated to x" shows once, keyed on
+  `carryon.seenVersion`; an install that predates the key but has pages
+  counts as an update.
+
 - **Next links are found at save time (0.10.0).** save.js reads the
   page's next link before Readability strips navigation: `rel="next"`
   first, then a link whose words are a "next" phrase in a few languages

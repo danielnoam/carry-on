@@ -2,6 +2,20 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.11.0] - 2026-10-02
+
+### Added
+- Settings has an Updates section: the version you have, whether a newer
+  one is out (checked at each launch, or with Check for updates), and the
+  update itself, with its download progress and what's in it.
+- What's new: every version's changes, from Settings. After an update,
+  the library says "Updated to 0.11.0" with a What's new button, once.
+
+### Changed
+- The library's update bar now only tells you a new version is out; View
+  opens Settings at Updates, where the download and install happen. It
+  can be dismissed with ×.
+
 ## [0.10.0] - 2026-10-02
 
 ### Added
