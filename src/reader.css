@@ -86,6 +86,15 @@ figure .co-placeholder { border-width: 0 0 1.5px; border-radius: 0; }
 .co-video-title { font-weight: 500; }
 .co-video-note { font-size: var(--fs-meta); color: var(--muted); }
 
+.co-next {
+  display: flex; flex-direction: column; gap: 2px;
+  margin-top: var(--s-6); padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--surface); color: var(--ink); text-decoration: none;
+  font-family: var(--sans);
+}
+.co-next-over { font: 600 var(--fs-meta)/var(--lh-meta) var(--sans); color: var(--muted); }
+.co-next-title { font: 600 var(--fs-label)/var(--lh-label) var(--serif); color: var(--accent); }
 .co-licence {
   margin-top: var(--s-6); padding-top: var(--s-2);
   border-top: 1px solid var(--line);
