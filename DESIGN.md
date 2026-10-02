@@ -79,7 +79,8 @@ Source Serif 4 and Instrument Sans (Now).
 
 ## 5. Components
 
-- **Library card (Now):** site line with
+- **Library card (Now):** reading line "9 min", "6 min left" with a 3 px
+  accent line under the status, or "Finished". Site line with
   favicon, serif title, then status: a progress bar and "Saving · 14 of 31
   image previews", or "9 min · 1.4 MB · Offline ready", or "Text saved · 3
   previews missing · Retry".

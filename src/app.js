@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.4.0";
+  const APP_VERSION = "0.5.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -173,9 +173,17 @@
     card.querySelector(".card-status").textContent = savingStatus(s);
   }
 
+  // "Finished" once read to the end, "6 min left" part way, else the length.
+  function readingLine(p) {
+    if (p.finished) return "Finished";
+    if (p.at > 0.02) return Math.max(1, Math.ceil(p.minutes * (1 - p.at))) + " min left";
+    return p.minutes + " min";
+  }
+
   function pageCard(p) {
     const thumb = thumbUrl(p);
-    const facts = [p.minutes + " min", formatSize(p.bytes || 0)].join(" · ") + " · ";
+    const facts = [readingLine(p), formatSize(p.bytes || 0)].join(" · ") + " · ";
+    const started = !p.finished && p.at > 0.02;
     const status = p.missing
       ? el("span", { class: "warn" }, "Text saved · " + p.missing + (p.missing === 1 ? " preview" : " previews") + " missing")
       : p.mode === "links"
@@ -186,7 +194,10 @@
       el("span", { class: "card-body" },
         el("span", { class: "card-site", dir: "auto" }, p.site),
         el("span", { class: "card-title", dir: "auto" }, p.title),
-        el("span", { class: "card-status" }, facts, status)));
+        el("span", { class: "card-status" }, facts, status),
+        started ? el("span", { class: "progress thin", role: "progressbar", "aria-label": "Read so far",
+          "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": String(Math.round(p.at * 100)) },
+          el("span", { class: "progress-fill", style: "transform: scaleX(" + p.at + ")" })) : null));
   }
 
   // Cards are keyed and kept between renders; only ones that weren't there
@@ -200,13 +211,17 @@
     $("libraryMeta").textContent = n ? pagesLine(n) + (allOffline ? " · all readable offline" : "") : "Nothing saved yet";
     const nodes = [];
     const fresh = [];
-    const keep = (key, make) => {
+    // A kept card whose content changed (reading progress, a renamed page)
+    // is rebuilt in place, without arriving again.
+    const keep = (key, make, sig) => {
       let node = old.get(key);
       if (!node) { node = make(); node.dataset.key = key; fresh.push(node); }
+      else if (sig != null && node.dataset.sig !== sig) { node = make(); node.dataset.key = key; }
+      if (sig != null) node.dataset.sig = sig;
       nodes.push(node);
     };
     for (const s of state.saving) keep((s.error ? "f:" : "s:") + s.key, () => (s.error ? failedCard(s) : savingCard(s)));
-    for (const p of state.pages) keep("p:" + p.id, () => pageCard(p));
+    for (const p of state.pages) keep("p:" + p.id, () => pageCard(p), [p.title, readingLine(p), p.missing, p.thumb, Math.round((p.at || 0) * 50)].join("|"));
     if (!n && !state.saving.length) {
       keep("empty", () => el("div", { class: "empty" },
         el("h2", { class: "empty-title" }, "Pages you take with you"),
@@ -292,14 +307,32 @@
     $("readerOriginal").href = p.url;
     showOffline();
     if (!fromHistory) history.pushState({ view: "reader", page: id }, "");
-    const shown = C.reader.open($("readerFrame"), html, p);
+    const shown = C.reader.open($("readerFrame"), html, p, { at: p.at || 0, onPosition: (f) => notePosition(p, f) });
     cover($("readerView"));
     await shown;
     $("readerFrame").focus();
   }
 
+  // Where each page was left (`at`, 0 to 1) and whether it was ever read to
+  // the end, kept in the library index; written a moment after scrolling
+  // stops, and when the page is closed.
+  let positionTimer = null;
+  function notePosition(p, f) {
+    p.at = Math.round(f * 1000) / 1000;
+    if (f >= 0.97) p.finished = true;
+    clearTimeout(positionTimer);
+    positionTimer = setTimeout(savePositions, 1500);
+  }
+  function savePositions() {
+    clearTimeout(positionTimer);
+    positionTimer = null;
+    return C.store.writeIndex(state.pages).catch(() => {});
+  }
+
   function closeReader() {
     if (!state.open) return;
+    if (positionTimer) savePositions();
+    renderLibrary();
     closeSheet(true);
     state.open = null;
     uncover($("readerView")).then(() => { if (!state.open) C.reader.close(); });

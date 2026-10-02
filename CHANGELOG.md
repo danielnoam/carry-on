@@ -2,6 +2,13 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.5.0] - 2026-10-02
+
+### Added
+- Reading progress: a page reopens where you left it, and its library card
+  says how much is left ("6 min left") with a thin line, or "Finished"
+  once you've read to the end. A finished page opens at the top again.
+
 ## [0.4.0] - 2026-10-02
 
 ### Added
