@@ -27,11 +27,7 @@ todo:
 
 ## Library and reader
 
-- Reader top bar: hide on scroll down, back on scroll up; tapping an image
-  opens it full screen.
-- Reader progress: a thin bar at the bottom of the reader showing how far
-  through the page you are (Daniel, 2 Oct 2026). Reduced motion: it
-  still moves with the scroll, it just doesn't animate between jumps.
+- Reader: tapping an image opens it full screen.
 - Folders, next steps: reorder its pages (drag, or move up and down), and
   delete a whole folder at once.
 - Follow next links on pages saved before 0.10.0 (they have no `next`

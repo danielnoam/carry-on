@@ -14,7 +14,7 @@
     "reader-fs", "reader-lh", "reader-font"];
   const NEAR = 2;
 
-  let frame = null, doc = null, scrollTimer = null;
+  let frame = null, doc = null, scrollTimer = null, scrollFrame = 0, topSpace = null;
   // The "Next" link this file adds at the end of a page in a folder; only
   // that element (not a look-alike in the page) moves on.
   let nextLink = null, onNext = null;
@@ -132,11 +132,19 @@
     return room <= 0 ? 1 : Math.min(1, Math.max(0, w.scrollY / room));
   }
 
+  // Room at the top of the page for the reader bar, which floats over it.
+  function applyTop() {
+    if (doc && topSpace) doc.documentElement.style.setProperty("--co-top", topSpace() + "px");
+  }
+
   // Renders `html` (a page.html) into `iframe`, scrolled to `at` (0 to 1),
-  // and reports the position as the reader scrolls; resolves once it's shown.
-  // `next` ({ over, title, go }) adds a link to the next page at the end.
-  function open(iframe, html, meta, { at = 0, onPosition, next } = {}) {
+  // and reports the position as the reader scrolls: onScroll(at, y) every
+  // frame, onPosition(at) once it stops. Resolves once it's shown.
+  // `next` ({ over, title, go }) adds a link to the next page at the end;
+  // `top` () gives the height the bar covers.
+  function open(iframe, html, meta, { at = 0, onPosition, onScroll, next, top } = {}) {
     frame = iframe;
+    topSpace = top || null;
     doc = null;
     nextLink = null;
     onNext = next ? next.go : null;
@@ -148,6 +156,7 @@
         if (!doc.documentElement.hasAttribute("dir") && C.save.textDir(doc) === "rtl") doc.documentElement.dir = "rtl";
         applyTheme();
         applyConnection();
+        applyTop();
         if (next) {
           nextLink = doc.createElement("a");
           nextLink.href = "#";
@@ -164,6 +173,12 @@
         }
         doc.addEventListener("click", onClick);
         iframe.contentWindow.addEventListener("scroll", () => {
+          if (onScroll && !scrollFrame) {
+            scrollFrame = requestAnimationFrame(() => {
+              scrollFrame = 0;
+              if (doc) onScroll(position(), iframe.contentWindow.scrollY);
+            });
+          }
           clearTimeout(scrollTimer);
           scrollTimer = setTimeout(() => {
             swapNearImages();
@@ -178,6 +193,7 @@
           const w = iframe.contentWindow;
           if (at > 0.01 && at < 0.97) w.scrollTo(0, at * (doc.documentElement.scrollHeight - w.innerHeight));
           else if (onPosition && position() === 1) onPosition(1);
+          if (onScroll) onScroll(position(), w.scrollY);
         });
         resolve();
       };
@@ -189,11 +205,13 @@
     if (frame) { frame.onload = null; frame.srcdoc = ""; }
     frame = null;
     doc = null;
+    topSpace = null;
     nextLink = null;
     onNext = null;
   }
 
   addEventListener("online", applyConnection);
+  addEventListener("resize", applyTop);
   addEventListener("offline", applyConnection);
 
   C.reader = { open, close, position, applyTheme, applyConnection, srcdoc, CSP };
