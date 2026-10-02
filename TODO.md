@@ -25,19 +25,23 @@ todo:
 
 ## Library and reader
 
-- Retry for missing previews (the card says how many are missing).
 - Reader top bar: hide on scroll down, back on scroll up; tapping an image
   opens it full screen.
-- Categories: give a page one or more categories, filter the library by
-  them (with the chips below).
+- Tags: a page has any number of tags (Daniel's word, not "categories");
+  filter the library by them with the chips below.
+- Folders: an ordered collection, at most one per page, e.g. the chapters
+  of a web novel read in sequence. The folder shows its pages in order with
+  progress across the whole folder; the reader gets next and previous
+  chapter. Decided by Daniel on 2 Oct 2026.
 - Batch saving: paste several links at once (or share several); they save
-  one after another in the library's saving cards, and can all go into a
-  category or folder chosen up front. Decide first whether folders and
-  categories are one thing: if a page can have several categories, a
-  folder is just a category, and two systems would confuse.
+  one after another, in order, optionally into a folder (new or existing)
+  and with tags chosen up front.
+- Follow "next chapter": from one saved chapter, offer to save the next N
+  by following the page's next link (rel="next", or a link named Next or
+  Next chapter) into the same folder. Only for sites that link chapters.
 - Naming pass: one vocabulary for what the app holds, used the same way in
   the code, the UI and the docs (a saved page, its previews, a capture, the
-  library, a category or folder). Write it as a glossary in NOTES.md, then
+  library, a tag, a folder). Write it as a glossary in NOTES.md, then
   rename functions and labels that don't match it (save.js `clean`,
   `localise`, `pageHtml`; app.js `takeShared`, `cover`).
 - Read aloud: a player in the reader that reads the page with the phone's

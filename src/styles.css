@@ -179,6 +179,21 @@ html.native .app { padding-top: env(safe-area-inset-top); }
   border: 1px solid var(--line); border-radius: var(--r-lg);
   text-align: start; cursor: pointer;
 }
+.card { position: relative; }
+.card-open {
+  position: absolute; inset: 0; z-index: 0;
+  border: 0; border-radius: inherit; background: transparent; cursor: pointer;
+}
+.card-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.card-open ~ .card-thumb, .card-open ~ .card-body { pointer-events: none; }
+.card-retry {
+  position: relative; z-index: 1; pointer-events: auto;
+  min-height: var(--tap); margin: calc((var(--lh-meta) - var(--tap)) / 2) 0; padding: 0 var(--s-1);
+  border: 0; background: transparent; color: var(--accent);
+  font: 600 var(--fs-meta)/var(--lh-meta) var(--sans); cursor: pointer;
+  vertical-align: middle;
+}
+.card-retry:disabled { color: var(--muted); cursor: default; }
 .card.saving { cursor: default; }
 .card.saving:active { transform: none; }
 .card-actions { display: flex; gap: var(--s-2); margin-top: var(--s-1); }

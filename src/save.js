@@ -376,6 +376,7 @@
       } catch (e) {
         missing++;
         m.el.setAttribute("data-full", fallback);
+        m.el.setAttribute("data-preview", url);
         m.el.className = "co-missing";
       }
     }
@@ -468,8 +469,42 @@
     return meta;
   }
 
+  // Tries the previews that didn't download when the page was saved again,
+  // into the same folder. Pages saved before 0.6.0 didn't keep the preview's
+  // address, so those use the full image's (a Wikimedia one is narrowed to
+  // the preview width). Resolves to { got, missing, bytes, thumb }.
+  async function retryMissing(meta, onProgress) {
+    const html = await C.store.readPage(meta.id);
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const imgs = [...doc.querySelectorAll("img.co-missing")];
+    let got = 0, bytes = 0, done = 0, thumb = meta.thumb || null;
+    const stamp = Date.now().toString(36);
+    for (const [i, img] of imgs.entries()) {
+      const full = img.getAttribute("data-full") || "";
+      let url = img.getAttribute("data-preview") || full;
+      if (!img.hasAttribute("data-preview") && /upload\.wikimedia\.org\/.*\/thumb\//.test(full)) url = wikimediaThumb(full, WIKI_PREVIEW, 0);
+      if (!/^https?:/.test(url)) continue;
+      const rel = "images/r" + stamp + "-" + i + "." + extOf(url);
+      try {
+        bytes += await C.store.download(meta.id, rel, url);
+        img.setAttribute("src", rel);
+        img.removeAttribute("class");
+        img.removeAttribute("data-preview");
+        if (!thumb && !img.closest(".co-video")) thumb = rel;
+        got++;
+      } catch (e) { /* still missing */ }
+      if (onProgress) onProgress(++done, imgs.length);
+    }
+    const missing = doc.querySelectorAll("img.co-missing").length;
+    if (got) {
+      const out = { ...meta, missing, thumb };
+      await C.store.writePage(meta.id, "<!doctype html>\n" + doc.documentElement.outerHTML, out);
+    }
+    return { got, missing, bytes, thumb };
+  }
+
   C.save = {
-    save, SaveError, textDir,
+    save, SaveError, retryMissing, textDir,
     wikipediaPage, wikimediaThumb, parseSrcset, pickWidth, youtubeId, vimeoId, extOf, isTrackingPixel, readingMinutes, siteName,
   };
 })();

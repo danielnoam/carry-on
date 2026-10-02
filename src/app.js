@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.5.0";
+  const APP_VERSION = "0.6.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -189,15 +189,44 @@
       : p.mode === "links"
         ? el("span", null, "Text offline · images online")
         : el("span", { class: "ok" }, "Offline ready");
-    return el("button", { class: "card", type: "button", onclick: () => openPage(p.id) },
+    // The whole card opens the page (a button stretched under everything);
+    // Retry sits above it, since a button can't hold another.
+    const retry = p.missing && C.platform.native && navigator.onLine
+      ? el("button", { class: "card-retry", type: "button", onclick: (e) => retryPreviews(p, e.currentTarget) }, "Retry")
+      : null;
+    return el("div", { class: "card" },
+      el("button", { class: "card-open", type: "button", "aria-label": p.title, onclick: () => openPage(p.id) }),
       thumb ? el("img", { class: "card-thumb", src: thumb, alt: "", loading: "lazy" }) : null,
       el("span", { class: "card-body" },
         el("span", { class: "card-site", dir: "auto" }, p.site),
         el("span", { class: "card-title", dir: "auto" }, p.title),
-        el("span", { class: "card-status" }, facts, status),
+        el("span", { class: "card-status" }, facts, status, retry ? " · " : null, retry),
         started ? el("span", { class: "progress thin", role: "progressbar", "aria-label": "Read so far",
           "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": String(Math.round(p.at * 100)) },
           el("span", { class: "progress-fill", style: "transform: scaleX(" + p.at + ")" })) : null));
+  }
+
+  async function retryPreviews(p, btn) {
+    btn.disabled = true;
+    btn.textContent = "Retrying…";
+    let res;
+    try {
+      res = await C.save.retryMissing(p, (done, total) => { btn.textContent = "Retrying " + done + " of " + total; });
+    } catch (e) {
+      res = null;
+    }
+    // A card whose content didn't change isn't rebuilt, so its button is reset here.
+    btn.disabled = false;
+    btn.textContent = "Retry";
+    if (!res) { toast("Couldn't open this page's file. Try again."); return; }
+    if (res.got) {
+      Object.assign(p, { missing: res.missing, thumb: res.thumb, bytes: (p.bytes || 0) + res.bytes });
+      await C.store.writeIndex(state.pages);
+    }
+    toast(!res.got ? "Still couldn't get them. The site may be down; the images load online."
+      : res.missing ? "Got " + res.got + ". " + res.missing + " still missing."
+      : "All previews saved. Offline ready.");
+    renderLibrary();
   }
 
   // Cards are keyed and kept between renders; only ones that weren't there
@@ -221,7 +250,7 @@
       nodes.push(node);
     };
     for (const s of state.saving) keep((s.error ? "f:" : "s:") + s.key, () => (s.error ? failedCard(s) : savingCard(s)));
-    for (const p of state.pages) keep("p:" + p.id, () => pageCard(p), [p.title, readingLine(p), p.missing, p.thumb, Math.round((p.at || 0) * 50)].join("|"));
+    for (const p of state.pages) keep("p:" + p.id, () => pageCard(p), [p.title, readingLine(p), p.missing, p.thumb, Math.round((p.at || 0) * 50), navigator.onLine].join("|"));
     if (!n && !state.saving.length) {
       keep("empty", () => el("div", { class: "empty" },
         el("h2", { class: "empty-title" }, "Pages you take with you"),
@@ -594,8 +623,8 @@
   $("sheetCatch").addEventListener("click", () => history.back());
   addEventListener("keydown", (e) => { if (e.key === "Escape" && state.sheet) history.back(); });
   addEventListener("popstate", (e) => route(e.state));
-  addEventListener("online", showOffline);
-  addEventListener("offline", showOffline);
+  addEventListener("online", () => { showOffline(); renderLibrary(); });
+  addEventListener("offline", () => { showOffline(); renderLibrary(); });
 
   // ---- Shared from another app (Android) ----
   // native/share hands over what Chrome's share sheet sent: usually the
