@@ -23,6 +23,7 @@ Every color is a token on `:root`, redefined per theme on
 | `--accent-ink` | #FFFFFF | #FFFFFF | #0F1216 | Text on an accent fill |
 | `--line` | #E4DED3 | #E0D2B8 | #252B33 | Borders, dividers |
 | `--preview` | #D9E2EA | #E3D5BC | #232A33 | Empty image preview |
+| `--bar` | #EDE8DF | #E7DAC0 | #181C22 | The reader's top bar, its foot and the status-bar strip: a step off the page |
 | `--ok` | #1F6F5C | #3F6B2E | #7CC4A8 | "Offline ready" |
 | `--warn` | #8A4B22 | #8A4B22 | #E0A46E | "Previews missing", retry |
 | `--video` | #3A4048 | #4A3F33 | #262C34 | Video card ground behind the thumbnail |
@@ -142,6 +143,11 @@ Source Serif 4 and Instrument Sans (Now).
   own screen. A new version adds an accent-bordered "Carry-on 0.20.0 is
   out" card with View above the groups. At 900 px and wider the menu
   stays on the left (360 px) and the section fills the rest.
+- **Storage by folder (Now):** under "By folder", one row a folder,
+  biggest first (name, page count, size, a chevron), then "Not in a
+  folder" in `--muted`. A tap opens the group in place: its pages
+  indented, biggest first; the chevron turns down on the control spring.
+  Reduced motion: it turns without easing.
 - **Storage and backup (Now):** the total in the title size, the page
   count, "Pages by size" (tap one to read it), then Backup.
 - **Backup (Now):** under Storage on its screen: two
@@ -158,13 +164,14 @@ Source Serif 4 and Instrument Sans (Now).
   a bordered block "Next in Novel" over the title in the accent serif. In
   ⋯, Previous and Next side by side, dimmed when there's none.
 - **Save several (Now):** a pushed screen. "Links" with the links one a
-  line in an editable box and a count under it, "Folder" with None and
+  line in an editable box and a count under it (with "Skip pages
+  already saved", a switch on by default, when any are), "Folder" with None and
   each folder as chips plus a "New folder" field, a note that pages keep
   the links' order, "Tags", then "Images" as a Previews / Full / Links
   segmented control set to the Settings choice (app only), then a
-  full-width "Save 4 pages into Novel". Saving
-  goes back to the library, where the queued cards say "Waiting · into
-  Novel" until their turn.
+  full-width "Save 4 pages into Novel" ("Nothing new to save" when all
+  are skipped). Saving goes back to the library, where two or more go
+  as one run card.
 - **Saving card (Now):** a 12 px ring turning (accent arc on the line
   colour) before the status, a bar that sweeps while the page downloads
   and fills as images land, and "Getting the page · 12 s" once it passes
@@ -195,9 +202,13 @@ Source Serif 4 and Instrument Sans (Now).
   button "Find chapters on this page" while the box holds one link; it
   reads "Finding chapters…" while it looks, then the box holds the
   chapters and the folder field the novel's name.
-- **Waiting card (Now):** more than three saves waiting for one folder
-  show as one card: the site, "48 pages waiting to go into Skyward" in
-  the card's title type, and Stop as a quiet button in the warn colour.
+- **Run card (Now):** a run of saves into a folder is one wide card
+  from start to end: the site, the folder's name in the title type, the
+  page in progress's bar, one status line ("3 of 10 saved · Saving 4 of 9
+  images", "Paused · 3 of 10 saved"), then Pause or Resume (small
+  button) and Stop (quiet, warn colour). Its height never changes: the
+  status is one line, cut with an ellipsis. Reduced motion: as the
+  saving card.
 - **Book cover (Now):** a book's first picture, or a 1200 × 1800 title
   card: Paper's background, a 160 × 12 accent rule, the title in Source
   Serif 4 semibold (88 px, smaller to fit), the site in Instrument Sans
@@ -213,7 +224,7 @@ Source Serif 4 and Instrument Sans (Now).
 - **Save next and previous (Now):** "Save next" with 1, 5, 10 and All
   as chips, in ⋯ and under a folder's list, when the last page has a
   next link; "Save previous" the same above the list, for the first
-  page. While a run saves, the chips dim and Stop (warn colour) joins
+  page. While a run saves, the chips dim and Pause (Resume when paused) and Stop (warn colour) join
   them. Pages come one at a time, half a second apart. 5, 10 or All ask
   first when the last chapters were 5 MB or more each, naming the total
   ("about 73 MB").

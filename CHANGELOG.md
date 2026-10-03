@@ -2,6 +2,23 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.23.0] - 2026-10-03
+
+### Added
+- Pause a run of saves into a folder, from its card or beside Save next.
+  It waits after the page in progress, and Resume carries on from there.
+- Save several skips pages you already have, and says how many. Untick
+  it to move them into the folder in the list's order instead.
+- Settings › Storage is grouped by folder, biggest first, with pages in
+  no folder as one more group. Tap a group to see its pages by size.
+
+### Changed
+- A run of saves is one card from start to end, "3 of 10 saved", that
+  keeps its height, so the library no longer jumps as each page comes
+  and goes. Pages that fail show on their own cards once the run ends.
+- The reader's top bar and foot are a step darker than the page in Paper
+  and Sepia, and a step lighter in Night.
+
 ## [0.22.0] - 2026-10-03
 
 ### Added

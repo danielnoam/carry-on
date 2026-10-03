@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.22.0";
+  const APP_VERSION = "0.23.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -190,19 +190,78 @@
           el("button", { class: "btn-quiet", type: "button", onclick: () => dropFailed(s) }, "Remove"))));
   }
 
-  // The waiting part of a long run, with Stop: what's saved stays, the
-  // rest is let go.
-  const QUEUE_CARDS = 3;
-  function queueCard(folder, jobs) {
-    return el("div", { class: "card saving queue wide", role: "group", "aria-label": "Waiting to save" },
+  // A run of saves into one folder (Save next 10, Save several, a
+  // contents page) is one card from start to end, the same height
+  // throughout, so the library doesn't jump as each page comes and goes.
+  // Pause waits after the page in progress; Stop lets the rest go.
+  // Pages that fail wait on their own cards until the run ends.
+  const runs = new Set();
+  let runIds = 0;
+  const runFor = (folder) => [...runs].find((r) => r.folder && folder && sameTag(r.folder, folder));
+  function startRun(folder, site, total) {
+    const r = { id: ++runIds, folder, site, total, saved: 0, failed: 0, paused: false, stopped: false, current: null, wake: null };
+    runs.add(r);
+    return r;
+  }
+  async function gate(r) {
+    while (r.paused && !r.stopped) await new Promise((go) => { r.wake = go; });
+    return !r.stopped;
+  }
+  function runChanged() {
+    renderLibrary();
+    if (state.folder) renderFolder();
+    if (state.sheet === "page" && state.open) $("readingBody").replaceChildren(SHEETS.page.build());
+  }
+  function pauseRun(r, on) {
+    r.paused = on;
+    if (!on && r.wake) { r.wake(); r.wake = null; }
+    runChanged();
+  }
+  function stopRun(r) {
+    if (!r) return;
+    r.stopped = true;
+    r.paused = false;
+    if (r.wake) { r.wake(); r.wake = null; }
+    state.saving = state.saving.filter((x) => !(x.run === r && x.waiting && !x.error));
+    runChanged();
+  }
+  function endRun(r) {
+    if (!r) return;
+    runs.delete(r);
+    r.done = true;
+  }
+  function runStatus(r) {
+    const done = r.total ? r.saved + " of " + r.total + " saved" : r.saved + " saved";
+    const failed = r.failed ? ", " + r.failed + " failed" : "";
+    if (r.stopped) return done + failed + " · Stopping";
+    if (r.paused) return (r.current ? "Pausing after this page · " : "Paused · ") + done + failed;
+    return done + failed + " · " + (r.current && !r.current.waiting ? savingStatus(r.current) : "Next in a moment");
+  }
+  function runCard(r) {
+    return el("div", { class: "card saving run wide", role: "group", "aria-label": "Saving into " + (r.folder || "the library") },
       el("span", { class: "card-body" },
-        el("span", { class: "card-site" }, jobs[0].site),
-        el("span", { class: "card-title" }, countLine(jobs.length) + " waiting" + (folder ? " to go into " + folder : "")),
+        el("span", { class: "card-site" }, r.site),
+        el("span", { class: "card-title", dir: "auto" }, r.folder || "Saving several"),
+        el("span", { class: "progress", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": "0" },
+          el("span", { class: "progress-fill" })),
+        el("span", { class: "card-status accent" },
+          el("span", { class: "spinner", "aria-hidden": "true" }),
+          el("span", { class: "status-text" }, runStatus(r))),
         el("span", { class: "card-actions" },
-          el("button", { class: "btn-quiet danger", type: "button", onclick: () => {
-            state.saving = state.saving.filter((x) => !(x.waiting && !x.error && (x.folder || "") === (folder || "")));
-            renderLibrary();
-          } }, "Stop"))));
+          el("button", { class: "btn-small run-pause", type: "button", onclick: () => pauseRun(r, !r.paused) }, r.paused ? "Resume" : "Pause"),
+          el("button", { class: "btn-quiet danger", type: "button", onclick: () => stopRun(r) }, "Stop"))));
+  }
+  function updateRunCard(r) {
+    const card = $("library").querySelector('[data-key="r:' + r.id + '"]');
+    if (!card) return;
+    const share = r.current && !r.current.waiting ? savingShare(r.current) : 0;
+    const bar = card.querySelector(".progress");
+    bar.classList.toggle("busy", share == null);
+    if (share == null) bar.removeAttribute("aria-valuenow");
+    else bar.setAttribute("aria-valuenow", String(Math.round(share * 100)));
+    card.querySelector(".progress-fill").style.transform = "scaleX(" + (share || 0) + ")";
+    card.querySelector(".spinner").hidden = r.paused && !r.current;
+    card.querySelector(".status-text").textContent = runStatus(r);
   }
 
   function dropFailed(s) {
@@ -225,6 +284,7 @@
   // Progress lands in the card that's already there, so the bar grows on
   // its spring instead of being redrawn at each image.
   function updateSavingCard(s) {
+    if (s.run && !s.run.done) { updateRunCard(s.run); return; }
     const card = $("library").querySelector('[data-key="' + CSS.escape("s:" + s.key) + '"]');
     if (!card || s.error) return;
     const share = savingShare(s);
@@ -497,15 +557,9 @@
       if (sig != null) node.dataset.sig = sig;
       nodes.push(node);
     };
-    // A long queue (a contents page's chapters) is one card, not hundreds.
-    const queues = new Map();
-    for (const s of state.saving) if (s.waiting && !s.error) queues.set(s.folder || "", [...(queues.get(s.folder || "") || []), s]);
+    for (const r of runs) keep("r:" + r.id, () => runCard(r), [r.paused, r.stopped].join());
     for (const s of state.saving) {
-      const q = s.waiting && !s.error && queues.get(s.folder || "");
-      if (q && q.length > QUEUE_CARDS) {
-        if (q[0] === s) keep("w:" + (s.folder || ""), () => queueCard(s.folder, q), String(q.length));
-        continue;
-      }
+      if (s.run && !s.run.done) continue;
       keep((s.error ? "f:" : "s:") + s.key, () => (s.error ? failedCard(s) : savingCard(s)));
     }
     const ts = terms();
@@ -564,6 +618,7 @@
     }
     root.replaceChildren(...nodes);
     for (const s of state.saving) updateSavingCard(s);
+    for (const r of runs) updateRunCard(r);
     if (!firstRender) fresh.forEach((node) => M.arrive(node));
     firstRender = false;
     paintPicks();
@@ -624,7 +679,8 @@
     const jobs = urls.filter((u) => !state.saving.some((s) => !s.error && sameUrl(s.url, u))).map((u) => ({ ...newJob(u, name), tags, mode }));
     state.saving = state.saving.filter((s) => !(s.error && jobs.some((j) => sameUrl(j.url, s.url))));
     const fresh = jobs.filter((j) => !savedAs(j.url));
-    fresh.forEach((j) => { j.waiting = true; });
+    const run = fresh.length > 1 ? startRun(name, fresh[0].site, fresh.length) : null;
+    fresh.forEach((j) => { j.waiting = true; j.run = run; });
     state.saving = [...fresh, ...state.saving];
     renderLibrary();
     let saved = 0, failed = 0, had = 0, stopped = 0;
@@ -639,12 +695,17 @@
         continue;
       }
       if (saved + failed) await new Promise((done) => setTimeout(done, PACE_MS));
+      if (run && !(await gate(run))) { stopped++; continue; }
       if (!state.saving.includes(job)) { stopped++; continue; }
       job.waiting = false;
+      if (run) run.current = job;
       renderLibrary();
-      if (await runJob(job)) saved++; else failed++;
+      if (await runJob(job)) { saved++; if (run) run.saved++; } else { failed++; if (run) run.failed++; }
+      if (run) { run.current = null; updateRunCard(run); }
       if (state.folder) renderFolder();
     }
+    endRun(run);
+    if (run) renderLibrary();
     if (!jobs.length) return;
     toast([saved ? "Saved " + countLine(saved) + (name ? " into " + name : "") : "",
       had ? had + " already saved" + (name && !saved ? ", now in " + name : "") : "",
@@ -1910,6 +1971,12 @@
       autocapitalize: "off", autocomplete: "off", dir: "ltr" });
     area.value = text;
     const count = el("p", { class: "meta batch-count" });
+    // Links already saved can be left where they are, or (switched off)
+    // moved into this folder at their place in the list.
+    const skip = el("input", { class: "switch batch-skip", type: "checkbox", role: "switch", checked: true, onchange: () => sync() });
+    const skipNote = el("span", { class: "choice-note" });
+    const skipRow = el("div", { class: "group" }, el("label", { class: "row" },
+      el("span", { class: "choice-text" }, el("span", { class: "choice-label" }, "Skip pages already saved"), skipNote), skip));
     const go = el("button", { class: "btn-primary batch-go", type: "submit" });
     const chips = el("div", { class: "chips" });
     const input = el("input", { class: "tag-input", type: "text", placeholder: "New folder", "aria-label": "New folder",
@@ -1933,10 +2000,15 @@
       finder.textContent = "Find chapters on this page";
     } }, "Find chapters on this page");
     const sync = () => {
-      const n = linksFrom(area.value).length;
-      finder.hidden = n !== 1;
-      count.textContent = n ? n + (n === 1 ? " link" : " links") : "No links yet. Paste them here, one a line.";
-      go.textContent = n ? "Save " + countLine(n) + (folder ? " into " + folder : "") : "Save";
+      const links = linksFrom(area.value);
+      const had = links.filter((u) => savedAs(u)).length;
+      const n = skip.checked ? links.length - had : links.length;
+      finder.hidden = links.length !== 1;
+      skipRow.hidden = !had;
+      skipNote.textContent = had === links.length ? "All " + had + " are already saved"
+        : had + " already saved" + (skip.checked ? ", left where they are" : (folder ? ", moved into " + folder : ""));
+      count.textContent = links.length ? links.length + (links.length === 1 ? " link" : " links") : "No links yet. Paste them here, one a line.";
+      go.textContent = n ? "Save " + countLine(n) + (folder ? " into " + folder : "") : links.length ? "Nothing new to save" : "Save";
       go.disabled = !n;
       chips.querySelectorAll(".chip").forEach((c) => {
         const on = c.dataset.folder === (folder || "");
@@ -1974,7 +2046,7 @@
     input.addEventListener("input", () => pick(cleanTag(input.value) ? folderName(input.value) : null, true));
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); input.blur(); } });
     const form = el("form", { class: "batch-form" },
-      el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Links"), area, count, finder),
+      el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Links"), area, count, finder, skipRow),
       el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Folder"),
         el("div", { class: "tag-edit" }, chips, input),
         el("p", { class: "meta" }, "Pages in a folder keep the order of the links.")),
@@ -1987,9 +2059,9 @@
       go);
     form.addEventListener("submit", (e) => {
       e.preventDefault();
-      const urls = linksFrom(area.value);
+      const urls = linksFrom(area.value).filter((u) => !skip.checked || skipRow.hidden || !savedAs(u));
       if (!urls.length) return;
-      if (urls.length > LONG_LIST && !confirm("Save " + urls.length + " pages? They save one at a time, so a list this long takes a while. Stop is on the waiting card.")) return;
+      if (urls.length > LONG_LIST && !confirm("Save " + urls.length + " pages? They save one at a time, so a list this long takes a while. Pause and Stop are on its card.")) return;
       history.back();
       saveAll(urls, folder, tags, mode);
     });
@@ -2012,8 +2084,7 @@
   // Saves up to `n` pages following `from`'s next links (previous ones
   // with `back`, placed before it in the folder); resolves to the first
   // one saved (or already there), or null. Quiet when asked. A folder's
-  // run stops early when its Stop is tapped.
-  const stopping = new Set();
+  // run stops early when its Stop is tapped and waits while paused.
   async function follow(from, n, quiet, back) {
     const key = back ? "prev" : "next", word = back ? "previous" : "next";
     if (from[key] === undefined) {
@@ -2025,11 +2096,11 @@
     const name = from.folder;
     let at = from.folderAt || from.savedAt || Date.now();
     const place = () => (back ? --at : undefined);
-    stopping.delete(name);
+    const run = n > 1 ? startRun(name, from.site, n === Infinity ? null : n) : null;
     const seen = new Set([from.url]);
     let url = from[key], saved = 0, first = null, failed = false, stopped = false;
     while (url && saved < n && !seen.has(url)) {
-      if (stopping.has(name)) { stopped = true; break; }
+      if (run && run.stopped) { stopped = true; break; }
       seen.add(url);
       const had = savedAs(url);
       if (had) {
@@ -2042,17 +2113,21 @@
       if (state.saving.some((s) => !s.error && sameUrl(s.url, url))) break;
       state.saving = state.saving.filter((s) => !(s.error && sameUrl(s.url, url)));
       if (saved) await new Promise((done) => setTimeout(done, PACE_MS));
-      const job = { ...newJob(url, name), folderAt: place() };
+      if (run && !(await gate(run))) { stopped = true; break; }
+      const job = { ...newJob(url, name), folderAt: place(), run };
       state.saving.unshift(job);
+      if (run) run.current = job;
       renderLibrary();
       const meta = await runJob(job);
-      if (!meta) { failed = true; break; }
+      if (run) run.current = null;
+      if (!meta) { failed = true; if (run) run.failed++; break; }
       saved++;
+      if (run) { run.saved++; updateRunCard(run); }
       first = first || meta;
       url = meta[key];
       if (state.folder) renderFolder();
     }
-    stopping.delete(name);
+    endRun(run);
     await C.store.writeIndex(state.pages);
     renderLibrary();
     if (state.folder) renderFolder();
@@ -2100,17 +2175,22 @@
     // A missing previous link is read when the folder opens (lookBack).
     const unknown = !back && p && p.next === undefined && p.licence !== "wikipedia";
     if (!p || (!unknown && (!p[key] || savedAs(p[key])))) return null;
-    const busy = () => state.saving.some((s) => !s.error && s.folder && p.folder && sameTag(s.folder, p.folder));
+    const busy = () => !!runFor(p.folder) || state.saving.some((s) => !s.error && s.folder && p.folder && sameTag(s.folder, p.folder));
     const what = back ? "previous" : "next";
+    const going = runFor(p.folder);
     const stop = el("button", { class: "chip stop", type: "button", "aria-label": "Stop saving",
-      onclick: () => { if (p.folder) stopping.add(p.folder); stop.disabled = true; } }, "Stop");
+      onclick: () => { stopRun(runFor(p.folder)); stop.disabled = true; } }, "Stop");
+    const pause = el("button", { class: "chip pause", type: "button", "aria-label": going && going.paused ? "Resume saving" : "Pause saving",
+      onclick: () => { const r = runFor(p.folder); if (r) pauseRun(r, !r.paused); } }, going && going.paused ? "Resume" : "Pause");
     stop.hidden = !busy();
+    pause.hidden = !going;
     const run = (n) => (e) => {
       if (busy()) return;
       if (!navigator.onLine) { toast("You're offline. Try again when you're back online."); return; }
       if (!sizeOk(p, n)) return;
-      e.currentTarget.closest(".follow").querySelectorAll("button:not(.stop)").forEach((b) => { b.disabled = true; });
+      e.currentTarget.closest(".follow").querySelectorAll("button:not(.stop):not(.pause)").forEach((b) => { b.disabled = true; });
       stop.hidden = false;
+      pause.hidden = n === 1;
       follow(p, n, false, back).then(() => { if (state.sheet === "page" && state.open) $("readingBody").replaceChildren(SHEETS.page.build()); });
     };
     const chip = (n) => {
@@ -2121,7 +2201,7 @@
       return b;
     };
     return el("div", { class: "rc-row follow" + (back ? " back" : "") }, el("span", { class: "rc-label" }, back ? "Save previous" : "Save next"),
-      el("div", { class: "chips" }, ...[1, 5, 10, Infinity].map(chip), stop));
+      el("div", { class: "chips" }, ...[1, 5, 10, Infinity].map(chip), pause, stop));
   }
 
   async function renameFolder() {
@@ -2221,19 +2301,45 @@
           input)));
   }
 
+  // Folders first, biggest first, then the pages in no folder as one
+  // more group; a group opens in place to its pages, biggest first.
+  const storageOpen = new Set();
   function storageGroup() {
     const n = state.pages.length;
+    const bySize = (a, b) => (b.bytes || 0) - (a.bytes || 0);
+    const groups = allFolders().map((name) => ({ key: "f:" + name, name, pages: folderPages(name) }));
+    const loose = state.pages.filter((p) => !p.folder);
+    groups.sort((a, b) => sizeOf(b.pages) - sizeOf(a.pages));
+    if (loose.length) groups.push({ key: "loose", name: "Not in a folder", pages: loose, loose: true });
     const list = el("div", { class: "group" });
     if (!n) list.append(el("div", { class: "row" }, el("span", { class: "row-label muted" }, "Nothing saved yet")));
-    for (const p of [...state.pages].sort((a, b) => (b.bytes || 0) - (a.bytes || 0))) {
-      list.append(el("button", { class: "row", type: "button", onclick: () => toLibrary().then(() => openPage(p.id)) },
-        el("span", { class: "row-label", dir: "auto" }, p.title),
-        el("span", { class: "row-value" }, formatSize(p.bytes || 0))));
+    for (const g of groups) {
+      const open = storageOpen.has(g.key);
+      const pages = el("div", { class: "storage-pages", id: "storage-" + g.key.replace(/[^\w-]/g, "_") });
+      pages.hidden = !open;
+      for (const p of [...g.pages].sort(bySize)) {
+        pages.append(el("button", { class: "row", type: "button", onclick: () => toLibrary().then(() => openPage(p.id)) },
+          el("span", { class: "row-label", dir: "auto" }, p.title),
+          el("span", { class: "row-value" }, formatSize(p.bytes || 0))));
+      }
+      const head = el("button", { class: "row storage-folder" + (g.loose ? " loose" : ""), type: "button", "aria-expanded": String(open), "aria-controls": pages.id,
+        onclick: () => {
+          const now = !storageOpen.has(g.key);
+          if (now) storageOpen.add(g.key); else storageOpen.delete(g.key);
+          head.setAttribute("aria-expanded", String(now));
+          pages.hidden = !now;
+        } },
+        el("span", { class: "choice-text" },
+          el("span", { class: "choice-label", dir: "auto" }, g.name),
+          el("span", { class: "choice-note" }, countLine(g.pages.length))),
+        el("span", { class: "row-value" }, formatSize(sizeOf(g.pages))),
+        el("span", { class: "row-chev", "aria-hidden": "true" }, "›"));
+      list.append(head, pages);
     }
     return el("section", { class: "settings-section" },
       el("p", { class: "storage-total" }, formatSize(totalBytes())),
       el("p", { class: "section-lead" }, n ? countLine(n) + " on this phone. Delete a page from its menu: press and hold it in the library." : "Pages you save show here with their size."),
-      el("h2", { class: "overline" }, "Pages by size"),
+      el("h2", { class: "overline" }, "By folder"),
       list);
   }
 

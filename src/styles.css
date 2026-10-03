@@ -11,6 +11,7 @@
   --accent-ink: #FFFFFF;
   --line: #E4DED3;
   --preview: #D9E2EA;
+  --bar: #EDE8DF;
   --ok: #1F6F5C;
   --warn: #8A4B22;
   --video: #3A4048;
@@ -29,6 +30,7 @@
   --accent-ink: #FFFFFF;
   --line: #E0D2B8;
   --preview: #E3D5BC;
+  --bar: #E7DAC0;
   --ok: #3F6B2E;
   --warn: #8A4B22;
   --video: #4A3F33;
@@ -47,6 +49,7 @@
   --accent-ink: #0F1216;
   --line: #252B33;
   --preview: #232A33;
+  --bar: #181C22;
   --ok: #7CC4A8;
   --warn: #E0A46E;
   --video: #262C34;
@@ -203,6 +206,9 @@ html.native .app { padding-top: env(safe-area-inset-top); }
 .card-retry:disabled { color: var(--muted); cursor: default; }
 .card.saving { cursor: default; }
 .card.saving:active { transform: none; }
+/* A run's card keeps one height: its status is one line whatever it says. */
+.card.run .card-status { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.card.run .spinner[hidden] { display: none; }
 .card-actions { display: flex; gap: var(--s-2); margin-top: var(--s-1); }
 .btn-quiet {
   height: var(--tap); padding: 0 var(--s-4); flex-shrink: 0;
@@ -345,7 +351,7 @@ html.native .reader-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top
 /* The bar stays live over the catch, so Aa and ⋯ swap or close their sheet. */
 .reader-bar {
   position: absolute; top: 0; left: 0; right: 0; z-index: 3;
-  background: var(--bg);
+  background: var(--bar);
   transition: transform var(--spring-control-ms, 300ms) var(--spring-control, ease-out);
 }
 /* Reading on down: the bar slides up out of the way, back on a scroll up
@@ -353,7 +359,7 @@ html.native .reader-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top
 .reader.bar-away .reader-bar:not(:focus-within) { transform: translateY(-100%); }
 html.native .reader::before {
   content: ""; position: absolute; top: 0; left: 0; right: 0; z-index: 4;
-  height: env(safe-area-inset-top); background: var(--bg);
+  height: env(safe-area-inset-top); background: var(--bar);
 }
 /* A tapped image, full screen: pinch or double-tap to zoom, drag to look
    around, swipe down (or ×, Escape, back) to close. */
@@ -393,7 +399,7 @@ html.native .reader::before {
 .read-left {
   display: flex; justify-content: space-between; gap: var(--s-3);
   margin: 0; padding: var(--s-1) var(--gutter) calc(var(--s-1) + env(safe-area-inset-bottom));
-  background: var(--bg); color: var(--muted);
+  background: var(--bar); color: var(--muted);
   font-size: var(--fs-meta); line-height: var(--lh-meta); font-variant-numeric: tabular-nums;
   transition: transform var(--spring-control-ms, 300ms) var(--spring-control, ease-out), opacity 120ms linear;
 }
@@ -598,12 +604,15 @@ html.native .reader::before {
 .batch-count { margin-top: var(--s-2); }
 .batch-find { margin-top: var(--s-2); }
 .batch-find[hidden] { display: none; }
+.batch-form .group { margin-top: var(--s-3); }
+.batch-form .group[hidden] { display: none; }
 .batch-go { display: block; width: 100%; margin-top: var(--s-6); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .batch-go:disabled { opacity: 0.5; cursor: default; }
 .rc-row.follow .chip { min-width: var(--tap); }
 .rc-row.follow .chip:disabled { opacity: 0.5; cursor: default; }
 .rc-row.follow .chip[hidden] { display: none; }
 .rc-row.follow .stop { color: var(--warn); border-color: var(--warn); }
+.rc-row.follow .chip[hidden] { display: none; }
 .screen-body .rc-row.follow { margin-top: var(--s-4); }
 .screen-body .rc-row.follow.back { margin-top: 0; margin-bottom: var(--s-4); }
 .folder-list li { display: flex; align-items: center; }
@@ -773,6 +782,13 @@ html.native .reader::before {
 .settings-menu { display: flex; flex-direction: column; gap: var(--s-5); }
 .nav-row .row-value { max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-chev { flex-shrink: 0; color: var(--muted); font-size: 22px; line-height: 1; margin-inline-start: calc(-1 * var(--s-1)); }
+.storage-folder .row-chev { transition: transform var(--spring-control-ms, 300ms) var(--spring-control, ease-out); }
+.storage-folder[aria-expanded="true"] .row-chev { transform: rotate(90deg); }
+.storage-folder.loose .choice-label { color: var(--muted); }
+.storage-pages[hidden] { display: none; }
+.storage-pages .row { padding-inline-start: var(--s-6); }
+.storage-pages > .row:first-child, .storage-pages + .row { border-top: 1px solid var(--line); }
+@media (prefers-reduced-motion: reduce) { .storage-folder .row-chev { transition: none; } }
 .nav-row[aria-current] { background: var(--bg); }
 .storage-total { margin: 0 0 var(--s-1) var(--s-1); font: 700 var(--fs-title)/var(--lh-title) var(--serif); }
 .settings-section > .section-lead { margin-bottom: var(--s-5); }

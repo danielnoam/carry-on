@@ -3,6 +3,28 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **A run is one card (0.23.0).** A run of saves into a folder (Save
+  next 5 or more, Save several with two or more new links) has a `run`
+  object: counts, the page in progress, paused and stopped. The library
+  draws one card for it from start to end, keyed by the run, so pages
+  coming and going don't move what's below; its pages' own cards stay
+  hidden until it ends, failures included, which then show with Try
+  again. Pause is checked before each next page, never mid-page, so a
+  half-saved page is never left behind. Runs live in memory: closing
+  the app ends them, as before.
+- **Skip pages already saved (0.23.0).** On by default in Save several:
+  saving a contents page again into the same folder should only fetch
+  what's missing and leave the rest alone. Off, the old behaviour stays
+  available: already-saved pages move into the folder at the list's
+  place, which reorders a folder to match a contents page.
+- **Storage opens in place (0.23.0).** Groups open and close in the
+  Storage section rather than pushing a screen: one level of disclosure
+  keeps Back simple, and the open groups are remembered until the app
+  closes.
+- **The bar token (0.23.0).** `--bar` is the reader's top bar, its foot
+  and the status-bar strip: #EDE8DF on Paper, #E7DAC0 on Sepia (darker
+  than the page) and #181C22 on Night (lighter, since darker than
+  #0F1216 wouldn't show). Muted text on it is 5.6, 4.8 and 6.6 to 1.
 - **How an image chapter is recognised (0.22.0).** After lazy pictures
   are resolved, the page's pictures that could be panels are kept: an
   http address, not a tracking pixel, at least 400 × 200 when the page
