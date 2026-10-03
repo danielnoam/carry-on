@@ -32,11 +32,15 @@ spacing set exactly rather than from a few steps.
 **Items** (Daniel, 3 Oct 2026)
 - **More fonts**, all bundled so they work offline, each OFL:
   - Source Serif 4 (today's serif) and Instrument Sans (today's sans).
-  - Literata: a serif drawn for long reading on screens.
-  - Atkinson Hyperlegible: a sans drawn for legibility.
-  - A Hebrew pair, Frank Ruhl Libre (serif) and Assistant (sans), used
-    automatically for Hebrew text whichever font is picked, since the
-    Latin fonts have no Hebrew letters. **(new)**
+  - Serifs: Literata (drawn for long reading on screens), Lora,
+    Merriweather (sturdy, for small sizes and Night), EB Garamond
+    (bookish).
+  - Sans: Inter, Atkinson Hyperlegible (drawn for legibility).
+  - OpenDyslexic, for readers who find it easier.
+  - Hebrew: Frank Ruhl Libre and David Libre (serif), Assistant and
+    Heebo (sans). A Hebrew page uses the Hebrew font matching the
+    chosen one's style, since the Latin fonts have no Hebrew letters,
+    or a Hebrew font can be picked outright. **(new)**
   - "System": the phone's own reading font, nothing to bundle.
   Shown as a list of rows in the Aa sheet and Settings, each name set
   in its own font.
@@ -54,7 +58,8 @@ spacing set exactly rather than from a few steps.
 1. Fonts: subset Latin woff2 files (and Hebrew ones) in src/fonts with
    their OFL texts; `@font-face` with `font-display: swap`; the reader's
    font stack puts the Hebrew face after the chosen one, so mixed pages
-   work. Keep the total added under about 600 KB; check the APK size.
+   work. Regular and italic only, Latin (and Hebrew) subsets; the total
+   added comes to roughly 1.5 MB, so check the APK size.
 2. Prefs: `size` becomes px and `spacing` a number, with old saved
    prefs (a step index, "tight"/"normal"/"loose") mapped on load.
 3. Sliders: native `input type="range"`, 44 px tall to touch, styled
