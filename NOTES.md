@@ -3,6 +3,19 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Covers and site icons (0.27.6).** A collection's cover is its
+  story page's `og:image` (Royal Road and Scribble Hub put the cover
+  there), read whenever the page is: linking it, a check for new
+  chapters, a Save several with a story page, or once a session on
+  opening a linked collection with none. It is kept small (preview
+  width) in `pages/_covers/` and named on every page of the collection
+  as `cover` (with `coverFrom`, the link, so it isn't fetched again);
+  collections have no file of their own. Backups don't carry
+  `_covers/`, so a tile whose cover fails to load drops it and reads it
+  again. A page's icon is the largest `<link rel=icon>` or apple touch
+  icon up to 256 px, else `/favicon.ico`, kept as `icon.*` beside the
+  page at save; pages saved before try the site's `/favicon.ico` while
+  online, and the site's first letter stands in when nothing loads.
 - **Dropdowns on Save with options (0.27.5).** Daniel found the rows of
   collection and tag chips too much. Both are now `dropdown()` as a form
   field (`.field-pick`), which gained `placeholder` (shown in `--muted`

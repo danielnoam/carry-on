@@ -27,14 +27,33 @@ asks from Daniel.
 ## 0.27.x: Library polish (Daniel, 3 Oct 2026)
 
 Asked for after 0.27.3 (the stuck tap shipped in 0.27.4, the add
-screen's dropdowns in 0.27.5). Placed before sync; Daniel can move it.
+screen's dropdowns in 0.27.5, covers and site icons in 0.27.6). Placed
+before sync; Daniel can move it.
 
 - **Library rework.** Daniel still thinks it could look better. Start
   with a few directions on the design canvas before any code.
-- **A cover image for a collection**, like a Royal Road story's book
-  cover: read it from the story page when the collection has a source,
-  else the first page's lead image.
-- **A page's site icon** as its image when it has none of its own.
+
+## Downloads (Daniel, 3 Oct 2026)
+
+Saving moves out of the library into a Downloads screen of its own.
+
+- **A Downloads button** in the top right, beside Settings: a dot on it
+  while anything is downloading, and a ring around it filling with the
+  overall progress.
+- **The screen** lists what's downloading and what just finished, one
+  card per collection being downloaded (its pages inside it) and one per
+  page saved on its own. A collection's card shows its failed or
+  incomplete pages as part of it, with Retry.
+- **Saving a collection's chapters again** (Save again, Save N new) shows
+  up there too, like any other download.
+- **Keeps going with the app closed or the phone locked.** Android: a
+  foreground service with a progress notification, as read aloud does
+  (SpeechService), so the fetching moves out of the WebView into native
+  code or a headless runner. iOS can't run arbitrary work in the
+  background: background `URLSession` downloads carry on for files, but
+  a page's text and the next link need the app; decide how far iOS goes.
+- The library then shows only saved pages; the saving and run cards
+  leave it.
 
 ## 0.28.0 and 0.29.0: Sync through a private GitHub repo
 
@@ -75,6 +94,23 @@ one and confirm it stays gone; edit tags offline on both and sync.
 
 **Depends on:** 0.18.0 (format, merge-by-URL rules).
 
+## A browser release (Daniel, 3 Oct 2026)
+
+A release of its own for the web copy, as a first-class way to use
+Carry-on rather than a preview of the app: what works without the
+phone's native fetch (CORS stops most sites, so saving needs the
+stateless server PROPOSAL.md allows, or saving stays app-only and the
+browser reads what sync brings), install as a PWA, and storage limits
+(IndexedDB quota, eviction). Decide the server question first.
+
+## RSS feeds (Daniel, 3 Oct 2026)
+
+Follow a site's RSS or Atom feed and save its new posts: add a feed by
+its link (or find it from a page's `<link rel="alternate">`), check it
+like collections are checked for new chapters, and save new items into a
+collection named after the feed, or list them to pick from. Settings per
+feed: save automatically or just show what's new.
+
 ---
 
 ## Waiting on a decision, not on a release slot
@@ -90,6 +126,9 @@ one and confirm it stays gone; edit tags offline on both and sync.
   needs its own app ID and an App Group, which sideloading with a free
   Apple account (AltStore, SideStore) makes painful: free accounts get
   3 app IDs. Decide on the Apple Developer Program first; slot it after.
+- **A new name (Daniel, 3 Oct 2026).** Find a different name for the
+  app. Check it against the App Store, Play and trademarks, and the
+  domain; then the app ID, store title, icons and repo follow.
 - **Before shipping to other people:** desktop browser version (and its
   worker) in v1 or not; Apple Developer Program or Android first; name
   checks (App Store, Play, trademark); privacy policy and store data
