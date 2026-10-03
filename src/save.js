@@ -172,8 +172,9 @@
     return srcs.length >= 4 ? { key, srcs } : null;
   }
 
-  // A page that is a column of large pictures with little text around
-  // them: the pictures, in order; null for an article. Run after
+  // A comic page's panels, in order: the column of large pictures when
+  // there is one (so an ad beside it stays out), else every picture that
+  // could be a panel; null when there are none. Run after
   // resolveLazyImages.
   function comicPanels(doc, base) {
     const ids = new Map();
@@ -187,11 +188,10 @@
       items.push({ src, path, img });
     }
     const group = comicGroup(items);
-    if (!group) return null;
-    const box = [...ids].find(([, k]) => k === group.key)[0];
-    const words = box.textContent.replace(/\s+/g, " ").trim().length;
-    if (words > 120 * group.srcs.length) return null;
-    return group.srcs;
+    if (group) return group.srcs;
+    // No clear column: every picture that could be a panel, in page order.
+    const srcs = [...new Set(items.map((i) => i.src))];
+    return srcs.length ? srcs : null;
   }
 
   // ---- A contents page's chapters (0.21.0) ----
@@ -403,32 +403,37 @@
 
   const CHECK_TITLE = /^(just a moment|attention required|access denied|are you a robot)/i;
 
-  // Reads the article out of a page's HTML. null when there isn't enough
-  // text, or the page is a browser check, so the caller can try drawing it.
-  function readArticle(html, finalUrl) {
+  // Reads the article out of a page's HTML, or with `comic` its pictures.
+  // null when there isn't enough text (or no pictures), or the page is a
+  // browser check, so the caller can try drawing it.
+  function readArticle(html, finalUrl, comic) {
     const doc = parse(html, finalUrl);
     const docTitle = (doc.querySelector("title") || {}).textContent || "";
     if (CHECK_TITLE.test(docTitle.trim())) return { check: true };
     const og = doc.querySelector('meta[property="og:title"]');
     const h1s = doc.querySelectorAll("h1");
     const headline = (og && og.content) || (h1s.length === 1 ? h1s[0].textContent : "");
-    const contents = contentsOf(doc, finalUrl, (headline || docTitle).replace(/\s+/g, " ").trim());
+    // A comic chapter's page often lists every chapter in a menu, so it is
+    // never taken for a contents page.
+    const contents = !comic && contentsOf(doc, finalUrl, (headline || docTitle).replace(/\s+/g, " ").trim());
     if (contents) return { contents };
     const next = nextLink(doc, finalUrl);
     const prev = nextLink(doc, finalUrl, true);
     resolveLazyImages(doc, finalUrl);
-    const panels = comicPanels(doc, finalUrl);
-    if (panels) return { doc, docTitle, headline, next, prev, panels };
+    if (comic) {
+      const panels = comicPanels(doc, finalUrl);
+      return panels ? { doc, docTitle, headline, next, prev, panels } : null;
+    }
     if (typeof window.Readability !== "function") throw new SaveError("The reader part of the app didn't load. Restart Carry-on.");
     const article = new window.Readability(doc, { charThreshold: 500, keepClasses: false }).parse();
     if (!article || (article.textContent || "").trim().length < MIN_TEXT) return null;
     return { doc, docTitle, headline, next, prev, article };
   }
 
-  async function fromAnyPage(url, onDrawing) {
+  async function fromAnyPage(url, onDrawing, comic) {
     const res = await get(url);
     let finalUrl = res.url || url;
-    let got = readArticle(res.text, finalUrl);
+    let got = readArticle(res.text, finalUrl, comic);
     // Pages that build themselves with scripts, or wait behind a browser
     // check, get drawn in a hidden WebView on Android and read again. The
     // saved copy is the same script-free HTML as any other page's.
@@ -437,11 +442,12 @@
       const drawn = await C.platform.render(finalUrl);
       if (drawn) {
         finalUrl = drawn.url;
-        got = readArticle(drawn.text, finalUrl);
+        got = readArticle(drawn.text, finalUrl, comic);
       }
     }
     if (got && got.check) throw new SaveError("The site asked for a browser check, so Carry-on can't save it yet.");
     if (got && got.contents) throw new ContentsPage(got.contents);
+    if (!got && comic) throw new SaveError("Carry-on couldn't find the pictures on this page.");
     if (!got) {
       throw new SaveError(C.platform.canRender
         ? "Carry-on couldn't find the article on this page, even after letting it draw itself."
@@ -792,15 +798,14 @@
 
   // Saves `url`; onProgress({ stage, done, total }) reports drawing a
   // script-built page, then images as they land. Resolves to the page's meta, which the library index lists.
-  async function save(url, { mode: chosen = "previews", onProgress } = {}) {
-    const wiki = wikipediaPage(url);
+  // `kind` "comic" saves the page's pictures as an image chapter instead
+  // of reading an article out of it; it is chosen, never guessed.
+  async function save(url, { mode = "previews", kind = "article", onProgress } = {}) {
+    const wiki = kind !== "comic" && wikipediaPage(url);
     if (onProgress) onProgress({ stage: "text" });
-    const got = wiki ? await fromWikipedia(wiki) : await fromAnyPage(url, () => onProgress && onProgress({ stage: "drawing" }));
+    const got = wiki ? await fromWikipedia(wiki) : await fromAnyPage(url, () => onProgress && onProgress({ stage: "drawing" }), kind === "comic");
     const out = document.implementation.createHTMLDocument("");
     const { root, media } = rebuild(got.body, got.base, got.url, out);
-    // An image chapter keeps its panels at full size whatever the setting:
-    // a preview of a page of a comic can't be read.
-    const mode = got.comic ? "full" : chosen;
     if (got.comic) root.classList.add("co-comic");
     else if (!root.textContent.trim()) throw new SaveError("Nothing readable was found on this page.");
     // The page's own headline, when the article kept it, would sit under the

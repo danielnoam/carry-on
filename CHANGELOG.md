@@ -2,6 +2,19 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.23.2] - 2026-10-03
+
+### Changed
+- Comics are chosen, not guessed: a plain Save always saves an article.
+  To save a comic, tap the options button next to Save (it takes the
+  link you typed), pick "Comic" under "Save as", then Previews, Full or
+  Links. Save next keeps a comic's choice for the chapters after it.
+- "Save several" is now "Save with options", with "Save as" and
+  "Images" right under the links.
+
+### Fixed
+- Articles with several big pictures no longer save as comics.
+
 ## [0.23.1] - 2026-10-03
 
 ### Fixed

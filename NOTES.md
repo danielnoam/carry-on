@@ -3,6 +3,16 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Comics are chosen, not guessed (0.23.2).** 0.22.0 looked for a
+  column of four or more big pictures on every page and saved those as
+  comics at full size. On real sites that fired on articles with photo
+  galleries, so Daniel's saves came out as the wrong kind. Now `save()`
+  takes `kind` ("article" by default, "comic" from Save with options),
+  a comic never goes through the contents-page check (its chapter menu
+  looks like one), and its image setting is whatever was picked (Full
+  is preselected). With no clear column, a comic keeps every picture
+  that could be a panel. Save next carries `kind` and `mode` from the
+  page it follows.
 - **Where filled-in chapters go (0.23.1).** With "Skip pages already
   saved" on, a new link's place comes from its neighbours in the list
   that are already in the folder: between them (an even share of the

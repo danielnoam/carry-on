@@ -163,15 +163,17 @@ Source Serif 4 and Instrument Sans (Now).
 - **Next in a folder (Now):** at the end of the page, after the licence,
   a bordered block "Next in Novel" over the title in the accent serif. In
   ⋯, Previous and Next side by side, dimmed when there's none.
-- **Save several (Now):** a pushed screen. "Links" with the links one a
-  line in an editable box and a count under it (with "Skip pages
-  already saved", a switch on by default, when any are), "Folder" with None and
-  each folder as chips plus a "New folder" field, a note that pages keep
-  the links' order, "Tags", then "Images" as a Previews / Full / Links
-  segmented control set to the Settings choice (app only), then a
-  full-width "Save 4 pages into Novel" ("Nothing new to save" when all
-  are skipped). Saving goes back to the library, where two or more go
-  as one run card.
+- **Save with options (Now, was Save several):** a pushed screen, opened
+  by the list icon beside Save with whatever is typed in the field.
+  "Links": the links one a line in an editable box, a count under it,
+  and "Skip pages already saved" (a switch, on by default) when any are.
+  "Save as": Article / Comic, a segmented control with a one-line note.
+  "Images": Previews / Full / Links (app only), set to the Settings
+  choice, or Full when Comic is picked. "Folder": None and each folder
+  as chips plus a "New folder" field, with a note that pages keep the
+  links' order. "Tags". Then a full-width "Save 4 pages into Novel"
+  ("Nothing new to save" when all are skipped). Saving goes back to the
+  library, where two or more go as one run card.
 - **Saving card (Now):** a 12 px ring turning (accent arc on the line
   colour) before the status, a bar that sweeps while the page downloads
   and fills as images land, and "Getting the page · 12 s" once it passes
