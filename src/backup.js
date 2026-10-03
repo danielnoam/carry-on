@@ -279,8 +279,125 @@
     const charset = doc.createElement("meta");
     charset.setAttribute("charset", "utf-8");
     doc.head.prepend(charset);
-    const slug = p.title.replace(/[\\/:*?"<>|#%\u0000-\u001f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 60) || "Page";
-    return { name: slug + ".html", html: "<!doctype html>\n" + doc.documentElement.outerHTML };
+    return { name: pageSlug(p.title) + ".html", html: "<!doctype html>\n" + doc.documentElement.outerHTML };
+  }
+
+  // ---- A page as Markdown (0.25.2) ----
+  // The saved page's text: headings, paragraphs, lists, quotes, code,
+  // tables and links. Pictures point at the full image on the site, since
+  // the local preview stays in the app; a video is a link.
+  const pageSlug = (title) => title.replace(/[\\/:*?"<>|#%\u0000-\u001f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 60) || "Page";
+  const mdEscape = (t) => t.replace(/([\\`*_[\]])/g, "\\$1").replace(/^(\s*)(?:([#>+-])|(\d+)\.)(?=\s)/, (m, sp, mark, num) => sp + (mark ? "\\" + mark : num + "\\."));
+  const webUrl = (u) => (/^(https?:|mailto:)/i.test(u || "") ? u.replace(/[()\s]/g, (c) => encodeURIComponent(c)) : "");
+  const imageUrl = (img) => webUrl(img.getAttribute("data-full")) || webUrl(img.getAttribute("src"));
+
+  function mdInline(node) {
+    let out = "";
+    for (const n of node.childNodes) {
+      if (n.nodeType === 3) { out += mdEscape(n.textContent.replace(/\s+/g, " ")); continue; }
+      if (n.nodeType !== 1) continue;
+      const tag = n.tagName.toLowerCase();
+      const inner = () => mdInline(n);
+      const wrap = (mark) => { const t = inner().trim(); return t ? mark + t + mark : ""; };
+      if (tag === "br") out += "  \n";
+      else if (tag === "strong" || tag === "b") out += wrap("**");
+      else if (tag === "em" || tag === "i") out += wrap("*");
+      else if (tag === "s" || tag === "del") out += wrap("~~");
+      else if (tag === "code") { const t = n.textContent; const tick = t.includes("`") ? "``" : "`"; out += tick + t + tick; }
+      else if (tag === "img") { const u = imageUrl(n); if (u) out += "![" + mdEscape(n.getAttribute("alt") || "") + "](" + u + ")"; }
+      else if (tag === "a") { const t = inner().trim(); const u = webUrl(n.getAttribute("href")); out += u && t ? "[" + t + "](" + u + ")" : t; }
+      else if (tag === "script" || tag === "style") continue;
+      else out += inner();
+    }
+    return out;
+  }
+
+  const BLOCK_TAGS = new Set(["p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "blockquote", "pre", "hr", "figure", "table", "div", "section", "article", "header", "footer", "aside", "main", "dl", "dt", "dd", "figcaption", "details", "summary", "nav"]);
+  const hasBlocks = (n) => [...n.children].some((c) => BLOCK_TAGS.has(c.tagName.toLowerCase()));
+
+  // Each block as a string; blocks are joined with a blank line.
+  function mdBlocks(node, out) {
+    let loose = null;
+    const flush = () => { if (loose) { const t = mdInline(loose).trim(); if (t) out.push(t); loose = null; } };
+    for (const n of node.childNodes) {
+      const block = n.nodeType === 1 && BLOCK_TAGS.has(n.tagName.toLowerCase());
+      if (!block) {
+        if (n.nodeType === 1 || (n.nodeType === 3 && n.textContent.trim())) {
+          if (!loose) loose = node.ownerDocument.createElement("span");
+          loose.append(n.cloneNode(true));
+        }
+        continue;
+      }
+      flush();
+      mdBlock(n, out);
+    }
+    flush();
+  }
+
+  function mdList(list, depth) {
+    const lines = [];
+    let i = Number(list.getAttribute("start")) || 1;
+    const ordered = list.tagName.toLowerCase() === "ol";
+    for (const li of list.children) {
+      if (li.tagName.toLowerCase() !== "li") continue;
+      const mark = ordered ? i++ + ". " : "- ";
+      const pad = " ".repeat(mark.length);
+      const own = li.cloneNode(true);
+      own.querySelectorAll(":scope > ul, :scope > ol").forEach((x) => x.remove());
+      const parts = [];
+      if (hasBlocks(own)) mdBlocks(own, parts); else parts.push(mdInline(own).trim());
+      const text = parts.filter(Boolean).join("\n\n").split("\n").map((l, k) => (k ? (l ? pad + l : l) : l)).join("\n");
+      lines.push("  ".repeat(depth) + mark + text);
+      for (const sub of li.querySelectorAll(":scope > ul, :scope > ol")) lines.push(mdList(sub, depth + 1));
+    }
+    return lines.join("\n");
+  }
+
+  function mdTable(table) {
+    const rows = [...table.querySelectorAll("tr")].map((tr) => [...tr.children].map((c) => mdInline(c).replace(/\|/g, "\\|").replace(/\s*\n\s*/g, " ").trim()));
+    if (!rows.length) return "";
+    const width = Math.max(...rows.map((r) => r.length));
+    const line = (r) => "| " + Array.from({ length: width }, (_, k) => r[k] || "").join(" | ") + " |";
+    return [line(rows[0]), "|" + " --- |".repeat(width), ...rows.slice(1).map(line)].join("\n");
+  }
+
+  function mdBlock(n, out) {
+    const tag = n.tagName.toLowerCase();
+    if (n.classList.contains("co-head") || n.classList.contains("co-licence") || n.classList.contains("co-next")) return;
+    const quoted = (parts) => parts.join("\n\n").split("\n").map((l) => (l ? "> " + l : ">")).join("\n");
+    if (/^h[1-6]$/.test(tag)) { const t = mdInline(n).trim(); if (t) out.push("#".repeat(Math.min(6, +tag[1] + (tag === "h1" ? 1 : 0))) + " " + t); }
+    else if (tag === "p" || tag === "dt" || tag === "summary") { const t = mdInline(n).trim(); if (t) out.push(tag === "dt" ? "**" + t + "**" : t); }
+    else if (tag === "ul" || tag === "ol") { const t = mdList(n, 0); if (t) out.push(t); }
+    else if (tag === "blockquote") { const parts = []; mdBlocks(n, parts); if (parts.length) out.push(quoted(parts)); }
+    else if (tag === "pre") { const t = n.textContent.replace(/\n$/, ""); const fence = t.includes("```") ? "~~~" : "```"; out.push(fence + "\n" + t + "\n" + fence); }
+    else if (tag === "hr") out.push("---");
+    else if (tag === "table") { const t = mdTable(n); if (t) out.push(t); }
+    else if (tag === "figure" && n.classList.contains("co-video")) {
+      const a = n.querySelector("a[href]");
+      const title = (n.querySelector(".co-video-title") || {}).textContent || "Video";
+      const u = a && webUrl(a.getAttribute("href"));
+      if (u) out.push("[▶ " + mdEscape(title.trim()) + "](" + u + ")");
+    } else if (tag === "figure") {
+      for (const img of n.querySelectorAll("img")) { const u = imageUrl(img); if (u) out.push("![" + mdEscape(img.getAttribute("alt") || "") + "](" + u + ")"); }
+      const cap = n.querySelector("figcaption");
+      const t = cap && mdInline(cap).trim();
+      if (t) out.push("*" + t + "*");
+    } else mdBlocks(n, out);
+  }
+
+  // { name, text } for a saved page as Markdown: its title, byline and
+  // source first, the licence line last.
+  async function exportMarkdown(p) {
+    const doc = new DOMParser().parseFromString(await S().readPage(p.id), "text/html");
+    const out = [];
+    mdBlocks(doc.body, out);
+    const head = ["# " + mdEscape(p.title)];
+    if (p.byline) head.push("*" + mdEscape(p.byline) + "*");
+    head.push("[" + mdEscape(p.site || p.url) + "](" + webUrl(p.url) + ")");
+    const licence = doc.querySelector(".co-licence");
+    const foot = licence ? "---\n\n" + mdInline(licence).trim() : "";
+    const text = [...head, ...out, foot].filter(Boolean).join("\n\n").replace(/\n{3,}/g, "\n\n") + "\n";
+    return { name: pageSlug(p.title) + ".md", text };
   }
 
   // A page file back into the library. Resolves to its new index entry,
@@ -319,5 +436,5 @@
     return meta;
   }
 
-  C.backup = { cleanMeta, crc32, zipWriter, zipEntries, zipRead, exportLibrary, restoreLibrary, exportPage, importPage, imageType };
+  C.backup = { cleanMeta, crc32, zipWriter, zipEntries, zipRead, exportLibrary, restoreLibrary, exportPage, exportMarkdown, importPage, imageType, mdBlocks };
 })();

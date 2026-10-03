@@ -155,6 +155,25 @@
     return shareFile(uri, filename);
   }
 
+  // A file the app wrote (writeCache, or an exported book) saved where the
+  // person picks: Android's "save to" screen, iOS's Files. Resolves to
+  // whether it was saved; null where there's no such plugin, so the caller
+  // offers the share sheet or a download instead.
+  async function saveFile(uri, name, mime) {
+    const F = plugin("FileSave");
+    if (!F) return null;
+    const res = await F.save({ uri, name, mime });
+    return !!(res && res.saved);
+  }
+
+  // Text written to the app's cache as a file; resolves to its uri, or
+  // null in a browser.
+  async function writeCache(filename, text) {
+    const FS = plugin("Filesystem");
+    if (!FS) return null;
+    return (await FS.writeFile({ path: filename, data: text, directory: "CACHE", encoding: "utf8" })).uri;
+  }
+
   // The share sheet, with a file already on disk or with a link. Putting
   // the sheet away isn't an error. false where there's no share sheet.
   async function share(what) {
@@ -244,6 +263,9 @@
     downloadTo,
     openOutside,
     saveAndShare,
+    saveFile,
+    writeCache,
+    get canSaveFiles() { return !!plugin("FileSave"); },
     shareFile,
     shareLink,
     printHtml,

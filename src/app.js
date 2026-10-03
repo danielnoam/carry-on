@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.25.1";
+  const APP_VERSION = "0.25.2";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -30,6 +30,7 @@
   const CONTINUE_KEY = "carryon.continue";
   const NEW_KEY = "carryon.newChapters";
   const DAILY_KEY = "carryon.checkDaily";
+  const EXPORT_KEY = "carryon.exportKind";
 
   const $ = (id) => document.getElementById(id);
   // The filter chips move into the library's list, and out of the page
@@ -1582,7 +1583,13 @@
   function pageSheet(p, where) {
     const box = el("div", { class: "page-controls" });
     const inReader = where === "reader";
+    let exporting = false;
     const draw = () => {
+      if (exporting) {
+        fill(box, exportControls(p, () => { exporting = false; draw(); focusFirst(box); }));
+        focusFirst(box);
+        return;
+      }
       const series = inReader ? [neighbours(p), neighbour(p, -1) ? null : followControls(p, true), neighbour(p, 1) ? null : followControls(p)].filter(Boolean) : [];
       fill(box,
         inReader ? null : el("div", { class: "menu-head" },
@@ -1591,7 +1598,7 @@
         el("div", { class: "tile-row" },
           inReader ? null : tileButton("open", "Open", () => back().then(() => openPage(p.id))),
           tileButton("share", "Share", () => shareLink(p)),
-          tileButton("send", "Send", (e) => sendPage(p, e.currentTarget)),
+          tileButton("send", "Export", () => { exporting = true; draw(); }),
           tileButton("original", "Original", () => C.platform.openOutside(p.url))),
         el("h3", { class: "overline" }, "This page"),
         tagsRow(p, draw),
@@ -1600,12 +1607,9 @@
         ...series,
         el("h3", { class: "overline" }, "More"),
         el("div", { class: "group" },
-          menuRow("Send as EPUB", (e) => sendBook(p, e.currentTarget)),
-          menuRow("Print or save as PDF", (e) => printPage(p, e.currentTarget)),
           menuRow(p.finished ? "Mark as unread" : "Mark as read", () => markRead([p], !p.finished).then(draw)),
           inReader ? null : menuRow("Select", () => back().then(() => startSelect([p.id]))),
           fullImagesRow(p),
-          menuRow("Send page source", (e) => sendSource(p, e.currentTarget)),
           menuRow("Delete this page", () => deletePage(p, where), "warn")));
     };
     draw();
@@ -1917,30 +1921,63 @@
     } catch (e) { toast("Couldn't share the link. Try again."); }
   }
 
-  // The page as one HTML file that opens in any browser, and in Carry-on
-  // through Settings, Restore or open.
-  async function sendPage(p, btn) {
-    btn.disabled = true;
-    try {
-      const { name, html } = await C.backup.exportPage(p);
-      if (!(await C.platform.saveAndShare(name, html))) C.platform.download(name, new Blob([html], { type: "text/html" }));
-    } catch (e) {
-      console.error(e);
-      toast("Couldn't make the file. Try again.");
-    }
-    btn.disabled = false;
+  // ---- Export (0.25.2) ----
+  // A page as a file of the kind picked, saved where the person picks or
+  // handed to the share sheet. PDF goes through the print screen, where
+  // Save as PDF is a printer; page source is the site's page fetched again,
+  // for working out why a site saves badly.
+  const EXPORTS = [
+    { value: "pdf", label: "PDF", note: "Opens the print screen, where Save as PDF is a printer." },
+    { value: "html", label: "HTML", note: "One file with its pictures. Opens in any browser, and back in Carry-on.", mime: "text/html" },
+    { value: "epub", label: "EPUB", note: "For an e-reader, Apple Books or Send to Kindle.", mime: "application/epub+zip" },
+    { value: "md", label: "Markdown", note: "The text for a notes app. Pictures link to the site.", mime: "text/markdown" },
+    { value: "source", label: "Page source", note: "The site's own page, fetched again. Send it when a site saves badly.", mime: "text/html" },
+  ];
+  const exportKind = () => { const k = load(EXPORT_KEY, "html"); return EXPORTS.some((e) => e.value === k) ? k : "html"; };
+
+  function focusFirst(box) {
+    requestAnimationFrame(() => { const f = box.querySelector("input:checked, button"); if (f) f.focus({ preventScroll: true }); });
   }
 
-  // The original page as the site serves it, fetched again, for working
-  // out why a site saves badly.
-  async function sendSource(p, btn) {
-    if (!navigator.onLine) { toast("You're offline. Try again when you're back online."); return; }
+  function exportControls(p, done) {
+    let kind = exportKind();
+    const save = el("button", { class: "btn-primary export-save", type: "button", onclick: () => exportAs(p, kind, "save", save) });
+    const send = el("button", { class: "btn-quiet export-send", type: "button", onclick: () => exportAs(p, kind, "send", send) }, "Send");
+    const sync = () => {
+      save.textContent = kind === "pdf" ? "Print or save as PDF" : C.platform.native ? "Save to device" : "Download";
+      send.hidden = kind === "pdf" || !C.platform.native;
+    };
+    const group = choiceGroup({ key: "export-kind", label: "Export as", options: EXPORTS, get: () => kind,
+      set: (v) => { kind = v; store(EXPORT_KEY, v); sync(); } });
+    sync();
+    return el("div", { class: "export" },
+      el("div", { class: "export-top" },
+        el("button", { class: "btn-quiet export-back", type: "button", onclick: done }, "Back"),
+        el("p", { class: "menu-title", dir: "auto" }, p.title)),
+      group,
+      el("div", { class: "export-actions" }, save, send));
+  }
+
+  async function exportAs(p, kind, how, btn) {
+    if (kind === "pdf") { await printPage(p, btn); return; }
+    if (kind === "source" && !navigator.onLine) { toast("You're offline. Try again when you're back online."); return; }
+    const mime = EXPORTS.find((e) => e.value === kind).mime;
     btn.disabled = true;
     try {
-      const { name, html } = await C.save.pageSource(p.url);
-      if (!(await C.platform.saveAndShare(name, html))) C.platform.download(name, new Blob([html], { type: "text/html" }));
+      let name, text = null, uri = null, blob = null;
+      if (kind === "epub") ({ name, uri = null, blob = null } = await C.epub.exportBook([p]));
+      else if (kind === "md") ({ name, text } = await C.backup.exportMarkdown(p));
+      else ({ name, html: text } = await (kind === "html" ? C.backup.exportPage(p) : C.save.pageSource(p.url)));
+      if (!uri && text != null) uri = await C.platform.writeCache(name, text);
+      if (!uri) C.platform.download(name, blob || new Blob([text], { type: mime }));
+      else if (how === "save") {
+        const saved = await C.platform.saveFile(uri, name, mime);
+        if (saved === null) await C.platform.shareFile(uri, name);
+        else if (saved) toast("Saved " + name);
+      } else await C.platform.shareFile(uri, name);
     } catch (e) {
-      toast(e instanceof C.save.SaveError ? e.message : "Couldn't get the page. Try again.");
+      if (!(e instanceof C.save.SaveError)) console.error(e);
+      toast(e instanceof C.save.SaveError ? e.message : "Couldn't make the file. Try again.");
     }
     btn.disabled = false;
   }

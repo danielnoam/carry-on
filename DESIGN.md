@@ -154,15 +154,20 @@ and the page shows above it.
   font as segmented controls, theme as four swatches. Tapping the page or
   back closes it.
 - **Page sheet (Now):** ⋯ opens it in the Aa sheet's place, in groups
-  in the order they're used. Share, Send and Original as three tiles (72 px,
+  in the order they're used. Share, Export and Original as three tiles (72 px,
   accent icon over the label). "This page": tags as round chips (accent
   fill, × to remove), an "Add a tag" field, then "+ tag" chips for tags
   used elsewhere; the folder the same way. "Series": Previous and Next
   side by side, and Save previous and Save next. "More": a group of rows,
-  Send as EPUB, Print or save as PDF, Mark as read or unread, Save full
-  images (counting "Saving full images, 3 of 12"),
-  then "Delete this page" in the warn colour. The sheet scrolls past 76%
-  of the screen.
+  Mark as read or unread, Save full images (counting "Saving full images,
+  3 of 12"), then "Delete this page" in the warn colour. The sheet scrolls
+  past 76% of the screen.
+- **Export (Now, 0.25.2):** the page sheet's Export tile turns the sheet
+  into a Back button and the page's title, an "Export as" choice group
+  (PDF, HTML, EPUB, Markdown, Page source, each with a one-line note, the
+  last pick remembered), and two 48 px buttons side by side: "Save to
+  device" (primary) and "Send" (quiet). PDF has one button, "Print or
+  save as PDF". The web copy has one, "Download".
 - **Settings (Now):** a menu of three groups: Appearance and Saving (the
   current choice on the right), Storage and backup (the total), Updates
   and About (the version). Each row ends with a chevron and pushes its

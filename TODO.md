@@ -30,23 +30,9 @@ asks from Daniel.
 finished, and a Blogger serial saves as whole chapters.
 
 **Items** (Daniel, 3 Oct 2026)
-- **Export, not EPUB:** the folder's EPUB tile becomes "Export" and asks
-  which kind: PDF, HTML, EPUB or Markdown. The page sheet's top row
-  becomes Share, Export and Original: "Send" (HTML), "Send as EPUB" and
-  Print fold into Export, which also answers the doubled buttons below.
-  - **Save or send (Daniel, 2026-10-03):** after the kind, Export asks
-    "Save to device" or "Send". Save writes the file where the person
-    can find it (Android: Downloads through the system file picker; iOS:
-    the Files app via the share sheet's Save to Files, or a document
-    picker); Send is today's share sheet. On the web copy, Save is a
-    download.
-  - **Markdown (new kind):** the saved page's text turned into Markdown
-    (headings, paragraphs, lists, links, quotes, images as links to the
-    original), with the title, source link and credit line at the top.
-    Written small in src/, no library.
-  - **PDF:** from the reading view's own type and theme (Paper, so it
-    prints light), through the print path that exists today, which on
-    Android and iOS already offers "Save as PDF".
+- **Export for folders:** the folder's EPUB tile becomes "Export" with
+  the page sheet's Export (shipped in 0.25.2): EPUB, one HTML file, PDF
+  or Markdown, then Save to device or Send.
 - **Series tools together:** "New chapters", Save previous (backfill)
   and Save next (forward fill) move out of the page list into one
   "Chapters" button at the top of the folder, opening a sheet with all
@@ -62,9 +48,6 @@ finished, and a Blogger serial saves as whole chapters.
   folder's tile and header show a book icon instead of the folder icon.
 - **Reader bars:** scrolling up no longer brings the bars back; a tap on
   the page shows them and any scroll hides them again.
-- **The ⋯ sheet repeats itself:** Share, Send and Original at the top,
-  then "Send as EPUB" and Print under More. Send and Send as EPUB merge
-  into Export; each action appears once.
 - **Pressed states everywhere:** no browser blue outline or grey flash
   on tap (`-webkit-tap-highlight-color` and focus rings only for a
   keyboard, `:focus-visible`), and every button, chip, row and tile gets
@@ -85,9 +68,8 @@ finished, and a Blogger serial saves as whole chapters.
   phone to check what "full chapter" links point at.
 
 **Steps**
-1. Export sheet (PDF, HTML, EPUB, Markdown, then Save or Send) shared
-   by the folder and ⋯; `toMarkdown(html)` in src/; a native save on
-   Android and iOS beside share.
+1. The folder uses exportControls from the page sheet; a folder's HTML
+   and Markdown are its pages one after another.
 2. Folder "Chapters" sheet with New chapters, Save previous, Save next
    and Refresh; `refresh(p, mode)` re-saves in place under the same id.
 3. `folder.source` on its pages' index entries (no folders file); the
