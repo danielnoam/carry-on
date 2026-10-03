@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.25.2";
+  const APP_VERSION = "0.26.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -652,8 +652,8 @@
   // Cards are keyed and kept between renders; only ones that weren't there
   // before arrive on a spring, so a re-render never replays the list.
   // The library is in sections: Continue reading (unless it's turned off),
-  // Folders, the filters, then the pages in no folder. A status or tag
-  // filter lists every page it matches, folders' pages too; a search
+  // Collections, the filters, then the pages in no collection. A tag
+  // filter lists every page it matches, collections' pages too; a search
   // lists only what it found.
   let firstRender = true;
   function renderLibrary() {
@@ -692,24 +692,33 @@
       return false;
     }));
     onScreen = pages;
-    const flat = ts.length || state.filter !== "all";
+    // Unread and Finished keep collections whole: a collection shows when
+    // it has an unread page, or when all of it is read.
+    const status = state.filter === "unread" || state.filter === "finished";
+    const flat = ts.length || (state.filter !== "all" && !status);
+    const folders = flat ? [] : foldersByUse().filter((f) => !status
+      || (state.filter === "unread" ? folderPages(f).some(unread) : folderPages(f).every((x) => x.finished)));
+    const strip = () => {
+      if (!folders.length) return;
+      keep("h:folders", () => sectionHead("Collections"));
+      keep("folders", () => foldersStrip(folders), folders.map((f) => [f, freshCount(f), ...folderPages(f).map((x) => x.id + readingLine(x) + (x.thumb || ""))].join("|")).join("‖"));
+    };
     if (!ts.length) {
       const going = !state.select && load(CONTINUE_KEY, true) && continuePage();
       if (going) {
         keep("h:continue", () => sectionHead("Continue reading"));
         keep("c:" + going.id, () => pageCard(going), pageSig(going));
       }
-      const folders = foldersByUse();
-      if (folders.length) {
-        keep("h:folders", () => sectionHead("Collections"));
-        keep("folders", () => foldersStrip(folders), folders.map((f) => [f, freshCount(f), ...folderPages(f).map((x) => x.id + readingLine(x) + (x.thumb || ""))].join("|")).join("‖"));
-      }
+      if (!status) strip();
     }
-    // The filters sit over the pages they filter, under the folders.
+    // The filters sit over the pages they filter, under the collections
+    // unless they filter those too.
     if (n) nodes.push(filterBox); else filterBox.remove();
+    if (status) strip();
     const loose = flat ? pages : pages.filter((p) => !p.folder);
     if (loose.length) {
-      const label = (ts.length ? "Found" : state.filter === "all" ? (n > loose.length ? "Pages in no collection" : "Pages") : filterName()) + " · " + loose.length;
+      const label = (ts.length ? "Found" : state.filter === "all" ? (n > loose.length ? "Pages in no collection" : "Pages")
+        : status && folders.length ? filterName() + " pages in no collection" : filterName()) + " · " + loose.length;
       keep("h:pages", () => sectionHead(label, sortControl()), label);
     }
     for (const p of loose) {
@@ -724,7 +733,7 @@
         el("button", { class: "btn-quiet", type: "button", onclick: clearSearch }, "Clear search")));
       nodes[nodes.length - 1].querySelector("[data-q]").textContent = searching ? "Searching…"
         : "Nothing matches “" + state.query.trim() + "”" + (state.filter === "all" ? "." : " in " + filterName() + ".");
-    } else if (n && !pages.length) {
+    } else if (n && !loose.length && !folders.length) {
       keep("none:" + state.filter, () => el("div", { class: "empty wide" },
         el("p", { class: "empty-text" }, state.filter === "unread" ? "You've started everything you saved."
           : state.filter === "finished" ? "Nothing finished yet." : "No pages tagged " + state.filter + "."),
@@ -971,11 +980,12 @@
     }).then(() => { $("readerContents").hidden = C.reader.headings().length < 2; });
   }
 
-  // A tap on the text hides the bar for reading, or brings it back.
+  // A tap on the text brings the bar back, or hides it for reading.
   function toggleBar() {
     if (state.sheet) return;
     const away = !$("readerView").classList.contains("bar-away");
     $("readerView").classList.toggle("bar-away", away);
+    lastY = readerY;
     if (!away) readerFoot(C.reader.position());
   }
 
@@ -989,18 +999,17 @@
   }
 
   // The bar along the bottom fills as the page is read. The top bar slides
-  // away while reading on down and comes back on any scroll up, at the top
-  // and at the end, and while a sheet is up.
-  let lastY = 0;
+  // away on any scroll, up or down, and a tap brings it back; it stays at
+  // the top, at the end, and while a sheet is up.
+  let lastY = 0, readerY = 0;
   function readerScrolled(at, y) {
+    readerY = y;
     $("readProgress").firstElementChild.style.transform = "scaleX(" + at + ")";
     if (!$("readerView").classList.contains("bar-away")) readerFoot(at);
     const bar = $("readerView").querySelector(".reader-bar").offsetHeight;
-    const dy = y - lastY;
     let away = $("readerView").classList.contains("bar-away");
     if (y <= bar || at >= 0.999 || state.sheet) away = false;
-    else if (dy > 12) away = true;
-    else if (dy < -12) away = false;
+    else if (Math.abs(y - lastY) > 12) away = true;
     else return;
     lastY = y;
     $("readerView").classList.toggle("bar-away", away);

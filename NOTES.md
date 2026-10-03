@@ -3,6 +3,38 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Blogger serials and the feed (0.26.0).** A serial on Blogger puts a
+  chapter in several posts ("Page 1" to "Page 14") under a label like
+  `ch1`, and its contents page is plain text with no links. The rule in
+  `SITES` reads the blog's JSON feed instead of its pages: a label page
+  becomes `/feeds/posts/default/-/<label>?alt=json`, its posts joined
+  oldest first into one chapter, with next and previous being the
+  neighbouring `chN` labels that exist; the home or a contents page
+  lists every `chN` label from the summary feed's categories. A single
+  post reads `.post-body` and the Newer and Older Post links. Written
+  from saved copies of thezombieknight; the sandbox can't reach the
+  real site, so the first real save is the test.
+- **A collection's story page and Save again (0.26.0).** `source` is
+  kept on each of the collection's index entries (there is no file for
+  collections), so it travels with backups. With a source, the check
+  reads its chapter list and keeps it as `all`, so "Save N" saves the
+  missing ones, wherever they sit. Save again re-saves each page with
+  `save()` and copies its place, order, tags and read state onto the
+  new entry before removing the old file; a failed page keeps its old
+  copy.
+- **Our own dropdown (0.26.0).** The system `<select>` drew a different
+  menu on Android, iOS and desktop, none in the app's type or themes.
+  `dropdown()` in app.js is a listbox button: arrows, Home, End and
+  Escape work, a tap outside closes it, and its rows are 44px.
+- **Reader bars on tap (0.26.0).** Bars that came back on any scroll up
+  popped in while reading back a paragraph. Now only a tap brings them
+  back; any scroll of more than 12px hides them, measured from where
+  the tap left the page. They still show at the top, at the end and
+  under a sheet.
+- **Pressed states (0.26.0).** `--press` is a translucent tint per
+  theme, laid over a control's own fill as a background image, so one
+  rule fits accent buttons and plain rows alike. Rows and choices only
+  tint; small controls also scale to 0.97, which reduced motion drops.
 - **Export and saving to the device (0.25.2).** One Export in the page
   sheet replaces Send, Send as EPUB, Print and Send page source. A file
   is written to the cache, then either handed to native/share's FileSave
