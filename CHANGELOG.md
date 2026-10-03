@@ -2,6 +2,17 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.23.1] - 2026-10-03
+
+### Fixed
+- Filling in chapters with Save several now puts them in the list's
+  order among the chapters already in the folder, instead of at the
+  end.
+
+### Added
+- "Sort by chapter" while reordering a folder puts its pages in order by
+  the chapter number in their titles or addresses.
+
 ## [0.23.0] - 2026-10-03
 
 ### Added

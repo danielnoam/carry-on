@@ -3,6 +3,15 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Where filled-in chapters go (0.23.1).** With "Skip pages already
+  saved" on, a new link's place comes from its neighbours in the list
+  that are already in the folder: between them (an even share of the
+  gap), just before the next one, or just after the last one; links with
+  no neighbour in the folder go at the end as before. Before this, every
+  new page went at the end, so filling in chapters 1 to 40 under 41 to
+  60 put them after 60. "Sort by chapter" repairs folders saved that
+  way, using `chapterNumber` (title first, then address); pages with no
+  number keep their order, at the end.
 - **A run is one card (0.23.0).** A run of saves into a folder (Save
   next 5 or more, Save several with two or more new links) has a `run`
   object: counts, the page in progress, paused and stopped. The library
