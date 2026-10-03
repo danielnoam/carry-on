@@ -251,6 +251,16 @@ and the page shows above it.
   rows with a tick by the current one and `--bar` under the finger.
   Arrows, Home, End and Escape work; a tap outside closes it. It
   arrives on the control spring; reduced motion fades it.
+- **Read aloud (Now, 0.27.0):** a speaker icon button in the reader's
+  bar, before Aa: accent on `--line` while reading, and its label says
+  Stop. While it reads, a pill floats over the page's foot on
+  `--surface` with a `--line` border and the soft shadow: previous
+  paragraph, play or pause (accent disc), next paragraph, 44 px each. It
+  arrives on the control spring (a fade with reduced motion) and stays
+  when the bars go away. The block being read has `--preview` behind it
+  with a `--s-1` spread and `--r-sm` corners. In Aa, under the theme:
+  "Read aloud", Voice (a dropdown of the page language's voices, the
+  phone's default first), Speed (0.75× to 2×) and a footnote.
 - **Pressed (Now, 0.26.0):** no tap flash and no focus ring after a
   tap, only for a keyboard (`:focus-visible`). Buttons, chips and tiles
   scale to 0.97 on the control spring with `--press` over their fill;

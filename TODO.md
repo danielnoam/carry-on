@@ -24,35 +24,6 @@ asks from Daniel.
 
 ---
 
-## 0.27.0: Read aloud
-
-**Goal:** listen to a saved page, offline.
-
-**Items**
-- A player in the reader: play and pause, speed, skip by paragraph,
-  following along in the text.
-- **Its own button in the reader's top bar** (Daniel, 3 Oct 2026): one
-  tap starts reading, another stops. The voice settings (voice, speed)
-  live in the Aa sheet with the other reading settings, not on the
-  button.
-
-**Steps**
-1. Native TTS in native/share: Android `TextToSpeech`, iOS
-   `AVSpeechSynthesizer`, both offline with the phone's voices. Events for
-   each utterance's start so the reader can highlight it.
-2. Split the page into paragraphs in reader.js; speak one at a time.
-3. **Decide with Daniel:** keep reading with the screen off? That needs an
-   Android foreground service and a media notification, which is a lot
-   more work. Default plan: screen on only, in this release.
-
-**Daniel's phone:** English and Hebrew voices (Hebrew needs the voice
-data installed on the phone), speed changes, skip, and what happens when
-the screen locks.
-
-**Depends on:** nothing; can move earlier if wanted more than export.
-
----
-
 ## 0.28.0 and 0.29.0: Sync through a private GitHub repo
 
 Split in two because it's the riskiest work and loses data if wrong.

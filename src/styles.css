@@ -90,7 +90,7 @@
   --accent: #1D6A9E;
   --accent-ink: #FFFFFF;
   --line: #EEE8D5;
-  --preview: #E6DFCB;
+  --preview: #EBE5D3;
   --bar: #F3EBD6;
   --ok: #5C6A00;
   --warn: #A4331A;
@@ -473,6 +473,27 @@ html.native .reader-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top
 .icon-btn[hidden] { display: none; }
 .aa-btn { font: 600 var(--fs-label)/1 var(--serif); letter-spacing: -0.01em; }
 .aa-btn[aria-expanded="true"] { background: var(--line); }
+.aloud-btn[aria-pressed="true"] { color: var(--accent); background: var(--line); }
+
+/* Read aloud (0.27.0): previous, play or pause, next, floating over the
+   page's foot while it reads. */
+.aloud-player {
+  position: absolute; z-index: 2; left: 50%; bottom: calc(var(--s-7) + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: flex; gap: var(--s-1); padding: var(--s-1);
+  background: var(--surface); color: var(--ink);
+  border: 1px solid var(--line); border-radius: var(--r-full);
+  box-shadow: 0 8px 24px var(--shadow), 0 1px 4px var(--shadow);
+}
+.aloud-player[hidden] { display: none; }
+.aloud-controls { display: flex; flex-direction: column; gap: var(--s-3); }
+.aloud-controls > .overline { margin: var(--s-2) 0 calc(-1 * var(--s-1)) var(--s-1); }
+.aloud-controls .footnote { margin: 0 var(--s-1); }
+.voice-pick .dropdown-menu { max-height: 50vh; overflow-y: auto; max-width: min(320px, calc(100vw - 2 * var(--gutter))); }
+.aloud-player .icon-btn { border-radius: var(--r-full); }
+.aloud-play { background: var(--accent); color: var(--accent-ink); }
+.aloud-play .aloud-play-icon, .aloud-play.paused .aloud-pause-icon { display: none; }
+.aloud-play.paused .aloud-play-icon { display: block; }
 
 /* The reader's Aa sheet: rises over the bottom of the page, no scrim, so
    each change shows on the text above it as it's made. */

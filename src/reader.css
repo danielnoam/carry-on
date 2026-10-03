@@ -109,3 +109,10 @@ figure .co-placeholder { border-width: 0 0 1.5px; border-radius: 0; }
   border-top: 1px solid var(--line);
   font: 400 var(--fs-meta)/1.5 var(--sans); color: var(--muted);
 }
+
+/* Read aloud (0.27.0): the block being read. */
+.co-speaking {
+  background: var(--preview);
+  box-shadow: 0 0 0 var(--s-1) var(--preview);
+  border-radius: var(--r-sm);
+}

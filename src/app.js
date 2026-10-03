@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.26.0";
+  const APP_VERSION = "0.27.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -31,6 +31,8 @@
   const NEW_KEY = "carryon.newChapters";
   const DAILY_KEY = "carryon.checkDaily";
   const EXPORT_KEY = "carryon.exportKind";
+  const RATE_KEY = "carryon.aloudRate";
+  const VOICE_KEY = "carryon.aloudVoice";
 
   const $ = (id) => document.getElementById(id);
   // The filter chips move into the library's list, and out of the page
@@ -961,6 +963,7 @@
   const readerState = (p, sheet, image) => ({ view: "reader", page: p.id, folder: state.folder || undefined, sheet: sheet || undefined, image: image || undefined });
 
   function show(p, html) {
+    if (aloud.key !== p.id) stopAloud();
     state.open = p;
     p.readAt = Date.now();
     clearTimeout(positionTimer);
@@ -1000,7 +1003,8 @@
 
   // The bar along the bottom fills as the page is read. The top bar slides
   // away on any scroll, up or down, and a tap brings it back; it stays at
-  // the top, at the end, and while a sheet is up.
+  // the top, at the end, and while a sheet is up. Read aloud's own
+  // scrolling, following the voice, leaves it as it is.
   let lastY = 0, readerY = 0;
   function readerScrolled(at, y) {
     readerY = y;
@@ -1009,6 +1013,7 @@
     const bar = $("readerView").querySelector(".reader-bar").offsetHeight;
     let away = $("readerView").classList.contains("bar-away");
     if (y <= bar || at >= 0.999 || state.sheet) away = false;
+    else if (C.reader.following()) { lastY = y; return; }
     else if (Math.abs(y - lastY) > 12) away = true;
     else return;
     lastY = y;
@@ -1087,8 +1092,168 @@
     if (state.folder) renderFolder();
     closeSheet(true);
     if (state.image) { state.image = false; $("imageViewer").hidden = true; $("viewerImg").removeAttribute("src"); }
+    stopAloud();
     state.open = null;
     popScreen($("readerView")).then(() => { if (!state.open) C.reader.close(); });
+  }
+
+  // ---- Read aloud (0.27.0) ----
+  // The page's blocks go to the phone's speech engine (platform.js) as
+  // pieces of a sentence or few, from the block at the top of the screen.
+  // The app reads on with the screen off; a browser while the page is open.
+  // `map` is each piece's block, which the reader lights up.
+
+  const speech = C.platform.speech;
+  const aloud = { key: "", map: [], state: "stopped", index: -1, arrived: false };
+  const RATES = [0.75, 1, 1.25, 1.5, 2];
+  const PIECE = 600;
+
+  function pieces(texts) {
+    const items = [], map = [];
+    // A sentence longer than a piece breaks after a comma, else a space.
+    const cut = (x) => {
+      const out = [];
+      while (x.length > PIECE) {
+        let at = x.lastIndexOf(", ", PIECE);
+        if (at < PIECE / 2) at = x.lastIndexOf(" ", PIECE);
+        if (at < PIECE / 2) at = PIECE;
+        out.push(x.slice(0, at + 1));
+        x = x.slice(at + 1);
+      }
+      return x ? out.concat(x) : out;
+    };
+    texts.forEach((t, b) => {
+      const sentences = (t.match(/[^.!?。！？]+(?:[.!?。！？]+["'”’)\]]*\s*|$)/g) || [t]).flatMap(cut);
+      let cur = "";
+      for (const x of sentences) {
+        if (cur && (cur + x).length > PIECE) { items.push(cur.trim()); map.push(b); cur = ""; }
+        cur += x;
+      }
+      if (cur.trim()) { items.push(cur.trim()); map.push(b); }
+    });
+    return { items, map };
+  }
+
+  const langOf = (p) => (p.lang || navigator.language || "en").toLowerCase().replace(/^iw\b/, "he");
+  const primary = (lang) => String(lang || "").toLowerCase().split(/[-_]/)[0].replace(/^iw$/, "he");
+  const voiceFor = (p) => load(VOICE_KEY, {})[primary(langOf(p))] || "";
+
+  async function startAloud(from) {
+    const p = state.open;
+    if (!p) return;
+    const texts = C.reader.readable();
+    if (!texts.length) { toast("There's no text on this page to read aloud."); return; }
+    const { items, map } = pieces(texts);
+    const block = from == null ? C.reader.firstShown() : from;
+    const start = Math.max(0, map.indexOf(block));
+    Object.assign(aloud, { key: p.id, map });
+    setAloud("playing", start);
+    try {
+      await speech.play({ items, start, lang: p.lang || "", voice: voiceFor(p), rate: load(RATE_KEY, 1),
+        title: p.title, subtitle: p.folder || p.site || "", key: p.id });
+    } catch (e) {
+      setAloud("stopped", -1);
+      toast("Couldn't read aloud. Check the phone's text-to-speech settings.");
+    }
+  }
+
+  function stopAloud() {
+    if (aloud.state === "stopped") return;
+    setAloud("stopped", -1);
+    speech.stop();
+  }
+
+  // The block that piece `i` is in, and the first piece of a block.
+  const blockAt = (i) => aloud.map[i] ?? -1;
+  function moveAloud(d) {
+    const b = blockAt(aloud.index) + d;
+    const i = aloud.map.indexOf(b);
+    if (i < 0) return;
+    setAloud(aloud.state, i);
+    speech.seek(i);
+  }
+
+  function setAloud(st, index) {
+    const on = st === "playing" || st === "paused";
+    aloud.state = on ? st : "stopped";
+    if (index >= 0 || !on) aloud.index = index;
+    const btn = $("readerAloud");
+    btn.setAttribute("aria-pressed", String(on));
+    btn.setAttribute("aria-label", on ? "Stop reading aloud" : "Read aloud");
+    const player = $("aloudPlayer");
+    if (on && player.hidden) { player.hidden = false; M.arrive(player, 12); }
+    else if (!on && !player.hidden) { player.hidden = true; }
+    const play = $("aloudPlay");
+    play.classList.toggle("paused", st === "paused");
+    play.setAttribute("aria-label", st === "paused" ? "Play" : "Pause");
+    const b = blockAt(aloud.index);
+    $("aloudPrev").disabled = !on || b <= 0;
+    $("aloudNext").disabled = !on || b >= (aloud.map[aloud.map.length - 1] ?? 0);
+    if (state.open && state.open.id === aloud.key) C.reader.light(on ? b : -1);
+    if (!on) aloud.key = "";
+    if (st === "error") toast("The phone's voice stopped. Try again, or pick another voice in Aa.");
+  }
+
+  speech.onProgress(({ key, index, state: st }) => {
+    if (!key || key !== aloud.key) return;
+    setAloud(st, index);
+  });
+  // Back from the lock screen: the reading may have moved on or ended
+  // while the page slept.
+  document.addEventListener("visibilitychange", async () => {
+    if (document.hidden || aloud.state === "stopped") return;
+    const now = await speech.state();
+    if (now.key && now.key === aloud.key) setAloud(now.state, now.index);
+    else setAloud("stopped", -1);
+  });
+
+  $("readerAloud").hidden = !speech.available;
+  $("readerAloud").addEventListener("click", () => (aloud.state === "stopped" ? startAloud() : stopAloud()));
+  $("aloudPlay").addEventListener("click", () => {
+    if (aloud.state === "playing") { setAloud("paused", aloud.index); speech.pause(); }
+    else { setAloud("playing", aloud.index); speech.resume(); }
+  });
+  $("aloudPrev").addEventListener("click", () => moveAloud(-1));
+  $("aloudNext").addEventListener("click", () => moveAloud(1));
+
+  // In the Aa sheet: the voice for this page's language and the speed.
+  function aloudControls() {
+    const p = state.open;
+    const lang = primary(langOf(p));
+    const name = (() => { try { return new Intl.DisplayNames([navigator.language || "en"], { type: "language" }).of(lang); } catch (e) { return lang; } })();
+    const voiceRow = el("div", { class: "rc-row" }, el("span", { class: "rc-label" }, "Voice"), el("span", { class: "meta" }, "Looking…"));
+    const note = el("p", { class: "footnote aloud-note" }, speech.background ? "Keeps reading with the screen off. Pause it from the lock screen." : "Reads while this page is open.");
+    speech.voices().then((all) => {
+      const mine = all.filter((v) => primary(v.lang) === lang);
+      if (!mine.length) {
+        voiceRow.lastChild.replaceWith(el("span", { class: "meta" }, "Phone's default"));
+        note.textContent = "No " + name + " voice on this phone. Add one in its text-to-speech settings, then come back.";
+        return;
+      }
+      const label = (v, n) => {
+        let region = v.lang;
+        try { region = new Intl.DisplayNames([navigator.language || "en"], { type: "language" }).of(v.lang.replace("_", "-")); } catch (e) { /* as is */ }
+        const plain = /-x-|#|^[a-z]{2,3}[-_]/i.test(v.name) ? "Voice " + n : v.name;
+        return plain + " · " + region + (v.online ? " · online" : "");
+      };
+      const options = [{ value: "", label: "Phone's default" }, ...mine.map((v, i) => ({ value: v.id, label: label(v, i + 1) }))];
+      const saved = voiceFor(p);
+      voiceRow.lastChild.replaceWith(dropdown({ label: "Voice", cls: "voice-pick", options,
+        value: options.some((o) => o.value === saved) ? saved : "",
+        onpick: (v) => {
+          const all = load(VOICE_KEY, {});
+          if (v) all[lang] = v; else delete all[lang];
+          store(VOICE_KEY, all);
+          if (aloud.state !== "stopped" && state.open && aloud.key === state.open.id) startAloud(blockAt(aloud.index));
+        } }));
+    });
+    return el("div", { class: "aloud-controls" },
+      el("h2", { class: "overline" }, "Read aloud"),
+      voiceRow,
+      el("div", { class: "rc-row stack" }, el("span", { class: "rc-label" }, "Speed"),
+        seg("aloud-rate", "Speed", RATES.map((r) => ({ value: String(r), label: r + "×" })), String(load(RATE_KEY, 1)),
+          (v) => { store(RATE_KEY, Number(v)); if (aloud.state !== "stopped") speech.rate(Number(v)); })),
+      note);
   }
 
   // The same controls in the Aa sheet and in Settings. A change is applied
@@ -1176,7 +1341,11 @@
   // history entry of its own, so Android's back closes it before the page.
 
   const SHEETS = {
-    reading: { button: "readerAa", label: "Text and theme", build: () => readingControls(true) },
+    reading: { button: "readerAa", label: "Text and theme", build: () => {
+      const box = readingControls(true);
+      if (speech.available) box.insertBefore(aloudControls(), box.querySelector(".reset"));
+      return box;
+    } },
     page: { button: "readerMore", label: "This page", build: () => pageSheet(state.open, "reader") },
     contents: { button: "readerContents", label: "Contents", build: contentsList },
   };
