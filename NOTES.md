@@ -3,6 +3,14 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Dropdowns on Save with options (0.27.5).** Daniel found the rows of
+  collection and tag chips too much. Both are now `dropdown()` as a form
+  field (`.field-pick`), which gained `placeholder` (shown in `--muted`
+  when nothing is picked, for "Add a tag") and `set(value)` (so Find
+  chapters can pick a collection or switch to New collection… with the
+  name filled in). "New collection…" and "New tag…" open the same text
+  fields as before. The page's own ⋯ sheets keep their chips: they show
+  one page's few tags, not a whole library's.
 - **The stuck library (0.27.4).** Daniel: a tap on a collection or page
   sometimes left everything stuck. `popScreen` hid the screen when its
   slide-out animation ended, so back then a tap on the same collection
