@@ -24,10 +24,10 @@ asks from Daniel.
 
 ---
 
-## 0.24.0: Reading type
+## 0.24.0: Reading type and themes
 
-**Goal:** the page reads the way you like it: more fonts, and size and
-spacing set exactly rather than from a few steps.
+**Goal:** the page reads the way you like it: more fonts, more themes,
+and size and spacing set exactly rather than from a few steps.
 
 **Items** (Daniel, 3 Oct 2026)
 - **More fonts**, all bundled so they work offline, each OFL:
@@ -51,6 +51,16 @@ spacing set exactly rather than from a few steps.
   place of Tight / Normal / Loose, showing the value ("1.60").
 - **Margins (new):** narrow, normal or wide, since a bigger size or a
   wider line changes how long a line feels.
+- **More themes (new),** beside Paper, Sepia and Night:
+  - Light: **Slate** (cool grey), **Solarized Light**, **High contrast**
+    (black on white, for bright sun).
+  - Dark: **Black** (true black, saves battery on OLED screens),
+    **Dusk** (warm brown-grey, softer than Night at bedtime),
+    **Solarized Dark**.
+  - **Auto:** pick one light and one dark theme and follow the phone's
+    light/dark setting.
+  Shown as swatches in the Aa sheet and Settings, the whole app (not
+  only the page) takes the theme.
 - A preview line in Settings, as today, follows every change; Reset puts
   the defaults back.
 
@@ -65,11 +75,16 @@ spacing set exactly rather than from a few steps.
 3. Sliders: native `input type="range"`, 44 px tall to touch, styled
    with the tokens; changes paint the open page live, as today.
 4. EPUB export keeps using generic serif/sans (readers pick their own).
-5. Check every font in Paper, Sepia and Night at phone and desktop
-   width, and right to left.
+5. Themes: each is a full token set in styles.css (`[data-theme=…]`,
+   including `--bar` and `--preview`), the status bar colour and the
+   sandboxed page's CSS follow it, and `prefers-color-scheme` drives
+   Auto. Every theme passes WCAG AA for text, links and controls.
+6. Check every font in every theme at phone and desktop width, and
+   right to left.
 
-**Daniel's phone:** read the same page in each font; drag size and
-spacing while reading; a Hebrew page in each font.
+**Daniel's phone:** read the same page in each font and theme; drag
+size and spacing while reading; a Hebrew page in each font; switch the
+phone to dark mode with Auto on.
 
 **Depends on:** nothing.
 
