@@ -24,10 +24,11 @@ asks from Daniel.
 
 ---
 
-## 0.23.0: Saving runs, and the reader's bars
+## 0.23.0: Saving runs, storage by folder, and the reader's bars
 
 **Goal:** a long run into a folder can be paused and doesn't make the
-screen jump; the reader's bars stand apart from the page.
+screen jump; Storage stays short however much is saved; the reader's
+bars stand apart from the page.
 
 **Items** (Daniel, 3 Oct 2026)
 - **Pause** beside Stop for a run into a folder (Save next 10 or All,
@@ -50,6 +51,11 @@ screen jump; the reader's bars stand apart from the page.
 - **Darker bars in the reader.** The top bar and the foot a step darker
   than the page in Paper and Sepia, and a step lighter in Night, as a
   token per theme (`--bar`), checked for AA against the bar's text.
+- **Storage by folder** (Daniel, 3 Oct 2026). Settings › Storage shows
+  folders first, one row each with its page count and size, biggest
+  first, and "Not in a folder" as one more row. Tapping a row pushes
+  that group's pages as a list, biggest first, each with its size and
+  Delete as today. The total stays at the top.
 
 **Steps**
 1. Pause: a `paused` set beside `stopping`; `saveAll` and `follow` wait
@@ -63,10 +69,15 @@ screen jump; the reader's bars stand apart from the page.
 4. `--bar` in DESIGN.md's color table for each theme, used by
    `.reader-bar` and the reader foot; check the "Offline" pill and the
    progress line on it.
+5. Storage: `storageGroup` builds folder rows from `allFolders()` and
+   `sizeOf(folderPages(name))`; the pushed list reuses today's page
+   rows. A pushed screen like the folder screen, so Back returns to
+   Storage.
 
 **Daniel's phone:** pause a 10 chapter run, leave the app in the
 background, resume; save a contents page twice into the same folder with
-the box on and off; check the bars in all three themes.
+the box on and off; check the bars in all three themes; open Storage
+and a folder in it.
 
 **Depends on:** nothing.
 
