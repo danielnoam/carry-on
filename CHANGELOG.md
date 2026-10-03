@@ -2,6 +2,13 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.27.4] - 2026-10-03
+
+### Fixed
+- Going back and quickly tapping the same collection or page again no
+  longer leaves the library stuck, taking no taps until you leave and
+  come back.
+
 ## [0.27.3] - 2026-10-03
 
 ### Fixed

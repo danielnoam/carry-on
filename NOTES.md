@@ -3,6 +3,14 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **The stuck library (0.27.4).** Daniel: a tap on a collection or page
+  sometimes left everything stuck. `popScreen` hid the screen when its
+  slide-out animation ended, so back then a tap on the same collection
+  within about half a second re-pushed it (library made inert) and then
+  the old animation finished and hid it: the library showed but was
+  inert. Each push is now counted and a pop only hides the screen if it
+  wasn't pushed again since. A second tap on a page while its file is
+  still loading is also ignored, so it can't push two reader entries.
 - **Where reading aloud could still end early (0.27.3).** Daniel's
   saved Zombie Knight chapter (copied to the e2e as zk-ch1.html) has
   each post's lines inside one `<span>` with `<br>`s, so 0.27.2's

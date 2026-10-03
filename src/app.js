@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.27.3";
+  const APP_VERSION = "0.27.4";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -920,7 +920,13 @@
   // Wide enough for Settings' menu to stay beside the section it opened.
   const wide = window.matchMedia ? matchMedia("(min-width: 900px)") : { matches: false };
 
+  // Each push counts, so a pop's animation ending after the same screen
+  // was pushed again (back, then a quick tap on it) doesn't hide it and
+  // leave the screen underneath inert, taking no taps.
+  const pushes = new WeakMap();
+
   function pushScreen(screen) {
+    pushes.set(screen, (pushes.get(screen) || 0) + 1);
     if (screen.id === "sectionView" && wide.matches) {
       screen.dataset.beside = "1";
       screen.hidden = false;
@@ -935,22 +941,26 @@
   }
 
   function popScreen(screen) {
-    if (screen.dataset.beside) return M.leave(screen).then(() => { screen.hidden = true; });
+    const n = pushes.get(screen);
+    const hide = () => { if (pushes.get(screen) === n) screen.hidden = true; };
+    if (screen.dataset.beside) return M.leave(screen).then(hide);
     const under = below(screen);
     under.inert = false;
     M.under(under, false);
-    return M.popOut(screen).then(() => { screen.hidden = true; });
+    return M.popOut(screen).then(hide);
   }
 
   function showOffline() {
     $("offlinePill").hidden = navigator.onLine;
   }
 
+  let opening = null;
   async function openPage(id, fromHistory) {
     const p = state.pages.find((x) => x.id === id);
-    if (!p) return;
+    if (!p || (!fromHistory && opening === id)) return;
     let html;
-    try { html = await C.store.readPage(id); } catch (e) { html = null; }
+    opening = id;
+    try { html = await C.store.readPage(id); } catch (e) { html = null; } finally { opening = null; }
     if (!html) { toast("This page's file is missing. Delete it and save it again."); return; }
     if (!fromHistory) history.pushState(readerState(p), "");
     const shown = show(p, html);
