@@ -516,7 +516,110 @@
         };
       },
     },
+    {
+      // A serial on Blogger posts each chapter in parts and tags the parts
+      // with the chapter's label ("ch1", "ch2"). A label's page is saved
+      // as one chapter, its posts in order, read from the blog's feed; the
+      // labels in order are the contents. A single post saves on its own,
+      // with Newer and Older Post as next and previous.
+      name: "Blogger",
+      host: /\.blogspot\.com$/i,
+      fetch(url) {
+        const u = new URL(url);
+        const label = bloggerLabel(u);
+        if (label != null) return u.origin + "/feeds/posts/default/-/" + encodeURIComponent(label) + "?alt=json&max-results=150";
+        u.searchParams.delete("m");
+        return u.href;
+      },
+      clean(url) {
+        const u = new URL(url);
+        const m = u.pathname.match(/^\/feeds\/posts\/default\/-\/([^/]+)/);
+        if (m) return u.origin + "/search/label/" + m[1];
+        u.searchParams.delete("m");
+        u.searchParams.delete("max-results");
+        return u.href;
+      },
+      // The blog's home page, or a page of its own titled as contents.
+      async contents(doc, url) {
+        const u = new URL(url);
+        const home = u.pathname === "/" || u.pathname === "";
+        if (!home && !(/^\/p\//.test(u.pathname) && /contents|chapters/i.test(text(doc.querySelector("title")) + " " + text(doc.querySelector(".post-title, h1, h3")))) ) return null;
+        const got = await bloggerChapters(u.origin);
+        return got.links.length >= 3 ? got : null;
+      },
+      async list(doc, url) {
+        return (await bloggerChapters(new URL(url).origin)).links;
+      },
+      chapter(doc, url, raw) {
+        const u = new URL(url);
+        const label = bloggerLabel(u);
+        if (label != null) return bloggerLabelChapter(doc, u, label, raw);
+        const body = doc.querySelector(".post-body");
+        if (!body) return null;
+        const content = doc.createElement("div");
+        content.append(body.cloneNode(true));
+        const link = (sel) => { const a = doc.querySelector(sel); return a ? absolute(a.getAttribute("href"), url).replace(/[?&]m=1\b/, "") : ""; };
+        const og = doc.querySelector('meta[property="og:site_name"]');
+        return {
+          content,
+          siteName: u.hostname,
+          title: text(doc.querySelector(".post-title")),
+          series: (og && og.content.trim()) || text(doc.querySelector(".header h1, #header h1")),
+          next: link("a.blog-pager-newer-link, #blog-pager-newer-link a"),
+          prev: link("a.blog-pager-older-link, #blog-pager-older-link a"),
+        };
+      },
+    },
   ];
+
+  // "ch12" for /search/label/ch12; null for any other page.
+  function bloggerLabel(u) {
+    const m = u.pathname.match(/^\/search\/label\/([^/]+)\/?$/);
+    return m ? decodeURIComponent(m[1]) : null;
+  }
+  const CHAPTER_LABEL = /^(?:ch|chap|chapter)[\s._-]*(\d+)$/i;
+  const labelNumber = (t) => { const m = String(t || "").match(CHAPTER_LABEL); return m ? Number(m[1]) : null; };
+  const labelUrl = (origin, t) => origin + "/search/label/" + encodeURIComponent(t);
+
+  async function bloggerChapters(origin) {
+    const res = await get(origin + "/feeds/posts/summary?alt=json&max-results=0");
+    let feed;
+    try { feed = JSON.parse(res.text).feed; } catch (e) { return { title: "", links: [] }; }
+    const labels = (feed.category || []).map((c) => c.term).filter((t) => labelNumber(t) != null);
+    labels.sort((a, b) => labelNumber(a) - labelNumber(b));
+    return { title: (feed.title && feed.title.$t) || "", links: labels.map((t) => labelUrl(origin, t)) };
+  }
+
+  // One chapter from its label's feed: the posts oldest first, a rule
+  // between them; next and previous are the neighbouring labels when the
+  // blog has them.
+  function bloggerLabelChapter(doc, u, label, raw) {
+    let feed;
+    try { feed = JSON.parse(raw).feed; } catch (e) { return null; }
+    const posts = (feed.entry || []).filter((e) => e.content && e.content.$t)
+      .sort((a, b) => String(a.published && a.published.$t).localeCompare(String(b.published && b.published.$t)));
+    if (!posts.length) return null;
+    const content = doc.createElement("div");
+    posts.forEach((e, i) => {
+      if (i) content.append(doc.createElement("hr"));
+      const part = doc.createElement("div");
+      part.innerHTML = e.content.$t;
+      content.append(part);
+    });
+    const n = labelNumber(label);
+    const terms = (feed.category || []).map((c) => c.term);
+    const near = (d) => { const t = n == null ? null : terms.find((x) => labelNumber(x) === n + d); return t ? labelUrl(u.origin, t) : ""; };
+    const author = posts[0].author && posts[0].author[0] && posts[0].author[0].name;
+    return {
+      content,
+      siteName: u.hostname,
+      title: n == null ? label : "Chapter " + n,
+      series: (feed.title && feed.title.$t) || "",
+      byline: (author && author.$t && !/^unknown$/i.test(author.$t)) ? author.$t : "",
+      next: near(1),
+      prev: near(-1),
+    };
+  }
 
   function siteRule(url) {
     let host;
@@ -667,7 +770,7 @@
     const headline = (og && og.content) || (h1s.length === 1 ? h1s[0].textContent : "");
     // A comic chapter's page often lists every chapter in a menu, so it is
     // never taken for a contents page.
-    const own = !comic && site && site.chapter ? site.chapter(doc, finalUrl) : null;
+    const own = !comic && site && site.chapter ? site.chapter(doc, finalUrl, html) : null;
     const contents = !comic && !asPage && !own && !site && contentsOf(doc, finalUrl, (headline || docTitle).replace(/\s+/g, " ").trim());
     if (contents) return { contents };
     let next = nextLink(doc, finalUrl);
@@ -677,7 +780,7 @@
       if (own.next !== undefined) next = own.next;
       if (own.prev !== undefined) prev = own.prev;
       const t = own.content.textContent;
-      const article = { content: own.content.innerHTML, title: own.title, byline: own.byline, siteName: site.name, textContent: t, lang: "", dir: "" };
+      const article = { content: own.content.innerHTML, title: own.title, byline: own.byline, siteName: own.siteName || site.name, textContent: t, lang: "", dir: "" };
       return { doc, docTitle, headline: own.title || headline, next, prev, article, series: own.series || "" };
     }
     if (comic) {
@@ -1178,7 +1281,7 @@
     const res = await get(site && site.fetch ? site.fetch(url) : url);
     const at = res.url || url;
     const doc = parse(res.text, at);
-    const own = site && site.chapter ? site.chapter(doc, at) : null;
+    const own = site && site.chapter ? site.chapter(doc, at, res.text) : null;
     const pick = own && (back ? own.prev : own.next);
     return pick !== undefined && pick !== null ? pick : nextLink(doc, at, back);
   }
