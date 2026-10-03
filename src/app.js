@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.23.1";
+  const APP_VERSION = "0.23.2";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -186,7 +186,7 @@
         el("span", { class: "card-title", dir: "auto" }, s.url),
         el("span", { class: "card-status" }, el("span", { class: "warn" }, s.error)),
         el("span", { class: "card-actions" },
-          el("button", { class: "btn-small", type: "button", onclick: () => { dropFailed(s); savePage(s.url, s.folder); } }, "Try again"),
+          el("button", { class: "btn-small", type: "button", onclick: () => { dropFailed(s); savePage(s.url, s.folder, { kind: s.kind, mode: s.mode }); } }, "Try again"),
           el("button", { class: "btn-quiet", type: "button", onclick: () => dropFailed(s) }, "Remove"))));
   }
 
@@ -650,12 +650,12 @@
   const savedAs = (url) => state.pages.find((p) => sameUrl(p.url, url) || sameUrl(p.requested, url));
   const newJob = (url, folder) => ({ key: url, url, site: C.save.siteName(url), done: 0, total: null, error: null, folder: folder || null });
 
-  async function savePage(url, folder) {
+  async function savePage(url, folder, how) {
     const existing = savedAs(url);
     if (existing) { toast("Already in your library"); openPage(existing.id); return; }
     if (state.saving.some((s) => !s.error && sameUrl(s.url, url))) return;
     state.saving = state.saving.filter((s) => !(s.error && sameUrl(s.url, url)));
-    const job = newJob(url, folder);
+    const job = { ...newJob(url, folder), ...how };
     state.saving.unshift(job);
     renderLibrary();
     const meta = await runJob(job);
@@ -674,11 +674,11 @@
   // Several links saved one after another, in order, optionally into a
   // folder (so its pages follow the order of the links). A link already
   // saved isn't saved again; it just joins the folder at its place.
-  async function saveAll(all, folder, tags = [], mode, skipSaved) {
+  async function saveAll(all, folder, tags = [], mode, skipSaved, kind) {
     const name = folder ? folderName(folder) : null;
     const places = skipSaved && name ? placesBetween(all, name) : new Map();
     const urls = skipSaved ? all.filter((u) => !savedAs(u)) : all;
-    const jobs = urls.filter((u) => !state.saving.some((s) => !s.error && sameUrl(s.url, u))).map((u) => ({ ...newJob(u, name), tags, mode }));
+    const jobs = urls.filter((u) => !state.saving.some((s) => !s.error && sameUrl(s.url, u))).map((u) => ({ ...newJob(u, name), tags, mode, kind }));
     state.saving = state.saving.filter((s) => !(s.error && jobs.some((j) => sameUrl(j.url, s.url))));
     const fresh = jobs.filter((j) => !savedAs(j.url));
     fresh.forEach((j) => { if (places.has(j.url)) j.folderAt = places.get(j.url); });
@@ -750,6 +750,7 @@
     try {
       const meta = await C.save.save(job.url, {
         mode: job.mode || load(IMAGES_KEY, "previews"),
+        kind: job.kind || "article",
         onProgress: (p) => {
           if (p.stage === "drawing") job.drawing = true;
           if (p.stage === "images") { job.done = p.done; job.total = p.total; }
@@ -2018,6 +2019,9 @@
   function renderBatch(text, preset) {
     let folder = preset;
     let mode = load(IMAGES_KEY, "previews");
+    // A comic's folder saves its next chapters as comics too.
+    let kind = preset && folderPages(preset).some((p) => p.comic) ? "comic" : "article";
+    if (kind === "comic") mode = "full";
     const tags = [];
     const area = el("textarea", { class: "batch-links", rows: "6", "aria-label": "Links, one a line", spellcheck: "false",
       autocapitalize: "off", autocomplete: "off", dir: "ltr" });
@@ -2097,17 +2101,28 @@
     area.addEventListener("input", sync);
     input.addEventListener("input", () => pick(cleanTag(input.value) ? folderName(input.value) : null, true));
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); input.blur(); } });
+    const KIND_NOTES = { article: "The text and its pictures, read as a page.", comic: "Only the page's pictures, in order, edge to edge. For comics and manga." };
+    const kindNote = el("p", { class: "meta" }, KIND_NOTES[kind]);
+    const images = C.platform.native ? seg("batch-images", "Images", [
+      { value: "previews", label: "Previews" }, { value: "full", label: "Full" }, { value: "links", label: "Links" },
+    ], mode, (v) => { mode = v; }) : null;
     const form = el("form", { class: "batch-form" },
       el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Links"), area, count, finder, skipRow),
+      el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Save as"),
+        seg("batch-kind", "Save as", [{ value: "article", label: "Article" }, { value: "comic", label: "Comic" }], kind, (v) => {
+          kind = v;
+          kindNote.textContent = KIND_NOTES[v];
+          // Comics read best full size; still a choice below.
+          const pick = images && images.querySelector('input[value="' + (v === "comic" ? "full" : load(IMAGES_KEY, "previews")) + '"]');
+          if (pick) { pick.checked = true; mode = pick.value; }
+        }),
+        kindNote),
+      images ? el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Images"), images,
+        el("p", { class: "meta" }, "Full images for comics, maps and diagrams. Settings picks the usual choice.")) : null,
       el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Folder"),
         el("div", { class: "tag-edit" }, chips, input),
         el("p", { class: "meta" }, "Pages in a folder keep the order of the links.")),
       el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Tags"), tagBox),
-      C.platform.native ? el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Images"),
-        seg("batch-images", "Images", [
-          { value: "previews", label: "Previews" }, { value: "full", label: "Full" }, { value: "links", label: "Links" },
-        ], mode, (v) => { mode = v; }),
-        el("p", { class: "meta" }, "Full images for comics, maps and diagrams. Settings picks the usual choice.")) : null,
       go);
     form.addEventListener("submit", (e) => {
       e.preventDefault();
@@ -2117,7 +2132,7 @@
       if (!urls.length) return;
       if (urls.length > LONG_LIST && !confirm("Save " + urls.length + " pages? They save one at a time, so a list this long takes a while. Pause and Stop are on its card.")) return;
       history.back();
-      saveAll(skipSaved ? all : urls, folder, tags, mode, skipSaved);
+      saveAll(skipSaved ? all : urls, folder, tags, mode, skipSaved, kind);
     });
     $("batchBody").replaceChildren(form);
     if (folder && !allFolders().some((f) => sameTag(f, folder))) input.value = folder;
@@ -2168,7 +2183,7 @@
       state.saving = state.saving.filter((s) => !(s.error && sameUrl(s.url, url)));
       if (saved) await new Promise((done) => setTimeout(done, PACE_MS));
       if (run && !(await gate(run))) { stopped = true; break; }
-      const job = { ...newJob(url, name), folderAt: place(), run };
+      const job = { ...newJob(url, name), folderAt: place(), run, ...(from.comic ? { kind: "comic", mode: from.mode } : {}) };
       state.saving.unshift(job);
       if (run) run.current = job;
       renderLibrary();
@@ -2542,7 +2557,9 @@
   $("settingsBack").addEventListener("click", () => history.back());
   $("folderBack").addEventListener("click", () => history.back());
   $("batchBack").addEventListener("click", () => history.back());
-  $("severalBtn").addEventListener("click", () => openBatch(""));
+  // What's typed in the save field comes along, so one link can be saved
+  // as a comic or with other images.
+  $("severalBtn").addEventListener("click", () => { const typed = $("saveUrl").value; $("saveUrl").value = ""; openBatch(typed); });
   $("librarySearch").addEventListener("input", onSearch);
   $("librarySearch").addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
