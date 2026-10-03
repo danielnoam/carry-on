@@ -263,13 +263,256 @@
   // (Save several's Find chapters). { title, links }; links is [] when
   // nothing looks like chapters.
   async function findChapters(url) {
-    const res = await get(url);
+    const site = siteRule(url);
+    const res = await get(site && site.fetch ? site.fetch(url) : url);
     const at = res.url || url;
     const doc = parse(res.text, at);
+    if (site) {
+      const own = (site.contents && await site.contents(doc, at, res.text)) || null;
+      const links = own ? own.links : site.list ? await site.list(doc, at, res.text) : [];
+      if (links.length) return { title: (own && own.title) || readTitle(doc), links };
+    }
+    return { title: readTitle(doc), links: pickChapters(linkGroups(doc, at)).map((l) => l.url) };
+  }
+
+  function readTitle(doc) {
     const og = doc.querySelector('meta[property="og:title"]');
     const h1s = doc.querySelectorAll("h1");
-    const title = ((og && og.content) || (h1s.length === 1 ? h1s[0].textContent : "") || (doc.querySelector("title") || {}).textContent || "").replace(/\s+/g, " ").trim();
-    return { title, links: pickChapters(linkGroups(doc, at)).map((l) => l.url) };
+    return ((og && og.content) || (h1s.length === 1 ? h1s[0].textContent : "") || (doc.querySelector("title") || {}).textContent || "").replace(/\s+/g, " ").trim();
+  }
+
+  // ---- Sites with rules of their own (0.25.0) ----
+  // Serial-fiction sites whose pages the general reader gets wrong: the
+  // chapter text sits beside menus and comments, the chapter list is split
+  // over pages or built by script, or text is hidden by the site's own CSS.
+  // Each rule may give:
+  //   fetch(url): the address to fetch instead (AO3's adult click-through)
+  //   contents(doc, url, html): { title, links } when the page is a list of chapters
+  //   list(doc, url, html): the chapter list read from any of its pages (Find chapters)
+  //   chapter(doc, url): { content, title, series, byline, next, prev } for a chapter
+  // contents and list may be async and fetch more pages.
+
+  // Elements a page's own <style> hides outright (outside @media), which a
+  // DOMParser document doesn't apply. Royal Road hides lines saying the
+  // text was stolen from it among the paragraphs this way.
+  function removeHidden(doc) {
+    for (const st of doc.querySelectorAll("style")) {
+      const css = st.textContent.replace(/\/\*[\s\S]*?\*\//g, "").replace(/@media[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, "");
+      for (const [, sel, body] of css.matchAll(/([^{}@]+)\{([^{}]*)\}/g)) {
+        if (!/display\s*:\s*none|visibility\s*:\s*hidden/i.test(body)) continue;
+        for (const one of sel.split(",")) {
+          const q = one.trim();
+          if (!q || /^(html|body|\*)$/i.test(q)) continue;
+          try { doc.querySelectorAll(q).forEach((n) => n.remove()); } catch (e) { /* not a selector the DOM knows */ }
+        }
+      }
+    }
+  }
+
+  // A note from the author, kept and set apart: a quote under its label.
+  function noteBlock(doc, label, from) {
+    const q = doc.createElement("blockquote");
+    const head = doc.createElement("p");
+    const b = doc.createElement("strong");
+    b.textContent = label;
+    head.append(b);
+    q.append(head, ...[...from.childNodes].map((n) => n.cloneNode(true)));
+    return q;
+  }
+
+  const text = (n) => (n ? n.textContent.replace(/\s+/g, " ").trim() : "");
+
+  // The array a page's script assigns, e.g. `window.chapters = [...];`.
+  function scriptJson(html, name) {
+    const at = html.indexOf(name);
+    if (at < 0) return null;
+    const start = html.indexOf("[", at);
+    if (start < 0) return null;
+    let depth = 0, inStr = false, esc = false;
+    for (let i = start; i < html.length; i++) {
+      const c = html[i];
+      if (inStr) { if (esc) esc = false; else if (c === "\\") esc = true; else if (c === '"') inStr = false; continue; }
+      if (c === '"') inStr = true;
+      else if (c === "[" || c === "{") depth++;
+      else if ((c === "]" || c === "}") && --depth === 0) {
+        try { return JSON.parse(html.slice(start, i + 1)); } catch (e) { return null; }
+      }
+    }
+    return null;
+  }
+
+  const uniqueLinks = (links) => { const seen = new Set(); return links.filter((u) => u && !seen.has(u) && seen.add(u)); };
+
+  const SITES = [
+    {
+      name: "Royal Road",
+      host: /(^|\.)royalroadl?\.com$/i,
+      contents(doc, url, html) {
+        if (!/^\/fiction\/\d+(\/[^/]+)?\/?$/.test(new URL(url).pathname)) return null;
+        const list = scriptJson(html, "window.chapters");
+        const fiction = new URL(url).pathname.replace(/\/+$/, "");
+        let links = Array.isArray(list)
+          ? list.filter((c) => c && (c.url || c.id)).map((c) => absolute(c.url || fiction + "/chapter/" + c.id + "/" + (c.slug || ""), url))
+          : [...doc.querySelectorAll("table#chapters a[href*='/chapter/']")].map((a) => absolute(a.getAttribute("href"), url));
+        links = uniqueLinks(links);
+        const og = doc.querySelector('meta[property="og:title"]');
+        return links.length ? { title: text(doc.querySelector(".fic-header h1")) || (og && og.content.trim()) || "", links } : null;
+      },
+      chapter(doc) {
+        removeHidden(doc);
+        const inner = doc.querySelector(".chapter-inner.chapter-content, .chapter-inner");
+        if (!inner) return null;
+        const content = doc.createElement("div");
+        for (const n of doc.querySelectorAll(".author-note-portlet, .author-note-card, .chapter-inner")) {
+          if (n.classList.contains("chapter-inner")) { if (!n.parentElement.closest(".chapter-inner")) content.append(n.cloneNode(true)); continue; }
+          if (n.parentElement && n.parentElement.closest(".author-note-portlet, .author-note-card")) continue;
+          content.append(noteBlock(doc, "Author's note", n.querySelector(".author-note") || n));
+        }
+        const head = doc.querySelector(".fic-header");
+        const author = doc.querySelector('.fic-header a[href^="/profile/"]') || doc.querySelector('meta[property="books:author"]');
+        return {
+          content,
+          title: text(head && head.querySelector("h1")),
+          series: text(head && head.querySelector("h2")) || text(head && head.querySelector('a[href^="/fiction/"]:not([href*="/chapter/"])')),
+          byline: author ? (author.content || text(author)).trim() : "",
+        };
+      },
+    },
+    {
+      name: "Archive of Our Own",
+      host: /(^|\.)(archiveofourown\.org|ao3\.org)$/i,
+      // A work marked for adults stops at a click-through without this.
+      fetch(url) {
+        const u = new URL(url);
+        if (/^\/works\/\d+/.test(u.pathname) && !u.searchParams.has("view_adult")) u.searchParams.set("view_adult", "true");
+        return u.href;
+      },
+      // ...and the page is kept under its plain address, which is how
+      // next links and the chapter list name it.
+      clean(url) {
+        const u = new URL(url);
+        u.searchParams.delete("view_adult");
+        return u.href;
+      },
+      async contents(doc, url) {
+        if (!/^\/works\/\d+\/navigate\/?$/.test(new URL(url).pathname)) return null;
+        const links = uniqueLinks([...doc.querySelectorAll("ol.chapter a[href], ol.index a[href]")].map((a) => absolute(a.getAttribute("href"), url)));
+        return links.length ? { title: text(doc.querySelector("h2.heading a, h2.heading")), links } : null;
+      },
+      async list(doc, url) {
+        const m = new URL(url).pathname.match(/^\/works\/(\d+)/);
+        if (!m) return [];
+        const res = await get(new URL("/works/" + m[1] + "/navigate", url).href);
+        const nav = parse(res.text, res.url || url);
+        return uniqueLinks([...nav.querySelectorAll("ol.chapter a[href], ol.index a[href]")].map((a) => absolute(a.getAttribute("href"), url)));
+      },
+      chapter(doc) {
+        const box = doc.querySelector("#chapters");
+        const body = box && (box.querySelector(".userstuff.module, [role='article'].userstuff") || box.querySelector(".userstuff"));
+        if (!body) return null;
+        const content = doc.createElement("div");
+        const notes = (sel, label) => doc.querySelectorAll(sel).forEach((n) => { const u = n.querySelector(".userstuff"); if (u && text(u)) content.append(noteBlock(doc, label, u)); });
+        notes("#workskin > .preface .notes:not(.end), #chapters .chapter > .preface .notes:not(.end)", "Notes");
+        const copy = body.cloneNode(true);
+        copy.querySelectorAll("h3.landmark").forEach((n) => n.remove());
+        content.append(copy);
+        notes("#chapters .chapter > .preface .end.notes, #work_endnotes", "End notes");
+        const work = text(doc.querySelector("h2.title.heading, h2.heading"));
+        const chap = text(doc.querySelector("#chapters h3.title"));
+        return {
+          content,
+          title: chap ? chap.replace(/^Chapter\s+(\d+)\s*:\s*(.+)$/i, "Chapter $1: $2") : work,
+          series: chap ? work : "",
+          byline: [...doc.querySelectorAll("h3.byline a[rel='author']")].map(text).join(", "),
+        };
+      },
+    },
+    {
+      name: "Scribble Hub",
+      host: /(^|\.)scribblehub\.com$/i,
+      // The series page lists chapters newest first, fifteen or so to a
+      // page (?toc=2 and on), with the total beside them.
+      async contents(doc, url) {
+        if (!/^\/series\/\d+/.test(new URL(url).pathname)) return null;
+        const total = parseInt(text(doc.querySelector("span.cnt_toc")), 10) || 0;
+        const read = (d) => [...d.querySelectorAll("a.toc_a[href]")].map((a) => absolute(a.getAttribute("href"), url));
+        let links = read(doc);
+        const base = url.split(/[?#]/)[0];
+        for (let page = 2; links.length < total && page <= 200; page++) {
+          const res = await get(base + "?toc=" + page);
+          const more = read(parse(res.text, res.url || base));
+          if (!more.length) break;
+          links = links.concat(more);
+        }
+        links = uniqueLinks(links).reverse();
+        return links.length ? { title: text(doc.querySelector("div.fic_title")), links } : null;
+      },
+      chapter(doc) {
+        const raw = doc.querySelector("#chp_raw");
+        if (!raw) return null;
+        const content = doc.createElement("div");
+        const copy = raw.cloneNode(true);
+        copy.querySelectorAll(".wi_authornotes, .wi_news").forEach((n) => {
+          const body = n.querySelector(".wi_authornotes_body, .wi_news_body") || n;
+          n.replaceWith(noteBlock(doc, n.classList.contains("wi_news") ? "News" : "Author's note", body));
+        });
+        copy.querySelectorAll(".sp-wrap").forEach((w) => {
+          const d = doc.createElement("details"), sm = doc.createElement("summary");
+          sm.textContent = text(w.querySelector(".sp-head")) || "Spoiler";
+          d.append(sm, ...[...((w.querySelector(".sp-body") || w).childNodes)].map((n) => n.cloneNode(true)));
+          w.replaceWith(d);
+        });
+        content.append(copy);
+        return {
+          content,
+          title: text(doc.querySelector(".chapter-title")),
+          series: text(doc.querySelector(".chp_byline a, .wi_fic_title, div.fic_title")),
+          byline: text(doc.querySelector(".auth_name_fic")),
+        };
+      },
+    },
+    {
+      name: "FanFiction.net",
+      host: /(^|\.)(fanfiction\.net|fictionpress\.com)$/i,
+      // Chapters are a <select>; its onchange builds each one's address.
+      list(doc, url) {
+        const sel = doc.querySelector("select#chap_select");
+        if (!sel) return [];
+        const parts = (sel.getAttribute("onchange") || "").split("'");
+        const story = new URL(url).pathname.match(/^\/s\/(\d+)\/\d+\/?(.*)$/);
+        return uniqueLinks([...sel.querySelectorAll("option")].map((o) => {
+          const v = o.getAttribute("value");
+          if (parts.length >= 4) return absolute(parts[1] + v + parts[3], url);
+          return story ? absolute("/s/" + story[1] + "/" + v + "/" + story[2], url) : "";
+        }));
+      },
+      chapter(doc, url) {
+        const story = doc.querySelector("#storytext, .storytext");
+        if (!story) return null;
+        const content = doc.createElement("div");
+        content.append(story.cloneNode(true));
+        const top = doc.querySelector("#profile_top");
+        const sel = doc.querySelector("select#chap_select");
+        const picked = sel && (sel.querySelector("option[selected]") || sel.options[sel.selectedIndex]);
+        const links = this.list(doc, url);
+        const at = picked ? [...sel.querySelectorAll("option")].indexOf(picked) : -1;
+        const series = text(top && top.querySelector("b"));
+        return {
+          content,
+          title: picked ? text(picked).replace(/^(\d+)\.\s*/, "Chapter $1: ") : series,
+          series: picked ? series : "",
+          byline: text(top && top.querySelector("a[href^='/u/']")),
+          next: at >= 0 ? links[at + 1] || "" : undefined,
+          prev: at > 0 ? links[at - 1] : at === 0 ? "" : undefined,
+        };
+      },
+    },
+  ];
+
+  function siteRule(url) {
+    let host;
+    try { host = new URL(url).hostname; } catch (e) { return null; }
+    return SITES.find((s) => s.host.test(host)) || null;
   }
 
   function siteName(url) {
@@ -406,7 +649,7 @@
   // Reads the article out of a page's HTML, or with `comic` its pictures.
   // null when there isn't enough text (or no pictures), or the page is a
   // browser check, so the caller can try drawing it.
-  function readArticle(html, finalUrl, comic) {
+  function readArticle(html, finalUrl, comic, site) {
     const doc = parse(html, finalUrl);
     const docTitle = (doc.querySelector("title") || {}).textContent || "";
     if (CHECK_TITLE.test(docTitle.trim())) return { check: true };
@@ -415,11 +658,19 @@
     const headline = (og && og.content) || (h1s.length === 1 ? h1s[0].textContent : "");
     // A comic chapter's page often lists every chapter in a menu, so it is
     // never taken for a contents page.
-    const contents = !comic && contentsOf(doc, finalUrl, (headline || docTitle).replace(/\s+/g, " ").trim());
+    const own = !comic && site && site.chapter ? site.chapter(doc, finalUrl) : null;
+    const contents = !comic && !own && !site && contentsOf(doc, finalUrl, (headline || docTitle).replace(/\s+/g, " ").trim());
     if (contents) return { contents };
-    const next = nextLink(doc, finalUrl);
-    const prev = nextLink(doc, finalUrl, true);
+    let next = nextLink(doc, finalUrl);
+    let prev = nextLink(doc, finalUrl, true);
     resolveLazyImages(doc, finalUrl);
+    if (own && own.content && own.content.textContent.trim().length >= MIN_TEXT / 5) {
+      if (own.next !== undefined) next = own.next;
+      if (own.prev !== undefined) prev = own.prev;
+      const t = own.content.textContent;
+      const article = { content: own.content.innerHTML, title: own.title, byline: own.byline, siteName: site.name, textContent: t, lang: "", dir: "" };
+      return { doc, docTitle, headline: own.title || headline, next, prev, article, series: own.series || "" };
+    }
     if (comic) {
       const panels = comicPanels(doc, finalUrl);
       return panels ? { doc, docTitle, headline, next, prev, panels } : null;
@@ -431,9 +682,15 @@
   }
 
   async function fromAnyPage(url, onDrawing, comic) {
-    const res = await get(url);
+    const site = siteRule(url);
+    const res = await get(site && site.fetch ? site.fetch(url) : url);
     let finalUrl = res.url || url;
-    let got = readArticle(res.text, finalUrl, comic);
+    if (site && site.clean) finalUrl = site.clean(finalUrl);
+    if (site && site.contents && !comic) {
+      const own = await site.contents(parse(res.text, finalUrl), finalUrl, res.text);
+      if (own && own.links.length) throw new ContentsPage(own);
+    }
+    let got = readArticle(res.text, finalUrl, comic, site);
     // Pages that build themselves with scripts, or wait behind a browser
     // check, get drawn in a hidden WebView on Android and read again. The
     // saved copy is the same script-free HTML as any other page's.
@@ -442,7 +699,7 @@
       const drawn = await C.platform.render(finalUrl);
       if (drawn) {
         finalUrl = drawn.url;
-        got = readArticle(drawn.text, finalUrl, comic);
+        got = readArticle(drawn.text, finalUrl, comic, siteRule(finalUrl));
       }
     }
     if (got && got.check) throw new SaveError("The site asked for a browser check, so Carry-on can't save it yet.");
@@ -469,10 +726,10 @@
         lang: (doc.documentElement.getAttribute("lang") || "").trim(), dir: "", next, prev,
       };
     }
-    const { doc, docTitle, headline, next, prev, article } = got;
+    const { doc, docTitle, headline, next, prev, article, series } = got;
     const body = new DOMParser().parseFromString(article.content, "text/html").body;
     return {
-      url: finalUrl,
+      url: finalUrl, series: series || "",
       title: (headline.trim() || article.title || docTitle || siteName(finalUrl)).trim().replace(/\s+/g, " "),
       site: (article.siteName || siteName(finalUrl)).trim(),
       byline: (article.byline || "").trim(),
@@ -821,6 +1078,7 @@
       lang: wiki ? wiki.host.split(".")[0] : got.lang || "", dir: got.dir || "", mode: C.platform.native ? mode : "links",
       next: got.next || "", prev: got.prev || "",
     };
+    if (got.series) meta.series = got.series;
     if (got.comic) Object.assign(meta, { comic: true, minutes: Math.max(1, Math.round(media.length / 10)) });
     if (onProgress) onProgress({ stage: "images", done: 0, total: media.length });
     const res = await saveImages(id, media, mode, (done, total) => onProgress && onProgress({ stage: "images", done, total }), got.url);
@@ -907,12 +1165,27 @@
   // for pages saved before 0.10.0, which kept no next link, or 0.20.0,
   // which kept no previous one. "" when it has none.
   async function findNext(url, back) {
-    const res = await get(url);
-    return nextLink(parse(res.text, res.url || url), res.url || url, back);
+    const site = siteRule(url);
+    const res = await get(site && site.fetch ? site.fetch(url) : url);
+    const at = res.url || url;
+    const doc = parse(res.text, at);
+    const own = site && site.chapter ? site.chapter(doc, at) : null;
+    const pick = own && (back ? own.prev : own.next);
+    return pick !== undefined && pick !== null ? pick : nextLink(doc, at, back);
+  }
+
+  // The original page's HTML as the site serves it, as a file to hand
+  // over when a site saves badly ("Send page source" in ⋯).
+  async function pageSource(url) {
+    const site = siteRule(url);
+    const res = await get(site && site.fetch ? site.fetch(url) : url);
+    const name = (siteName(res.url || url) + new URL(res.url || url).pathname).replace(/[^a-z0-9.]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 80) + ".source.html";
+    return { name, html: "<!-- " + (res.url || url).replace(/--/g, "%2D%2D") + " -->\n" + res.text };
   }
 
   C.save = {
-    save, SaveError, ContentsPage, findChapters, chapterNumber, pickChapters, comicGroup, isPanel, retryMissing, saveFullImages, findNext, creditLine, cleanSaved, savedPageHtml, newId, textDir, isNextText, isPrevText, plainText,
+    pageSource,
+    save, SaveError, ContentsPage, findChapters, siteRule, removeHidden, scriptJson, chapterNumber, pickChapters, comicGroup, isPanel, retryMissing, saveFullImages, findNext, creditLine, cleanSaved, savedPageHtml, newId, textDir, isNextText, isPrevText, plainText,
     wikipediaPage, wikimediaThumb, parseSrcset, pickWidth, youtubeId, vimeoId, extOf, isTrackingPixel, readingMinutes, siteName,
   };
 })();

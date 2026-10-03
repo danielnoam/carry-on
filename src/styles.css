@@ -827,6 +827,7 @@ html.native .reader::before {
   border: 1px solid var(--line); border-radius: var(--r-lg); cursor: pointer;
 }
 .tile-thumb {
+  position: relative;
   display: flex; align-items: center; justify-content: center;
   height: 88px; margin-bottom: var(--s-1); border-radius: var(--r-sm); overflow: hidden;
   background: var(--preview); color: var(--muted);
@@ -837,6 +838,15 @@ html.native .reader::before {
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere;
 }
 .tile-meta { font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--muted); }
+.tile-new {
+  position: absolute; top: var(--s-2); inset-inline-end: var(--s-2);
+  padding: 2px var(--s-2); border-radius: var(--r-full);
+  background: var(--accent); color: var(--accent-ink);
+  font: 600 var(--fs-meta)/var(--lh-meta) var(--sans);
+}
+.check-new .chips { flex-wrap: nowrap; justify-content: space-between; }
+.check-note { color: var(--muted); font-size: var(--fs-meta); line-height: var(--lh-meta); }
+.check-note.accent { color: var(--accent); font-weight: 600; }
 .tile .progress { margin-top: auto; }
 .card-open ~ *, .tile .card-open ~ * { pointer-events: none; }
 .card-open ~ .card-body .card-retry { pointer-events: auto; }
