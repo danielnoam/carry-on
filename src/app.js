@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.27.0";
+  const APP_VERSION = "0.27.1";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -979,6 +979,7 @@
       onScroll: readerScrolled,
       onImage: openImage,
       onTap: toggleBar,
+      onSelect: showReadHere,
       top: () => $("readerView").querySelector(".reader-bar").offsetHeight,
     }).then(() => { $("readerContents").hidden = C.reader.headings().length < 2; });
   }
@@ -1008,8 +1009,9 @@
   let lastY = 0, readerY = 0;
   function readerScrolled(at, y) {
     readerY = y;
+    if (readHere && !readHere.hidden) showReadHere(C.reader.selectionSpot());
     $("readProgress").firstElementChild.style.transform = "scaleX(" + at + ")";
-    if (!$("readerView").classList.contains("bar-away")) readerFoot(at);
+    if (!$("readerView").classList.contains("bar-away") || aloud.state !== "stopped") readerFoot(at);
     const bar = $("readerView").querySelector(".reader-bar").offsetHeight;
     let away = $("readerView").classList.contains("bar-away");
     if (y <= bar || at >= 0.999 || state.sheet) away = false;
@@ -1093,6 +1095,7 @@
     closeSheet(true);
     if (state.image) { state.image = false; $("imageViewer").hidden = true; $("viewerImg").removeAttribute("src"); }
     stopAloud();
+    hideReadHere();
     state.open = null;
     popScreen($("readerView")).then(() => { if (!state.open) C.reader.close(); });
   }
@@ -1108,8 +1111,11 @@
   const RATES = [0.75, 1, 1.25, 1.5, 2];
   const PIECE = 600;
 
-  function pieces(texts) {
+  // `parts` is [{ text, block }]; a block can be in two parts when the
+  // reading starts partway through it.
+  function pieces(parts) {
     const items = [], map = [];
+    let first = -1;
     // A sentence longer than a piece breaks after a comma, else a space.
     const cut = (x) => {
       const out = [];
@@ -1122,7 +1128,8 @@
       }
       return x ? out.concat(x) : out;
     };
-    texts.forEach((t, b) => {
+    parts.forEach(({ text: t, block: b, from }) => {
+      if (from) first = items.length;
       const sentences = (t.match(/[^.!?。！？]+(?:[.!?。！？]+["'”’)\]]*\s*|$)/g) || [t]).flatMap(cut);
       let cur = "";
       for (const x of sentences) {
@@ -1131,21 +1138,29 @@
       }
       if (cur.trim()) { items.push(cur.trim()); map.push(b); }
     });
-    return { items, map };
+    return { items, map, first };
   }
 
   const langOf = (p) => (p.lang || navigator.language || "en").toLowerCase().replace(/^iw\b/, "he");
   const primary = (lang) => String(lang || "").toLowerCase().split(/[-_]/)[0].replace(/^iw$/, "he");
   const voiceFor = (p) => load(VOICE_KEY, {})[primary(langOf(p))] || "";
 
-  async function startAloud(from) {
+  // From a block, or from a word in it (`spot` from a selection).
+  async function startAloud(from, spot) {
     const p = state.open;
     if (!p) return;
     const texts = C.reader.readable();
     if (!texts.length) { toast("There's no text on this page to read aloud."); return; }
-    const { items, map } = pieces(texts);
-    const block = from == null ? C.reader.firstShown() : from;
-    const start = Math.max(0, map.indexOf(block));
+    const block = spot ? spot.block : from == null ? C.reader.firstShown() : from;
+    const parts = [];
+    texts.forEach((text, b) => {
+      if (b !== block) { parts.push({ text, block: b }); return; }
+      let cut = spot ? wordAt(text, spot) : 0;
+      if (cut > 0) parts.push({ text: text.slice(0, cut), block: b });
+      parts.push({ text: text.slice(cut), block: b, from: true });
+    });
+    const { items, map, first } = pieces(parts);
+    const start = Math.max(0, first);
     Object.assign(aloud, { key: p.id, map });
     setAloud("playing", start);
     try {
@@ -1156,6 +1171,44 @@
       toast("Couldn't read aloud. Check the phone's text-to-speech settings.");
     }
   }
+
+  // Where the selected word starts in the block's spoken text: the copy of
+  // the word nearest the selection's offset, else the word at the offset.
+  function wordAt(text, spot) {
+    const near = (i) => (i < 0 ? Infinity : Math.abs(i - spot.offset));
+    let best = -1;
+    if (spot.word) for (let i = text.indexOf(spot.word); i >= 0; i = text.indexOf(spot.word, i + 1)) if (near(i) < near(best)) best = i;
+    if (best >= 0 && near(best) < 40) return best;
+    const at = Math.min(spot.offset, text.length);
+    const space = text.lastIndexOf(" ", at - 1);
+    return space < 0 ? 0 : space + 1;
+  }
+
+  // "Read from here", under a selection while one is up.
+  let readHere = null;
+  function showReadHere(spot) {
+    if (!spot || !speech.available || !state.open || state.sheet) { hideReadHere(); return; }
+    if (!readHere) {
+      readHere = el("button", { class: "read-here", type: "button", onclick: () => {
+        const s = C.reader.selectionSpot();
+        hideReadHere();
+        C.reader.clearSelection();
+        if (s) startAloud(null, s);
+      } });
+      readHere.innerHTML = $("readerAloud").innerHTML;
+      readHere.append("Read from here");
+      $("readerView").append(readHere);
+    }
+    const frame = $("readerFrame").getBoundingClientRect();
+    const h = 44, room = frame.bottom - 72;
+    let top = frame.top + spot.bottom + 12;
+    if (top + h > room) top = frame.top + spot.top - h - 12;
+    top = Math.max(frame.top + 8, Math.min(top, room - h));
+    readHere.style.top = top + "px";
+    readHere.style.left = Math.max(8, Math.min(frame.left + (spot.left + spot.right) / 2, innerWidth - 8)) + "px";
+    readHere.hidden = false;
+  }
+  function hideReadHere() { if (readHere) readHere.hidden = true; }
 
   function stopAloud() {
     if (aloud.state === "stopped") return;
@@ -1180,9 +1233,9 @@
     const btn = $("readerAloud");
     btn.setAttribute("aria-pressed", String(on));
     btn.setAttribute("aria-label", on ? "Stop reading aloud" : "Read aloud");
-    const player = $("aloudPlayer");
-    if (on && player.hidden) { player.hidden = false; M.arrive(player, 12); }
-    else if (!on && !player.hidden) { player.hidden = true; }
+    $("aloudPlayer").hidden = !on;
+    $("readerView").classList.toggle("aloud", on);
+    if (on && state.open) readerFoot(C.reader.position());
     const play = $("aloudPlay");
     play.classList.toggle("paused", st === "paused");
     play.setAttribute("aria-label", st === "paused" ? "Play" : "Pause");

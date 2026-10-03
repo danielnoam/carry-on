@@ -216,7 +216,7 @@ and the page shows above it.
   five seconds. A page that builds itself says "Letting the page draw
   itself" while it's drawn. Reduced motion: both breathe instead.
 - **Reader bar and progress (Now):** the bar and the foot slide out of
-  the way (control spring). A 3 px accent line along the bottom fills
+  the way (control spring). A 5 px accent line along the bottom fills
   with the position, from the page's start side; it's decoration
   (aria-hidden), the page itself being the content. Reduced motion: the
   bar appears and disappears without sliding. A tap on the page brings
@@ -253,11 +253,12 @@ and the page shows above it.
   arrives on the control spring; reduced motion fades it.
 - **Read aloud (Now, 0.27.0):** a speaker icon button in the reader's
   bar, before Aa: accent on `--line` while reading, and its label says
-  Stop. While it reads, a pill floats over the page's foot on
-  `--surface` with a `--line` border and the soft shadow: previous
-  paragraph, play or pause (accent disc), next paragraph, 44 px each. It
-  arrives on the control spring (a fade with reduced motion) and stays
-  when the bars go away. The block being read has `--preview` behind it
+  Stop. While it reads, the bar along the bottom stays up and holds the
+  controls in its middle, between the section and the minutes left:
+  previous paragraph, play or pause (accent disc), next paragraph, 44 px
+  each. Selecting text shows "Read from here" under it (or over it near
+  the bottom): an accent pill, 44 px, speaker icon and label. The block
+  being read has `--preview` behind it
   with a `--s-1` spread and `--r-sm` corners. In Aa, under the theme:
   "Read aloud", Voice (a dropdown of the page language's voices, the
   phone's default first), Speed (0.75× to 2×) and a footnote.

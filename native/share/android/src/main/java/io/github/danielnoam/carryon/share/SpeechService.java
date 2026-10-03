@@ -66,6 +66,8 @@ public class SpeechService extends Service {
     private PowerManager.WakeLock wake;
     private AudioManager audio;
     private AudioFocusRequest focus;
+    // Paused by a call or another app's sound, to go on when it's over.
+    private boolean pausedForFocus;
 
     static void send(Context ctx, String action, Integer value, Float rate) {
         Intent i = new Intent(ctx, SpeechService.class).setAction(action);
@@ -167,7 +169,15 @@ public class SpeechService extends Service {
         generation++;
         applyVoice();
         tts.setSpeechRate(job.rate);
-        tts.speak(job.items[index], TextToSpeech.QUEUE_FLUSH, null, generation + ":" + index);
+        String id = generation + ":" + index;
+        String text = job.items[index];
+        if (tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, id) != TextToSpeech.SUCCESS) {
+            main.postDelayed(() -> said(id), 300);
+        }
+        // Some engines say nothing back for a piece they can't voice, which
+        // left the reading stuck there: after well over its length, go on.
+        long most = 8000 + (long) (text.length() * 160 / Math.max(0.5f, job.rate));
+        main.postDelayed(() -> said(id), most);
         report();
     }
 
@@ -188,7 +198,7 @@ public class SpeechService extends Service {
     }
 
     private void said(String id) {
-        if (!id.equals(generation + ":" + index) || !"playing".equals(state)) return;
+        if (job == null || !id.equals(generation + ":" + index) || !"playing".equals(state)) return;
         if (index + 1 >= job.items.length) {
             finish("ended");
             return;
@@ -199,6 +209,7 @@ public class SpeechService extends Service {
 
     private void pause() {
         if (!"playing".equals(state)) return;
+        pausedForFocus = false;
         state = "paused";
         generation++;
         if (tts != null) tts.stop();
@@ -236,8 +247,16 @@ public class SpeechService extends Service {
         if (focus == null) {
             focus = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
                 .setAudioAttributes(attributes())
+                .setWillPauseWhenDucked(false)
                 .setOnAudioFocusChangeListener((change) -> main.post(() -> {
-                    if (change == AudioManager.AUDIOFOCUS_LOSS || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) pause();
+                    if (change == AudioManager.AUDIOFOCUS_LOSS) pause();
+                    else if (change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT && "playing".equals(state)) {
+                        pause();
+                        pausedForFocus = true;
+                    } else if (change == AudioManager.AUDIOFOCUS_GAIN && pausedForFocus) {
+                        pausedForFocus = false;
+                        resume();
+                    }
                 }))
                 .build();
         }

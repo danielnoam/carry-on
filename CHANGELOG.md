@@ -2,6 +2,23 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.27.1] - 2026-10-03
+
+### Added
+- Select a word and tap "Read from here" to start reading aloud from it.
+
+### Changed
+- The read-aloud controls are in the middle of the bar along the bottom,
+  which stays up while it reads.
+- The reading progress line along the bottom is thicker.
+
+### Fixed
+- Reading aloud no longer stops at a line with no words, like a scene
+  break ("* * *"), or when the phone's engine skips a piece without
+  saying so; after a short pause it goes on.
+- A notification sound or another app's short sound pauses the reading
+  only while it plays, then it goes on by itself.
+
 ## [0.27.0] - 2026-10-03
 
 ### Added
