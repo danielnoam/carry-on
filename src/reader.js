@@ -134,8 +134,20 @@
     };
   }
 
+  // In an image chapter a tap shows or hides the bar, as text does, and a
+  // double tap opens the panel in the viewer, to zoom.
+  let tapTimer = 0;
   function onClick(e) {
     const img = onImage && e.target.closest && e.target.closest("img");
+    if (img && img.closest(".co-comic")) {
+      if (tapTimer) {
+        clearTimeout(tapTimer);
+        tapTimer = 0;
+        if (!img.hidden && img.naturalWidth) onImage(imageInfo(img));
+      } else tapTimer = setTimeout(() => { tapTimer = 0; if (onTap) onTap(); }, 280);
+      e.preventDefault();
+      return;
+    }
     if (img && !img.hidden && !img.closest(".co-video") && img.naturalWidth) {
       e.preventDefault();
       onImage(imageInfo(img));

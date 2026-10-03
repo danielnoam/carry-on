@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.21.0";
+  const APP_VERSION = "0.22.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -2079,6 +2079,20 @@
   // "Save the next 1 · 5 · 10 · All" for the last page of a run with a
   // next link, or the previous ones (`back`) for the first. While a run
   // saves, Stop.
+  // Image chapters run to tens of megabytes, so a long run is confirmed
+  // with a size taken from the chapters saved last.
+  const BIG_CHAPTER = 5e6;
+  function sizeOk(p, n) {
+    if (n < 5) return true;
+    const last = (p.folder ? folderPages(p.folder) : [p]).filter((q) => q.bytes)
+      .sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0)).slice(0, 3);
+    const each = last.length ? sizeOf(last) / last.length : 0;
+    if (each < BIG_CHAPTER) return true;
+    return confirm(n === Infinity
+      ? "The last chapters were about " + formatSize(each) + " each. Save all of them?"
+      : "The last chapters were about " + formatSize(each) + " each, so " + n + " more is about " + formatSize(each * n) + ". Save them?");
+  }
+
   function followControls(p, back) {
     const key = back ? "prev" : "next";
     // Pages saved before 0.10.0 never looked for a next link (`next` is
@@ -2094,6 +2108,7 @@
     const run = (n) => (e) => {
       if (busy()) return;
       if (!navigator.onLine) { toast("You're offline. Try again when you're back online."); return; }
+      if (!sizeOk(p, n)) return;
       e.currentTarget.closest(".follow").querySelectorAll("button:not(.stop)").forEach((b) => { b.disabled = true; });
       stop.hidden = false;
       follow(p, n, false, back).then(() => { if (state.sheet === "page" && state.open) $("readingBody").replaceChildren(SHEETS.page.build()); });

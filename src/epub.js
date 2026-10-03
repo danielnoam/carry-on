@@ -22,7 +22,7 @@
   const ATTRS = { a: ["href"], img: ["alt", "width", "height"], td: ["colspan", "rowspan"], th: ["colspan", "rowspan", "scope"],
     ol: ["start"], abbr: ["title"] };
   const NUMERIC = /^(width|height|colspan|rowspan|start)$/;
-  const CLASSES = /^co-(head|meta|byline|body|licence|video|video-title|video-note|credit)$/;
+  const CLASSES = /^co-(head|meta|byline|body|licence|video|video-title|video-note|credit|comic)$/;
 
   const FORMATS = { "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif" };
 
@@ -204,6 +204,7 @@
     ".co-credit { display: block; }",
     ".co-video-title, .co-video-note { display: block; }",
     ".co-licence { margin: 2em 0 1em; padding-top: 0.5em; border-top: 1px solid #ccc; }",
+    ".co-comic img { display: block; width: 100%; margin: 0; page-break-inside: avoid; }",
     "blockquote { margin: 1em 1.5em; }",
     "pre { white-space: pre-wrap; font-size: 0.85em; }",
     "table { border-collapse: collapse; margin: 1em 0; font-size: 0.9em; }",

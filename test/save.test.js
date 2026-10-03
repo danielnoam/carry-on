@@ -101,6 +101,26 @@ test("the chapter list is the group with the most numbered links, in reading ord
   assert.deepStrictEqual(S.pickChapters([[L(1), L(2), L(3), ...["a", "b", "c", "d", "e", "f", "g"].map((w) => ({ url: "https://x.example/" + w, text: w }))]]), [], "mostly unnumbered isn't chapters");
 });
 
+test("panels are big pictures, not page furniture", () => {
+  assert.ok(S.isPanel("https://cdn.example/ch1/01.jpg", null, null, ""));
+  assert.ok(S.isPanel("https://cdn.example/ch1/01.webp", "800", "1200", "page 1"));
+  assert.ok(!S.isPanel("https://cdn.example/logo.png", null, null, ""));
+  assert.ok(!S.isPanel("https://cdn.example/a.jpg", "120", "120", ""));
+  assert.ok(!S.isPanel("https://cdn.example/a.jpg", null, null, "user avatar"));
+  assert.ok(!S.isPanel("data:image/gif;base64,R0lGOD", null, null, ""));
+});
+
+test("the panels are the pictures most of which share one box", () => {
+  const P = (n, path) => ({ src: "https://cdn.example/" + n + ".jpg", path });
+  const col = [1, 2, 3, 4, 5, 6].map((n) => P(n, ["fig" + n, "reader", "main", "body"]));
+  const g = S.comicGroup([P("ad", ["side", "aside", "main", "body"]), ...col, P(3, ["fig3", "reader", "main", "body"])]);
+  assert.strictEqual(g.key, "reader", "the nearest box holding them, not one further out");
+  assert.deepStrictEqual(g.srcs, col.map((p) => p.src), "in order, each once");
+  assert.strictEqual(S.comicGroup(col.slice(0, 3)), null, "three pictures aren't a chapter");
+  const scattered = [1, 2, 3, 4, 5, 6].map((n) => P(n, ["p" + n, "s" + (n % 3)]));
+  assert.strictEqual(S.comicGroup(scattered), null, "pictures spread over an article aren't a column");
+});
+
 test("links worded as the previous chapter are recognised, other links aren't", () => {
   for (const t of ["Previous", "Prev", "« Previous Chapter", "‹ Prev", "← previous page", "הפרק הקודם", "Anterior", "上一章"]) assert.ok(S.isPrevText(t), t);
   for (const t of ["Next", "Previously on the show", "Chapter 1", "Previous issues: 12", "", null]) assert.ok(!S.isPrevText(t), String(t));

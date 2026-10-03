@@ -2,6 +2,23 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.22.0] - 2026-10-03
+
+### Added
+- Comics and manga: a chapter that is a column of pictures saves as an
+  image chapter, its panels in order and full size whatever the image
+  setting, without the site's logo, ads or thumbnails.
+- Image chapters read edge to edge with no gaps. A tap shows or hides
+  the bar, a double tap opens the panel to zoom.
+- Save next 5, 10 or All asks first when the last chapters were large:
+  "about 7.3 MB each, so 10 more is about 73 MB".
+- Image chapters keep their layout in a book.
+
+### Changed
+- Pictures are fetched with the page's site as Referer, as a browser
+  does, so sites that refuse pictures linked from elsewhere let them
+  through.
+
 ## [0.21.0] - 2026-10-03
 
 ### Added

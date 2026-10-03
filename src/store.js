@@ -107,10 +107,12 @@
 
   // Downloads `url` into the page's directory; resolves to the file's size.
   // Throws where there is no directory, so callers keep the link instead.
-  async function download(id, rel, url) {
+  // `page` is the address of the page the file is on: sites that refuse
+  // other sites' pages their pictures check it (0.22.0).
+  async function download(id, rel, url, page) {
     if (!FS()) throw new Error("no directory");
     const path = "pages/" + id + "/" + rel;
-    await P.downloadTo(url, path);
+    await P.downloadTo(url, path, page);
     const { size } = await FS().stat({ path, directory: DIR });
     if (!size) throw new Error("empty download");
     return size;
