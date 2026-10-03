@@ -2,6 +2,20 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.25.2] - 2026-10-03
+
+### Added
+- Export a page as PDF, HTML, EPUB, Markdown or the site's page source,
+  from Export in the page's ⋯ menu. Save it to your phone (Android asks
+  where; on iPhone it goes to Files) or send it.
+- Markdown export: the page's text with its headings, lists, quotes,
+  tables and links, for a notes app. Pictures link to the full image on
+  the site.
+
+### Changed
+- ⋯ is shorter: Send, Send as EPUB, Print and Send page source are now
+  all in Export.
+
 ## [0.25.1] - 2026-10-03
 
 ### Fixed

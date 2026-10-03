@@ -3,6 +3,16 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Export and saving to the device (0.25.2).** One Export in the page
+  sheet replaces Send, Send as EPUB, Print and Send page source. A file
+  is written to the cache, then either handed to native/share's FileSave
+  (Android's ACTION_CREATE_DOCUMENT, copied in on a thread; iOS's
+  document picker for exporting, as a copy) or to the share sheet. A
+  build without FileSave falls back to the share sheet, a browser to a
+  download. PDF stays the print screen's Save as PDF: making a PDF in
+  JavaScript would need a library. Markdown (`exportMarkdown` in
+  backup.js) walks the saved page's blocks; images use `data-full`, the
+  site's address, because the local preview can't go with the file.
 - **Telling a contents page from a page (0.25.1).** A chapter word
   must stand alone ("Sep 12" was "ep 12", and /2025/sep/03/ in an
   address was episode 3), and the share of linked text is counted
