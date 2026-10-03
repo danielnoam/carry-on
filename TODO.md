@@ -24,7 +24,55 @@ asks from Daniel.
 
 ---
 
-## 0.25.0: Read aloud
+## 0.25.0: Sites and new chapters
+
+**Goal:** the sites Daniel reads save cleanly, and a series tells you when
+it has a new chapter instead of you checking by hand.
+
+**Items** (Daniel, 3 Oct 2026)
+- **New chapters:** a folder that follows a series (its last page has
+  been saved with Save next) can be checked for a chapter after its
+  last one.
+  - "Check for new chapters" on the folder screen, and on the library
+    for every series folder at once.
+  - An automatic check when the library opens while online, at most
+    once a day per folder, never on mobile data if a setting says so.
+  - A folder with new chapters shows a badge ("2 new") on its card and
+    a "Save new chapters" button, which saves them into the folder at
+    its end, as a run with Pause and Stop.
+  - It walks next links from the last saved page, up to 20 pages, so a
+    long gap still counts right.
+- **Better support for specific sites:** a small table of per-site
+  rules in src/save.js (where the text is, what to cut, where the next
+  link is, how chapter titles are written), used before the general
+  reader. Which sites: **waiting on Daniel's list.**
+- **"Send page source" (new),** in a page's ⋯ sheet: shares the page's
+  original HTML as a file, so a site that saves badly can be handed
+  over and a rule written from it. The sandbox can't reach most sites,
+  so this is how site rules get built and tested.
+
+**Steps**
+1. Store each folder's `lastChecked` and `newCount` on its pages' index
+   entries (no folders file, per the decisions above).
+2. `checkNew(folder)`: fetch the last page by `folderAt`, follow
+   `findNext` without saving, stop at a page already saved or after 20.
+3. Library: badge and button on folder cards; the once-a-day check runs
+   after the library paints, one site at a time, quietly.
+4. Site rules: `{ host, content, remove, next, title }` matched by host;
+   each rule gets a fixture in test/ built from a sent page source.
+5. Send page source: keep the fetched HTML beside `page.html` as
+   `source.html` (or fetch it again when asked), shared through the
+   share sheet.
+
+**Daniel's phone:** a series with a new chapter shows it after the
+daily check; Save new chapters puts it at the end; each listed site
+saves without menus or ads in the text.
+
+**Depends on:** nothing.
+
+---
+
+## 0.26.0: Read aloud
 
 **Goal:** listen to a saved page, offline.
 
@@ -53,18 +101,18 @@ the screen locks.
 
 ---
 
-## 0.26.0 and 0.27.0: Sync through a private GitHub repo
+## 0.27.0 and 0.28.0: Sync through a private GitHub repo
 
 Split in two because it's the riskiest work and loses data if wrong.
 
-**0.26.0, the index and text.** A fine-grained token for one repo, kept on
+**0.27.0, the index and text.** A fine-grained token for one repo, kept on
 the device. Sync `library.json` and each `page.html` + `meta.json`
 through the contents API with `sha` for conflicts, as LifeLog's
 src/storage.js does. Deletes become tombstones in `library.json` so they
 don't come back from the other device. The other device re-downloads
 previews from the original links. Reuses the 0.18.0 backup format.
 
-**0.27.0, images.** Push `images/` through the Git Data API (blobs, one
+**0.28.0, images.** Push `images/` through the Git Data API (blobs, one
 tree and one commit per save), since the contents API stops at 1 MB and
 broke LifeLog's sync. Decide first whether the repo's growth (0.5 to 1.5
 MB per illustrated page, far more for comics) is acceptable, or whether
