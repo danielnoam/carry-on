@@ -115,4 +115,5 @@ figure .co-placeholder { border-width: 0 0 1.5px; border-radius: 0; }
   background: var(--preview);
   box-shadow: 0 0 0 var(--s-1) var(--preview);
   border-radius: var(--r-sm);
+  -webkit-box-decoration-break: clone; box-decoration-break: clone;
 }

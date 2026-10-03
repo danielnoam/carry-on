@@ -3,6 +3,14 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Reading text with no paragraphs (0.27.2).** Blogger posts (the
+  Zombie Knight serial) keep their text straight in a `<div>` between
+  `<br>`s, so `readable()` found no `p` past the byline and the reading
+  ended there, and a selection there had no block for "Read from here".
+  The reader now wraps each run of such text between line breaks in an
+  inline `span.co-run` (no change on screen, `box-decoration-break:
+  clone` so its light wraps cleanly) and reads those as blocks. Done in
+  the reader rather than at save so pages already saved are fixed too.
 - **Why reading aloud stopped at gaps (0.27.1).** Daniel heard it stop
   partway. Not reproducible off a phone, so three likely causes are all
   fixed: a block with no letters or digits ("* * *" scene breaks in
