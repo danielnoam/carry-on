@@ -24,33 +24,6 @@ asks from Daniel.
 
 ---
 
-## 0.21.0: Whole folders as books
-
-**Goal:** a web novel goes from a table of contents page to one EPUB.
-
-**Items**
-- A folder's EPUB already makes one book of its pages, in order, with
-  contents (0.20.0). Left: a cover, the first page's image or a
-  generated title card, and the folder's name as the series.
-- "Save all chapters" from a table-of-contents page (0.20.0's research
-  says yes, as a list to check; see NOTES.md): list the chapter links it
-  found, in Save several, for Daniel to check before saving.
-
-**Steps**
-1. Cover: a title card drawn on a canvas (folder name, site) when the
-   first page has no picture; an XHTML cover page first in the spine.
-2. Chapter list finder: the largest run of same-host links in one list
-   or table whose text looks like chapters (numbers in order); hand them
-   to Save several with a new folder named after the page.
-3. Warn when a list is long (over 50) before saving.
-
-**Daniel's phone:** a real web novel with 30+ chapters, from its contents
-page to an EPUB on an e-reader.
-
-**Depends on:** 0.20.0 (EPUB writer, research, Save all).
-
----
-
 ## 0.22.0: Comics and manga
 
 **Goal:** a chapter that is a column of images saves and reads well.

@@ -596,6 +596,8 @@ html.native .reader::before {
 }
 .batch-links:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
 .batch-count { margin-top: var(--s-2); }
+.batch-find { margin-top: var(--s-2); }
+.batch-find[hidden] { display: none; }
 .batch-go { display: block; width: 100%; margin-top: var(--s-6); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .batch-go:disabled { opacity: 0.5; cursor: default; }
 .rc-row.follow .chip { min-width: var(--tap); }

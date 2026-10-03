@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.20.0";
+  const APP_VERSION = "0.21.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -188,6 +188,21 @@
         el("span", { class: "card-actions" },
           el("button", { class: "btn-small", type: "button", onclick: () => { dropFailed(s); savePage(s.url, s.folder); } }, "Try again"),
           el("button", { class: "btn-quiet", type: "button", onclick: () => dropFailed(s) }, "Remove"))));
+  }
+
+  // The waiting part of a long run, with Stop: what's saved stays, the
+  // rest is let go.
+  const QUEUE_CARDS = 3;
+  function queueCard(folder, jobs) {
+    return el("div", { class: "card saving queue wide", role: "group", "aria-label": "Waiting to save" },
+      el("span", { class: "card-body" },
+        el("span", { class: "card-site" }, jobs[0].site),
+        el("span", { class: "card-title" }, countLine(jobs.length) + " waiting" + (folder ? " to go into " + folder : "")),
+        el("span", { class: "card-actions" },
+          el("button", { class: "btn-quiet danger", type: "button", onclick: () => {
+            state.saving = state.saving.filter((x) => !(x.waiting && !x.error && (x.folder || "") === (folder || "")));
+            renderLibrary();
+          } }, "Stop"))));
   }
 
   function dropFailed(s) {
@@ -482,7 +497,17 @@
       if (sig != null) node.dataset.sig = sig;
       nodes.push(node);
     };
-    for (const s of state.saving) keep((s.error ? "f:" : "s:") + s.key, () => (s.error ? failedCard(s) : savingCard(s)));
+    // A long queue (a contents page's chapters) is one card, not hundreds.
+    const queues = new Map();
+    for (const s of state.saving) if (s.waiting && !s.error) queues.set(s.folder || "", [...(queues.get(s.folder || "") || []), s]);
+    for (const s of state.saving) {
+      const q = s.waiting && !s.error && queues.get(s.folder || "");
+      if (q && q.length > QUEUE_CARDS) {
+        if (q[0] === s) keep("w:" + (s.folder || ""), () => queueCard(s.folder, q), String(q.length));
+        continue;
+      }
+      keep((s.error ? "f:" : "s:") + s.key, () => (s.error ? failedCard(s) : savingCard(s)));
+    }
     const ts = terms();
     const found = new Map();
     const pages = sorted(state.pages.filter(shown).filter((p) => {
@@ -580,7 +605,16 @@
     renderLibrary();
     const meta = await runJob(job);
     if (meta) toast(meta.missing ? "Saved. Some previews are missing." : "Saved for offline reading");
+    else if (job.contents) {
+      dropFailed(job);
+      openBatch(job.contents.links.join("\n"), false, folderName(job.contents.title || job.site));
+      toast("That's a list of chapters. Check them, then save.");
+    }
   }
+
+  // Saves one after another are half a second apart, as WebToEpub spaces
+  // them, so a long run doesn't hammer the site.
+  const PACE_MS = 500;
 
   // Several links saved one after another, in order, optionally into a
   // folder (so its pages follow the order of the links). A link already
@@ -593,8 +627,9 @@
     fresh.forEach((j) => { j.waiting = true; });
     state.saving = [...fresh, ...state.saving];
     renderLibrary();
-    let saved = 0, failed = 0, had = 0;
+    let saved = 0, failed = 0, had = 0, stopped = 0;
     for (const job of jobs) {
+      if (job.waiting && !state.saving.includes(job)) { stopped++; continue; }
       const existing = savedAs(job.url);
       if (existing) {
         had++;
@@ -603,15 +638,17 @@
         if (name || tags.length) { await C.store.writeIndex(state.pages); renderLibrary(); if (state.folder) renderFolder(); }
         continue;
       }
+      if (saved + failed) await new Promise((done) => setTimeout(done, PACE_MS));
+      if (!state.saving.includes(job)) { stopped++; continue; }
       job.waiting = false;
-      updateSavingCard(job);
+      renderLibrary();
       if (await runJob(job)) saved++; else failed++;
       if (state.folder) renderFolder();
     }
     if (!jobs.length) return;
     toast([saved ? "Saved " + countLine(saved) + (name ? " into " + name : "") : "",
       had ? had + " already saved" + (name && !saved ? ", now in " + name : "") : "",
-      failed ? failed + " couldn't be saved" : ""].filter(Boolean).join(" · ") + ".");
+      failed ? failed + " couldn't be saved" : "", stopped ? "stopped before " + countLine(stopped) : ""].filter(Boolean).join(" · ") + ".");
   }
 
   // Saves one queued link; resolves to its meta, or null when it failed
@@ -637,6 +674,7 @@
       return meta;
     } catch (e) {
       job.error = e instanceof C.save.SaveError ? e.message : "Couldn't save this page. Try again.";
+      if (e instanceof C.save.ContentsPage) job.contents = e.contents;
       if (!(e instanceof C.save.SaveError)) console.error(e);
       renderLibrary();
       return null;
@@ -1862,6 +1900,8 @@
     popScreen($("batchView"));
   }
 
+  const LONG_LIST = 50;
+
   function renderBatch(text, preset) {
     let folder = preset;
     let mode = load(IMAGES_KEY, "previews");
@@ -1874,8 +1914,27 @@
     const chips = el("div", { class: "chips" });
     const input = el("input", { class: "tag-input", type: "text", placeholder: "New folder", "aria-label": "New folder",
       maxlength: "32", enterkeyhint: "done", autocapitalize: "sentences" });
+    // One link may be a contents page: its chapters replace it, and the
+    // folder takes its name.
+    const finder = el("button", { class: "btn-small batch-find", type: "button", onclick: async () => {
+      const url = linksFrom(area.value)[0];
+      if (!navigator.onLine) { toast("You're offline. Try again when you're back online."); return; }
+      finder.disabled = true;
+      finder.textContent = "Finding chapters…";
+      try {
+        const found = await C.save.findChapters(url);
+        if (found.links.length) {
+          area.value = found.links.join("\n");
+          if (!folder) { const name = folderName(found.title || C.save.siteName(url)); input.value = name; pick(name, true); }
+          sync();
+        } else toast("Couldn't find a list of chapters on that page.");
+      } catch (e) { toast(e instanceof C.save.SaveError ? e.message : "Couldn't read that page. Try again."); }
+      finder.disabled = false;
+      finder.textContent = "Find chapters on this page";
+    } }, "Find chapters on this page");
     const sync = () => {
       const n = linksFrom(area.value).length;
+      finder.hidden = n !== 1;
       count.textContent = n ? n + (n === 1 ? " link" : " links") : "No links yet. Paste them here, one a line.";
       go.textContent = n ? "Save " + countLine(n) + (folder ? " into " + folder : "") : "Save";
       go.disabled = !n;
@@ -1915,7 +1974,7 @@
     input.addEventListener("input", () => pick(cleanTag(input.value) ? folderName(input.value) : null, true));
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); input.blur(); } });
     const form = el("form", { class: "batch-form" },
-      el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Links"), area, count),
+      el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Links"), area, count, finder),
       el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Folder"),
         el("div", { class: "tag-edit" }, chips, input),
         el("p", { class: "meta" }, "Pages in a folder keep the order of the links.")),
@@ -1930,10 +1989,12 @@
       e.preventDefault();
       const urls = linksFrom(area.value);
       if (!urls.length) return;
+      if (urls.length > LONG_LIST && !confirm("Save " + urls.length + " pages? They save one at a time, so a list this long takes a while. Stop is on the waiting card.")) return;
       history.back();
       saveAll(urls, folder, tags, mode);
     });
     $("batchBody").replaceChildren(form);
+    if (folder && !allFolders().some((f) => sameTag(f, folder))) input.value = folder;
     sync();
   }
 
@@ -1953,7 +2014,6 @@
   // one saved (or already there), or null. Quiet when asked. A folder's
   // run stops early when its Stop is tapped.
   const stopping = new Set();
-  const PACE_MS = 500;
   async function follow(from, n, quiet, back) {
     const key = back ? "prev" : "next", word = back ? "previous" : "next";
     if (from[key] === undefined) {

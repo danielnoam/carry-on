@@ -3,6 +3,32 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **How a contents page is recognised (0.21.0).** Before Readability
+  runs, the page's same-site links are grouped by the list, table or
+  block they sit in, and the group with the most links that carry a
+  chapter number ("Chapter 12", "Ch. 3.5", "פרק 4", "7. …", or
+  /chapter-9 in the address) wins, if it has three and they are at least
+  half the group. A page is a contents page when that list has five or
+  more and more than 40% of its words are links (WebToEpub's scanner
+  uses the same 40%); then nothing is saved and Save several opens with
+  the list. Lists stay in the page's order, turned around when the
+  numbers mostly go down (newest first); they are not sorted, since
+  "1.01 … 1.10" numbering sorts wrong as numbers. A contents page with a
+  long description saves as an article, so Save several has "Find
+  chapters on this page" for one link. Not covered: contents split over
+  several pages, or drawn by scripts; Save next and previous, All cover
+  those.
+- **A long run is one card (0.21.0).** More than three waiting saves for
+  the same folder show as "N pages waiting to go into …" with Stop,
+  instead of a card each; Stop drops the waiting ones and keeps what
+  saved. Links already saved still move into the run's folder, as Save
+  several always did.
+- **Covers are the first picture or a drawn title card (0.21.0).** The
+  title card is drawn on a canvas at 1200 × 1800 in the Paper colours
+  and the bundled type, right to left for Hebrew, and saved as a JPEG in
+  the book only. A folder's book also opens on a cover page; one page's
+  book doesn't, since its first screen already shows the title.
+
 - **What Carry-on takes from WebToEpub (0.20.0).** WebToEpub (the
   browser extension that packs web novels into EPUBs) was read before
   writing the EPUB export. It is GPLv3, so no code is copied: epub.js is

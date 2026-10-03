@@ -135,6 +135,84 @@
     return "";
   }
 
+  // ---- A contents page's chapters (0.21.0) ----
+
+  // A chapter's number from its link text ("Chapter 12", "Ch. 3.5",
+  // "פרק 4", "12. The Fall"), or from its address; null when it has none.
+  const CHAPTER_WORD = /(?:chapter|chap\.?|ch\.?|part|episode|ep\.?|book|vol\.?|פרק|capítulo|chapitre|kapitel|глава|第)\s*(\d+(?:\.\d+)?)/iu;
+  function chapterNumber(text, href) {
+    const t = String(text || "").trim();
+    const m = t.match(CHAPTER_WORD) || t.match(/^(\d+(?:\.\d+)?)(?:\s*[.:)\-–—]\s|$)/u) ||
+      String(href || "").match(/(?:chapter|chap|ch|episode|ep|part)[-_/]?(\d+(?:[.-]\d+)?)/i);
+    return m ? parseFloat(m[1].replace("-", ".")) : null;
+  }
+
+  // The chapter list among groups of links (each [{ url, text }], one group
+  // a list, table or block): the group with the most numbered links, three
+  // at least, in reading order (newest-first lists are turned around);
+  // [] when no group looks like chapters.
+  function pickChapters(groups) {
+    let best = null, bestScore = 0;
+    for (const g of groups) {
+      const seen = new Set();
+      const links = g.filter((l) => !seen.has(l.url) && seen.add(l.url));
+      const nums = links.map((l) => chapterNumber(l.text, l.url));
+      const score = nums.filter((n) => n != null).length;
+      if (score >= 3 && score >= links.length / 2 && score > bestScore) { best = { links, nums }; bestScore = score; }
+    }
+    if (!best) return [];
+    const known = best.nums.filter((n) => n != null);
+    let down = 0, up = 0;
+    for (let i = 1; i < known.length; i++) { if (known[i] < known[i - 1]) down++; else if (known[i] > known[i - 1]) up++; }
+    return down > up ? [...best.links].reverse() : best.links;
+  }
+
+  // The links on a page grouped by the list, table or block they sit in:
+  // same site only, not the page itself.
+  function linkGroups(doc, pageUrl) {
+    let host;
+    try { host = new URL(pageUrl).host; } catch (e) { return []; }
+    const groups = new Map();
+    for (const a of doc.querySelectorAll("body a[href]")) {
+      const text = a.textContent.replace(/\s+/g, " ").trim();
+      if (!text) continue;
+      const u = absolute(a.getAttribute("href"), pageUrl);
+      let x;
+      try { x = new URL(u); } catch (e) { continue; }
+      const url = u.split("#")[0];
+      if (!/^https?:$/.test(x.protocol) || x.host !== host || url === pageUrl.split("#")[0]) continue;
+      const box = a.closest("ul, ol, table, dl, select") || (a.parentElement && a.parentElement.closest("div, section, nav, p")) || doc.body;
+      if (!groups.has(box)) groups.set(box, []);
+      groups.get(box).push({ url, text: text.slice(0, 200) });
+    }
+    return [...groups.values()];
+  }
+
+  // { title, links } for a page that is mostly a list of chapters (more
+  // of its words are links than not, as WebToEpub's scanner counts it);
+  // null for anything else.
+  function contentsOf(doc, pageUrl, title) {
+    const body = doc.body;
+    if (!body) return null;
+    const all = body.textContent.replace(/\s+/g, " ").trim().length;
+    const linked = [...body.querySelectorAll("a[href]")].reduce((n, a) => n + a.textContent.replace(/\s+/g, " ").trim().length, 0);
+    const links = pickChapters(linkGroups(doc, pageUrl));
+    return links.length >= 5 && linked > all * 0.4 ? { title, links: links.map((l) => l.url) } : null;
+  }
+
+  // A contents page's chapter links, read from the page whatever it is
+  // (Save several's Find chapters). { title, links }; links is [] when
+  // nothing looks like chapters.
+  async function findChapters(url) {
+    const res = await get(url);
+    const at = res.url || url;
+    const doc = parse(res.text, at);
+    const og = doc.querySelector('meta[property="og:title"]');
+    const h1s = doc.querySelectorAll("h1");
+    const title = ((og && og.content) || (h1s.length === 1 ? h1s[0].textContent : "") || (doc.querySelector("title") || {}).textContent || "").replace(/\s+/g, " ").trim();
+    return { title, links: pickChapters(linkGroups(doc, at)).map((l) => l.url) };
+  }
+
   function siteName(url) {
     try { return new URL(url).hostname.replace(/^www\./, ""); } catch (e) { return ""; }
   }
@@ -142,6 +220,15 @@
   // ---- Fetching ----
 
   class SaveError extends Error {}
+
+  // Thrown for a contents page instead of saving it: `contents` holds its
+  // title and chapter links, for Save several.
+  class ContentsPage extends SaveError {
+    constructor(contents) {
+      super("This is a list of chapters, not a chapter.");
+      this.contents = contents;
+    }
+  }
 
   async function get(url, headers) {
     let res;
@@ -266,6 +353,8 @@
     const og = doc.querySelector('meta[property="og:title"]');
     const h1s = doc.querySelectorAll("h1");
     const headline = (og && og.content) || (h1s.length === 1 ? h1s[0].textContent : "");
+    const contents = contentsOf(doc, finalUrl, (headline || docTitle).replace(/\s+/g, " ").trim());
+    if (contents) return { contents };
     const next = nextLink(doc, finalUrl);
     const prev = nextLink(doc, finalUrl, true);
     resolveLazyImages(doc, finalUrl);
@@ -291,6 +380,7 @@
       }
     }
     if (got && got.check) throw new SaveError("The site asked for a browser check, so Carry-on can't save it yet.");
+    if (got && got.contents) throw new ContentsPage(got.contents);
     if (!got) {
       throw new SaveError(C.platform.canRender
         ? "Carry-on couldn't find the article on this page, even after letting it draw itself."
@@ -735,7 +825,7 @@
   }
 
   C.save = {
-    save, SaveError, retryMissing, saveFullImages, findNext, creditLine, cleanSaved, savedPageHtml, newId, textDir, isNextText, isPrevText, plainText,
+    save, SaveError, ContentsPage, findChapters, chapterNumber, pickChapters, retryMissing, saveFullImages, findNext, creditLine, cleanSaved, savedPageHtml, newId, textDir, isNextText, isPrevText, plainText,
     wikipediaPage, wikimediaThumb, parseSrcset, pickWidth, youtubeId, vimeoId, extOf, isTrackingPixel, readingMinutes, siteName,
   };
 })();
