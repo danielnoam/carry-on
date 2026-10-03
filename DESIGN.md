@@ -109,36 +109,36 @@ and the page shows above it.
   Settings (a gear) as 44 px icons; the count; search, always open.
   Without a search the library is in sections, each with an overline:
   "Continue reading" (the started page read last, one card; Settings,
-  Appearance, Library can turn it off), "Folders" (a row of tiles that
+  Appearance, Library can turn it off), "Collections" (a row of tiles that
   scrolls sideways on a phone and wraps on a desktop), then the filter
-  chips, then "Pages" or "Pages in no folder · N" with the order on the
+  chips, then "Pages" or "Pages in no collection · N" with the order on the
   right ("Newest saved", "Last read", "Longest", "Site", a quiet select
-  with an arrows icon). A filter lists every page it matches, folder
+  with an arrows icon). A filter lists every page it matches, collection
   pages too, under "Unread · 4" or "#trip · 3"; a search lists pages
   only, under "Found · 2". At 900 px and wider the pages are two
   columns.
-- **Library card (Now):** thumbnail, site line (site, folder, #tags),
+- **Library card (Now):** thumbnail, site line (site, collection, #tags),
   serif title, then the reading line ("9 min", "6 min left" with a 3 px
   accent line, or "Finished") and the size. A status only when it needs
   a look: "2 previews missing · Retry" in warn, or "Images online".
-- **Folder tile (Now):** 136 px wide, its first picture (or a folder
+- **Collection tile (Now):** 136 px wide, its first picture (or a collection
   glyph on `--preview`), the name in the serif, "3 of 12 read" and a thin
   accent line. A series with chapters not yet saved shows "2 new" as a
   pill at the picture's top end: `--accent` fill, `--accent-ink` text,
   meta size, semibold (0.25.0).
-- **Picking (Now):** the library and folder screens get a circle at
+- **Picking (Now):** the library and collection screens get a circle at
   each card's top end (24 px, a 2 px muted ring), filled with the accent
   and a tick once picked, and the card's border turns accent. A bar over
   the top: Cancel, "3 pages picked", Select all (or Pick none), accent
-  text buttons. A bar along the bottom: Tags, Folder, Mark read (or
+  text buttons. A bar along the bottom: Tags, Collection, Mark read (or
   unread), Delete (warn), icon over label, 56 px, dimmed until something
   is picked.
 - **Library sheet (Now):** a long press (or right-click) on a page: the
   sheet from the bottom over a `--scrim` dim, with the page's title and
   facts, then the same groups as ⋯ plus Open first and Select under More.
   For picked pages it holds Tags (chips on all filled, on some dashed
-  with "2/5", a New tag field, Done) or Folder (each folder as a chip, a
-  New folder field, "Take out of their folders").
+  with "2/5", a New tag field, Done) or Collection (each collection as a chip, a
+  New collection field, "Take out of their collections").
 - **Reader top bar (Now):** back, an "Offline" pill when there is no
   connection, then Contents (a list icon, only when the page has two or
   more headings), Aa and ⋯. A tap on the text hides and shows it;
@@ -157,7 +157,7 @@ and the page shows above it.
   in the order they're used. Share, Export and Original as three tiles (72 px,
   accent icon over the label). "This page": tags as round chips (accent
   fill, × to remove), an "Add a tag" field, then "+ tag" chips for tags
-  used elsewhere; the folder the same way. "Series": Previous and Next
+  used elsewhere; the collection the same way. "Series": Previous and Next
   side by side, and Save previous and Save next. "More": a group of rows,
   Mark as read or unread, Save full images (counting "Saving full images,
   3 of 12"), then "Delete this page" in the warn colour. The sheet scrolls
@@ -174,9 +174,9 @@ and the page shows above it.
   own screen. A new version adds an accent-bordered "Carry-on 0.20.0 is
   out" card with View above the groups. At 900 px and wider the menu
   stays on the left (360 px) and the section fills the rest.
-- **Storage by folder (Now):** under "By folder", one row a folder,
+- **Storage by collection (Now):** under "By collection", one row a collection,
   biggest first (name, page count, size, a chevron), then "Not in a
-  folder" in `--muted`. A tap opens the group in place: its pages
+  collection" in `--muted`. A tap opens the group in place: its pages
   indented, biggest first; the chevron turns down on the control spring.
   Reduced motion: it turns without easing.
 - **Storage and backup (Now):** the total in the title size, the page
@@ -187,13 +187,13 @@ and the page shows above it.
   footnote saying what a backup holds and that the copy saved last wins.
   The result is a toast, such as "Restored 12 pages. 3 already here were
   kept."
-- **Folder screen (Now):** pushed like Settings. The count, the
-  folder's tools, a full-width primary button to carry on, Save
+- **Collection screen (Now):** pushed like Settings. The count, the
+  collection's tools, a full-width primary button to carry on, Save
   previous, then the pages as a numbered group (the next one's number in
   the accent), then, for a series, "New chapters" (what the last check
   found and when, in the accent when there are some, and a Check chip),
   then Save next.
-- **Next in a folder (Now):** at the end of the page, after the licence,
+- **Next in a collection (Now):** at the end of the page, after the licence,
   a bordered block "Next in Novel" over the title in the accent serif. In
   ⋯, Previous and Next side by side, dimmed when there's none.
 - **Save with options (Now, was Save several):** a pushed screen, opened
@@ -202,8 +202,8 @@ and the page shows above it.
   and "Skip pages already saved" (a switch, on by default) when any are.
   "Save as": Article / Comic, a segmented control with a one-line note.
   "Images": Previews / Full / Links (app only), set to the Settings
-  choice, or Full when Comic is picked. "Folder": None and each folder
-  as chips plus a "New folder" field, with a note that pages keep the
+  choice, or Full when Comic is picked. "Collection": None and each collection
+  as chips plus a "New collection" field, with a note that pages keep the
   links' order. "Tags". Then a full-width "Save 4 pages into Novel"
   ("Nothing new to save" when all are skipped). Saving goes back to the
   library, where two or more go as one run card.
@@ -224,7 +224,7 @@ and the page shows above it.
   a text match adds its sentence in muted meta type under the title,
   two lines at most. None found: "Nothing matches “…”." (with " in
   Finished" and the like when a filter is on) and Clear search.
-- **Folder screen tools (Now):** above the pages, the page sheet's tiles
+- **Collection screen tools (Now):** above the pages, the page sheet's tiles
   (64 px, accent icon over the label) three to a row on a phone and six
   in one row from 600 px: Add pages, Select, Reorder (dimmed with one
   page), Rename, EPUB, Remove (icon and label in the warn colour).
@@ -232,14 +232,14 @@ and the page shows above it.
   their chapter numbers.", a quiet "Sort by chapter" and Done, and
   shows a chevron up and down (44 px, accent; disabled ones in
   `--line`) on each row. Remove asks in place: "Remove the
-  folder, keep its N pages", "Delete the folder and its N pages" (warn,
+  collection, keep its N pages", "Delete the collection and its N pages" (warn,
   then a system confirm), Cancel.
 - **Find chapters (Now):** in Save several, under the count, a small
   button "Find chapters on this page" while the box holds one link; it
   reads "Finding chapters…" while it looks, then the box holds the
-  chapters and the folder field the novel's name.
-- **Run card (Now):** a run of saves into a folder is one wide card
-  from start to end: the site, the folder's name in the title type, the
+  chapters and the collection field the novel's name.
+- **Run card (Now):** a run of saves into a collection is one wide card
+  from start to end: the site, the collection's name in the title type, the
   page in progress's bar, one status line ("3 of 10 saved · Saving 4 of 9
   images", "Paused · 3 of 10 saved"), then Pause or Resume (small
   button) and Stop (quiet, warn colour). Its height never changes: the
@@ -258,7 +258,7 @@ and the page shows above it.
   closes past 120 px. Reduced motion: it fades in and out, and zoom
   steps without easing.
 - **Save next and previous (Now):** "Save next" with 1, 5, 10 and All
-  as chips, in ⋯ and under a folder's list, when the last page has a
+  as chips, in ⋯ and under a collection's list, when the last page has a
   next link; "Save previous" the same above the list, for the first
   page. While a run saves, the chips dim and Pause (Resume when paused) and Stop (warn colour) join
   them. Pages come one at a time, half a second apart. 5, 10 or All ask
