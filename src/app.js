@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.27.4";
+  const APP_VERSION = "0.27.5";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -588,9 +588,11 @@
     btn.insertAdjacentHTML("beforeend", '<svg class="dropdown-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>');
     const wrap = el("div", { class: "dropdown " + (o.cls || "") }, btn);
     const show = () => {
-      const at = o.options.find((x) => x.value === value) || o.options[0];
+      const at = o.options.find((x) => x.value === value) || (o.placeholder ? { label: o.placeholder } : o.options[0]);
+      const empty = !!o.placeholder && at.label === o.placeholder;
       face.textContent = at.label;
-      btn.setAttribute("aria-label", o.label + ": " + at.label);
+      face.classList.toggle("unset", empty);
+      btn.setAttribute("aria-label", empty ? o.label : o.label + ": " + at.label);
     };
     let menu = null;
     const outside = (e) => { if (!wrap.contains(e.target)) close(false); };
@@ -623,12 +625,15 @@
       wrap.append(menu);
       btn.setAttribute("aria-expanded", "true");
       M.arrive(menu, -6);
+      // A menu opened low on the screen scrolls up into view.
+      menu.scrollIntoView({ block: "nearest" });
       document.addEventListener("pointerdown", outside, true);
       (items.find((b) => b.getAttribute("aria-selected") === "true") || items[0]).focus({ preventScroll: true });
     }
     btn.addEventListener("click", () => (menu ? close(true) : open()));
     btn.addEventListener("keydown", (e) => { if ((e.key === "ArrowDown" || e.key === "ArrowUp") && !menu) { e.preventDefault(); open(); } });
     show();
+    wrap.set = (v) => { value = v; show(); };
     return wrap;
   }
 
@@ -2497,7 +2502,6 @@
     const skipRow = el("div", { class: "group" }, el("label", { class: "row" },
       el("span", { class: "choice-text" }, el("span", { class: "choice-label" }, "Skip pages already saved"), skipNote), skip));
     const go = el("button", { class: "btn-primary batch-go", type: "submit" });
-    const chips = el("div", { class: "chips" });
     const input = el("input", { class: "tag-input", type: "text", placeholder: "New collection", "aria-label": "New collection",
       maxlength: "32", enterkeyhint: "done", autocapitalize: "sentences" });
     // One link may be a contents page: its chapters replace it, and the
@@ -2512,7 +2516,7 @@
         if (found.links.length) {
           source = url;
           area.value = found.links.join("\n");
-          if (!folder) { const name = folderName(found.title || C.save.siteName(url)); input.value = name; pick(name, true); }
+          if (!folder) choose(folderName(found.title || C.save.siteName(url)));
           sync();
         } else toast("Couldn't find a list of chapters on that page.");
       } catch (e) { toast(e instanceof C.save.SaveError ? e.message : "Couldn't read that page. Try again."); }
@@ -2530,36 +2534,53 @@
       count.textContent = links.length ? links.length + (links.length === 1 ? " link" : " links") : "No links yet. Paste them here, one a line.";
       go.textContent = n ? "Save " + countLine(n) + (folder ? " into " + folder : "") : links.length ? "Nothing new to save" : "Save";
       go.disabled = !n;
-      chips.querySelectorAll(".chip").forEach((c) => {
-        const on = c.dataset.folder === (folder || "");
-        c.classList.toggle("on", on);
-        c.setAttribute("aria-pressed", String(on));
-      });
     };
     const pick = (f, typed) => { folder = f; if (!typed) input.value = ""; sync(); };
-    chips.append(...[null, ...allFolders()].map((f) => el("button", { class: "chip", type: "button", "data-folder": f || "",
-      onclick: () => pick(f) }, f || "None")));
-    // Tags for every page this saves, chosen the same way as in ⋯.
+    // The collection: None, one already there, or a new one typed in.
+    const NEW = "\u0000new";
+    const folderPick = dropdown({ label: "Collection", cls: "field-pick batch-folder", value: "",
+      options: [{ value: "", label: "None" }, ...foldersByUse().map((f) => ({ value: f, label: f })), { value: NEW, label: "New collection…" }],
+      onpick: (v) => {
+        input.hidden = v !== NEW;
+        if (v === NEW) { pick(cleanTag(input.value) ? folderName(input.value) : null, true); input.focus(); }
+        else pick(v || null);
+      } });
+    input.hidden = true;
+    const choose = (name) => {
+      const had = name && allFolders().find((f) => sameTag(f, name));
+      folderPick.set(had || (name ? NEW : ""));
+      input.hidden = !name || !!had;
+      if (had) pick(had);
+      else { input.value = name || ""; pick(name || null, true); }
+    };
+    // Tags for every page this saves: the ones picked, each with its ×,
+    // then a dropdown of the rest and "New tag…", which opens a field.
     const tagBox = el("div", { class: "tag-edit" });
-    const drawTags = () => {
+    let typing = false;
+    const drawTags = (focus) => {
       const others = allTags().filter((t) => !tags.some((x) => sameTag(x, t)));
-      const tagInput = el("input", { class: "tag-input", type: "text", placeholder: "Add a tag", "aria-label": "Add a tag",
+      const tagInput = el("input", { class: "tag-input", type: "text", placeholder: "New tag", "aria-label": "New tag",
         maxlength: "32", enterkeyhint: "done", autocapitalize: "off" });
       const add = (raw) => {
         const t = cleanTag(raw);
         if (!t || tags.some((x) => sameTag(x, t))) return;
         tags.push(allTags().find((x) => sameTag(x, t)) || t);
-        drawTags();
-        tagBox.querySelector(".tag-input").focus({ preventScroll: true });
+        typing = false;
+        drawTags("pick");
       };
       tagInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); add(tagInput.value); } });
+      const showInput = typing || !allTags().length;
+      tagInput.hidden = !showInput;
+      const tagPick = dropdown({ label: "Add a tag", placeholder: "Add a tag", cls: "field-pick batch-tag", value: null,
+        options: [...others.map((t) => ({ value: t, label: t })), { value: NEW, label: "New tag…" }],
+        onpick: (v) => { if (v === NEW) { typing = true; drawTags("input"); } else add(v); } });
       fill(tagBox,
-        el("div", { class: "chips" },
+        tags.length ? el("div", { class: "chips" },
           ...tags.map((t) => el("button", { class: "chip on", type: "button", "aria-label": "Remove tag " + t,
-            onclick: () => { tags.splice(tags.indexOf(t), 1); drawTags(); } }, t, el("span", { class: "chip-x", "aria-hidden": "true" }, "×"))),
-          tagInput),
-        others.length ? el("div", { class: "chips" },
-          ...others.slice(0, 12).map((t) => el("button", { class: "chip", type: "button", "aria-label": "Add tag " + t, onclick: () => add(t) }, "+ " + t))) : null);
+            onclick: () => { tags.splice(tags.indexOf(t), 1); drawTags(); } }, t, el("span", { class: "chip-x", "aria-hidden": "true" }, "×")))) : null,
+        allTags().length ? tagPick : null, tagInput);
+      if (focus === "input") tagInput.focus({ preventScroll: true });
+      else if (focus === "pick" && allTags().length) tagPick.querySelector(".dropdown-btn").focus({ preventScroll: true });
     };
     drawTags();
     area.addEventListener("input", sync);
@@ -2588,7 +2609,7 @@
       images ? el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Images"), images,
         el("p", { class: "meta" }, "Full images for comics, maps and diagrams. Settings picks the usual choice.")) : null,
       el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Collection"),
-        el("div", { class: "tag-edit" }, chips, input),
+        el("div", { class: "tag-edit" }, folderPick, input),
         el("p", { class: "meta" }, "Pages in a collection keep the order of the links.")),
       el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Tags"), tagBox),
       go);
@@ -2603,7 +2624,7 @@
       saveAll(skipSaved ? all : urls, folder, tags, mode, skipSaved, kind, source);
     });
     $("batchBody").replaceChildren(form);
-    if (folder && !allFolders().some((f) => sameTag(f, folder))) input.value = folder;
+    if (folder) choose(folder);
     sync();
   }
 

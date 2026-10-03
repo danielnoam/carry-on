@@ -501,6 +501,16 @@ html.native .reader-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top
 .aloud-controls { display: flex; flex-direction: column; gap: var(--s-3); }
 .aloud-controls > .overline { margin: var(--s-2) 0 calc(-1 * var(--s-1)) var(--s-1); }
 .aloud-controls .footnote { margin: 0 var(--s-1); }
+/* A dropdown as a form field (Save several's collection and tags). */
+.field-pick { display: flex; }
+.field-pick .dropdown-btn {
+  flex: 1; justify-content: space-between; padding: 0 var(--s-3);
+  border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+  font: 400 var(--fs-label)/var(--lh-label) var(--sans);
+}
+.field-pick .dropdown-face { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: start; }
+.field-pick .dropdown-face.unset { color: var(--muted); }
+.field-pick .dropdown-menu { left: 0; right: 0; max-height: 50vh; overflow-y: auto; }
 .voice-pick .dropdown-menu { max-height: 50vh; overflow-y: auto; max-width: min(320px, calc(100vw - 2 * var(--gutter))); }
 .aloud-player .icon-btn { border-radius: var(--r-full); }
 .aloud-play { background: var(--accent); color: var(--accent-ink); }

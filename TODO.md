@@ -26,8 +26,8 @@ asks from Daniel.
 
 ## 0.27.x: Library polish (Daniel, 3 Oct 2026)
 
-Asked for after 0.27.3 (the stuck-tap bug shipped in 0.27.4). Placed
-before sync; Daniel can move it.
+Asked for after 0.27.3 (the stuck tap shipped in 0.27.4, the add
+screen's dropdowns in 0.27.5). Placed before sync; Daniel can move it.
 
 - **Library rework.** Daniel still thinks it could look better. Start
   with a few directions on the design canvas before any code.
@@ -35,8 +35,6 @@ before sync; Daniel can move it.
   cover: read it from the story page when the collection has a source,
   else the first page's lead image.
 - **A page's site icon** as its image when it has none of its own.
-- **Add screen: collections and tags as dropdowns** (`dropdown()`, with
-  "New collection" / "New tag" in the menu) instead of rows of capsules.
 
 ## 0.28.0 and 0.29.0: Sync through a private GitHub repo
 

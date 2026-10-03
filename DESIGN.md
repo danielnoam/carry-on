@@ -205,9 +205,12 @@ and the page shows above it.
   and "Skip pages already saved" (a switch, on by default) when any are.
   "Save as": Article / Comic, a segmented control with a one-line note.
   "Images": Previews / Full / Links (app only), set to the Settings
-  choice, or Full when Comic is picked. "Collection": None and each collection
-  as chips plus a "New collection" field, with a note that pages keep the
-  links' order. "Tags". Then a full-width "Save 4 pages into Novel"
+  choice, or Full when Comic is picked. "Collection" (0.27.5): a field
+  dropdown of None, each collection (last used first) and "New
+  collection…", which opens a name field under it, with a note that
+  pages keep the links' order. "Tags" (0.27.5): the picked tags as chips
+  with ×, then an "Add a tag" field dropdown of the rest and "New tag…",
+  which opens a field (straight away when there are no tags yet). Then a full-width "Save 4 pages into Novel"
   ("Nothing new to save" when all are skipped). Saving goes back to the
   library, where two or more go as one run card.
 - **Saving card (Now):** a 12 px ring turning (accent arc on the line
@@ -250,7 +253,11 @@ and the page shows above it.
   `--surface` menu with a `--line` border and the soft shadow, 44 px
   rows with a tick by the current one and `--bar` under the finger.
   Arrows, Home, End and Escape work; a tap outside closes it. It
-  arrives on the control spring; reduced motion fades it.
+  arrives on the control spring; reduced motion fades it, and a menu
+  opened low on the screen scrolls into view. As a form field
+  (`.field-pick`, 0.27.5) it is full width with the input's `--line`
+  border, `--bg` fill and label type, an unpicked placeholder in
+  `--muted`, and its menu as wide as the field.
 - **Read aloud (Now, 0.27.0):** a speaker icon button in the reader's
   bar, before Aa: accent on `--line` while reading, and its label says
   Stop. While it reads, the bar along the bottom stays up and holds the

@@ -2,6 +2,14 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.27.5] - 2026-10-03
+
+### Changed
+- Save with options picks the collection from a dropdown (None, your
+  collections, or New collection…) instead of a row of buttons.
+- Its tags are a dropdown too: the tags you have, or New tag…. The ones
+  picked show above it, each with × to take it off.
+
 ## [0.27.4] - 2026-10-03
 
 ### Fixed
