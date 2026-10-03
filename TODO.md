@@ -26,12 +26,9 @@ asks from Daniel.
 
 ## 0.27.x: Library polish (Daniel, 3 Oct 2026)
 
-Asked for after 0.27.3. Placed before sync because the bug is a bug;
-Daniel can move the rest.
+Asked for after 0.27.3 (the stuck-tap bug shipped in 0.27.4). Placed
+before sync; Daniel can move it.
 
-- **Bug: a tap on a collection or page sometimes gets stuck**, and only
-  leaving and coming back fixes it. Not reproduced yet: needs which
-  screen, what was tapped, and whether anything was playing or saving.
 - **Library rework.** Daniel still thinks it could look better. Start
   with a few directions on the design canvas before any code.
 - **A cover image for a collection**, like a Royal Road story's book
@@ -57,6 +54,20 @@ tree and one commit per save), since the contents API stops at 1 MB and
 broke LifeLog's sync. Decide first whether the repo's growth (0.5 to 1.5
 MB per illustrated page, far more for comics) is acceptable, or whether
 comics folders stay off sync.
+
+**What syncs of the images (Daniel, 3 Oct 2026).** Each page syncs its
+images as one of three: **Links** (none, the other device loads them
+online), **Previews** (the small local copies) or **Full images**.
+- Two defaults in Settings: one for collections, one for pages not in a
+  collection.
+- A collection can override it from inside its own screen; a page not
+  in a collection can override it from the page.
+- A page in a collection always follows its collection (its default or
+  its override), never its own.
+- Anything not overridden follows the default, so changing a default
+  changes everything that never picked its own.
+This also answers the repo-size question above: a comics collection can
+sync as Links.
 
 The token is per device and stays in the app; for anyone but Daniel sync
 stays optional, with 0.18.0's backup as the no-account way.
