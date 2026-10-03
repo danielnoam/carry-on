@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.27.6";
+  const APP_VERSION = "0.27.7";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -28,6 +28,13 @@
   const SEEN_KEY = "carryon.seenVersion";
   const SORT_KEY = "carryon.sort";
   const CONTINUE_KEY = "carryon.continue";
+  const LAYOUT_KEY = "carryon.layout";
+  // The library's three looks (0.28.0); Settings, Appearance picks one.
+  const LAYOUTS = [
+    { value: "shelf", label: "Shelf", note: "Collections as a row of covers, pages listed under them" },
+    { value: "list", label: "One list", note: "Collections and pages together, grouped by date or site" },
+    { value: "grid", label: "Grid", note: "Covers three across, pages as picture cards" },
+  ];
   const NEW_KEY = "carryon.newChapters";
   const DAILY_KEY = "carryon.checkDaily";
   const EXPORT_KEY = "carryon.exportKind";
@@ -35,9 +42,7 @@
   const VOICE_KEY = "carryon.aloudVoice";
 
   const $ = (id) => document.getElementById(id);
-  // The filter chips move into the library's list, and out of the page
-  // while it's empty, so they're held here rather than looked up.
-  const filterBox = $("filterBox"), filterRow = $("filters"), tagRow = $("tagFilters");
+  const libTools = $("libTools");
 
   function el(tag, attrs, ...children) {
     const node = document.createElement(tag);
@@ -129,8 +134,6 @@
     filter: load(FILTER_KEY, "all"),
     // What's typed in the library's search field.
     query: "",
-    // The row of tag chips under the status chips.
-    tagsOpen: false,
     // The library's order: "saved", "read", "length" or "site".
     sort: load(SORT_KEY, "saved"),
     // Picking pages to change together: the ids picked, or null.
@@ -399,7 +402,9 @@
 
   // Only what needs a look gets a word: missing previews, or images that
   // load online only. Anything else is ready offline, which goes unsaid.
-  function pageCard(p, found) {
+  // Continue reading's card shows its collection's cover, when it has one.
+  function pageCard(p, found, hero) {
+    const cover = hero && p.folder ? coverUrl(folderPages(p.folder)) : null;
     const thumb = thumbUrl(p);
     const facts = [readingLine(p), formatSize(p.bytes || 0)].join(" · ");
     const started = !p.finished && p.at > 0.02;
@@ -411,10 +416,11 @@
     const retry = p.missing && C.platform.native && navigator.onLine
       ? el("button", { class: "card-retry", type: "button", onclick: (e) => retryPreviews(p, e.currentTarget) }, "Retry")
       : null;
-    return el("div", { class: "card", "data-ids": p.id },
+    return el("div", { class: "card page-card" + (hero ? " continue wide" : "") + (cover ? " has-cover" : ""), "data-ids": p.id },
       el("button", { class: "card-open", type: "button", "aria-label": p.title, onclick: () => tapPages([p.id], () => openPage(p.id)) }),
       pickMark(),
-      thumb ? el("img", { class: "card-thumb", src: thumb, alt: "", loading: "lazy" }) : siteMark(p),
+      cover ? el("img", { class: "card-thumb cover", src: cover, alt: "", loading: "lazy" })
+        : thumb ? el("img", { class: "card-thumb", src: thumb, alt: "", loading: "lazy" }) : siteMark(p),
       el("span", { class: "card-body" },
         el("span", { class: "card-site", dir: "auto" }, p.site, p.folder ? " · " + p.folder : null, ...(p.tags || []).map((t) => el("span", { class: "card-tag" }, " · #" + t))),
         el("span", { class: "card-title", dir: "auto" }, p.title),
@@ -570,26 +576,25 @@
     renderLibrary();
   }
 
-  // Status first (All, Unread, Finished), then Tags, which opens a row of
-  // its own so a long tag list doesn't push the status chips away.
-  function renderFilters() {
-    const box = filterRow, row = tagRow;
+  // Show and Order (0.28.0), over everything the library lists: one
+  // dropdown each, so a long tag list waits in a menu instead of a row of
+  // capsules. Rebuilt only when what they show changes, so a save landing
+  // doesn't close a menu that's open.
+  function renderTools() {
     const tags = allTags();
-    const tagOn = state.filter.startsWith("#");
-    box.hidden = !state.pages.length;
-    row.hidden = box.hidden || !tags.length || !(state.tagsOpen || tagOn);
-    if (box.hidden) return;
-    const chip = (f, label) => el("button", { class: "chip" + (state.filter === f ? " on" : ""), type: "button",
-      "aria-pressed": String(state.filter === f), onclick: () => setFilter(state.filter === f && f !== "all" ? "all" : f) }, label);
-    const tagsChip = tags.length ? el("button", { class: "chip" + (tagOn ? " on" : ""), type: "button",
-      "aria-expanded": String(!row.hidden), "aria-controls": "tagFilters",
-      onclick: () => {
-        if (tagOn) { state.tagsOpen = false; setFilter("all"); return; }
-        state.tagsOpen = !state.tagsOpen;
-        renderFilters();
-      } }, tagOn ? state.filter : "Tags", el("span", { class: "chip-caret", "aria-hidden": "true" }, tagOn ? "×" : "▾")) : null;
-    fill(box, chip("all", "All"), chip("unread", "Unread"), chip("finished", "Finished"), tagsChip);
-    if (!row.hidden) fill(row, ...tags.map((t) => chip("#" + t, "#" + t)));
+    const sig = [state.pages.length > 0, state.filter, state.sort, tags.join("\u0000")].join("|");
+    if (libTools.dataset.sig === sig) return;
+    libTools.dataset.sig = sig;
+    libTools.hidden = !state.pages.length;
+    if (libTools.hidden) return;
+    fill(libTools, dropdown({
+      label: "Show", cls: "start show-wrap" + (state.filter === "all" ? "" : " on"),
+      icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>',
+      options: [{ value: "all", label: "All pages" }, { value: "unread", label: "Unread" }, { value: "finished", label: "Finished" },
+        ...(tags.length ? [{ head: "Tags" }, ...tags.map((t) => ({ value: "#" + t, label: "#" + t }))] : [])],
+      value: state.filter,
+      onpick: setFilter,
+    }), sortControl());
   }
 
   const SORTS = [["saved", "Newest saved"], ["read", "Last read"], ["length", "Longest"], ["site", "Site"]];
@@ -603,7 +608,7 @@
 
   function sortControl() {
     return dropdown({
-      label: "Order", cls: "sort-wrap",
+      label: "Order", cls: "end sort-wrap",
       icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4"/></svg>',
       options: SORTS.map(([value, label]) => ({ value, label })),
       value: BY[state.sort] ? state.sort : "saved",
@@ -622,7 +627,7 @@
     btn.insertAdjacentHTML("beforeend", '<svg class="dropdown-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>');
     const wrap = el("div", { class: "dropdown " + (o.cls || "") }, btn);
     const show = () => {
-      const at = o.options.find((x) => x.value === value) || (o.placeholder ? { label: o.placeholder } : o.options[0]);
+      const at = o.options.find((x) => !x.head && x.value === value) || (o.placeholder ? { label: o.placeholder } : o.options[0]);
       const empty = !!o.placeholder && at.label === o.placeholder;
       face.textContent = at.label;
       face.classList.toggle("unset", empty);
@@ -641,14 +646,16 @@
       if (focus) btn.focus();
     }
     function open() {
-      const items = o.options.map((x) => {
+      const nodes = o.options.map((x) => {
+        if (x.head) return el("div", { class: "dropdown-head", role: "presentation" }, x.head);
         const check = el("span", { class: "dropdown-check", "aria-hidden": "true" });
         if (x.value === value) check.innerHTML = CHECK;
         return el("button", { class: "dropdown-item", type: "button", role: "option", "aria-selected": String(x.value === value),
           onclick: () => { const changed = x.value !== value; value = x.value; show(); close(true); if (changed) o.onpick(x.value); } },
-          el("span", { class: "dropdown-text" }, x.label), check);
+          el("span", { class: "dropdown-text", dir: "auto" }, x.label), check);
       });
-      menu = el("div", { class: "dropdown-menu", role: "listbox", "aria-label": o.label }, ...items);
+      const items = nodes.filter((x) => x.tagName === "BUTTON");
+      menu = el("div", { class: "dropdown-menu", role: "listbox", "aria-label": o.label }, ...nodes);
       menu.addEventListener("keydown", (e) => {
         const i = items.indexOf(document.activeElement);
         if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(true); }
@@ -685,6 +692,30 @@
     return allFolders().map((n) => [n, last(n)]).sort((a, b) => b[1] - a[1]).map(([n]) => n);
   }
 
+  // A collection as one item among pages, for the library's order: its
+  // newest page, the one read last, its length and its site.
+  function asItem(name) {
+    const list = folderPages(name);
+    return { folder: name, title: name, site: list[0].site,
+      savedAt: Math.max(...list.map((p) => p.savedAt || 0)),
+      readAt: Math.max(...list.map((p) => p.readAt || 0)),
+      minutes: list.reduce((n, p) => n + (p.minutes || 0), 0) };
+  }
+
+  // One list's groups: by day under Newest saved and Last read, by site
+  // under Site, none under Longest.
+  function groupOf(x) {
+    if (state.sort === "site") return x.site || "";
+    if (state.sort === "length") return "";
+    const t = state.sort === "read" ? x.readAt : x.savedAt;
+    if (!t) return "Not started";
+    const day = 864e5, start = new Date().setHours(0, 0, 0, 0);
+    return t >= start ? "Today" : t >= start - day ? "Yesterday" : t >= start - 6 * day ? "This week"
+      : t >= start - 29 * day ? "This month" : "Earlier";
+  }
+
+  const layout = () => { const v = load(LAYOUT_KEY, "shelf"); return LAYOUTS.some((l) => l.value === v) ? v : "shelf"; };
+
   const pageSig = (p) => [p.title, readingLine(p), p.missing, p.thumb, Math.round((p.at || 0) * 50), navigator.onLine, (p.tags || []).join(","), p.folder, p.mode].join("|");
 
   // The pages the library is showing, for Select all.
@@ -692,10 +723,12 @@
 
   // Cards are keyed and kept between renders; only ones that weren't there
   // before arrive on a spring, so a re-render never replays the list.
-  // The library is in sections: Continue reading (unless it's turned off),
-  // Collections, the filters, then the pages in no collection. A tag
-  // filter lists every page it matches, collections' pages too; a search
-  // lists only what it found.
+  // Show and Order sit over everything. Shelf and Grid are in sections:
+  // Continue reading (unless it's turned off, or something is filtered),
+  // Collections, then the pages in no collection. One list puts the
+  // collections among those pages, in groups. A tag filter lists every
+  // page it matches, collections' pages too; a search lists only what it
+  // found.
   let firstRender = true;
   function renderLibrary() {
     const root = $("library");
@@ -704,9 +737,11 @@
     // A tag filter whose last page lost the tag (or was deleted) falls back to All.
     if (n && state.filter.startsWith("#")
       && !allTags().some((t) => sameTag(t, state.filter.slice(1)))) { state.filter = "all"; store(FILTER_KEY, "all"); }
-    renderFilters();
+    renderTools();
     $("libraryMeta").textContent = n ? pagesLine(n) : "Nothing saved yet";
-    $("searchBox").hidden = $("selectBtn").hidden = !n;
+    $("searchBox").hidden = $("searchBtn").hidden = $("selectBtn").hidden = !n;
+    const how = layout();
+    $("libraryView").dataset.layout = how;
     const nodes = [];
     const fresh = [];
     // A kept card whose content changed (reading progress, a renamed page)
@@ -737,36 +772,44 @@
     // it has an unread page, or when all of it is read.
     const status = state.filter === "unread" || state.filter === "finished";
     const flat = ts.length || (state.filter !== "all" && !status);
-    const folders = flat ? [] : foldersByUse().filter((f) => !status
+    const folders = flat ? [] : allFolders().filter((f) => !status
       || (state.filter === "unread" ? folderPages(f).some(unread) : folderPages(f).every((x) => x.finished)));
-    const strip = () => {
-      if (!folders.length) return;
-      keep("h:folders", () => sectionHead("Collections"));
-      keep("folders", () => foldersStrip(folders), folders.map((f) => [f, freshCount(f), ...folderPages(f).map((x) => x.id + readingLine(x) + (x.thumb || "") + (x.cover || ""))].join("|")).join("‖"));
-    };
-    if (!ts.length) {
+    const folderSig = (f) => [f, freshCount(f), ...folderPages(f).map((x) => x.id + readingLine(x) + (x.thumb || "") + (x.cover || ""))].join("|");
+    if (!ts.length && state.filter === "all") {
       const going = !state.select && load(CONTINUE_KEY, true) && continuePage();
       if (going) {
         keep("h:continue", () => sectionHead("Continue reading"));
-        keep("c:" + going.id, () => pageCard(going), pageSig(going));
+        keep("c:" + going.id, () => pageCard(going, null, true), pageSig(going));
       }
-      if (!status) strip();
     }
-    // The filters sit over the pages they filter, under the collections
-    // unless they filter those too.
-    if (n) nodes.push(filterBox); else filterBox.remove();
-    if (status) strip();
     const loose = flat ? pages : pages.filter((p) => !p.folder);
-    if (loose.length) {
-      const label = (ts.length ? "Found" : state.filter === "all" ? (n > loose.length ? "Pages in no collection" : "Pages")
-        : status && folders.length ? filterName() + " pages in no collection" : filterName()) + " · " + loose.length;
-      keep("h:pages", () => sectionHead(label, sortControl()), label);
-    }
-    for (const p of loose) {
-      if (ts.length) {
-        const s = found.get(p.id);
-        keep("q:" + p.id, () => pageCard(p, s), [pageSig(p), s].join("|"));
-      } else keep("p:" + p.id, () => pageCard(p), pageSig(p));
+    if (how === "list" && !flat) {
+      const items = sorted([...folders.map(asItem), ...loose]);
+      let group = null;
+      for (const x of items) {
+        const g = groupOf(x);
+        if (g && g !== group) keep("h:g:" + g, () => sectionHead(g));
+        group = g;
+        if (x.id) keep("p:" + x.id, () => pageCard(x), pageSig(x));
+        else keep("t:" + x.folder, () => { const t = folderTile(x.folder); t.removeAttribute("role"); return t; }, folderSig(x.folder));
+      }
+    } else {
+      if (folders.length) {
+        const names = sorted(folders.map(asItem)).map((x) => x.folder);
+        keep("h:folders", () => sectionHead("Collections"));
+        keep("folders", () => foldersStrip(names), names.map(folderSig).join("‖"));
+      }
+      if (loose.length) {
+        const label = (ts.length ? "Found" : state.filter === "all" ? (n > loose.length ? "Pages in no collection" : "Pages")
+          : status && folders.length ? filterName() + " pages in no collection" : filterName()) + " · " + loose.length;
+        keep("h:pages", () => sectionHead(label), label);
+      }
+      for (const p of loose) {
+        if (ts.length) {
+          const s = found.get(p.id);
+          keep("q:" + p.id, () => pageCard(p, s), [pageSig(p), s].join("|"));
+        } else keep("p:" + p.id, () => pageCard(p), pageSig(p));
+      }
     }
     if (n && !pages.length && ts.length) {
       keep("none:q", () => el("div", { class: "empty wide" },
@@ -1720,7 +1763,7 @@
         thumb ? el("img", { src: thumb, alt: "", loading: "lazy" }) : null,
         fresh ? el("span", { class: "tile-new" }, newCountText(fresh)) : null),
       el("span", { class: "tile-name", dir: "auto" }, name),
-      el("span", { class: "tile-meta" }, (done === list.length ? "All read" : done + " of " + list.length + " read") + " · " + formatSize(sizeOf(list))),
+      el("span", { class: "tile-meta" }, el("span", { class: "tile-kind" }, "Collection · "), (done === list.length ? "All read" : done + " of " + list.length + " read"), el("span", { class: "tile-size" }, " · " + formatSize(sizeOf(list)))),
       el("span", { class: "progress thin", "aria-hidden": "true" },
         el("span", { class: "progress-fill", style: "transform: scaleX(" + done / list.length + ")" })));
     // A cover whose file is gone (a restored backup) is read again.
@@ -1728,8 +1771,12 @@
       for (const p of list) { delete p.cover; delete p.coverFrom; }
       updateCover(name);
     }, { once: true });
-    if (!thumb) tile.querySelector(".tile-thumb").insertAdjacentHTML("afterbegin", folderSource(list) ? bookIcon(28).outerHTML
-      : '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>');
+    // No picture at all: a cover drawn from its name.
+    if (!thumb) {
+      tile.querySelector(".tile-thumb").insertAdjacentHTML("afterbegin", folderSource(list) ? bookIcon(28).outerHTML
+        : '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>');
+      tile.querySelector(".tile-thumb").append(el("span", { class: "tile-cover-name", dir: "auto" }, name));
+    }
     else if (folderSource(list)) tile.querySelector(".tile-thumb").append(el("span", { class: "tile-book" }, bookIcon(16)));
     return tile;
   }
@@ -3261,7 +3308,9 @@
   // Settings is a short menu; each entry is a screen of its own.
   const updateOut = () => ["available", "downloading", "ready"].includes(upd.phase) && upd.latest;
   const SECTIONS = {
-    appearance: { title: "Appearance", build: () => [choiceGroup(SETTINGS[0]), autoGroup(), readingGroup(), libraryGroup()],
+    appearance: { title: "Appearance", build: () => [choiceGroup(SETTINGS[0]), autoGroup(), readingGroup(),
+      choiceGroup({ key: LAYOUT_KEY, label: "Library layout", get: layout, set: (v) => { store(LAYOUT_KEY, v); renderLibrary(); }, options: LAYOUTS }),
+      libraryGroup()],
       value: () => themeName(state.theme) },
     saving: { title: "Saving", build: () => [choiceGroup(SETTINGS[1])],
       value: () => SETTINGS[1].options.find((o) => o.value === SETTINGS[1].get()).label },
@@ -3379,6 +3428,14 @@
   $("settingsBtn").addEventListener("click", () => openSettings());
   $("sectionBack").addEventListener("click", () => history.back());
   $("selectBtn").addEventListener("click", () => startSelect([]));
+  // Search sits in the bar that stays, so it's there from anywhere in the list.
+  $("searchBtn").addEventListener("click", () => {
+    window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    $("librarySearch").focus({ preventScroll: true });
+  });
+  // The bar gets its hairline once the list scrolls under it.
+  const topBar = $("topBar");
+  addEventListener("scroll", () => topBar.classList.toggle("scrolled", scrollY > 0), { passive: true });
   $("selectCancel").addEventListener("click", () => history.back());
   $("selectAll").addEventListener("click", selectAll);
   $("selTags").addEventListener("click", () => openMenu("tags"));

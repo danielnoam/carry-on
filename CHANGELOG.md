@@ -2,6 +2,25 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.27.7] - 2026-10-03
+
+### Added
+- Three looks for the library, picked in Settings, Appearance, Library
+  layout: Shelf (the default: collections as a row of book covers,
+  pages listed under them), One list (collections and pages together,
+  grouped by date or site) and Grid (covers three across, pages as
+  picture cards).
+- The library's top bar stays while you scroll, with a Search button
+  that takes you up to the search field.
+
+### Changed
+- The filter capsules are now one Show dropdown (All pages, Unread,
+  Finished, your tags) beside the order, over the whole library.
+- The order applies to collections too: by their newest page, the one
+  read last, their length or their site.
+- Continue reading shows only when nothing is filtered.
+- A collection with no picture gets a cover drawn from its name.
+
 ## [0.27.6] - 2026-10-03
 
 ### Added
