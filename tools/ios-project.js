@@ -5,7 +5,9 @@
 //   node tools/ios-project.js
 //
 // Info.plist gains ITSAppUsesNonExemptEncryption = false (the app uses only
-// the system's HTTPS), which spares a question on every TestFlight upload.
+// the system's HTTPS), which spares a question on every TestFlight upload,
+// and the "audio" background mode, so Read aloud (0.27.0) goes on with the
+// screen locked.
 // project.pbxproj gets MARKETING_VERSION = APP_VERSION and
 // CURRENT_PROJECT_VERSION = the same number Android's versionCode is.
 //
@@ -17,6 +19,7 @@ const { versionCode } = require("./android-version");
 
 const PLIST = [
   ["ITSAppUsesNonExemptEncryption", "<false/>"],
+  ["UIBackgroundModes", "<array>\n\t\t<string>audio</string>\n\t</array>"],
 ];
 
 function patchPlist(xml) {

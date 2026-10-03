@@ -37,6 +37,13 @@ for (const name of ["paper", "sepia", "night", "slate", "solarized", "contrast",
       });
     }
   }
+  // Read aloud lights the paragraph being read with --preview (0.27.0).
+  for (const fg of ["ink", "accent"]) {
+    test(name + ": --" + fg + " on --preview", () => {
+      const r = ratio(t[fg], t.preview);
+      assert.ok(r >= 4.5, r.toFixed(2) + ":1");
+    });
+  }
   test(name + ": --accent-ink on --accent", () => {
     const r = ratio(t["accent-ink"], t.accent);
     assert.ok(r >= 4.5, r.toFixed(2) + ":1");

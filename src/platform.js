@@ -115,6 +115,113 @@
   // PDF is one of the printers: native/share's Print plugin in the app,
   // whose WebView ignores window.print(). In a browser, a hidden frame
   // that runs no scripts prints it.
+  // Read aloud (0.27.0). In the app, native/share's Speech plugin reads a
+  // list of paragraphs with the phone's voices and goes on with the screen
+  // off; in a browser, speechSynthesis reads them one at a time while the
+  // page is open. Either way `onProgress` hears { key, index, state } as
+  // each paragraph starts and when it pauses, ends or stops.
+  const synth = window.speechSynthesis || null;
+  const heard = new Set();
+  const tell = (p) => { for (const f of heard) f(p); };
+  let hooked = false;
+  const web = { items: [], i: -1, state: "stopped", key: "", opts: {}, utter: null };
+  function webSpeak() {
+    const text = web.items[web.i];
+    const u = new SpeechSynthesisUtterance(text);
+    const o = web.opts;
+    if (o.lang) u.lang = o.lang;
+    const v = o.voice && synth.getVoices().find((x) => x.voiceURI === o.voice);
+    if (v) u.voice = v;
+    u.rate = o.rate || 1;
+    web.utter = u;
+    u.onend = () => {
+      if (web.utter !== u || web.state !== "playing") return;
+      if (web.i + 1 >= web.items.length) { webEnd("ended"); return; }
+      web.i++;
+      webSpeak();
+    };
+    u.onerror = (e) => { if (web.utter === u && e.error !== "interrupted" && e.error !== "canceled") webEnd("error"); };
+    synth.cancel();
+    synth.speak(u);
+    tell({ key: web.key, index: web.i, state: "playing" });
+  }
+  function webEnd(how) {
+    web.utter = null;
+    web.state = how;
+    synth.cancel();
+    tell({ key: web.key, index: web.i, state: how });
+    web.items = [];
+  }
+  const speech = {
+    get available() { return !!plugin("Speech") || !!(synth && window.SpeechSynthesisUtterance); },
+    // Whether it goes on with the screen off and the app put away.
+    get background() { return !!plugin("Speech"); },
+    onProgress(f) {
+      heard.add(f);
+      const S = plugin("Speech");
+      if (S && !hooked) { hooked = true; S.addListener("progress", tell); }
+      return () => heard.delete(f);
+    },
+    async voices() {
+      const S = plugin("Speech");
+      if (S) { try { return (await S.voices()).voices || []; } catch (e) { return []; } }
+      if (!synth) return [];
+      let list = synth.getVoices();
+      if (!list.length) {
+        await new Promise((ok) => { synth.addEventListener("voiceschanged", ok, { once: true }); setTimeout(ok, 1500); });
+        list = synth.getVoices();
+      }
+      return list.map((v) => ({ id: v.voiceURI, name: v.name, lang: v.lang, online: !v.localService }));
+    },
+    // { items, start, lang, voice, rate, title, subtitle, key }
+    async play(o) {
+      const S = plugin("Speech");
+      if (S) return S.play(o);
+      Object.assign(web, { items: o.items.slice(), i: Math.max(0, Math.min(o.start || 0, o.items.length - 1)), key: o.key || "", opts: o, state: "playing" });
+      webSpeak();
+    },
+    async pause() {
+      const S = plugin("Speech");
+      if (S) return S.pause();
+      if (web.state !== "playing") return;
+      web.state = "paused";
+      web.utter = null;
+      synth.cancel();
+      tell({ key: web.key, index: web.i, state: "paused" });
+    },
+    async resume() {
+      const S = plugin("Speech");
+      if (S) return S.resume();
+      if (web.state !== "paused" || !web.items.length) return;
+      web.state = "playing";
+      webSpeak();
+    },
+    async seek(index) {
+      const S = plugin("Speech");
+      if (S) return S.seek({ index });
+      if (!web.items.length) return;
+      web.i = Math.max(0, Math.min(index, web.items.length - 1));
+      if (web.state === "playing") webSpeak();
+      else tell({ key: web.key, index: web.i, state: web.state });
+    },
+    async rate(rate) {
+      const S = plugin("Speech");
+      if (S) return S.rate({ rate });
+      web.opts = { ...web.opts, rate };
+      if (web.state === "playing") webSpeak();
+    },
+    async stop() {
+      const S = plugin("Speech");
+      if (S) { try { await S.stop(); } catch (e) { /* nothing was reading */ } return; }
+      if (web.items.length) webEnd("stopped");
+    },
+    async state() {
+      const S = plugin("Speech");
+      if (S) { try { return await S.state(); } catch (e) { return { key: "", index: -1, state: "stopped" }; } }
+      return { key: web.key, index: web.i, state: web.items.length ? web.state : "stopped" };
+    },
+  };
+
   async function printHtml(name, html) {
     const P = plugin("Print");
     if (P) { await P.print({ html, name }); return; }
@@ -269,6 +376,7 @@
     shareFile,
     shareLink,
     printHtml,
+    speech,
     download,
     downloadUpdate,
     openInstaller,

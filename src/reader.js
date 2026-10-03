@@ -206,6 +206,46 @@
     w.scrollTo(0, h.getBoundingClientRect().top + w.scrollY - (topSpace ? topSpace() : 0) - 8);
   }
 
+  // Read aloud (0.27.0): the page's text as blocks in reading order, and
+  // the one being read lit up and kept in view.
+  const BLOCKS = "h1, h2, h3, h4, h5, h6, p, li, blockquote, pre, figcaption, dt, dd, td, th";
+  let blocks = [], lit = null, followUntil = 0;
+  function speechText(el) {
+    const c = el.cloneNode(true);
+    for (const x of c.querySelectorAll("sup")) if (/^\s*\[[^\]]*\]\s*$/.test(x.textContent)) x.remove();
+    for (const x of c.querySelectorAll("style, script, button, .co-placeholder")) x.remove();
+    return c.textContent.replace(/\s+/g, " ").trim();
+  }
+  function readable() {
+    if (!doc) return [];
+    blocks = [...doc.body.querySelectorAll(BLOCKS)].filter((el) => !el.closest(".co-meta, .co-licence, .co-next, .co-video, nav, aside")
+      && !el.querySelector(BLOCKS)).map((el) => ({ el, text: speechText(el) })).filter((b) => b.text);
+    return blocks.map((b) => b.text);
+  }
+  // The first block not yet scrolled past, where reading starts.
+  function firstShown() {
+    const edge = (topSpace ? topSpace() : 0) + 8;
+    const i = blocks.findIndex((b) => b.el.getBoundingClientRect().bottom > edge);
+    return Math.max(0, i);
+  }
+  function light(i) {
+    if (lit) lit.classList.remove("co-speaking");
+    lit = blocks[i] ? blocks[i].el : null;
+    if (!lit || !frame) return;
+    lit.classList.add("co-speaking");
+    const w = frame.contentWindow;
+    const r = lit.getBoundingClientRect();
+    const edge = (topSpace ? topSpace() : 0) + 8;
+    if (r.top < edge || r.bottom > w.innerHeight - 48) {
+      followUntil = Date.now() + 1000;
+      w.scrollTo({ top: r.top + w.scrollY - edge - 16, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    }
+  }
+
+  // Whether the page is scrolling itself to follow the reading, which
+  // shouldn't put the bars away.
+  const following = () => Date.now() < followUntil;
+
   // Room at the top of the page for the reader bar, which floats over it.
   function applyTop() {
     if (doc && topSpace) doc.documentElement.style.setProperty("--co-top", topSpace() + "px");
@@ -219,6 +259,8 @@
   // image.
   function open(iframe, html, meta, { at = 0, onPosition, onScroll, next, top, onImage: image, onTap: tap } = {}) {
     frame = iframe;
+    blocks = [];
+    lit = null;
     onImage = image || null;
     onTap = tap || null;
     heads = [];
@@ -291,11 +333,13 @@
     heads = [];
     nextLink = null;
     onNext = null;
+    blocks = [];
+    lit = null;
   }
 
   addEventListener("online", applyConnection);
   addEventListener("resize", applyTop);
   addEventListener("offline", applyConnection);
 
-  C.reader = { open, close, position, headings, section, jumpTo, applyTheme, applyConnection, srcdoc, CSP };
+  C.reader = { open, close, position, headings, section, jumpTo, readable, firstShown, light, following, applyTheme, applyConnection, srcdoc, CSP };
 })();

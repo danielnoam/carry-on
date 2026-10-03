@@ -2,6 +2,24 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.27.0] - 2026-10-03
+
+### Added
+- Read aloud: the speaker button in the reader's top bar reads the page
+  with your phone's own voices, offline, from the paragraph on screen.
+  The paragraph being read is lit up and the page follows along.
+- A small player while it reads: previous paragraph, pause or play,
+  next paragraph. Tap the speaker again to stop.
+- It keeps reading with the screen off. Pause, skip or stop it from the
+  lock screen or the notification.
+- Voice and speed for reading aloud are in Aa. The voice is kept for
+  each language, so a Hebrew page and an English one can each have
+  their own.
+
+### Changed
+- The page no longer puts the reader's bars away when it scrolls itself
+  to follow the voice.
+
 ## [0.26.0] - 2026-10-03
 
 ### Added

@@ -3,6 +3,29 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Read aloud goes on with the screen off (0.27.0).** Daniel chose
+  screen-off reading over a simpler screen-on version. So the native side
+  owns the reading, not the page: the app sends the whole page as pieces
+  of up to 600 characters (sentences, cut after a comma when one runs
+  long), and native/share's Speech plugin reads them in order. On Android
+  that is SpeechService, a foreground service of type mediaPlayback with
+  the TextToSpeech engine, a partial wake lock, audio focus, and a media
+  session with a notification for previous, play or pause, next and
+  stop. On iOS the rest of the page is queued in AVSpeechSynthesizer at
+  once (so it reads on while the app is suspended) under the "audio"
+  background mode, with lock-screen commands. The page only listens:
+  "progress" events say which piece started, the reader lights that
+  piece's block, and on coming back from the lock screen it asks
+  `state()` where the reading got to. A browser uses speechSynthesis
+  one piece at a time while the page is open. Pause on Android stops the
+  engine and starts the piece again on play; iOS pauses at a word.
+  Android 11 only finds the TTS engine with the TTS_SERVICE `<queries>`
+  entry in native/share's manifest. None of this can be tried off a
+  phone.
+- **The read-aloud light (0.27.0).** The block being read gets
+  `--preview` behind it, the color an image's empty box has, so no new
+  token; the contrast test now checks ink and accent on it, which made
+  Solarized's `--preview` a shade lighter.
 - **Blogger serials and the feed (0.26.0).** A serial on Blogger puts a
   chapter in several posts ("Page 1" to "Page 14") under a label like
   `ch1`, and its contents page is plain text with no links. The rule in
