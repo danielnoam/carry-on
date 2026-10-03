@@ -80,6 +80,27 @@ test("links worded as the next chapter are recognised, other links aren't", () =
   for (const t of ["Previous", "Next week's issue", "Chapter 2", "Read next: ten more", "", null]) assert.ok(!S.isNextText(t), String(t));
 });
 
+test("chapter numbers come from the link's words, or its address", () => {
+  assert.strictEqual(S.chapterNumber("Chapter 12: The Fall"), 12);
+  assert.strictEqual(S.chapterNumber("Ch. 3.5"), 3.5);
+  assert.strictEqual(S.chapterNumber("פרק 4 - ההתחלה"), 4);
+  assert.strictEqual(S.chapterNumber("7. A long night"), 7);
+  assert.strictEqual(S.chapterNumber("The Fall", "https://x.example/novel/chapter-9"), 9);
+  assert.strictEqual(S.chapterNumber("About us", "https://x.example/about"), null);
+  assert.strictEqual(S.chapterNumber("2024 in review"), null);
+});
+
+test("the chapter list is the group with the most numbered links, in reading order", () => {
+  const L = (n, w = "Chapter ") => ({ url: "https://x.example/c" + n, text: w + n });
+  const nav = [{ url: "https://x.example/", text: "Home" }, { url: "https://x.example/about", text: "About" }, { url: "https://x.example/c9", text: "Latest" }];
+  const chapters = [1, 2, 3, 4, 5, 6].map((n) => L(n));
+  assert.deepStrictEqual(S.pickChapters([nav, chapters]).map((l) => l.url), chapters.map((l) => l.url));
+  assert.deepStrictEqual(S.pickChapters([[...chapters].reverse()]).map((l) => l.url), chapters.map((l) => l.url), "newest first is turned around");
+  assert.deepStrictEqual(S.pickChapters([[L(1), L(2), L(1), L(3), L(4)]]).length, 4, "repeats count once");
+  assert.deepStrictEqual(S.pickChapters([nav, [L(1), L(2)]]), [], "two links aren't a list");
+  assert.deepStrictEqual(S.pickChapters([[L(1), L(2), L(3), ...["a", "b", "c", "d", "e", "f", "g"].map((w) => ({ url: "https://x.example/" + w, text: w }))]]), [], "mostly unnumbered isn't chapters");
+});
+
 test("links worded as the previous chapter are recognised, other links aren't", () => {
   for (const t of ["Previous", "Prev", "« Previous Chapter", "‹ Prev", "← previous page", "הפרק הקודם", "Anterior", "上一章"]) assert.ok(S.isPrevText(t), t);
   for (const t of ["Next", "Previously on the show", "Chapter 1", "Previous issues: 12", "", null]) assert.ok(!S.isPrevText(t), String(t));

@@ -209,6 +209,8 @@
     "table { border-collapse: collapse; margin: 1em 0; font-size: 0.9em; }",
     "td, th { border: 1px solid #ccc; padding: 0.2em 0.4em; vertical-align: top; }",
     "nav ol { list-style: none; padding-left: 1em; }",
+    "body.cover { margin: 0; text-align: center; }",
+    "body.cover img { max-height: 100%; }",
     "",
   ].join("\n");
 
@@ -218,6 +220,46 @@
     b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128;
     const h = [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
     return h.slice(0, 8) + "-" + h.slice(8, 12) + "-" + h.slice(12, 16) + "-" + h.slice(16, 20) + "-" + h.slice(20);
+  }
+
+  // A cover for a book with no pictures: the title on the Paper theme's
+  // colours, in the reading type, with the site under it. 1200 × 1800, the
+  // shape e-reader shelves expect. null where there's no canvas.
+  async function titleCard(title, site, rtl) {
+    try {
+      await Promise.all(['600 88px "Source Serif 4"', '500 40px "Instrument Sans"'].map((f) => document.fonts.load(f))).catch(() => {});
+      const W = 1200, H = 1800, M = 120;
+      const canvas = document.createElement("canvas");
+      canvas.width = W; canvas.height = H;
+      const g = canvas.getContext("2d");
+      g.fillStyle = "#F7F4EE";
+      g.fillRect(0, 0, W, H);
+      g.fillStyle = "#2F5D8A";
+      g.fillRect(rtl ? W - M - 160 : M, 300, 160, 12);
+      g.direction = rtl ? "rtl" : "ltr";
+      g.textAlign = rtl ? "right" : "left";
+      const x = rtl ? W - M : M;
+      let size = 96, lines;
+      do {
+        size -= 8;
+        g.font = '600 ' + size + 'px "Source Serif 4", Georgia, serif';
+        lines = [];
+        let line = "";
+        for (const word of title.split(/\s+/)) {
+          const next = line ? line + " " + word : word;
+          if (line && g.measureText(next).width > W - 2 * M) { lines.push(line); line = word; } else line = next;
+        }
+        if (line) lines.push(line);
+      } while (lines.length * size * 1.2 > 900 && size > 48);
+      g.fillStyle = "#1C1B19";
+      g.textBaseline = "top";
+      lines.slice(0, 9).forEach((l, i) => g.fillText(l, x, 380 + i * size * 1.2));
+      g.font = '500 40px "Instrument Sans", system-ui, sans-serif';
+      g.fillStyle = "#5E5A53";
+      g.fillText(site, x, H - M - 40);
+      const blob = await new Promise((done) => canvas.toBlob(done, "image/jpeg", 0.9));
+      return blob ? new Uint8Array(await blob.arrayBuffer()) : null;
+    } catch (e) { return null; }
   }
 
   const slug = (t) => t.replace(/[\\/:*?"<>|#%\u0000-\u001f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 60) || "Book";
@@ -246,14 +288,27 @@
     const wiki = pages.some((p) => p.licence === "wikipedia");
     const items = chapters.map(outline);
 
+    // The cover: the first picture, or a title card. A book of several
+    // pages also opens on it, as a page of its own before the first.
+    let coverAt = images.length ? 0 : -1;
+    if (coverAt < 0) {
+      const card = await titleCard(title, first.site || "", rtl);
+      if (card) { images.push({ file: "images/cover.jpg", bytes: card, type: "image/jpeg" }); coverAt = images.length - 1; }
+    }
+    const coverPage = pages.length > 1 && coverAt >= 0 ? '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE html>\n' +
+      '<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="' + esc(lang) + '" xml:lang="' + esc(lang) + '">\n' +
+      "<head><meta charset=\"utf-8\"/><title>" + esc(title) + '</title><link rel="stylesheet" type="text/css" href="style.css"/></head>\n' +
+      '<body class="cover"><section epub:type="cover"><img src="' + images[coverAt].file + '" alt="' + esc(title) + '"/></section></body>\n</html>\n' : null;
+
     const manifest = [
       '<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>',
       '<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>',
       '<item id="css" href="style.css" media-type="text/css"/>',
+      coverPage ? '<item id="cover" href="cover.xhtml" media-type="application/xhtml+xml"/>' : null,
       ...chapters.map((c, i) => '<item id="c' + (i + 1) + '" href="' + c.file + '" media-type="application/xhtml+xml"/>'),
       ...images.map((im, i) => '<item id="i' + (i + 1) + '" href="' + im.file + '" media-type="' + im.type + '"' +
-        (i === 0 ? ' properties="cover-image"' : "") + "/>"),
-    ];
+        (i === coverAt ? ' properties="cover-image"' : "") + "/>"),
+    ].filter(Boolean);
     const opf = '<?xml version="1.0" encoding="UTF-8"?>\n' +
       '<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uid" xml:lang="' + esc(lang) + '">\n' +
       '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">\n' +
@@ -265,9 +320,10 @@
       (wiki ? "<dc:rights>Text from Wikipedia, CC BY-SA 4.0, by Wikipedia contributors.</dc:rights>\n" : "") +
       "<dc:contributor>Carry-on</dc:contributor>\n" +
       '<meta property="dcterms:modified">' + modified + "</meta>\n" +
-      (images.length ? '<meta name="cover" content="i1"/>\n' : "") +
+      (coverAt >= 0 ? '<meta name="cover" content="i' + (coverAt + 1) + '"/>\n' : "") +
       "</metadata>\n<manifest>\n" + manifest.join("\n") + "\n</manifest>\n" +
       '<spine toc="ncx"' + (rtl ? ' page-progression-direction="rtl"' : "") + ">\n" +
+      (coverPage ? '<itemref idref="cover"/>\n' : "") +
       chapters.map((c, i) => '<itemref idref="c' + (i + 1) + '"/>').join("\n") + "\n</spine>\n</package>\n";
 
     const file = native ? await S().cacheFile(name) : null;
@@ -281,6 +337,7 @@
     await zip.add("OEBPS/nav.xhtml", utf8(navXhtml(title, lang, items)));
     await zip.add("OEBPS/toc.ncx", utf8(tocNcx(uid, title, items)));
     await zip.add("OEBPS/style.css", utf8(STYLE));
+    if (coverPage) await zip.add("OEBPS/cover.xhtml", utf8(coverPage));
     for (const c of chapters) await zip.add("OEBPS/" + c.file, utf8(c.xhtml));
     for (const im of images) await zip.add("OEBPS/" + im.file, im.bytes);
     await zip.finish();

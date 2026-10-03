@@ -2,6 +2,23 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.21.0] - 2026-10-03
+
+### Added
+- Paste a web novel's contents page and Carry-on lists its chapters in
+  Save several, oldest first, with a folder named after the novel, for
+  you to check before saving. In Save several, one link offers "Find
+  chapters on this page" for contents pages that also carry a long
+  description.
+- Books get a cover: the first picture, or a title card with the title
+  and the site. A folder's book opens on its cover.
+- A list over 50 pages asks before saving, and a long run waits as one
+  card, "48 pages waiting to go into Skyward", with Stop.
+
+### Changed
+- Pages in a long run save half a second apart, so the site isn't
+  hammered.
+
 ## [0.20.0] - 2026-10-02
 
 ### Added

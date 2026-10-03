@@ -191,6 +191,17 @@ Source Serif 4 and Instrument Sans (Now).
   `--line`) on each row. Remove asks in place: "Remove the
   folder, keep its N pages", "Delete the folder and its N pages" (warn,
   then a system confirm), Cancel.
+- **Find chapters (Now):** in Save several, under the count, a small
+  button "Find chapters on this page" while the box holds one link; it
+  reads "Finding chapters…" while it looks, then the box holds the
+  chapters and the folder field the novel's name.
+- **Waiting card (Now):** more than three saves waiting for one folder
+  show as one card: the site, "48 pages waiting to go into Skyward" in
+  the card's title type, and Stop as a quiet button in the warn colour.
+- **Book cover (Now):** a book's first picture, or a 1200 × 1800 title
+  card: Paper's background, a 160 × 12 accent rule, the title in Source
+  Serif 4 semibold (88 px, smaller to fit), the site in Instrument Sans
+  at the foot in the muted colour; mirrored for right to left.
 - **Save several button (Now):** a list icon (44 px) after Save in the
   save bar.
 - **Image viewer (Now):** a tapped image fills the screen on `--viewer`,
