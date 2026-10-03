@@ -97,6 +97,10 @@ phone to dark mode with Auto on.
 **Items**
 - A player in the reader: play and pause, speed, skip by paragraph,
   following along in the text.
+- **Its own button in the reader's top bar** (Daniel, 3 Oct 2026): one
+  tap starts reading, another stops. The voice settings (voice, speed)
+  live in the Aa sheet with the other reading settings, not on the
+  button.
 
 **Steps**
 1. Native TTS in native/share: Android `TextToSpeech`, iOS
