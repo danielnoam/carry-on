@@ -2,6 +2,27 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.24.0] - 2026-10-03
+
+### Added
+- Ten fonts to read in: Source Serif, Literata, Lora, Merriweather,
+  EB Garamond, Instrument Sans, Inter, Atkinson Hyperlegible,
+  OpenDyslexic and your phone's own System font. All work offline.
+- Hebrew fonts: Frank Ruhl Libre, David Libre, Assistant and Heebo. A
+  Hebrew page uses the one matching your font's style, or the one you
+  pick under "Hebrew" in Aa.
+- Six more themes: Slate, Solarized, High contrast, Black, Dusk and
+  Solarized Dark. Auto can switch between any light and any dark theme
+  (Settings, Appearance).
+- Margins: Narrow, Normal or Wide.
+- "Reset text" puts size, spacing, margins and fonts back.
+
+### Changed
+- Text size is a slider from 14 to 32 px (the small and large A still go
+  one step at a time), and line spacing a slider from 1.20 to 2.20.
+  Both show their value.
+  Your current size and spacing carry over.
+
 ## [0.23.2] - 2026-10-03
 
 ### Changed

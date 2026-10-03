@@ -11,7 +11,7 @@
   const TOKENS = ["bg", "surface", "ink", "muted", "accent", "line", "preview", "video", "on-video", "scrim",
     "serif", "sans", "measure", "s-1", "s-2", "s-3", "s-4", "s-5", "s-6", "s-7", "r-sm", "r-md", "r-full",
     "fs-title", "lh-title", "fs-heading", "lh-heading", "fs-body", "lh-body", "fs-label", "lh-label", "fs-meta", "lh-meta",
-    "reader-fs", "reader-lh", "reader-font"];
+    "reader-fs", "reader-lh", "reader-font", "reader-pad", "reader-measure"];
   const NEAR = 2;
 
   let frame = null, doc = null, scrollTimer = null, scrollFrame = 0, topSpace = null;

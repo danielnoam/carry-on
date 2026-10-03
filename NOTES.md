@@ -3,6 +3,25 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Fonts, Hebrew fonts and themes (0.24.0).** The new fonts are Google
+  Fonts' own Latin subsets (variable 400 to 700 where the family has
+  one), so 13 families add under 1 MB. The four Hebrew faces carry only
+  Hebrew letters (their unicode-range says so), and `--reader-font`
+  lists the picked Latin font, then a Hebrew one, then a generic: the
+  browser takes each letter from the first face that has it, so a mixed
+  page needs nothing else. With Hebrew on Auto, a serif picks Frank Ruhl
+  Libre and a sans picks Heebo; System leaves Hebrew to the phone.
+  OpenDyslexic's licence reserves its name for unmodified files, so it
+  ships as released (regular and bold, about 100 KB each, no subset)
+  and italics are slanted by the browser. Themes are token sets like
+  the first three and pass the same contrast test; Auto keeps a light
+  and a dark pick in `carryon.themeAuto` (Paper and Night by default).
+  Font, Hebrew and theme pickers scroll sideways in Aa so the sheet
+  leaves the page visible while you change it.
+- **Size and spacing are numbers (0.24.0).** `size` is px (14 to 32)
+  and `spacing` a multiple of the size (1.20 to 2.20); old prefs, a
+  step index and a word, are mapped on load (step 2 is 19 px, "normal"
+  1.60), so nobody's page changes on update.
 - **Comics are chosen, not guessed (0.23.2).** 0.22.0 looked for a
   column of four or more big pictures on every page and saved those as
   comics at full size. On real sites that fired on articles with photo
@@ -522,7 +541,8 @@ bold title and its version so a search finds it.
 - **Fonts are bundled, Latin subset (0.1.0).** Source Serif 4 and
   Instrument Sans from Google Fonts, OFL. Other scripts fall back to the
   system font through unicode-range, so Hebrew or Arabic pages still read
-  well without shipping megabytes of glyphs.
+  well without shipping megabytes of glyphs. Hebrew got its own bundled
+  faces in 0.24.0.
 - **Readability is vendored at 0.6.0 (0.1.0).** One file, Apache-2.0, the
   same parser Firefox Reader View uses. Vendored rather than installed to
   keep the no-build rule.

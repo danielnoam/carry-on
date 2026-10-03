@@ -27,7 +27,7 @@ function ratio(a, b) {
   return (x + 0.05) / (y + 0.05);
 }
 
-for (const name of ["paper", "sepia", "night"]) {
+for (const name of ["paper", "sepia", "night", "slate", "solarized", "contrast", "black", "dusk", "solarized-dark"]) {
   const t = theme(name);
   for (const fg of ["ink", "muted", "accent", "ok", "warn"]) {
     for (const bg of ["bg", "surface"]) {
