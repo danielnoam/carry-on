@@ -2,6 +2,17 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.27.3] - 2026-10-03
+
+### Fixed
+- Reading aloud no longer stops partway through a Blogger chapter whose
+  lines are all inside one block, like The Zombie Knight.
+- It reads an author's note's text and a list item that has a sublist,
+  which it skipped before.
+- It skips a closed spoiler instead of reading it out.
+- In a browser, a line the voice can't say is skipped instead of ending
+  the reading.
+
 ## [0.27.2] - 2026-10-03
 
 ### Fixed

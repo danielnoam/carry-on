@@ -3,6 +3,19 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Where reading aloud could still end early (0.27.3).** Daniel's
+  saved Zombie Knight chapter (copied to the e2e as zk-ch1.html) has
+  each post's lines inside one `<span>` with `<br>`s, so 0.27.2's
+  wrapping saw an inline element holding breaks and skipped it whole;
+  `wrapLoose` now splits inside such inline wrappers. Looking for the
+  same kind of hole: text beside a nested block (a Scribble Hub
+  author's note is a blockquote with a heading `p` and loose text after
+  it; an `li` with a sublist) was never read either, since the outer
+  block isn't a leaf and its text sat inside a block; such text is now
+  wrapped too. Closed `<details>` (spoilers) are skipped, the summary
+  read. The browser engine ended the whole reading on any piece's error;
+  now only "not-allowed" ends it and other errors move on, like the
+  Android watchdog.
 - **Reading text with no paragraphs (0.27.2).** Blogger posts (the
   Zombie Knight serial) keep their text straight in a `<div>` between
   `<br>`s, so `readable()` found no `p` past the byline and the reading

@@ -140,7 +140,12 @@
       web.i++;
       webSpeak();
     };
-    u.onerror = (e) => { if (web.utter === u && e.error !== "interrupted" && e.error !== "canceled") webEnd("error"); };
+    // A piece the voice can't say is skipped, not the end of the reading.
+    u.onerror = (e) => {
+      if (web.utter !== u || e.error === "interrupted" || e.error === "canceled") return;
+      if (e.error === "not-allowed") webEnd("error");
+      else u.onend();
+    };
     synth.cancel();
     synth.speak(u);
     tell({ key: web.key, index: web.i, state: "playing" });

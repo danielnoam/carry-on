@@ -220,9 +220,10 @@
   const BREAKS = new Set(("BR HR P DIV SECTION ARTICLE HEADER FOOTER MAIN FIGURE TABLE UL OL DL LI BLOCKQUOTE PRE " +
     "H1 H2 H3 H4 H5 H6 DETAILS SUMMARY FIGCAPTION DT DD").split(" "));
   // Text that sits straight in a div between <br>s (Blogger posts, old
-  // sites) has no paragraph to read or light, so each run of it between
-  // line breaks is wrapped in an inline span.co-run, which changes nothing
-  // on screen.
+  // sites), or beside a nested block (an author's note's text after its
+  // heading, a list item with a sublist), has no paragraph of its own to
+  // read or light, so each run of it between line breaks is wrapped in an
+  // inline span.co-run, which changes nothing on screen.
   function wrapLoose() {
     if (doc.body.dataset.coRuns) return;
     doc.body.dataset.coRuns = "1";
@@ -230,11 +231,13 @@
     const walk = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
     for (let t = walk.nextNode(); t; t = walk.nextNode()) {
       const up = t.parentElement;
-      if (!/[\p{L}\p{N}]/u.test(t.data) || up.closest(BLOCKS) || up.closest(SKIP)) continue;
+      const block = up.closest(BLOCKS);
+      if (!/[\p{L}\p{N}]/u.test(t.data) || (block && !block.querySelector(BLOCKS)) || up.closest(SKIP)) continue;
       let h = up;
       while (h !== doc.body && !BREAKS.has(h.tagName)) h = h.parentElement;
       holders.add(h);
     }
+    const SEL = [...BREAKS].join(",");
     for (const h of holders) {
       let run = [];
       const close = () => {
@@ -246,18 +249,26 @@
         }
         run = [];
       };
-      for (const n of [...h.childNodes]) {
-        if (n.nodeType === 1 && (BREAKS.has(n.tagName) || n.querySelector([...BREAKS].join(",")))) close();
-        else run.push(n);
-      }
+      // An inline element holding line breaks (a <span> around the whole
+      // post) is split inside itself.
+      const split = (el) => {
+        for (const n of [...el.childNodes]) {
+          if (n.nodeType === 1 && BREAKS.has(n.tagName)) close();
+          else if (n.nodeType === 1 && n.querySelector(SEL)) { close(); split(n); close(); }
+          else run.push(n);
+        }
+      };
+      split(h);
       close();
     }
   }
+  // Inside a closed spoiler: not read, as it isn't shown.
+  const hidden = (el) => { const d = el.closest("details:not([open])"); return !!d && !el.closest("summary"); };
   function readable() {
     if (!doc) return [];
     wrapLoose();
     blocks = [...doc.body.querySelectorAll(BLOCKS + ", .co-run")].filter((el) => !el.closest(SKIP)
-      && !el.querySelector(BLOCKS)).map((el) => ({ el, text: speechText(el) })).filter((b) => /[\p{L}\p{N}]/u.test(b.text));
+      && !el.querySelector(BLOCKS) && !hidden(el)).map((el) => ({ el, text: speechText(el) })).filter((b) => /[\p{L}\p{N}]/u.test(b.text));
     return blocks.map((b) => b.text);
   }
   // The first block not yet scrolled past, where reading starts.
