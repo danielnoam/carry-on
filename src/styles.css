@@ -19,6 +19,7 @@
   --scrim: rgba(0, 0, 0, 0.55);
   --viewer: #0B0D10;
   --shadow: rgba(0, 0, 0, 0.08);
+  --press: rgba(0, 0, 0, 0.06);
   color-scheme: light;
 }
 [data-theme="sepia"] {
@@ -38,6 +39,7 @@
   --scrim: rgba(0, 0, 0, 0.55);
   --viewer: #0B0D10;
   --shadow: rgba(43, 33, 24, 0.1);
+  --press: rgba(0, 0, 0, 0.06);
   color-scheme: light;
 }
 [data-theme="night"] {
@@ -57,6 +59,7 @@
   --scrim: rgba(0, 0, 0, 0.55);
   --viewer: #0B0D10;
   --shadow: rgba(0, 0, 0, 0.45);
+  --press: rgba(255, 255, 255, 0.08);
   color-scheme: dark;
 }
 [data-theme="slate"] {
@@ -76,6 +79,7 @@
   --scrim: rgba(0, 0, 0, 0.55);
   --viewer: #0B0D10;
   --shadow: rgba(20, 30, 45, 0.08);
+  --press: rgba(0, 0, 0, 0.06);
   color-scheme: light;
 }
 [data-theme="solarized"] {
@@ -95,6 +99,7 @@
   --scrim: rgba(0, 0, 0, 0.55);
   --viewer: #0B0D10;
   --shadow: rgba(61, 79, 85, 0.1);
+  --press: rgba(0, 0, 0, 0.06);
   color-scheme: light;
 }
 [data-theme="contrast"] {
@@ -114,6 +119,7 @@
   --scrim: rgba(0, 0, 0, 0.6);
   --viewer: #000000;
   --shadow: rgba(0, 0, 0, 0.12);
+  --press: rgba(0, 0, 0, 0.06);
   color-scheme: light;
 }
 [data-theme="black"] {
@@ -133,6 +139,7 @@
   --scrim: rgba(0, 0, 0, 0.6);
   --viewer: #000000;
   --shadow: rgba(0, 0, 0, 0.6);
+  --press: rgba(255, 255, 255, 0.08);
   color-scheme: dark;
 }
 [data-theme="dusk"] {
@@ -152,6 +159,7 @@
   --scrim: rgba(0, 0, 0, 0.55);
   --viewer: #0B0D10;
   --shadow: rgba(0, 0, 0, 0.45);
+  --press: rgba(255, 255, 255, 0.08);
   color-scheme: dark;
 }
 [data-theme="solarized-dark"] {
@@ -171,6 +179,7 @@
   --scrim: rgba(0, 0, 0, 0.55);
   --viewer: #0B0D10;
   --shadow: rgba(0, 0, 0, 0.45);
+  --press: rgba(255, 255, 255, 0.08);
   color-scheme: dark;
 }
 
@@ -285,6 +294,14 @@ html.native .app { padding-top: env(safe-area-inset-top); }
   font-size: 16px;
 }
 .save-form input::placeholder { color: var(--muted); }
+/* Save and its options button are one pair: same height and fill, split
+   by a hairline. */
+.save-form .btn-primary { border-start-end-radius: 0; border-end-end-radius: 0; }
+.several-btn {
+  width: 48px; height: 48px; margin-inline-start: calc(1px - var(--s-2));
+  border-start-start-radius: 0; border-end-start-radius: 0;
+  background: var(--accent); color: var(--accent-ink);
+}
 .btn-primary {
   height: 48px; padding: 0 18px;
   border: 0; border-radius: var(--r-md);
@@ -308,7 +325,6 @@ html.native .app { padding-top: env(safe-area-inset-top); }
   position: absolute; inset: 0; z-index: 0;
   border: 0; border-radius: inherit; background: transparent; cursor: pointer;
 }
-.card-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .card-open ~ .card-thumb, .card-open ~ .card-body { pointer-events: none; }
 .card-retry {
   position: relative; z-index: 1; pointer-events: auto;
@@ -319,7 +335,6 @@ html.native .app { padding-top: env(safe-area-inset-top); }
 }
 .card-retry:disabled { color: var(--muted); cursor: default; }
 .card.saving { cursor: default; }
-.card.saving:active { transform: none; }
 /* A run's card keeps one height: its status is one line whatever it says. */
 .card.run .card-status { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .card.run .spinner[hidden] { display: none; }
@@ -573,7 +588,6 @@ html.native .reader::before {
 /* 36px to look at, 44px to hit. */
 .chip::before { content: ""; position: absolute; inset: -4px 0; }
 .chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-.chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .chip-x { font-size: 16px; line-height: 1; opacity: 0.8; }
 /* Scrolls edge to edge, so a long tag list isn't clipped at the gutter. */
 .filters {
@@ -620,7 +634,6 @@ html.native .reader::before {
 .share-rows .sheet-row { flex: 1; justify-content: center; }
 .sheet-row.two-line { flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; padding: var(--s-2) var(--s-3); text-align: start; }
 .sheet-note { font: 400 var(--fs-meta)/var(--lh-meta) var(--sans); color: var(--muted); }
-.sheet-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .card-tag { color: var(--accent); }
 .step-rows { display: flex; gap: var(--s-2); }
 .step-row {
@@ -709,14 +722,27 @@ html.native .reader::before {
   font-size: var(--fs-label);
 }
 
-/* Presses answer on the small-control spring. */
-.card, .tile, .tile-btn, .btn-primary, .btn-small, .btn-quiet, .icon-btn, .step-btn, .choice, .row {
-  transition: transform var(--spring-control-ms, 300ms) var(--spring-control, ease-out), background-color 120ms linear;
-  -webkit-tap-highlight-color: transparent;
+/* Presses: no grey flash on tap and no ring after a click, only for a
+   keyboard. Every control answers with the small-control spring and the
+   --press tint over its own fill; rows only tint, as list cells do. */
+html { -webkit-tap-highlight-color: transparent; }
+:focus:not(:focus-visible) { outline: none; }
+.card, .tile, .tile-btn, .btn-primary, .btn-small, .btn-quiet, .icon-btn, .step-btn, .chip, .sheet-row,
+.seg-face, .select-act, .btn-text, .dropdown-btn, .choice, .row {
+  transition: transform var(--spring-control-ms, 300ms) var(--spring-control, ease-out),
+    background-color 120ms linear, color 120ms linear, border-color 120ms linear;
 }
-.card:active, .tile:active, .tile-btn:active, .btn-primary:active, .btn-small:active, .btn-quiet:active, .icon-btn:active, .step-btn:active:not(:disabled) { transform: scale(0.97); }
-.choice:active, .row:active { background: var(--bg); }
-.icon-btn:active { background: var(--line); }
+:is(.card, .tile, .tile-btn, .btn-primary, .btn-small, .btn-quiet, .icon-btn, .step-btn, .chip, .sheet-row,
+.seg-face, .select-act, .btn-text, .dropdown-btn, .choice, .row):active:not(:disabled) {
+  background-image: linear-gradient(var(--press), var(--press));
+}
+:is(.card, .tile, .tile-btn, .btn-primary, .btn-small, .btn-quiet, .icon-btn, .step-btn, .chip, .sheet-row,
+.select-act, .btn-text, .dropdown-btn):active:not(:disabled) { transform: scale(0.97); }
+.card.saving:active { transform: none; background-image: none; }
+@media (prefers-reduced-motion: reduce) {
+  :is(.card, .tile, .tile-btn, .btn-primary, .btn-small, .btn-quiet, .icon-btn, .step-btn, .chip, .sheet-row,
+  .select-act, .btn-text, .dropdown-btn):active { transform: none; }
+}
 
 ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 260ms; }
 
@@ -914,7 +940,6 @@ html.native .reader::before {
 }
 .select-act.danger { color: var(--warn); }
 .select-act:disabled { color: var(--muted); opacity: 0.5; cursor: default; }
-.select-act:active:not(:disabled), .btn-text:active { background: var(--bg); }
 
 /* The library's sheet: over a dimmed library, from the bottom. */
 .menu-catch { position: fixed; inset: 0; z-index: 15; background: var(--scrim); }

@@ -2,6 +2,32 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.26.0] - 2026-10-03
+
+### Added
+- Blogger serials save as whole chapters: a chapter spread over several
+  posts (a label like "ch12") becomes one page, read from the blog's
+  feed, and the blog's home or contents page lists every chapter.
+- A collection's Chapters button: look for new chapters, save previous
+  or next ones, link it to the story's page, and save its pages again.
+- Link a collection to its story page (a Royal Road fiction page, an
+  AO3 work). New chapters come from its chapter list, which also finds
+  chapters added in between, and the collection shows a book icon.
+- Save again: download a collection's pages again with other pictures
+  or the author's edits. Each keeps its place, tags and read position.
+- Export a whole collection as EPUB, one HTML file, PDF or Markdown,
+  then save it to your phone or send it.
+
+### Changed
+- Folders are now called collections.
+- The library's sort is our own menu, not the system's.
+- The reader's bars: a tap on the page shows them, and any scroll hides
+  them again. Scrolling up no longer brings them back.
+- Every button, chip, row and tile answers a press, with no grey flash
+  or blue outline. The options button beside Save matches it.
+- Unread and Finished keep collections whole, as tiles, and list only
+  the pages in no collection.
+
 ## [0.25.2] - 2026-10-03
 
 ### Added

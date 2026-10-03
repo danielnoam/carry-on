@@ -31,6 +31,7 @@ Every color is a token on `:root`, redefined per theme on
 | `--scrim` | black 55% | black 55% | black 55% | Play button disc |
 | `--viewer` | #0B0D10 | #0B0D10 | #0B0D10 | Behind a full-screen image (with `--on-video` for its controls) |
 | `--shadow` | black 8% | brown 10% | black 45% | The one soft shadow: a screen pushed over the library |
+| `--press` | black 6% | black 6% | white 8% | Laid over a control's own fill while it's pressed |
 
 Night is for a dim cabin: no pure white text, no pure black ground.
 
@@ -112,9 +113,11 @@ and the page shows above it.
   Appearance, Library can turn it off), "Collections" (a row of tiles that
   scrolls sideways on a phone and wraps on a desktop), then the filter
   chips, then "Pages" or "Pages in no collection · N" with the order on the
-  right ("Newest saved", "Last read", "Longest", "Site", a quiet select
-  with an arrows icon). A filter lists every page it matches, collection
-  pages too, under "Unread · 4" or "#trip · 3"; a search lists pages
+  right ("Newest saved", "Last read", "Longest", "Site", a dropdown with
+  an arrows icon). Unread and Finished keep collections whole: the
+  collections with an unread page (or all read) move under the filters,
+  then "Unread pages in no collection · 4". A tag lists every page it
+  matches, collection pages too, under "#trip · 3"; a search lists pages
   only, under "Found · 2". At 900 px and wider the pages are two
   columns.
 - **Library card (Now):** thumbnail, site line (site, collection, #tags),
@@ -216,7 +219,9 @@ and the page shows above it.
   the way (control spring). A 3 px accent line along the bottom fills
   with the position, from the page's start side; it's decoration
   (aria-hidden), the page itself being the content. Reduced motion: the
-  bar appears and disappears without sliding.
+  bar appears and disappears without sliding. A tap on the page brings
+  them back and any scroll hides them; they stay at the top, at the
+  end and under a sheet (0.26.0).
 - **Library search (Now):** always there once something is saved: a
   44 px field on `--surface` under the library's count, magnifier inside
   on the start side, × to clear on the end side once there's text.
@@ -225,9 +230,33 @@ and the page shows above it.
   two lines at most. None found: "Nothing matches “…”." (with " in
   Finished" and the like when a filter is on) and Clear search.
 - **Collection screen tools (Now):** above the pages, the page sheet's tiles
-  (64 px, accent icon over the label) three to a row on a phone and six
-  in one row from 600 px: Add pages, Select, Reorder (dimmed with one
-  page), Rename, EPUB, Remove (icon and label in the warn colour).
+  (64 px, accent icon over the label) four to a row on a phone and
+  seven in one row from 600 px: Add pages, Chapters (with the "N new"
+  pill), Select, Reorder (dimmed with one page), Rename, Export, Remove
+  (icon and label in the warn colour). A collection linked to its story
+  page shows a book icon in place of the collection glyph, on its
+  header and its tile.
+- **Chapters panel (Now, 0.26.0):** in place of the tools: the check
+  row with "Save N" when there are new chapters, Save previous and
+  Save next, then "Story page" (a 44 px link field, Link or Change,
+  Unlink), then "Save again" (Previews, Full, Links as a segmented
+  control and a quiet "Save 12 pages again"), then Done as the primary
+  button.
+- **Collection Export (Now, 0.26.0):** the page sheet's Export with the
+  collection's name as its title: PDF, HTML, EPUB (picked first) and
+  Markdown, no page source.
+- **Dropdown (Now, 0.26.0):** our own, never the system's: a quiet
+  button (icon, the current choice, a caret that turns), then a
+  `--surface` menu with a `--line` border and the soft shadow, 44 px
+  rows with a tick by the current one and `--bar` under the finger.
+  Arrows, Home, End and Escape work; a tap outside closes it. It
+  arrives on the control spring; reduced motion fades it.
+- **Pressed (Now, 0.26.0):** no tap flash and no focus ring after a
+  tap, only for a keyboard (`:focus-visible`). Buttons, chips and tiles
+  scale to 0.97 on the control spring with `--press` over their fill;
+  rows and choices only take the tint. Reduced motion keeps the tint
+  and drops the scale. Save and the options button beside it are one
+  pair: 48 px, the accent fill, split by a hairline.
   Reorder swaps them for "Move pages with the arrows, or sort them by
   their chapter numbers.", a quiet "Sort by chapter" and Done, and
   shows a chevron up and down (44 px, accent; disabled ones in

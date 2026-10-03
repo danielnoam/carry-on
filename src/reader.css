@@ -2,7 +2,7 @@
    or sizes of its own: src/reader.js copies the app's tokens onto this
    document's :root, so a theme change reaches both. */
 
-html { -webkit-text-size-adjust: 100%; scroll-padding-top: var(--co-top, 0px); }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: var(--co-top, 0px); -webkit-tap-highlight-color: transparent; }
 body {
   margin: 0 auto;
   max-width: var(--reader-measure, var(--measure));
