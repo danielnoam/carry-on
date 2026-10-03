@@ -216,9 +216,47 @@
     for (const x of c.querySelectorAll("style, script, button, .co-placeholder")) x.remove();
     return c.textContent.replace(/\s+/g, " ").trim();
   }
+  const SKIP = ".co-meta, .co-licence, .co-next, .co-video, nav, aside";
+  const BREAKS = new Set(("BR HR P DIV SECTION ARTICLE HEADER FOOTER MAIN FIGURE TABLE UL OL DL LI BLOCKQUOTE PRE " +
+    "H1 H2 H3 H4 H5 H6 DETAILS SUMMARY FIGCAPTION DT DD").split(" "));
+  // Text that sits straight in a div between <br>s (Blogger posts, old
+  // sites) has no paragraph to read or light, so each run of it between
+  // line breaks is wrapped in an inline span.co-run, which changes nothing
+  // on screen.
+  function wrapLoose() {
+    if (doc.body.dataset.coRuns) return;
+    doc.body.dataset.coRuns = "1";
+    const holders = new Set();
+    const walk = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+    for (let t = walk.nextNode(); t; t = walk.nextNode()) {
+      const up = t.parentElement;
+      if (!/[\p{L}\p{N}]/u.test(t.data) || up.closest(BLOCKS) || up.closest(SKIP)) continue;
+      let h = up;
+      while (h !== doc.body && !BREAKS.has(h.tagName)) h = h.parentElement;
+      holders.add(h);
+    }
+    for (const h of holders) {
+      let run = [];
+      const close = () => {
+        if (run.some((n) => /[\p{L}\p{N}]/u.test(n.textContent))) {
+          const span = doc.createElement("span");
+          span.className = "co-run";
+          run[0].before(span);
+          span.append(...run);
+        }
+        run = [];
+      };
+      for (const n of [...h.childNodes]) {
+        if (n.nodeType === 1 && (BREAKS.has(n.tagName) || n.querySelector([...BREAKS].join(",")))) close();
+        else run.push(n);
+      }
+      close();
+    }
+  }
   function readable() {
     if (!doc) return [];
-    blocks = [...doc.body.querySelectorAll(BLOCKS)].filter((el) => !el.closest(".co-meta, .co-licence, .co-next, .co-video, nav, aside")
+    wrapLoose();
+    blocks = [...doc.body.querySelectorAll(BLOCKS + ", .co-run")].filter((el) => !el.closest(SKIP)
       && !el.querySelector(BLOCKS)).map((el) => ({ el, text: speechText(el) })).filter((b) => /[\p{L}\p{N}]/u.test(b.text));
     return blocks.map((b) => b.text);
   }

@@ -2,6 +2,13 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.27.2] - 2026-10-03
+
+### Fixed
+- Reading aloud reads pages whose text isn't split into paragraphs, like
+  Blogger serials, instead of stopping after the title and author. "Read
+  from here" works on those lines too.
+
 ## [0.27.1] - 2026-10-03
 
 ### Added
