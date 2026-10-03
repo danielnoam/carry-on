@@ -33,7 +33,15 @@ Every color is a token on `:root`, redefined per theme on
 | `--shadow` | black 8% | brown 10% | black 45% | The one soft shadow: a screen pushed over the library |
 
 Night is for a dim cabin: no pure white text, no pure black ground.
-"System" follows the phone's light or dark setting (Paper or Night).
+
+Six more themes (0.24.0), the same tokens with their own values in
+`src/styles.css`: light Slate (cool grey), Solarized and High contrast
+(black on white, borders strong enough to see in sun); dark Black (true
+black ground for OLED), Dusk (warm brown-grey, amber accent) and
+Solarized Dark. "Auto" follows the phone's light or dark setting with a
+light and a dark theme picked in Settings (Paper and Night unless
+changed). Pickers show each theme as a swatch: its ground with its
+accent as a dot.
 
 Contrast: text tokens (`--ink`, `--muted`, `--accent`, `--ok`, `--warn`)
 meet WCAG AA (4.5:1) on `--bg` and `--surface` in every theme. Check with a
@@ -41,9 +49,10 @@ contrast script before changing any value.
 
 ## 2. Type (Now)
 
-Two families, both bundled in `src/fonts` (OFL), Latin subset. Other
-scripts (Hebrew, Arabic, CJK) fall back to the system font by
-`unicode-range`, which is intended.
+Two families for the interface, both bundled in `src/fonts` (OFL),
+Latin subset. Arabic and CJK fall back to the system font by
+`unicode-range`, which is intended; Hebrew has bundled faces for reading
+(below).
 
 | Role | Family | Size / line | Weight |
 | --- | --- | --- | --- |
@@ -56,10 +65,25 @@ scripts (Hebrew, Arabic, CJK) fall back to the system font by
 | Meta, caption | Instrument Sans | 13 / 18 | 400 |
 | Overline | Instrument Sans | 13 / 18 | 600, caps, 0.08em |
 
-Body text runs at about 65 characters a line (`max-width: 38rem`). Reader
-text size is adjustable in five steps (16, 18, 19, 21, 24 px), line
-spacing in three (1.4, 1.58, 1.8 times the size), and the font between
-Source Serif 4 and Instrument Sans (Now).
+Body text runs at about 65 characters a line (`max-width: 38rem`).
+The reader's text is the reader's choice (0.24.0):
+
+- Size: a slider from 14 to 32 px, with the small and large A buttons
+  for one step.
+- Line spacing: a slider from 1.20 to 2.20 times the size.
+- Margins: Narrow (12 px sides, 44rem), Normal (20 px, 38rem) or Wide
+  (40 px, 32rem).
+- Font: Source Serif 4, Literata, Lora, Merriweather, EB Garamond,
+  Instrument Sans, Inter, Atkinson Hyperlegible, OpenDyslexic or System,
+  each name set in its own face in the picker.
+- Hebrew: Frank Ruhl Libre, David Libre, Assistant or Heebo, after the
+  Latin font in the stack; Auto takes Frank Ruhl for a serif and Heebo
+  for a sans.
+
+Sliders are native range inputs, 44 px tall, a 4 px `--line` track and a
+`--surface` thumb ringed in `--accent`. Long pickers in the Aa sheet
+scroll sideways with the picked item centred, so the sheet stays short
+and the page shows above it.
 
 ## 3. Space, shape, depth (Now)
 

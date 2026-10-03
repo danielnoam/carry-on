@@ -1,13 +1,27 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.23.2";
+  const APP_VERSION = "0.24.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
   const M = C.motion;
-  const THEMES = ["paper", "sepia", "night"];
+  // Each theme is a token set in src/styles.css; "system" (Auto) picks
+  // the light or dark one chosen for it from the phone's setting.
+  const THEMES = [
+    { value: "paper", label: "Paper", dark: false },
+    { value: "sepia", label: "Sepia", dark: false, note: "Warmer, for long reads" },
+    { value: "slate", label: "Slate", dark: false, note: "Cool grey" },
+    { value: "solarized", label: "Solarized", dark: false },
+    { value: "contrast", label: "High contrast", short: "Contrast", dark: false, note: "Black on white, for bright sun" },
+    { value: "night", label: "Night", dark: true, note: "For a dim cabin" },
+    { value: "black", label: "Black", dark: true, note: "True black, easy on OLED batteries" },
+    { value: "dusk", label: "Dusk", dark: true, note: "Warm and soft, for bedtime" },
+    { value: "solarized-dark", label: "Solarized Dark", short: "Solarized", dark: true },
+  ];
+  const themeOf = (v) => THEMES.find((t) => t.value === v);
   const THEME_KEY = "carryon.theme";
+  const AUTO_KEY = "carryon.themeAuto";
   const IMAGES_KEY = "carryon.images";
   const READING_KEY = "carryon.reading";
   const FILTER_KEY = "carryon.filter";
@@ -57,9 +71,23 @@
   }
 
   // ---- Theme ----
-  // "system" follows the phone's light or dark setting: Paper or Night.
+  // "system" follows the phone's light or dark setting, with the light and
+  // dark theme picked for it (Paper and Night unless changed).
   const darkQuery = window.matchMedia ? matchMedia("(prefers-color-scheme: dark)") : null;
-  const resolveTheme = (choice) => (THEMES.includes(choice) ? choice : darkQuery && darkQuery.matches ? "night" : "paper");
+  function autoThemes() {
+    const a = load(AUTO_KEY, {});
+    const ok = (v, dark) => themeOf(v) && themeOf(v).dark === dark;
+    return { light: ok(a.light, false) ? a.light : "paper", dark: ok(a.dark, true) ? a.dark : "night" };
+  }
+  const resolveTheme = (choice) => (themeOf(choice) ? choice : autoThemes()[darkQuery && darkQuery.matches ? "dark" : "light"]);
+  const themeName = (choice) => (themeOf(choice) ? themeOf(choice).label : "Auto");
+
+  function setAutoTheme(change) {
+    store(AUTO_KEY, { ...autoThemes(), ...change });
+    if (state.theme === "system") paintTheme("system");
+    document.querySelectorAll(".swatch.auto").forEach((sw) => sw.replaceWith(swatch(autoSwatch(), "auto")));
+  }
+  const autoSwatch = () => { const a = autoThemes(); return [a.light, a.dark]; };
 
   function paintTheme(choice) {
     document.documentElement.dataset.theme = resolveTheme(choice);
@@ -110,29 +138,65 @@
   paintTheme(state.theme);
 
   // ---- Reading ----
-  // Text size, line spacing and font for saved pages, set from the reader's
-  // Aa sheet or Settings. They're tokens on the app's :root, which
-  // src/reader.js copies into the page like the theme's colours.
-  const SIZES = [16, 18, 19, 21, 24];
-  const SPACING = { tight: 1.4, normal: 1.58, loose: 1.8 };
-  const FONTS = { serif: "--serif", sans: "--sans" };
-  const READING_DEFAULT = { size: 2, spacing: "normal", font: "serif" };
+  // Text size, line spacing, margins and fonts for saved pages, set from
+  // the reader's Aa sheet or Settings. They're tokens on the app's :root,
+  // which src/reader.js copies into the page like the theme's colours.
+  const SIZE_MIN = 14, SIZE_MAX = 32;
+  const SPACING_MIN = 1.2, SPACING_MAX = 2.2;
+  // Every Latin font is followed by a Hebrew one (src/fonts.css), which
+  // gives a Hebrew page its letters: the one picked, or else the one
+  // matching the Latin font's style.
+  const FONTS = [
+    { value: "serif", label: "Source Serif", family: '"Source Serif 4"', kind: "serif" },
+    { value: "literata", label: "Literata", family: '"Literata"', kind: "serif" },
+    { value: "lora", label: "Lora", family: '"Lora"', kind: "serif" },
+    { value: "merriweather", label: "Merriweather", family: '"Merriweather"', kind: "serif" },
+    { value: "garamond", label: "EB Garamond", family: '"EB Garamond"', kind: "serif" },
+    { value: "sans", label: "Instrument Sans", family: '"Instrument Sans"', kind: "sans" },
+    { value: "inter", label: "Inter", family: '"Inter"', kind: "sans" },
+    { value: "atkinson", label: "Atkinson", family: '"Atkinson Hyperlegible"', kind: "sans" },
+    { value: "dyslexic", label: "OpenDyslexic", family: '"OpenDyslexic"', kind: "sans" },
+    { value: "system", label: "System", family: 'system-ui, -apple-system, "Segoe UI", Roboto', kind: "system" },
+  ];
+  const HEBREW = [
+    { value: "auto", label: "Auto" },
+    { value: "frank", label: "Frank Ruhl", family: '"Frank Ruhl Libre"' },
+    { value: "david", label: "David", family: '"David Libre"' },
+    { value: "assistant", label: "Assistant", family: '"Assistant"' },
+    { value: "heebo", label: "Heebo", family: '"Heebo"' },
+  ];
+  const MARGINS = { narrow: ["var(--s-3)", "44rem"], normal: ["20px", "38rem"], wide: ["var(--s-7)", "32rem"] };
+  const READING_DEFAULT = { size: 19, spacing: 1.6, font: "serif", hebrew: "auto", margins: "normal" };
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
+  // Before 0.24.0 size was a step of five and spacing a word.
   function readingPrefs() {
     const r = { ...READING_DEFAULT, ...load(READING_KEY, {}) };
-    if (!(r.size >= 0 && r.size < SIZES.length)) r.size = READING_DEFAULT.size;
-    if (!SPACING[r.spacing]) r.spacing = READING_DEFAULT.spacing;
-    if (!FONTS[r.font]) r.font = READING_DEFAULT.font;
+    if (Number.isInteger(r.size) && r.size >= 0 && r.size < 5) r.size = [16, 18, 19, 21, 24][r.size];
+    if (typeof r.spacing === "string") r.spacing = { tight: 1.4, normal: 1.6, loose: 1.8 }[r.spacing];
+    r.size = Number.isFinite(r.size) ? clamp(Math.round(r.size), SIZE_MIN, SIZE_MAX) : READING_DEFAULT.size;
+    r.spacing = Number.isFinite(r.spacing) ? clamp(Math.round(r.spacing * 20) / 20, SPACING_MIN, SPACING_MAX) : READING_DEFAULT.spacing;
+    if (!FONTS.some((f) => f.value === r.font)) r.font = READING_DEFAULT.font;
+    if (!HEBREW.some((f) => f.value === r.hebrew)) r.hebrew = READING_DEFAULT.hebrew;
+    if (!MARGINS[r.margins]) r.margins = READING_DEFAULT.margins;
     return r;
+  }
+
+  function fontStack(r) {
+    const f = FONTS.find((x) => x.value === r.font);
+    const picked = HEBREW.find((x) => x.value === r.hebrew).family;
+    const hebrew = picked || { serif: '"Frank Ruhl Libre"', sans: '"Heebo"' }[f.kind];
+    return [f.family, hebrew, f.kind === "serif" ? "Georgia, serif" : "sans-serif"].filter(Boolean).join(", ");
   }
 
   function paintReading() {
     const r = readingPrefs();
-    const px = SIZES[r.size];
     const root = document.documentElement.style;
-    root.setProperty("--reader-fs", px + "px");
-    root.setProperty("--reader-lh", Math.round(px * SPACING[r.spacing]) + "px");
-    root.setProperty("--reader-font", "var(" + FONTS[r.font] + ")");
+    root.setProperty("--reader-fs", r.size + "px");
+    root.setProperty("--reader-lh", Math.round(r.size * r.spacing) + "px");
+    root.setProperty("--reader-font", fontStack(r));
+    root.setProperty("--reader-pad", MARGINS[r.margins][0]);
+    root.setProperty("--reader-measure", MARGINS[r.margins][1]);
     if (C.reader) C.reader.applyTheme();
   }
 
@@ -968,49 +1032,72 @@
       ...options.map((o) => el("label", { class: "seg-item" },
         el("input", { class: "visually-hidden", type: "radio", name, value: o.value, checked: o.value === current,
           onchange: () => onpick(o.value) }),
-        el("span", { class: "seg-face", style: o.style || null }, o.swatch ? swatch(o.swatch) : null, o.label))));
+        el("span", { class: "seg-face", style: o.style || null }, o.swatch ? swatch(o.swatch, o.auto ? "auto" : "") : null, o.label, o.sample || null))));
+  }
+
+  const themeOptions = (list, short) => list.map((t) => ({ value: t.value, label: (short && t.short) || t.label, swatch: [t.value] }));
+
+  function slider(label, min, max, step, onvalue) {
+    return el("input", { class: "range", type: "range", min, max, step, "aria-label": label,
+      oninput: (e) => onvalue(Number(e.target.value)) });
   }
 
   let readingGroups = 0;
   function readingControls(withTheme) {
     const r = readingPrefs();
     const id = "rc" + ++readingGroups;
-    const row = (label, control) => el("div", { class: "rc-row" }, el("span", { class: "rc-label" }, label), control);
-    const steps = el("span", { class: "steps", role: "img" }, ...SIZES.map(() => el("span", { class: "step" })));
-    const stepper = el("div", { class: "stepper" },
-      el("button", { class: "step-btn small", type: "button", "data-step": "-1", "aria-label": "Smaller text",
-        onclick: () => setReading({ size: Math.max(0, readingPrefs().size - 1) }) }, "A"),
-      steps,
-      el("button", { class: "step-btn large", type: "button", "data-step": "1", "aria-label": "Larger text",
-        onclick: () => setReading({ size: Math.min(SIZES.length - 1, readingPrefs().size + 1) }) }, "A"));
+    const label = (text, key) => el("span", { class: "rc-label" }, text, key ? el("span", { class: "rc-value", "data-value": key }) : null);
+    const row = (text, control, key) => el("div", { class: "rc-row" }, label(text, key), control);
+    const stack = (text, control) => el("div", { class: "rc-row stack" }, label(text), control);
+    const nudge = (d) => setReading({ size: clamp(readingPrefs().size + d, SIZE_MIN, SIZE_MAX) });
     const box = el("div", { class: "reading-controls" },
-      row("Text size", stepper),
-      row("Spacing", seg(id + "-spacing", "Line spacing", [
-        { value: "tight", label: "Tight" }, { value: "normal", label: "Normal" }, { value: "loose", label: "Loose" },
-      ], r.spacing, (v) => setReading({ spacing: v }))),
-      row("Font", seg(id + "-font", "Font", [
-        { value: "serif", label: "Serif", style: "font-family: var(--serif)" },
-        { value: "sans", label: "Sans", style: "font-family: var(--sans)" },
-      ], r.font, (v) => setReading({ font: v }))),
-      withTheme ? row("Theme", seg(id + "-theme", "Theme", [
-        { value: "system", label: "Auto", swatch: ["paper", "night"] },
-        { value: "paper", label: "Paper", swatch: ["paper"] },
-        { value: "sepia", label: "Sepia", swatch: ["sepia"] },
-        { value: "night", label: "Night", swatch: ["night"] },
-      ], state.theme, (v) => { setTheme(v); syncThemeInputs(); }, "themes")) : null);
+      row("Text size", el("div", { class: "stepper" },
+        el("button", { class: "step-btn small", type: "button", "data-step": "-1", "aria-label": "Smaller text", onclick: () => nudge(-1) }, "A"),
+        slider("Text size", SIZE_MIN, SIZE_MAX, 1, (v) => setReading({ size: v })),
+        el("button", { class: "step-btn large", type: "button", "data-step": "1", "aria-label": "Larger text", onclick: () => nudge(1) }, "A")), "size"),
+      row("Spacing", el("div", { class: "stepper" },
+        slider("Line spacing", SPACING_MIN, SPACING_MAX, 0.05, (v) => setReading({ spacing: v }))), "spacing"),
+      row("Margins", seg(id + "-margins", "Margins", [
+        { value: "narrow", label: "Narrow" }, { value: "normal", label: "Normal" }, { value: "wide", label: "Wide" },
+      ], r.margins, (v) => setReading({ margins: v }))),
+      stack("Font", seg(id + "-font", "Font",
+        FONTS.map((f) => ({ value: f.value, label: f.label, style: "font-family: " + f.family + ", var(--sans)" })),
+        r.font, (v) => setReading({ font: v }), "scroll fonts")),
+      stack("Hebrew", seg(id + "-hebrew", "Hebrew font",
+        HEBREW.map((f) => ({ value: f.value, label: f.label,
+          sample: f.family ? el("span", { class: "seg-sample", lang: "he", dir: "rtl", style: "font-family: " + f.family, "aria-hidden": "true" }, "עברית") : null })),
+        r.hebrew, (v) => setReading({ hebrew: v }), "scroll hebrew")),
+      withTheme ? stack("Theme", seg(id + "-theme", "Theme",
+        [{ value: "system", label: "Auto", swatch: autoSwatch(), auto: true }, ...themeOptions(THEMES)],
+        state.theme, (v) => { setTheme(v); syncThemeInputs(); }, "themes scroll")) : null,
+      el("button", { class: "btn-quiet reset", type: "button", onclick: () => setReading({ ...READING_DEFAULT }) }, "Reset text"));
     syncReadingControls(box);
+    requestAnimationFrame(() => box.querySelectorAll(".seg.scroll").forEach(showPicked));
     return box;
+  }
+
+  // A row that scrolls sideways opens with its picked item in view.
+  function showPicked(row) {
+    const item = row.querySelector("input:checked");
+    if (item) row.scrollLeft = item.parentElement.offsetLeft - (row.clientWidth - item.parentElement.offsetWidth) / 2;
   }
 
   function syncReadingControls(box) {
     const r = readingPrefs();
-    box.querySelectorAll(".step").forEach((s, i) => { s.classList.toggle("on", i <= r.size); s.classList.toggle("now", i === r.size); });
-    box.querySelector(".steps").setAttribute("aria-label", "Text size " + (r.size + 1) + " of " + SIZES.length);
-    box.querySelector('[data-step="-1"]').disabled = r.size === 0;
-    box.querySelector('[data-step="1"]').disabled = r.size === SIZES.length - 1;
-    for (const [k, v] of [["spacing", r.spacing], ["font", r.font]]) {
-      box.querySelectorAll('input[name$="-' + k + '"]').forEach((i) => { i.checked = i.value === v; });
+    const [size, spacing] = box.querySelectorAll(".range");
+    size.value = r.size;
+    size.setAttribute("aria-valuetext", r.size + " pixels");
+    spacing.value = r.spacing;
+    spacing.setAttribute("aria-valuetext", r.spacing.toFixed(2));
+    box.querySelector('[data-value="size"]').textContent = r.size + " px";
+    box.querySelector('[data-value="spacing"]').textContent = r.spacing.toFixed(2);
+    box.querySelector('[data-step="-1"]').disabled = r.size <= SIZE_MIN;
+    box.querySelector('[data-step="1"]').disabled = r.size >= SIZE_MAX;
+    for (const k of ["margins", "font", "hebrew"]) {
+      box.querySelectorAll('input[name$="-' + k + '"]').forEach((i) => { i.checked = i.value === r[k]; });
     }
+    const dflt = Object.keys(READING_DEFAULT).every((k) => r[k] === READING_DEFAULT[k]);
+    box.querySelector(".reset").disabled = dflt;
   }
 
   // The theme lives in two places (Aa and Settings); keep both radios true.
@@ -2299,10 +2386,8 @@
       get: () => state.theme,
       set: setTheme,
       options: [
-        { value: "system", label: "System", note: "Paper or Night, following your phone", swatch: ["paper", "night"] },
-        { value: "paper", label: "Paper", swatch: ["paper"] },
-        { value: "sepia", label: "Sepia", note: "Warmer, for long reads", swatch: ["sepia"] },
-        { value: "night", label: "Night", note: "For a dim cabin", swatch: ["night"] },
+        { value: "system", label: "Auto", note: "Your light and dark themes, following your phone", swatch: autoSwatch(), auto: true },
+        ...THEMES.map((t) => ({ value: t.value, label: t.label, note: t.note, swatch: [t.value] })),
       ],
     },
     {
@@ -2320,8 +2405,8 @@
     },
   ];
 
-  function swatch(themes) {
-    return el("span", { class: "swatch", "aria-hidden": "true" },
+  function swatch(themes, cls) {
+    return el("span", { class: "swatch" + (cls ? " " + cls : ""), "aria-hidden": "true" },
       ...themes.map((t) => el("span", { class: "swatch-half", "data-theme": t }, el("span", { class: "swatch-dot" }))));
   }
 
@@ -2336,7 +2421,7 @@
       list.append(el("label", { class: "choice" },
         el("input", { class: "visually-hidden", type: "radio", name: g.key, value: o.value, checked: o.value === current,
           onchange: () => g.set(o.value) }),
-        o.swatch ? swatch(o.swatch) : null,
+        o.swatch ? swatch(o.auto ? autoSwatch() : o.swatch, o.auto ? "auto" : "") : null,
         el("span", { class: "choice-text" },
           el("span", { class: "choice-label" }, o.label),
           o.note ? el("span", { class: "choice-note" }, o.note) : null),
@@ -2346,6 +2431,21 @@
       el("h2", { class: "overline" }, g.label),
       list,
       g.footnote ? el("p", { class: "footnote" }, g.footnote) : null);
+  }
+
+  // Which light and which dark theme Auto switches between.
+  function autoGroup() {
+    const a = autoThemes();
+    const row = (text, control) => el("div", { class: "rc-row stack" }, el("span", { class: "rc-label" }, text), control);
+    return el("section", { class: "settings-section" },
+      el("h2", { class: "overline" }, "Auto"),
+      el("div", { class: "group" },
+        el("div", { class: "rc-list" },
+          row("When your phone is light", seg("auto-light", "Light theme for Auto", themeOptions(THEMES.filter((t) => !t.dark), true), a.light,
+            (v) => setAutoTheme({ light: v }), "themes grid five")),
+          row("When your phone is dark", seg("auto-dark", "Dark theme for Auto", themeOptions(THEMES.filter((t) => t.dark), true), a.dark,
+            (v) => setAutoTheme({ dark: v }), "themes grid")))),
+      el("p", { class: "footnote" }, "Used when the theme is Auto."));
   }
 
   function readingGroup() {
@@ -2427,8 +2527,8 @@
   // Settings is a short menu; each entry is a screen of its own.
   const updateOut = () => ["available", "downloading", "ready"].includes(upd.phase) && upd.latest;
   const SECTIONS = {
-    appearance: { title: "Appearance", build: () => [choiceGroup(SETTINGS[0]), readingGroup(), libraryGroup()],
-      value: () => SETTINGS[0].options.find((o) => o.value === state.theme).label },
+    appearance: { title: "Appearance", build: () => [choiceGroup(SETTINGS[0]), autoGroup(), readingGroup(), libraryGroup()],
+      value: () => themeName(state.theme) },
     saving: { title: "Saving", build: () => [choiceGroup(SETTINGS[1])],
       value: () => SETTINGS[1].options.find((o) => o.value === SETTINGS[1].get()).label },
     storage: { title: "Storage and backup", build: () => [storageGroup(), backupGroup()], value: () => formatSize(totalBytes()) },
