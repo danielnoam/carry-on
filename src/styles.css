@@ -628,7 +628,7 @@ html.native .reader::before {
 @media (min-width: 600px) { .folder-tools { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
 .folder-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); margin-bottom: var(--s-4); }
 .folder-actions .meta { margin: 0; }
-.folder-actions.order .meta { flex: 1; }
+.folder-actions.order .meta { flex: 1 1 100%; }
 .folder-actions.remove { flex-direction: column; align-items: stretch; }
 .folder-actions.remove .meta { margin: 0 0 var(--s-1); }
 .btn-quiet.danger { color: var(--warn); }

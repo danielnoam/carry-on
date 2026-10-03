@@ -193,7 +193,8 @@ Source Serif 4 and Instrument Sans (Now).
   (64 px, accent icon over the label) three to a row on a phone and six
   in one row from 600 px: Add pages, Select, Reorder (dimmed with one
   page), Rename, EPUB, Remove (icon and label in the warn colour).
-  Reorder swaps them for "Move pages with the arrows." and Done, and
+  Reorder swaps them for "Move pages with the arrows, or sort them by
+  their chapter numbers.", a quiet "Sort by chapter" and Done, and
   shows a chevron up and down (44 px, accent; disabled ones in
   `--line`) on each row. Remove asks in place: "Remove the
   folder, keep its N pages", "Delete the folder and its N pages" (warn,

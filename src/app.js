@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.23.0";
+  const APP_VERSION = "0.23.1";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -674,11 +674,14 @@
   // Several links saved one after another, in order, optionally into a
   // folder (so its pages follow the order of the links). A link already
   // saved isn't saved again; it just joins the folder at its place.
-  async function saveAll(urls, folder, tags = [], mode) {
+  async function saveAll(all, folder, tags = [], mode, skipSaved) {
     const name = folder ? folderName(folder) : null;
+    const places = skipSaved && name ? placesBetween(all, name) : new Map();
+    const urls = skipSaved ? all.filter((u) => !savedAs(u)) : all;
     const jobs = urls.filter((u) => !state.saving.some((s) => !s.error && sameUrl(s.url, u))).map((u) => ({ ...newJob(u, name), tags, mode }));
     state.saving = state.saving.filter((s) => !(s.error && jobs.some((j) => sameUrl(j.url, s.url))));
     const fresh = jobs.filter((j) => !savedAs(j.url));
+    fresh.forEach((j) => { if (places.has(j.url)) j.folderAt = places.get(j.url); });
     const run = fresh.length > 1 ? startRun(name, fresh[0].site, fresh.length) : null;
     fresh.forEach((j) => { j.waiting = true; j.run = run; });
     state.saving = [...fresh, ...state.saving];
@@ -710,6 +713,34 @@
     toast([saved ? "Saved " + countLine(saved) + (name ? " into " + name : "") : "",
       had ? had + " already saved" + (name && !saved ? ", now in " + name : "") : "",
       failed ? failed + " couldn't be saved" : "", stopped ? "stopped before " + countLine(stopped) : ""].filter(Boolean).join(" · ") + ".");
+  }
+
+  // Where new pages go in a folder when the pages around them in the list
+  // are already there: between their neighbours, in the list's order, so
+  // filling in chapters 1 to 40 under 41 to 60 puts them first. Links
+  // with no neighbour in the folder are left out (they go at the end).
+  function placesBetween(urls, name) {
+    const at = urls.map((u) => {
+      const p = savedAs(u);
+      return p && p.folder && sameTag(p.folder, name) ? (p.folderAt || p.savedAt || 0) : null;
+    });
+    const out = new Map();
+    for (let i = 0; i < urls.length;) {
+      if (at[i] != null || savedAs(urls[i])) { i++; continue; }
+      let j = i;
+      while (j < urls.length && at[j] == null) j++;
+      const gap = urls.slice(i, j).filter((u) => !savedAs(u));
+      let back = i - 1;
+      while (back >= 0 && at[back] == null) back--;
+      const lo = back >= 0 ? at[back] : null, hi = j < urls.length ? at[j] : null;
+      gap.forEach((u, k) => {
+        if (lo != null && hi != null && hi > lo) out.set(u, lo + ((hi - lo) * (k + 1)) / (gap.length + 1));
+        else if (hi != null) out.set(u, hi - (gap.length - k) / 1000);
+        else if (lo != null) out.set(u, lo + (k + 1) / 1000);
+      });
+      i = j;
+    }
+    return out;
   }
 
   // Saves one queued link; resolves to its meta, or null when it failed
@@ -1355,6 +1386,26 @@
     if (focus) focus.focus();
   }
 
+  // Chapter numbers from the titles (or addresses) put the folder in
+  // order; pages without one keep their place relative to each other, at
+  // the end. The folder's own places are reused, as in movePage.
+  async function sortByChapter(list) {
+    const nums = new Map(list.map((p) => [p, C.save.chapterNumber(p.title, p.url)]));
+    if ([...nums.values()].filter((n) => n != null).length < 2) { toast("These pages don't have chapter numbers to sort by."); return; }
+    const places = list.map((q) => q.folderAt || q.savedAt || 0);
+    for (let k = 1; k < places.length; k++) if (places[k] <= places[k - 1]) places[k] = places[k - 1] + 1;
+    const sorted = list.map((p, i) => [p, i]).sort((a, b) => {
+      const x = nums.get(a[0]), y = nums.get(b[0]);
+      return (x == null ? Infinity : x) - (y == null ? Infinity : y) || a[1] - b[1];
+    }).map(([p]) => p);
+    const moved = sorted.some((p, i) => p !== list[i]);
+    sorted.forEach((q, k) => { q.folderAt = places[k]; });
+    await C.store.writeIndex(state.pages);
+    renderFolder();
+    renderLibrary();
+    toast(moved ? "Sorted by chapter." : "Already in chapter order.");
+  }
+
   // The folder's tools, above its pages: two rows of three on a phone,
   // one row on a desktop. Reordering and removing take their place.
   function folderActions(list) {
@@ -1371,7 +1422,8 @@
     }
     if (folderMode === "order") {
       return el("div", { class: "folder-actions order" },
-        el("p", { class: "meta" }, "Move pages with the arrows."),
+        el("p", { class: "meta" }, "Move pages with the arrows, or sort them by their chapter numbers."),
+        el("button", { class: "btn-quiet sort-chapters", type: "button", onclick: () => sortByChapter(list) }, "Sort by chapter"),
         el("button", { class: "btn-primary", type: "button", onclick: mode("") }, "Done"));
     }
     const reorder = tileButton("reorder", "Reorder", mode("order"));
@@ -2059,11 +2111,13 @@
       go);
     form.addEventListener("submit", (e) => {
       e.preventDefault();
-      const urls = linksFrom(area.value).filter((u) => !skip.checked || skipRow.hidden || !savedAs(u));
+      const all = linksFrom(area.value);
+      const skipSaved = skip.checked && !skipRow.hidden;
+      const urls = skipSaved ? all.filter((u) => !savedAs(u)) : all;
       if (!urls.length) return;
       if (urls.length > LONG_LIST && !confirm("Save " + urls.length + " pages? They save one at a time, so a list this long takes a while. Pause and Stop are on its card.")) return;
       history.back();
-      saveAll(urls, folder, tags, mode);
+      saveAll(skipSaved ? all : urls, folder, tags, mode, skipSaved);
     });
     $("batchBody").replaceChildren(form);
     if (folder && !allFolders().some((f) => sameTag(f, folder))) input.value = folder;
