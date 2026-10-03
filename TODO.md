@@ -24,6 +24,23 @@ asks from Daniel.
 
 ---
 
+## 0.27.x: Library polish (Daniel, 3 Oct 2026)
+
+Asked for after 0.27.3. Placed before sync because the bug is a bug;
+Daniel can move the rest.
+
+- **Bug: a tap on a collection or page sometimes gets stuck**, and only
+  leaving and coming back fixes it. Not reproduced yet: needs which
+  screen, what was tapped, and whether anything was playing or saving.
+- **Library rework.** Daniel still thinks it could look better. Start
+  with a few directions on the design canvas before any code.
+- **A cover image for a collection**, like a Royal Road story's book
+  cover: read it from the story page when the collection has a source,
+  else the first page's lead image.
+- **A page's site icon** as its image when it has none of its own.
+- **Add screen: collections and tags as dropdowns** (`dropdown()`, with
+  "New collection" / "New tag" in the menu) instead of rows of capsules.
+
 ## 0.28.0 and 0.29.0: Sync through a private GitHub repo
 
 Split in two because it's the riskiest work and loses data if wrong.
