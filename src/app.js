@@ -741,11 +741,11 @@
   // Several links saved one after another, in order, optionally into a
   // folder (so its pages follow the order of the links). A link already
   // saved isn't saved again; it just joins the folder at its place.
-  async function saveAll(all, folder, tags = [], mode, skipSaved, kind) {
+  async function saveAll(all, folder, tags = [], mode, skipSaved, kind, source) {
     const name = folder ? folderName(folder) : null;
     const places = skipSaved && name ? placesBetween(all, name) : new Map();
     const urls = skipSaved ? all.filter((u) => !savedAs(u)) : all;
-    const jobs = urls.filter((u) => !state.saving.some((s) => !s.error && sameUrl(s.url, u))).map((u) => ({ ...newJob(u, name), tags, mode, kind }));
+    const jobs = urls.filter((u) => !state.saving.some((s) => !s.error && sameUrl(s.url, u))).map((u) => ({ ...newJob(u, name), tags, mode, kind, source: name ? source : undefined }));
     state.saving = state.saving.filter((s) => !(s.error && jobs.some((j) => sameUrl(j.url, s.url))));
     const fresh = jobs.filter((j) => !savedAs(j.url));
     fresh.forEach((j) => { if (places.has(j.url)) j.folderAt = places.get(j.url); });
@@ -759,7 +759,7 @@
       const existing = savedAs(job.url);
       if (existing) {
         had++;
-        if (name) { existing.folder = name; existing.folderAt = Date.now(); }
+        if (name) { existing.folder = name; existing.folderAt = Date.now(); if (source) existing.source = source; }
         if (tags.length) existing.tags = withTags(existing.tags, tags);
         if (name || tags.length) { await C.store.writeIndex(state.pages); renderLibrary(); if (state.folder) renderFolder(); }
         continue;
@@ -826,7 +826,7 @@
         },
       });
       meta.requested = job.url;
-      if (job.folder) { meta.folder = folderName(job.folder); meta.folderAt = job.folderAt || Date.now(); }
+      if (job.folder) { meta.folder = folderName(job.folder); meta.folderAt = job.folderAt || Date.now(); if (job.source) meta.source = job.source; }
       if (job.tags && job.tags.length) meta.tags = withTags([], job.tags);
       state.pages.unshift(meta);
       await C.store.writeIndex(state.pages);
@@ -1388,7 +1388,9 @@
       el("span", { class: "tile-meta" }, (done === list.length ? "All read" : done + " of " + list.length + " read") + " · " + formatSize(sizeOf(list))),
       el("span", { class: "progress thin", "aria-hidden": "true" },
         el("span", { class: "progress-fill", style: "transform: scaleX(" + done / list.length + ")" })));
-    if (!thumb) tile.querySelector(".tile-thumb").insertAdjacentHTML("afterbegin", '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>');
+    if (!thumb) tile.querySelector(".tile-thumb").insertAdjacentHTML("afterbegin", folderSource(list) ? bookIcon(28).outerHTML
+      : '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>');
+    else if (folderSource(list)) tile.querySelector(".tile-thumb").append(el("span", { class: "tile-book" }, bookIcon(16)));
     return tile;
   }
 
@@ -1418,7 +1420,7 @@
 
   function renderFolder() {
     const list = folderPages(state.folder);
-    $("folderTitle").textContent = state.folder;
+    fill($("folderTitle"), folderSource(list) ? bookIcon(18) : null, state.folder);
     if (!list.length) {
       $("folderBody").replaceChildren(el("p", { class: "empty-text" }, "This folder is empty."));
       return;
@@ -1434,7 +1436,6 @@
       picking ? null : folderActions(list),
       picking || folderMode ? null : el("button", { class: "btn-primary folder-go", type: "button", dir: "auto",
         onclick: () => openPage(done === list.length ? list[0].id : next.id) }, go),
-      folderMode || picking ? null : followControls(list[0], true),
       el("ol", { class: "group folder-list" + (folderMode === "order" ? " ordering" : "") },
         ...list.map((p, i) => el("li", folderMode ? { "data-id": p.id } : { "data-id": p.id, "data-ids": p.id },
           el("button", { class: "row chapter" + (p === next && done < list.length ? " now" : ""), type: "button", onclick: () => tapPages([p.id], () => openPage(p.id)) },
@@ -1445,8 +1446,7 @@
               el("span", { class: "choice-note" + (p.finished ? "" : p.at > 0.02 ? " accent" : "") }, readingLine(p)))),
           folderMode === "order" ? moveButton(p, i, -1, list.length) : null,
           folderMode === "order" ? moveButton(p, i, 1, list.length) : null))),
-      folderMode || picking ? null : checkRow(list),
-      folderMode || picking ? null : followControls(list[list.length - 1]));
+      null);
     paintPicks();
   }
 
@@ -1521,14 +1521,22 @@
         el("button", { class: "btn-quiet sort-chapters", type: "button", onclick: () => sortByChapter(list) }, "Sort by chapter"),
         el("button", { class: "btn-primary", type: "button", onclick: mode("") }, "Done"));
     }
+    if (folderMode === "export") {
+      return el("div", { class: "folder-actions export-panel" }, exportControls({ pages: list, title: state.folder }, mode("")));
+    }
+    if (folderMode === "chapters") return chaptersPanel(list, mode(""));
     const reorder = tileButton("reorder", "Reorder", mode("order"));
     reorder.disabled = n < 2;
+    const fresh = freshCount(state.folder);
+    const chapters = tileButton("chapters", "Chapters", mode("chapters"));
+    if (fresh) chapters.append(el("span", { class: "tile-new" }, newCountText(fresh)));
     return el("div", { class: "folder-tools", role: "group", "aria-label": "Folder" },
       tileButton("add", "Add pages", () => openBatch("", false, state.folder)),
+      chapters,
       tileButton("select", "Select", () => startSelect([])),
       reorder,
       tileButton("rename", "Rename", renameFolder),
-      tileButton("book", "EPUB", (e) => sendBook(list, e.currentTarget, state.folder)),
+      tileButton("send", "Export", mode("export")),
       tileButton("remove", "Remove", mode("remove"), "warn"));
   }
 
@@ -1567,6 +1575,7 @@
     reorder: '<path d="M8 4v16M4.5 7.5L8 4l3.5 3.5M16 20V4M12.5 16.5L16 20l3.5-3.5"/>',
     rename: '<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
     book: '<path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5zM5 19.5A1.5 1.5 0 0 0 6.5 21H19"/>',
+    chapters: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 5.5v2M4.5 11.5v1M4 17h1.5l-1.5 2h1.5"/>',
     remove: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>',
   };
   function tileButton(icon, label, onclick, cls) {
@@ -1939,35 +1948,42 @@
     requestAnimationFrame(() => { const f = box.querySelector("input:checked, button"); if (f) f.focus({ preventScroll: true }); });
   }
 
-  function exportControls(p, done) {
-    let kind = exportKind();
+  // `what` is a page, or { pages, title } for a folder.
+  function exportControls(what, done) {
+    const folder = !!what.pages;
+    const kinds = EXPORTS.filter((e) => !folder || e.value !== "source");
+    let kind = folder ? load(EXPORT_KEY + ".folder", "epub") : exportKind();
+    if (!kinds.some((e) => e.value === kind)) kind = "epub";
+    const p = what;
     const save = el("button", { class: "btn-primary export-save", type: "button", onclick: () => exportAs(p, kind, "save", save) });
     const send = el("button", { class: "btn-quiet export-send", type: "button", onclick: () => exportAs(p, kind, "send", send) }, "Send");
     const sync = () => {
       save.textContent = kind === "pdf" ? "Print or save as PDF" : C.platform.native ? "Save to device" : "Download";
       send.hidden = kind === "pdf" || !C.platform.native;
     };
-    const group = choiceGroup({ key: "export-kind", label: "Export as", options: EXPORTS, get: () => kind,
-      set: (v) => { kind = v; store(EXPORT_KEY, v); sync(); } });
+    const group = choiceGroup({ key: "export-kind", label: "Export as", options: kinds, get: () => kind,
+      set: (v) => { kind = v; store(folder ? EXPORT_KEY + ".folder" : EXPORT_KEY, v); sync(); } });
     sync();
     return el("div", { class: "export" },
       el("div", { class: "export-top" },
         el("button", { class: "btn-quiet export-back", type: "button", onclick: done }, "Back"),
-        el("p", { class: "menu-title", dir: "auto" }, p.title)),
+        el("p", { class: "menu-title", dir: "auto" }, folder ? what.title : p.title)),
       group,
       el("div", { class: "export-actions" }, save, send));
   }
 
   async function exportAs(p, kind, how, btn) {
-    if (kind === "pdf") { await printPage(p, btn); return; }
+    const pages = p.pages || null;
+    if (kind === "pdf") { await (pages ? printPages(pages, p.title, btn) : printPage(p, btn)); return; }
     if (kind === "source" && !navigator.onLine) { toast("You're offline. Try again when you're back online."); return; }
     const mime = EXPORTS.find((e) => e.value === kind).mime;
     btn.disabled = true;
     try {
       let name, text = null, uri = null, blob = null;
-      if (kind === "epub") ({ name, uri = null, blob = null } = await C.epub.exportBook([p]));
-      else if (kind === "md") ({ name, text } = await C.backup.exportMarkdown(p));
-      else ({ name, html: text } = await (kind === "html" ? C.backup.exportPage(p) : C.save.pageSource(p.url)));
+      if (kind === "epub") ({ name, uri = null, blob = null } = await C.epub.exportBook(pages || [p], pages ? p.title : undefined));
+      else if (kind === "md") ({ name, text } = await (pages ? C.backup.exportMarkdownAll(pages, p.title) : C.backup.exportMarkdown(p)));
+      else if (kind === "html") ({ name, html: text } = await (pages ? C.backup.exportPages(pages, p.title) : C.backup.exportPage(p)));
+      else ({ name, html: text } = await C.save.pageSource(p.url));
       if (!uri && text != null) uri = await C.platform.writeCache(name, text);
       if (!uri) C.platform.download(name, blob || new Blob([text], { type: mime }));
       else if (how === "save") {
@@ -1999,10 +2015,12 @@
 
   // The page file with a plain print style, on the phone's print screen;
   // it runs no scripts and loads nothing, its pictures are inside it.
-  async function printPage(p, btn) {
+  const printPage = (p, btn) => printFile(() => C.backup.exportPage(p), btn);
+  const printPages = (pages, title, btn) => printFile(() => C.backup.exportPages(pages, title), btn);
+  async function printFile(make, btn) {
     btn.disabled = true;
     try {
-      const { name, html } = await C.backup.exportPage(p);
+      const { name, html } = await make();
       const head = '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; img-src data:; style-src \'unsafe-inline\'">' +
         "<style>" + C.epub.STYLE + "</style>";
       await C.platform.printHtml(name.replace(/\.html$/, ""), html.replace(/<head>/i, "<head>" + head));
@@ -2167,6 +2185,8 @@
 
   function renderBatch(text, preset, from) {
     let folder = preset;
+    // The page the chapters were read from, kept on the folder (0.26.0).
+    let source = from || null;
     let mode = load(IMAGES_KEY, "previews");
     // A comic's folder saves its next chapters as comics too.
     let kind = preset && folderPages(preset).some((p) => p.comic) ? "comic" : "article";
@@ -2196,6 +2216,7 @@
       try {
         const found = await C.save.findChapters(url);
         if (found.links.length) {
+          source = url;
           area.value = found.links.join("\n");
           if (!folder) { const name = folderName(found.title || C.save.siteName(url)); input.value = name; pick(name, true); }
           sync();
@@ -2285,7 +2306,7 @@
       if (!urls.length) return;
       if (urls.length > LONG_LIST && !confirm("Save " + urls.length + " pages? They save one at a time, so a list this long takes a while. Pause and Stop are on its card.")) return;
       history.back();
-      saveAll(skipSaved ? all : urls, folder, tags, mode, skipSaved, kind);
+      saveAll(skipSaved ? all : urls, folder, tags, mode, skipSaved, kind, source);
     });
     $("batchBody").replaceChildren(form);
     if (folder && !allFolders().some((f) => sameTag(f, folder))) input.value = folder;
@@ -2445,7 +2466,17 @@
     store(NEW_KEY, all);
   }
 
+  // The story's page a folder is linked to (0.26.0): kept on each of its
+  // pages as `source`, so it travels with them in backups. "" when none.
+  const folderSource = (list) => (list.find((p) => p.source) || {}).source || "";
+  function bookIcon(size) {
+    const s = el("span", { class: "book-icon", "aria-hidden": "true" });
+    s.innerHTML = '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + ICONS.book + "</svg>";
+    return s;
+  }
+
   function isSeries(list) {
+    if (folderSource(list)) return true;
     if (list.length < 2) return false;
     const last = list[list.length - 1];
     if (!/^https?:/.test(last.url || "") || last.licence === "wikipedia") return false;
@@ -2464,20 +2495,29 @@
     checking.add(key);
     if (state.folder && sameTag(state.folder, name)) renderFolder();
     let count = 0;
+    const source = folderSource(list);
     try {
-      let url = await C.save.findNext(last.url);
-      if (url && !savedAs(url)) {
-        last.next = url;
-        await C.store.writeIndex(state.pages);
-        const seen = new Set([last.url]);
-        while (url && !seen.has(url) && !savedAs(url) && count < NEW_MAX) {
-          seen.add(url);
-          count++;
-          if (count === NEW_MAX) break;
-          try { url = await C.save.findNext(url); } catch (e) { break; }
+      if (source) {
+        // A linked folder reads the story's own chapter list: whatever in
+        // it isn't saved is new, wherever it sits.
+        const all = (await C.save.findChapters(source)).links.slice(0, 5000);
+        count = all.filter((u) => !savedAs(u)).length;
+        setNewFor(name, { at: Date.now(), count, all });
+      } else {
+        let url = await C.save.findNext(last.url);
+        if (url && !savedAs(url)) {
+          last.next = url;
+          await C.store.writeIndex(state.pages);
+          const seen = new Set([last.url]);
+          while (url && !seen.has(url) && !savedAs(url) && count < NEW_MAX) {
+            seen.add(url);
+            count++;
+            if (count === NEW_MAX) break;
+            try { url = await C.save.findNext(url); } catch (e) { break; }
+          }
         }
+        setNewFor(name, { at: Date.now(), count });
       }
-      setNewFor(name, { at: Date.now(), count });
     } catch (e) {
       if (!quiet) toast("Couldn't reach " + last.site + " to look for new chapters.");
       count = null;
@@ -2497,6 +2537,7 @@
   function freshCount(name) {
     const entry = newFor(name);
     if (!entry || !entry.count) return 0;
+    if (entry.all) return entry.all.filter((u) => !savedAs(u)).length;
     const list = folderPages(name);
     const last = list[list.length - 1];
     if (!last || !last.next || savedAs(last.next)) return 0;
@@ -2518,10 +2559,111 @@
       checkNew(name, false);
     } }, "Check");
     btn.disabled = busy;
+    // From a story page, the new ones are saved straight from its list,
+    // each at its place among those already saved.
+    const take = entry && entry.all && fresh ? el("button", { class: "chip on save-new", type: "button", onclick: () => {
+      if (!navigator.onLine) { toast("You're offline. Try again when you're back online."); return; }
+      saveAll(entry.all, name, [], undefined, true, undefined, folderSource(list));
+    } }, "Save " + fresh) : null;
     return el("div", { class: "rc-row check-new" },
       el("span", { class: "rc-label" }, "New chapters"),
       el("div", { class: "chips" },
-        el("span", { class: "check-note" + (fresh ? " accent" : ""), role: "status" }, note), btn));
+        el("span", { class: "check-note" + (fresh ? " accent" : ""), role: "status" }, note), take, btn));
+  }
+
+  // ---- The folder's Chapters panel (0.26.0) ----
+  // Everything about a series in one place: new chapters, saving earlier
+  // or later ones, the story page it's linked to, and saving the saved
+  // ones again.
+  function chaptersPanel(list, done) {
+    const rows = [checkRow(list), followControls(list[0], true), followControls(list[list.length - 1])].filter(Boolean);
+    return el("div", { class: "folder-actions chapters-panel" },
+      rows.length ? el("div", { class: "chapter-tools" }, ...rows)
+        : el("p", { class: "meta" }, "These pages don't link to each other, so there's nothing to look for. Link the folder to its story page below."),
+      sourceSection(list),
+      refreshSection(list),
+      el("button", { class: "btn-primary chapters-done", type: "button", onclick: done }, "Done"));
+  }
+
+  function sourceSection(list) {
+    const name = state.folder;
+    const src = folderSource(list);
+    const input = el("input", { class: "tag-input source-input", type: "url", inputmode: "url", value: src,
+      placeholder: "The story's page, with its chapter list", "aria-label": "Story page", autocapitalize: "off", spellcheck: "false" });
+    const link = el("button", { class: "btn-quiet source-link", type: "button", onclick: async () => {
+      const u = linkFrom(input.value);
+      if (!u) { toast("Paste the link to the story's page."); return; }
+      if (!navigator.onLine) { toast("You're offline. Try again when you're back online."); return; }
+      link.disabled = true;
+      link.textContent = "Reading…";
+      try {
+        const found = await C.save.findChapters(u);
+        if (!found.links.length) { toast("Couldn't find a list of chapters on that page."); return; }
+        setSource(name, u);
+        toast("Linked to " + countLine(found.links.length).replace("page", "chapter") + " on " + C.save.siteName(u));
+      } catch (e) {
+        toast(e instanceof C.save.SaveError ? e.message : "Couldn't read that page. Try again.");
+      } finally {
+        if (link.isConnected) { link.disabled = false; link.textContent = src ? "Change" : "Link"; }
+      }
+    } }, src ? "Change" : "Link");
+    const unlink = src ? el("button", { class: "btn-quiet source-unlink", type: "button", onclick: () => { setSource(name, ""); toast("Unlinked " + name); } }, "Unlink") : null;
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); link.click(); } });
+    return el("section", { class: "settings-section source-section" },
+      el("h2", { class: "overline" }, "Story page"),
+      el("div", { class: "source-row" }, input, link, unlink),
+      el("p", { class: "footnote" }, "New chapters are read from its chapter list, which also finds chapters added in between."));
+  }
+
+  async function setSource(name, url) {
+    for (const p of folderPages(name)) { if (url) p.source = url; else delete p.source; }
+    setNewFor(name, null);
+    await C.store.writeIndex(state.pages);
+    renderFolder();
+    renderLibrary();
+  }
+
+  // Saves the folder's pages again where they are, to switch their
+  // pictures or pick up an author's edits; each keeps its place, tags
+  // and read position.
+  function refreshSection(list) {
+    let mode = load(IMAGES_KEY, "previews");
+    const go = el("button", { class: "btn-quiet refresh-go", type: "button", onclick: () => refreshFolder(state.folder, mode, go) },
+      "Save " + countLine(list.length) + " again");
+    go.disabled = !list.some((p) => /^https?:/.test(p.url || "")) || !!runFor(state.folder);
+    return el("section", { class: "settings-section refresh-section" },
+      el("h2", { class: "overline" }, "Save again"),
+      C.platform.native ? seg("refresh-images", "Images", [
+        { value: "previews", label: "Previews" }, { value: "full", label: "Full" }, { value: "links", label: "Links" },
+      ], mode, (v) => { mode = v; }) : null,
+      el("p", { class: "footnote" }, "Downloads the saved pages again, to switch their pictures or pick up the author's edits. Your place in each stays."),
+      go);
+  }
+
+  async function refreshFolder(name, mode, btn) {
+    const list = folderPages(name).filter((p) => /^https?:/.test(p.url || ""));
+    if (!list.length || !navigator.onLine) { if (!navigator.onLine) toast("You're offline. Try again when you're back online."); return; }
+    btn.disabled = true;
+    let done = 0, failed = 0;
+    for (const old of list) {
+      if (done + failed) await new Promise((ok) => setTimeout(ok, PACE_MS));
+      if (btn.isConnected) btn.textContent = "Saving again, " + (done + failed + 1) + " of " + list.length;
+      try {
+        const meta = await C.save.save(old.url, { mode, kind: old.comic ? "comic" : "article" });
+        for (const k of ["requested", "folder", "folderAt", "source", "tags", "at", "finished", "readAt"]) if (old[k] !== undefined) meta[k] = old[k];
+        const i = state.pages.indexOf(old);
+        if (i < 0) { await C.store.removePage(meta.id); continue; }
+        state.pages[i] = meta;
+        await C.store.writeIndex(state.pages);
+        await C.store.removePage(old.id);
+        done++;
+      } catch (e) {
+        failed++;
+      }
+    }
+    if (state.folder && sameTag(state.folder, name)) renderFolder();
+    renderLibrary();
+    toast("Saved " + countLine(done) + " again" + (failed ? " · " + failed + " couldn't be saved" : "") + ".");
   }
 
   function whenText(at) {

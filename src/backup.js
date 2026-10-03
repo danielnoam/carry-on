@@ -39,6 +39,8 @@
     if (tags.length) out.tags = [...new Set(tags)].slice(0, 50);
     const folder = text(m.folder, 32).replace(/\s+/g, " ").trim();
     if (folder) { out.folder = folder; out.folderAt = num(m.folderAt) || out.savedAt; }
+    if (folder && httpUrl(m.source)) out.source = httpUrl(m.source);
+    if (text(m.series, 200)) out.series = text(m.series, 200);
     return out;
   }
 
@@ -400,6 +402,34 @@
     return { name: pageSlug(p.title) + ".md", text };
   }
 
+  // A folder as one file (0.26.0): its pages in order, each with its own
+  // title and licence line, pictures inside.
+  async function exportPages(pages, title) {
+    const out = document.implementation.createHTMLDocument(title);
+    const charset = out.createElement("meta");
+    charset.setAttribute("charset", "utf-8");
+    out.head.prepend(charset);
+    const h = out.createElement("h1");
+    h.className = "co-folder";
+    h.textContent = title;
+    out.body.append(h);
+    for (const p of pages) {
+      const doc = new DOMParser().parseFromString((await exportPage(p)).html, "text/html");
+      const part = out.createElement("section");
+      part.className = "co-part";
+      part.append(...[...doc.body.childNodes].map((n) => out.importNode(n, true)));
+      part.querySelectorAll(".co-head h1").forEach((n) => { const h2 = out.createElement("h2"); h2.textContent = n.textContent; n.replaceWith(h2); });
+      out.body.append(part);
+    }
+    return { name: pageSlug(title) + ".html", html: "<!doctype html>\n" + out.documentElement.outerHTML };
+  }
+
+  async function exportMarkdownAll(pages, title) {
+    const parts = [];
+    for (const p of pages) parts.push((await exportMarkdown(p)).text.replace(/^# /, "## ").trim());
+    return { name: pageSlug(title) + ".md", text: "# " + mdEscape(title) + "\n\n" + parts.join("\n\n---\n\n") + "\n" };
+  }
+
   // A page file back into the library. Resolves to its new index entry,
   // or to { already } with the address when `has(url)` says it's saved;
   // throws an Error whose message says what's wrong with the file.
@@ -436,5 +466,5 @@
     return meta;
   }
 
-  C.backup = { cleanMeta, crc32, zipWriter, zipEntries, zipRead, exportLibrary, restoreLibrary, exportPage, exportMarkdown, importPage, imageType, mdBlocks };
+  C.backup = { cleanMeta, crc32, zipWriter, zipEntries, zipRead, exportLibrary, restoreLibrary, exportPage, exportPages, exportMarkdown, exportMarkdownAll, importPage, imageType, mdBlocks };
 })();

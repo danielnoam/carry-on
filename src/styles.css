@@ -765,11 +765,11 @@ html.native .reader::before {
 .folder-list .move:disabled { color: var(--line); cursor: default; }
 /* A folder's tools sit above its pages: three a row on a phone, six on a
    desktop, the same tiles as a page's sheet. */
-.folder-tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-2); margin-bottom: var(--s-4); }
+.folder-tools { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s-2); margin-bottom: var(--s-4); }
 .folder-tools .tile-btn { min-height: 64px; }
 .tile-btn.warn { color: var(--warn); }
 .tile-btn.warn .tile-icon { color: var(--warn); }
-@media (min-width: 600px) { .folder-tools { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+@media (min-width: 600px) { .folder-tools { grid-template-columns: repeat(7, minmax(0, 1fr)); } }
 .folder-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); margin-bottom: var(--s-4); }
 .folder-actions .meta { margin: 0; }
 .folder-actions.order .meta { flex: 1 1 100%; }
@@ -988,3 +988,18 @@ html.native .reader::before {
 .export-actions { display: flex; gap: var(--s-2); margin-top: var(--s-4); }
 .export-actions > * { flex: 1; height: 48px; }
 .export-actions [hidden] { display: none; }
+
+/* Folder Chapters and Export panels (0.26.0) */
+.folder-actions.chapters-panel, .folder-actions.export-panel { flex-direction: column; align-items: stretch; gap: var(--s-4); }
+.folder-actions.export-panel > .export { width: 100%; }
+.chapter-tools { display: flex; flex-direction: column; gap: var(--s-2); }
+.chapters-panel .settings-section { margin: 0; }
+.source-row { display: flex; gap: var(--s-2); align-items: center; }
+.source-row .source-input { flex: 1; min-width: 0; }
+.refresh-section .seg { margin-bottom: var(--s-2); }
+.refresh-section .refresh-go { width: 100%; margin-top: var(--s-2); }
+.folder-tools .tile-btn { position: relative; }
+.folder-tools .tile-new { position: absolute; top: var(--s-1); right: var(--s-1); }
+.bar-title .book-icon { display: inline-flex; vertical-align: -2px; margin-inline-end: var(--s-1); color: var(--accent); }
+.tile-thumb .book-icon { color: var(--accent); }
+.tile-book { position: absolute; left: var(--s-1); bottom: var(--s-1); display: inline-flex; padding: var(--s-1); border-radius: var(--r-sm); background: var(--surface); }
