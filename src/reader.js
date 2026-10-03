@@ -219,7 +219,7 @@
   function readable() {
     if (!doc) return [];
     blocks = [...doc.body.querySelectorAll(BLOCKS)].filter((el) => !el.closest(".co-meta, .co-licence, .co-next, .co-video, nav, aside")
-      && !el.querySelector(BLOCKS)).map((el) => ({ el, text: speechText(el) })).filter((b) => b.text);
+      && !el.querySelector(BLOCKS)).map((el) => ({ el, text: speechText(el) })).filter((b) => /[\p{L}\p{N}]/u.test(b.text));
     return blocks.map((b) => b.text);
   }
   // The first block not yet scrolled past, where reading starts.
@@ -242,6 +242,29 @@
     }
   }
 
+  // Where a selection starts, for "Read from here": its block, how far
+  // into the block's text, and where it is on screen (the frame's own
+  // coordinates).
+  function selectionSpot() {
+    const sel = doc && doc.getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount || !sel.toString().trim()) return null;
+    if (!blocks.length) readable();
+    const r = sel.getRangeAt(0);
+    const at = r.startContainer.nodeType === 1 ? r.startContainer : r.startContainer.parentElement;
+    const i = blocks.findIndex((b) => b.el.contains(at));
+    if (i < 0) return null;
+    const pre = doc.createRange();
+    pre.setStart(blocks[i].el, 0);
+    pre.setEnd(r.startContainer, r.startOffset);
+    const box = r.getBoundingClientRect();
+    return { block: i, offset: pre.toString().replace(/\s+/g, " ").replace(/^ /, "").length,
+      word: sel.toString().trim().split(/\s+/)[0], top: box.top, bottom: box.bottom, left: box.left, right: box.right };
+  }
+  function clearSelection() {
+    const sel = doc && doc.getSelection();
+    if (sel) sel.removeAllRanges();
+  }
+
   // Whether the page is scrolling itself to follow the reading, which
   // shouldn't put the bars away.
   const following = () => Date.now() < followUntil;
@@ -257,7 +280,7 @@
   // `next` ({ over, title, go }) adds a link to the next page at the end;
   // `top` () gives the height the bar covers; onImage(info) opens a tapped
   // image.
-  function open(iframe, html, meta, { at = 0, onPosition, onScroll, next, top, onImage: image, onTap: tap } = {}) {
+  function open(iframe, html, meta, { at = 0, onPosition, onScroll, next, top, onImage: image, onTap: tap, onSelect } = {}) {
     frame = iframe;
     blocks = [];
     lit = null;
@@ -294,6 +317,13 @@
         }
         heads = [...doc.body.querySelectorAll("h2, h3")].filter((h) => clean(h));
         doc.addEventListener("click", onClick);
+        if (onSelect) {
+          let selTimer = 0;
+          doc.addEventListener("selectionchange", () => {
+            clearTimeout(selTimer);
+            selTimer = setTimeout(() => { if (doc) onSelect(selectionSpot()); }, 250);
+          });
+        }
         iframe.contentWindow.addEventListener("scroll", () => {
           if (onScroll && !scrollFrame) {
             scrollFrame = requestAnimationFrame(() => {
@@ -341,5 +371,5 @@
   addEventListener("resize", applyTop);
   addEventListener("offline", applyConnection);
 
-  C.reader = { open, close, position, headings, section, jumpTo, readable, firstShown, light, following, applyTheme, applyConnection, srcdoc, CSP };
+  C.reader = { open, close, position, headings, section, jumpTo, readable, firstShown, light, following, selectionSpot, clearSelection, applyTheme, applyConnection, srcdoc, CSP };
 })();

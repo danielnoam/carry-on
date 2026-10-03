@@ -3,6 +3,18 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Why reading aloud stopped at gaps (0.27.1).** Daniel heard it stop
+  partway. Not reproducible off a phone, so three likely causes are all
+  fixed: a block with no letters or digits ("* * *" scene breaks in
+  serials) is no longer sent, since some engines say nothing back for a
+  piece they can't voice; SpeechService gives every piece a deadline of
+  8 s plus 160 ms a character (at 1×) and goes on if the engine never
+  reports it done; and a transient loss of audio focus (a notification,
+  another app) now pauses and resumes on regaining focus instead of
+  staying paused. "Read from here" takes the selection's block and its
+  offset (`selectionSpot` in reader.js), finds the selected word nearest
+  that offset in the block's spoken text, and starts the reading there,
+  the block split in two pieces.
 - **Read aloud goes on with the screen off (0.27.0).** Daniel chose
   screen-off reading over a simpler screen-on version. So the native side
   owns the reading, not the page: the app sends the whole page as pieces

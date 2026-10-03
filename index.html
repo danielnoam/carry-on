@@ -7,8 +7,8 @@
   <title>Carry-on</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="src/fonts.css?v=0.27.0">
-  <link rel="stylesheet" href="src/styles.css?v=0.27.0">
+  <link rel="stylesheet" href="src/fonts.css?v=0.27.1">
+  <link rel="stylesheet" href="src/styles.css?v=0.27.1">
 </head>
 <body>
   <div class="app" id="libraryView">
@@ -82,21 +82,24 @@
       </div>
     </header>
     <iframe class="reader-frame" id="readerFrame" sandbox="allow-same-origin" title="Saved page"></iframe>
-    <div class="aloud-player" id="aloudPlayer" role="group" aria-label="Reading aloud" hidden>
-      <button class="icon-btn" id="aloudPrev" type="button" aria-label="Previous paragraph">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h2v14H6zM20 5v14L9.5 12z"></path></svg>
-      </button>
-      <button class="icon-btn aloud-play" id="aloudPlay" type="button" aria-label="Pause">
-        <svg class="aloud-pause-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"></path></svg>
-        <svg class="aloud-play-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>
-      </button>
-      <button class="icon-btn" id="aloudNext" type="button" aria-label="Next paragraph">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 5h2v14h-2zM4 5v14l10.5-7z"></path></svg>
-      </button>
-    </div>
-    <div class="read-foot" id="readFoot" aria-hidden="true">
-      <p class="read-left"><span class="read-section" id="readSection" dir="auto"></span><span id="readLeft"></span></p>
-      <div class="read-progress" id="readProgress"><span></span></div>
+    <div class="read-foot" id="readFoot">
+      <div class="read-left">
+        <span class="read-section" id="readSection" dir="auto" aria-hidden="true"></span>
+        <div class="aloud-player" id="aloudPlayer" role="group" aria-label="Reading aloud" hidden>
+          <button class="icon-btn" id="aloudPrev" type="button" aria-label="Previous paragraph">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h2v14H6zM20 5v14L9.5 12z"></path></svg>
+          </button>
+          <button class="icon-btn aloud-play" id="aloudPlay" type="button" aria-label="Pause">
+            <svg class="aloud-pause-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"></path></svg>
+            <svg class="aloud-play-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>
+          </button>
+          <button class="icon-btn" id="aloudNext" type="button" aria-label="Next paragraph">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 5h2v14h-2zM4 5v14l10.5-7z"></path></svg>
+          </button>
+        </div>
+        <span class="read-time" id="readLeft" aria-hidden="true"></span>
+      </div>
+      <div class="read-progress" id="readProgress" aria-hidden="true"><span></span></div>
     </div>
     <div class="viewer" id="imageViewer" role="dialog" aria-modal="true" aria-label="Image" hidden>
       <div class="viewer-stage" id="viewerStage"><img class="viewer-img" id="viewerImg" alt=""></div>
@@ -179,14 +182,14 @@
   </div>
   <div class="toast" id="toast" role="status" hidden></div>
 
-  <script src="src/platform.js?v=0.27.0"></script>
-  <script src="src/motion.js?v=0.27.0"></script>
-  <script src="src/vendor/Readability.js?v=0.27.0"></script>
-  <script src="src/store.js?v=0.27.0"></script>
-  <script src="src/save.js?v=0.27.0"></script>
-  <script src="src/backup.js?v=0.27.0"></script>
-  <script src="src/epub.js?v=0.27.0"></script>
-  <script src="src/reader.js?v=0.27.0"></script>
-  <script src="src/app.js?v=0.27.0"></script>
+  <script src="src/platform.js?v=0.27.1"></script>
+  <script src="src/motion.js?v=0.27.1"></script>
+  <script src="src/vendor/Readability.js?v=0.27.1"></script>
+  <script src="src/store.js?v=0.27.1"></script>
+  <script src="src/save.js?v=0.27.1"></script>
+  <script src="src/backup.js?v=0.27.1"></script>
+  <script src="src/epub.js?v=0.27.1"></script>
+  <script src="src/reader.js?v=0.27.1"></script>
+  <script src="src/app.js?v=0.27.1"></script>
 </body>
 </html>
