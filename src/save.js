@@ -135,6 +135,65 @@
     return "";
   }
 
+  // ---- Image chapters: comics and manga (0.22.0) ----
+
+  // Pictures that are page furniture, not panels.
+  const NOT_PANEL = /logo|avatar|icon|emoji|sprite|banner|badge|button|\bads?\b|advert|sponsor|thumb|gravatar|spinner|loading|placeholder/i;
+  function isPanel(src, width, height, label) {
+    if (!/^https?:/.test(src || "") || isTrackingPixel(width, height, src)) return false;
+    const w = parseInt(width, 10), h = parseInt(height, 10);
+    if ((w && w < 400) || (h && h < 200)) return false;
+    return !NOT_PANEL.test(String(src).split("?")[0]) && !NOT_PANEL.test(label || "");
+  }
+
+  // The column of panels among pictures, each { src, path } with `path`
+  // the keys of its nearest few ancestors, nearest first: the nearest
+  // ancestor holding nearly as many as the fullest one (an ad beside the
+  // column shouldn't pull the choice outwards), four at least and most of
+  // all of them. Resolves to { key, srcs } in page order,
+  // each picture once; null when the pictures aren't a column.
+  function comicGroup(items) {
+    const counts = new Map(), depth = new Map();
+    for (const it of items) {
+      it.path.forEach((k, d) => {
+        counts.set(k, (counts.get(k) || 0) + 1);
+        depth.set(k, Math.min(depth.has(k) ? depth.get(k) : d, d));
+      });
+    }
+    const most = Math.max(0, ...counts.values());
+    let key = null, best = 0;
+    for (const [k, n] of counts) {
+      if (n < most * 0.8) continue;
+      if (key == null || depth.get(k) < depth.get(key) || (depth.get(k) === depth.get(key) && n > best)) { key = k; best = n; }
+    }
+    if (best < 4 || best < items.length * 0.6) return null;
+    const seen = new Set();
+    const srcs = items.filter((it) => it.path.includes(key)).map((it) => it.src).filter((u) => !seen.has(u) && seen.add(u));
+    return srcs.length >= 4 ? { key, srcs } : null;
+  }
+
+  // A page that is a column of large pictures with little text around
+  // them: the pictures, in order; null for an article. Run after
+  // resolveLazyImages.
+  function comicPanels(doc, base) {
+    const ids = new Map();
+    const keyOf = (n) => { if (!ids.has(n)) ids.set(n, ids.size); return ids.get(n); };
+    const items = [];
+    for (const img of doc.querySelectorAll("body img")) {
+      const src = absolute(img.getAttribute("src") || "", base);
+      if (!isPanel(src, img.getAttribute("width"), img.getAttribute("height"), (img.getAttribute("class") || "") + " " + (img.getAttribute("alt") || "") + " " + (img.id || ""))) continue;
+      const path = [];
+      for (let n = img.parentElement; n && n !== doc.body && path.length < 4; n = n.parentElement) path.push(keyOf(n));
+      items.push({ src, path, img });
+    }
+    const group = comicGroup(items);
+    if (!group) return null;
+    const box = [...ids].find(([, k]) => k === group.key)[0];
+    const words = box.textContent.replace(/\s+/g, " ").trim().length;
+    if (words > 120 * group.srcs.length) return null;
+    return group.srcs;
+  }
+
   // ---- A contents page's chapters (0.21.0) ----
 
   // A chapter's number from its link text ("Chapter 12", "Ch. 3.5",
@@ -358,6 +417,8 @@
     const next = nextLink(doc, finalUrl);
     const prev = nextLink(doc, finalUrl, true);
     resolveLazyImages(doc, finalUrl);
+    const panels = comicPanels(doc, finalUrl);
+    if (panels) return { doc, docTitle, headline, next, prev, panels };
     if (typeof window.Readability !== "function") throw new SaveError("The reader part of the app didn't load. Restart Carry-on.");
     const article = new window.Readability(doc, { charThreshold: 500, keepClasses: false }).parse();
     if (!article || (article.textContent || "").trim().length < MIN_TEXT) return null;
@@ -385,6 +446,22 @@
       throw new SaveError(C.platform.canRender
         ? "Carry-on couldn't find the article on this page, even after letting it draw itself."
         : "This page builds itself with JavaScript, which Carry-on can't save yet.");
+    }
+    if (got.panels) {
+      const { doc, docTitle, headline, next, prev, panels } = got;
+      const body = doc.implementation.createHTMLDocument("").body;
+      for (const src of panels) {
+        const img = body.ownerDocument.createElement("img");
+        img.setAttribute("src", src);
+        img.setAttribute("alt", "");
+        body.append(img);
+      }
+      return {
+        url: finalUrl, comic: true,
+        title: (headline.trim() || docTitle || siteName(finalUrl)).trim().replace(/\s+/g, " "),
+        site: siteName(finalUrl), byline: "", body, base: finalUrl, licence: null,
+        lang: (doc.documentElement.getAttribute("lang") || "").trim(), dir: "", next, prev,
+      };
     }
     const { doc, docTitle, headline, next, prev, article } = got;
     const body = new DOMParser().parseFromString(article.content, "text/html").body;
@@ -564,7 +641,7 @@
   // and attributes Carry-on itself writes. Images keep only a data: picture
   // or an https link; anything else a hand-edited file carries is dropped.
   // Resolves to { root, images } with the data: pictures to write out.
-  const CO_CLASS = /^co-(body|video|play|video-title|video-note|credit|missing)$/;
+  const CO_CLASS = /^co-(body|comic|video|play|video-title|video-note|credit|missing)$/;
   const DATA_IMAGE = /^data:image\/(png|jpe?g|gif|webp);base64,[a-z0-9+/=\s]+$/i;
   function cleanSaved(body, out) {
     const images = [];
@@ -615,15 +692,15 @@
   // Downloads one image into the page's directory; a preview much wider
   // than the screen needs is redrawn smaller (store.shrink). Resolves to
   // { rel, bytes } of the file kept.
-  async function keep(id, rel, url, mode) {
-    const size = await C.store.download(id, rel, url);
+  async function keep(id, rel, url, mode, page) {
+    const size = await C.store.download(id, rel, url, page);
     return mode === "full" ? { rel, bytes: size } : C.store.shrink(id, rel, size, PREVIEW_WIDTH);
   }
 
   // Downloads previews (or full images, or nothing, per the image setting)
   // into images/ beside page.html. A failed one keeps its link and is
   // counted as missing; the reader shows a placeholder for it offline.
-  async function saveImages(id, media, mode, onProgress) {
+  async function saveImages(id, media, mode, onProgress, page) {
     let done = 0, missing = 0, bytes = 0, thumb = null;
     const total = media.length;
     const queue = media.map((m, i) => ({ ...m, i }));
@@ -637,7 +714,7 @@
       if (mode === "links") { m.el.setAttribute("data-full", fallback); m.el.className = "co-missing"; return; }
       const rel = "images/" + m.i + "." + extOf(url);
       try {
-        const got = await keep(id, rel, url, mode);
+        const got = await keep(id, rel, url, mode, page);
         bytes += got.bytes;
         m.el.setAttribute("src", got.rel);
         if (!thumb && !m.video) thumb = got.rel;
@@ -715,13 +792,17 @@
 
   // Saves `url`; onProgress({ stage, done, total }) reports drawing a
   // script-built page, then images as they land. Resolves to the page's meta, which the library index lists.
-  async function save(url, { mode = "previews", onProgress } = {}) {
+  async function save(url, { mode: chosen = "previews", onProgress } = {}) {
     const wiki = wikipediaPage(url);
     if (onProgress) onProgress({ stage: "text" });
     const got = wiki ? await fromWikipedia(wiki) : await fromAnyPage(url, () => onProgress && onProgress({ stage: "drawing" }));
     const out = document.implementation.createHTMLDocument("");
     const { root, media } = rebuild(got.body, got.base, got.url, out);
-    if (!root.textContent.trim()) throw new SaveError("Nothing readable was found on this page.");
+    // An image chapter keeps its panels at full size whatever the setting:
+    // a preview of a page of a comic can't be read.
+    const mode = got.comic ? "full" : chosen;
+    if (got.comic) root.classList.add("co-comic");
+    else if (!root.textContent.trim()) throw new SaveError("Nothing readable was found on this page.");
     // The page's own headline, when the article kept it, would sit under the
     // one savedPageHtml writes.
     const norm = (t) => t.replace(/\s+/g, " ").trim().toLowerCase();
@@ -735,8 +816,9 @@
       lang: wiki ? wiki.host.split(".")[0] : got.lang || "", dir: got.dir || "", mode: C.platform.native ? mode : "links",
       next: got.next || "", prev: got.prev || "",
     };
+    if (got.comic) Object.assign(meta, { comic: true, minutes: Math.max(1, Math.round(media.length / 10)) });
     if (onProgress) onProgress({ stage: "images", done: 0, total: media.length });
-    const res = await saveImages(id, media, mode, (done, total) => onProgress && onProgress({ stage: "images", done, total }));
+    const res = await saveImages(id, media, mode, (done, total) => onProgress && onProgress({ stage: "images", done, total }), got.url);
     Object.assign(meta, { images: res.total, missing: res.missing, thumb: res.thumb });
     const html = savedPageHtml(meta, root, out);
     try {
@@ -768,7 +850,7 @@
       if (!/^https?:/.test(url)) continue;
       const rel = "images/r" + stamp + "-" + i + "." + extOf(url);
       try {
-        const kept = await keep(meta.id, rel, url, meta.mode);
+        const kept = await keep(meta.id, rel, url, meta.mode, meta.url);
         bytes += kept.bytes;
         img.setAttribute("src", kept.rel);
         img.removeAttribute("class");
@@ -800,7 +882,7 @@
       const url = img.getAttribute("data-full");
       const rel = "images/f" + stamp + "-" + i + "." + extOf(url);
       try {
-        bytes += await C.store.download(meta.id, rel, url);
+        bytes += await C.store.download(meta.id, rel, url, meta.url);
         // The library card keeps its small preview.
         const old = img.getAttribute("src") || "";
         if (/^images\//.test(old) && old !== meta.thumb) bytes -= await C.store.removeFile(meta.id, old);
@@ -825,7 +907,7 @@
   }
 
   C.save = {
-    save, SaveError, ContentsPage, findChapters, chapterNumber, pickChapters, retryMissing, saveFullImages, findNext, creditLine, cleanSaved, savedPageHtml, newId, textDir, isNextText, isPrevText, plainText,
+    save, SaveError, ContentsPage, findChapters, chapterNumber, pickChapters, comicGroup, isPanel, retryMissing, saveFullImages, findNext, creditLine, cleanSaved, savedPageHtml, newId, textDir, isNextText, isPrevText, plainText,
     wikipediaPage, wikimediaThumb, parseSrcset, pickWidth, youtubeId, vimeoId, extOf, isTrackingPixel, readingMinutes, siteName,
   };
 })();

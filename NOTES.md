@@ -3,6 +3,32 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **How an image chapter is recognised (0.22.0).** After lazy pictures
+  are resolved, the page's pictures that could be panels are kept: an
+  http address, not a tracking pixel, at least 400 × 200 when the page
+  says its size, and nothing in the address, class or alt that reads
+  like page furniture (logo, avatar, icon, banner, ad, thumb, spinner…).
+  Each is counted against its four nearest ancestors; the chosen box is
+  the nearest one holding at least 80% of the fullest box's count, so an
+  ad beside the column doesn't pull the choice out to the whole page. It
+  needs four pictures and 60% of them, and less than 120 characters of
+  text per picture, or the page is an illustrated article. Image chapters
+  always save full size: a 480 px preview of a page of speech bubbles is
+  unreadable. Script-drawn chapters with no pictures in their HTML are
+  not covered yet unless the hidden-WebView drawing kicks in.
+- **Referer is the page's origin (0.22.0).** Pictures are downloaded with
+  `Referer: https://site/`, the origin as browsers send it across sites
+  by default, not the full address. It is sent for every save, not only
+  image chapters: many news and image hosts check it too.
+- **A tap and a double tap on a panel (0.22.0).** A tap on text shows or
+  hides the bar; on an image chapter the whole screen is pictures, so a
+  single tap waits 280 ms for a second one: one tap is the bar, two open
+  the viewer to zoom. Pinch zoom stays in the viewer, so the reader's
+  iframe keeps its fixed scale.
+- **The size warning (0.22.0).** Save next or previous 5, 10 or All
+  averages the folder's three most recently saved pages; at 5 MB or more
+  each it asks first, with the total for a number and the size each for
+  All. One more never asks.
 - **How a contents page is recognised (0.21.0).** Before Readability
   runs, the page's same-site links are grouped by the list, table or
   block they sit in, and the group with the most links that carry a

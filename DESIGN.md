@@ -214,7 +214,15 @@ Source Serif 4 and Instrument Sans (Now).
   as chips, in ⋯ and under a folder's list, when the last page has a
   next link; "Save previous" the same above the list, for the first
   page. While a run saves, the chips dim and Stop (warn colour) joins
-  them. Pages come one at a time, half a second apart.
+  them. Pages come one at a time, half a second apart. 5, 10 or All ask
+  first when the last chapters were 5 MB or more each, naming the total
+  ("about 73 MB").
+- **Image chapter (Now):** the panels run the reader's full width on a
+  phone (the column's width on a wider screen), no gaps, no rounded
+  corners, `--preview` behind each while it loads. The headline and meta
+  line stay above as on any page. A tap shows or hides the bar; a double
+  tap opens the panel in the image viewer to zoom. No animation of its
+  own.
 - **Switch (Now):** 52 × 32, a `--muted` knob in a `--muted` outline
   when off; on, the track fills with the accent and the knob, in
   `--accent-ink`, slides to the end (mirrored right to left). A focus

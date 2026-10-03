@@ -30,6 +30,7 @@
       at: Math.min(1, Math.max(0, num(m.at))), finished: m.finished === true,
     };
     if (num(m.readAt)) out.readAt = num(m.readAt);
+    if (m.comic === true) out.comic = true;
     if (typeof m.next === "string") out.next = httpUrl(m.next);
     if (typeof m.prev === "string") out.prev = httpUrl(m.prev);
     if (httpUrl(m.requested)) out.requested = httpUrl(m.requested);

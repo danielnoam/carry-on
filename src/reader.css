@@ -98,6 +98,12 @@ figure .co-placeholder { border-width: 0 0 1.5px; border-radius: 0; }
 }
 .co-next-over { font: 600 var(--fs-meta)/var(--lh-meta) var(--sans); color: var(--muted); }
 .co-next-title { font: 600 var(--fs-label)/var(--lh-label) var(--serif); color: var(--accent); }
+/* An image chapter (0.22.0): the panels edge to edge at phone width, one
+   under the next with no gaps, no rounding. */
+.co-comic { margin: 0 -20px; }
+.co-comic img { display: block; width: 100%; height: auto; margin: 0; border-radius: 0; background: var(--preview); cursor: default; }
+.co-comic .co-placeholder { margin: 0; border-radius: 0; }
+
 .co-licence {
   margin-top: var(--s-6); padding-top: var(--s-2);
   border-top: 1px solid var(--line);

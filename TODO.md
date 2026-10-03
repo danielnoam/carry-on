@@ -24,40 +24,6 @@ asks from Daniel.
 
 ---
 
-## 0.22.0: Comics and manga
-
-**Goal:** a chapter that is a column of images saves and reads well.
-
-**Items**
-- Image-chapter mode: spot pages that are mostly one column of large
-  images, keep those images in order, drop the rest.
-- Full-size images for those pages, whatever the image setting.
-- A comics reader: images edge to edge, no gaps, pinch zoom (the 0.14.0
-  viewer's zoom).
-- Folders for series and next-chapter following, as today.
-- Show the folder's size, and warn before "Save next 10" when the last
-  chapters were large ("about 300 MB").
-
-**Steps**
-1. Detection: when Readability finds little text, count `<img>` (and
-   lazy `data-src`) taller than wide and over ~600 px wide in document
-   order; if they dominate, save as an image chapter.
-2. Images: send the page URL as Referer when downloading (many sites block
-   hotlinking without it); scripts that lazy-load fall back to the 0.12.0
-   hidden-WebView drawing, which may need scrolling to trigger loads.
-3. Reader: a separate CSS layout for image chapters in the same sandboxed
-   iframe; no new trust surface.
-4. Store listing and in-app text never name aggregator sites.
-
-**Daniel's phone:** two or three real sites, one that lazy-loads; a 10
-chapter "Save next" with the size warning; reading in the plane case
-(airplane mode).
-
-**Depends on:** 0.17.0 (full-size per save, folder size), 0.14.0
-(zoom), 0.12.0 (drawing).
-
----
-
 ## 0.23.0: Read aloud
 
 **Goal:** listen to a saved page, offline.

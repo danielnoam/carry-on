@@ -132,10 +132,14 @@
   // in the app's data folder, natively: no CORS, and the bytes never cross
   // the JavaScript bridge as base64. Resolves to a URL the WebView can load.
   // null in a browser, which has no folder to write to.
-  async function downloadTo(url, path) {
+  async function downloadTo(url, path, page) {
     const FS = plugin("Filesystem");
     if (!FS) return null;
-    await deadline(FS.downloadFile({ url, path, directory: "DATA", recursive: true, headers: { "User-Agent": USER_AGENT },
+    // The page's own site as Referer, as a browser sends it (its origin,
+    // not the whole address).
+    const headers = { "User-Agent": USER_AGENT };
+    try { if (page) headers.Referer = new URL(page).origin + "/"; } catch (e) { /* no referer */ }
+    await deadline(FS.downloadFile({ url, path, directory: "DATA", recursive: true, headers,
       connectTimeout: FILE_TIMEOUT / 2, readTimeout: FILE_TIMEOUT }), FILE_TIMEOUT + 5000);
     const { uri } = await FS.getUri({ path, directory: "DATA" });
     return cap.convertFileSrc ? cap.convertFileSrc(uri) : uri;
