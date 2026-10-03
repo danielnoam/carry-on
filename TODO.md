@@ -24,7 +24,55 @@ asks from Daniel.
 
 ---
 
-## 0.23.0: Read aloud
+## 0.23.0: Saving runs, and the reader's bars
+
+**Goal:** a long run into a folder can be paused and doesn't make the
+screen jump; the reader's bars stand apart from the page.
+
+**Items** (Daniel, 3 Oct 2026)
+- **Pause** beside Stop for a run into a folder (Save next 10 or All,
+  Save several, a contents page): the run waits after the page it is on
+  and Resume carries on from the next link. Stop still drops the rest.
+- **No jumping while a run saves.** Today each page gets its own saving
+  card as its turn comes and the card goes when it's saved, so
+  everything below moves up and down. A run into a folder becomes one
+  card from start to end, the same height throughout: the folder's name,
+  "3 of 10 saved · 7 waiting", the ring for the page in progress, Pause
+  and Stop. A failed page shows on that card with Try again, not as a
+  card of its own.
+- **Leave out what's already there.** Save several gets "Skip pages
+  already saved" (on by default), with the count ("8 already saved").
+  Today a link that's already saved isn't downloaded again, but it is
+  moved into the folder and to the run's place in it, and moved out of
+  any other folder it was in. With the box ticked those pages stay where
+  they are; unticked keeps today's behaviour, which is how you reorder a
+  folder to match a contents page.
+- **Darker bars in the reader.** The top bar and the foot a step darker
+  than the page in Paper and Sepia, and a step lighter in Night, as a
+  token per theme (`--bar`), checked for AA against the bar's text.
+
+**Steps**
+1. Pause: a `paused` set beside `stopping`; `saveAll` and `follow` wait
+   on a promise between pages while paused. A paused run survives
+   leaving the folder screen but not closing the app (as today).
+2. The run card replaces `QUEUE_CARDS`: one card per running folder
+   whatever the count, fixed height, the counts updating in place.
+3. Skip already saved: the Save several screen counts `savedAs` matches
+   as the links are edited; the box only shows when there is at least
+   one.
+4. `--bar` in DESIGN.md's color table for each theme, used by
+   `.reader-bar` and the reader foot; check the "Offline" pill and the
+   progress line on it.
+
+**Daniel's phone:** pause a 10 chapter run, leave the app in the
+background, resume; save a contents page twice into the same folder with
+the box on and off; check the bars in all three themes.
+
+**Depends on:** nothing.
+
+---
+
+## 0.24.0: Read aloud
 
 **Goal:** listen to a saved page, offline.
 
@@ -49,18 +97,18 @@ the screen locks.
 
 ---
 
-## 0.24.0 and 0.25.0: Sync through a private GitHub repo
+## 0.25.0 and 0.26.0: Sync through a private GitHub repo
 
 Split in two because it's the riskiest work and loses data if wrong.
 
-**0.24.0, the index and text.** A fine-grained token for one repo, kept on
+**0.25.0, the index and text.** A fine-grained token for one repo, kept on
 the device. Sync `library.json` and each `page.html` + `meta.json`
 through the contents API with `sha` for conflicts, as LifeLog's
 src/storage.js does. Deletes become tombstones in `library.json` so they
 don't come back from the other device. The other device re-downloads
 previews from the original links. Reuses the 0.18.0 backup format.
 
-**0.25.0, images.** Push `images/` through the Git Data API (blobs, one
+**0.26.0, images.** Push `images/` through the Git Data API (blobs, one
 tree and one commit per save), since the contents API stops at 1 MB and
 broke LifeLog's sync. Decide first whether the repo's growth (0.5 to 1.5
 MB per illustrated page, far more for comics) is acceptable, or whether

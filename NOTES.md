@@ -153,7 +153,7 @@ bold title and its version so a search finds it.
   picked file through `Blob.slice` from its central directory. So a
   library of hundreds of megabytes is never held in memory or sent across
   the bridge whole. A zip re-made with a computer's own tool (deflated)
-  still restores where `DecompressionStream` exists. Sync (0.24.0)
+  still restores where `DecompressionStream` exists. Sync (0.25.0)
   reuses this format.
 - **Restore never trusts the file (0.18.0).** Index entries go through
   `backup.cleanMeta`, which keeps only the fields Carry-on writes, with
