@@ -124,7 +124,11 @@ and the page shows above it.
   serif title, then the reading line ("9 min", "6 min left" with a 3 px
   accent line, or "Finished") and the size. A status only when it needs
   a look: "2 previews missing · Retry" in warn, or "Images online".
-- **Collection tile (Now):** 136 px wide, its first picture (or a collection
+  With no picture, the thumbnail is `--preview` with the site's icon
+  centred at 32 px (`--s-6`), or the site's first letter in the serif,
+  heading size, `--muted` (0.27.6).
+- **Collection tile (Now):** 136 px wide, its story page's cover when
+  it's linked to one (0.27.6), else its first picture (or a collection
   glyph on `--preview`), the name in the serif, "3 of 12 read" and a thin
   accent line. A series with chapters not yet saved shows "2 new" as a
   pill at the picture's top end: `--accent` fill, `--accent-ink` text,

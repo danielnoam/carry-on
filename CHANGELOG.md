@@ -2,6 +2,14 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.27.6] - 2026-10-03
+
+### Added
+- A collection linked to its story page shows the story's cover, like
+  a Royal Road book cover, kept on the phone so it shows offline.
+- A page with no picture of its own shows its site's icon, or the
+  site's first letter when there's no icon.
+
 ## [0.27.5] - 2026-10-03
 
 ### Changed

@@ -276,12 +276,32 @@
     const res = await get(site && site.fetch ? site.fetch(url) : url);
     const at = res.url || url;
     const doc = parse(res.text, at);
+    const cover = pageImage(doc, at);
     if (site) {
       const own = (site.contents && await site.contents(doc, at, res.text)) || null;
       const links = own ? own.links : site.list ? await site.list(doc, at, res.text) : [];
-      if (links.length) return { title: (own && own.title) || readTitle(doc), links };
+      if (links.length) return { title: (own && own.title) || readTitle(doc), links, cover };
     }
-    return { title: readTitle(doc), links: pickChapters(linkGroups(doc, at)).map((l) => l.url) };
+    return { title: readTitle(doc), links: pickChapters(linkGroups(doc, at)).map((l) => l.url), cover };
+  }
+
+  // The picture a page offers for sharing (og:image): on a story's page,
+  // its cover. Null when it has none.
+  function pageImage(doc, base) {
+    const m = doc.querySelector('meta[property="og:image"], meta[name="og:image"], meta[name="twitter:image"], meta[property="twitter:image"]');
+    const url = m && absolute((m.getAttribute("content") || "").trim(), base);
+    return url && /^https?:/.test(url) ? url : null;
+  }
+
+  // The site's icon: the largest one the page names up to 256 px (apple
+  // touch icons are 180), else /favicon.ico.
+  function siteIcon(doc, base) {
+    const size = (l) => { const m = (l.getAttribute("sizes") || "").match(/(\d+)x\d+/); return m ? Number(m[1]) : /apple/i.test(l.getAttribute("rel")) ? 180 : 16; };
+    const links = [...doc.querySelectorAll("link[rel][href]")].filter((l) => /(^|\s)(icon|apple-touch-icon(-precomposed)?)(\s|$)/i.test(l.getAttribute("rel")) && size(l) <= 256);
+    links.sort((a, b) => size(b) - size(a));
+    const url = links.length ? absolute(links[0].getAttribute("href"), base) : null;
+    if (url && /^https?:/.test(url)) return url;
+    try { return new URL("/favicon.ico", base).href; } catch (e) { return null; }
   }
 
   function readTitle(doc) {
@@ -835,7 +855,7 @@
         url: finalUrl, comic: true,
         title: (headline.trim() || docTitle || siteName(finalUrl)).trim().replace(/\s+/g, " "),
         site: siteName(finalUrl), byline: "", body, base: finalUrl, licence: null,
-        lang: (doc.documentElement.getAttribute("lang") || "").trim(), dir: "", next, prev,
+        lang: (doc.documentElement.getAttribute("lang") || "").trim(), dir: "", next, prev, icon: siteIcon(doc, finalUrl),
       };
     }
     const { doc, docTitle, headline, next, prev, article, series } = got;
@@ -848,7 +868,7 @@
       body, base: finalUrl, licence: null,
       lang: (doc.documentElement.getAttribute("lang") || article.lang || "").trim(),
       dir: article.dir === "rtl" || textDir(doc, article.textContent) === "rtl" ? "rtl" : "",
-      next, prev,
+      next, prev, icon: siteIcon(doc, finalUrl),
     };
   }
 
@@ -1072,6 +1092,30 @@
     return mode === "full" ? { rel, bytes: size } : C.store.shrink(id, rel, size, PREVIEW_WIDTH);
   }
 
+  // The site's icon beside the page, for a card with no picture of its
+  // own; its link when it can't be kept (or in a browser).
+  async function keepIcon(id, url, page) {
+    if (!url) return { icon: null, bytes: 0 };
+    if (!C.platform.native) return { icon: url, bytes: 0 };
+    try {
+      const m = url.split(/[?#]/)[0].match(/\.(png|ico|svg|jpe?g|gif|webp)$/i);
+      const rel = "icon." + (m ? m[1].toLowerCase().replace("jpeg", "jpg") : "png");
+      return { icon: rel, bytes: await C.store.download(id, rel, url, page) };
+    } catch (e) { return { icon: url, bytes: 0 }; }
+  }
+
+  // A collection's cover, kept small beside the pages in _covers/; its
+  // link in a browser or when it can't be fetched. Resolves to what
+  // goes on the collection's entries: a file name there, or the link.
+  async function keepCover(url, page) {
+    if (!C.platform.native) return url;
+    try {
+      const rel = "c" + newId() + "." + extOf(url);
+      const size = await C.store.download("_covers", rel, url, page);
+      return (await C.store.shrink("_covers", rel, size, PREVIEW_WIDTH)).rel;
+    } catch (e) { return url; }
+  }
+
   // Downloads previews (or full images, or nothing, per the image setting)
   // into images/ beside page.html. A failed one keeps its link and is
   // counted as missing; the reader shows a placeholder for it offline.
@@ -1195,9 +1239,11 @@
     if (onProgress) onProgress({ stage: "images", done: 0, total: media.length });
     const res = await saveImages(id, media, mode, (done, total) => onProgress && onProgress({ stage: "images", done, total }), got.url);
     Object.assign(meta, { images: res.total, missing: res.missing, thumb: res.thumb });
+    const icon = await keepIcon(id, got.icon || new URL("/favicon.ico", got.url).href, got.url);
+    if (icon.icon) meta.icon = icon.icon;
     const html = savedPageHtml(meta, root, out);
     try {
-      meta.bytes = res.bytes + await C.store.writePage(id, html, meta);
+      meta.bytes = res.bytes + icon.bytes + await C.store.writePage(id, html, meta);
       const text = plainText(root);
       await C.store.writeText(id, text);
       meta.bytes += C.store.bytesOf(text);
@@ -1297,7 +1343,7 @@
 
   C.save = {
     pageSource,
-    save, SaveError, ContentsPage, findChapters, siteRule, removeHidden, scriptJson, chapterNumber, pickChapters, comicGroup, isPanel, retryMissing, saveFullImages, findNext, creditLine, cleanSaved, savedPageHtml, newId, textDir, isNextText, isPrevText, plainText,
+    save, SaveError, ContentsPage, findChapters, pageImage, siteIcon, keepCover, siteRule, removeHidden, scriptJson, chapterNumber, pickChapters, comicGroup, isPanel, retryMissing, saveFullImages, findNext, creditLine, cleanSaved, savedPageHtml, newId, textDir, isNextText, isPrevText, plainText,
     wikipediaPage, wikimediaThumb, parseSrcset, pickWidth, youtubeId, vimeoId, extOf, isTrackingPixel, readingMinutes, siteName,
   };
 })();

@@ -350,6 +350,14 @@ html.native .app { padding-top: env(safe-area-inset-top); }
   border-radius: 10px; object-fit: cover;
   background: var(--preview);
 }
+/* A page with no picture of its own: its site's icon, or first letter. */
+.card-thumb.site-mark {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  color: var(--muted); font: 600 var(--fs-heading)/1 var(--serif);
+}
+.site-mark img { position: absolute; width: var(--s-6); height: var(--s-6); object-fit: contain; opacity: 0; }
+.site-mark.has-icon img { opacity: 1; }
+.site-mark.has-icon .site-letter { visibility: hidden; }
 /* A folder's card: its first picture with two sheets peeking behind it. */
 .card-thumb.stack {
   position: relative; display: block; overflow: visible;

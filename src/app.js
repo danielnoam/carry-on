@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.27.5";
+  const APP_VERSION = "0.27.6";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -229,6 +229,26 @@
     return base ? base + p.thumb : null;
   }
 
+  // The site's icon, for a card with no picture (0.27.6): kept beside the
+  // page, or its link; a page saved before then tries the site's
+  // /favicon.ico while online.
+  function iconUrl(p) {
+    if (p.icon && /^https?:/.test(p.icon)) return navigator.onLine ? p.icon : null;
+    if (p.icon) { const base = C.store.pageDirUrl(p.id); return base ? base + p.icon : null; }
+    if (!navigator.onLine) return null;
+    try { return new URL("/favicon.ico", p.url).href; } catch (e) { return null; }
+  }
+
+  // A collection's cover (0.27.6), read from its story page: kept in
+  // _covers/, or its link.
+  function coverUrl(list) {
+    const c = (list.find((p) => p.cover) || {}).cover;
+    if (!c) return null;
+    if (/^https?:/.test(c)) return navigator.onLine ? c : null;
+    const base = C.store.pageDirUrl("_covers");
+    return base ? base + c : null;
+  }
+
   // ---- Library ----
 
   // What a save is doing, with the seconds it has taken once that's long
@@ -394,7 +414,7 @@
     return el("div", { class: "card", "data-ids": p.id },
       el("button", { class: "card-open", type: "button", "aria-label": p.title, onclick: () => tapPages([p.id], () => openPage(p.id)) }),
       pickMark(),
-      thumb ? el("img", { class: "card-thumb", src: thumb, alt: "", loading: "lazy" }) : null,
+      thumb ? el("img", { class: "card-thumb", src: thumb, alt: "", loading: "lazy" }) : siteMark(p),
       el("span", { class: "card-body" },
         el("span", { class: "card-site", dir: "auto" }, p.site, p.folder ? " · " + p.folder : null, ...(p.tags || []).map((t) => el("span", { class: "card-tag" }, " · #" + t))),
         el("span", { class: "card-title", dir: "auto" }, p.title),
@@ -403,6 +423,20 @@
         started ? el("span", { class: "progress thin", role: "progressbar", "aria-label": "Read so far",
           "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": String(Math.round(p.at * 100)) },
           el("span", { class: "progress-fill", style: "transform: scaleX(" + p.at + ")" })) : null));
+  }
+
+  // A card with no picture shows its site: the icon on the preview tint,
+  // or the site's first letter when there's no icon to show.
+  function siteMark(p) {
+    const letter = el("span", { class: "site-letter" }, (p.site || "?").replace(/^www\./, "").charAt(0).toUpperCase());
+    const box = el("span", { class: "card-thumb site-mark", "aria-hidden": "true" }, letter);
+    const src = iconUrl(p);
+    if (src) {
+      const img = el("img", { src, alt: "", loading: "lazy" });
+      img.addEventListener("load", () => { if (img.naturalWidth > 1) box.classList.add("has-icon"); });
+      box.prepend(img);
+    }
+    return box;
   }
 
   // The circle a card shows while picking pages.
@@ -708,7 +742,7 @@
     const strip = () => {
       if (!folders.length) return;
       keep("h:folders", () => sectionHead("Collections"));
-      keep("folders", () => foldersStrip(folders), folders.map((f) => [f, freshCount(f), ...folderPages(f).map((x) => x.id + readingLine(x) + (x.thumb || ""))].join("|")).join("‖"));
+      keep("folders", () => foldersStrip(folders), folders.map((f) => [f, freshCount(f), ...folderPages(f).map((x) => x.id + readingLine(x) + (x.thumb || "") + (x.cover || ""))].join("|")).join("‖"));
     };
     if (!ts.length) {
       const going = !state.select && load(CONTINUE_KEY, true) && continuePage();
@@ -845,6 +879,7 @@
     }
     endRun(run);
     if (run) renderLibrary();
+    if (name && source) updateCover(name);
     if (!jobs.length) return;
     toast([saved ? "Saved " + countLine(saved) + (name ? " into " + name : "") : "",
       had ? had + " already saved" + (name && !saved ? ", now in " + name : "") : "",
@@ -1674,7 +1709,8 @@
     const list = folderPages(name);
     const done = list.filter((p) => p.finished).length;
     const withThumb = list.find((p) => thumbUrl(p));
-    const thumb = withThumb ? thumbUrl(withThumb) : null;
+    const cover = coverUrl(list);
+    const thumb = cover || (withThumb ? thumbUrl(withThumb) : null);
     const fresh = freshCount(name);
     const tile = el("div", { class: "tile", role: "listitem", "data-ids": list.map((p) => p.id).join(",") },
       el("button", { class: "card-open", type: "button", "aria-label": name + ", collection, " + list.length + " pages, " + done + " read" + (fresh ? ", " + newCountText(fresh) + " chapters" : ""),
@@ -1687,6 +1723,11 @@
       el("span", { class: "tile-meta" }, (done === list.length ? "All read" : done + " of " + list.length + " read") + " · " + formatSize(sizeOf(list))),
       el("span", { class: "progress thin", "aria-hidden": "true" },
         el("span", { class: "progress-fill", style: "transform: scaleX(" + done / list.length + ")" })));
+    // A cover whose file is gone (a restored backup) is read again.
+    if (cover) tile.querySelector(".tile-thumb img").addEventListener("error", () => {
+      for (const p of list) { delete p.cover; delete p.coverFrom; }
+      updateCover(name);
+    }, { once: true });
     if (!thumb) tile.querySelector(".tile-thumb").insertAdjacentHTML("afterbegin", folderSource(list) ? bookIcon(28).outerHTML
       : '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>');
     else if (folderSource(list)) tile.querySelector(".tile-thumb").append(el("span", { class: "tile-book" }, bookIcon(16)));
@@ -1705,6 +1746,7 @@
     if (!fromHistory) history.pushState({ view: "folder", folder: state.folder }, "");
     $("folderBody").scrollTop = 0;
     pushScreen($("folderView")).then(() => $("folderBack").focus());
+    updateCover(state.folder);
   }
 
   function closeFolder() {
@@ -2815,9 +2857,11 @@
       if (source) {
         // A linked folder reads the story's own chapter list: whatever in
         // it isn't saved is new, wherever it sits.
-        const all = (await C.save.findChapters(source)).links.slice(0, 5000);
+        const found = await C.save.findChapters(source);
+        const all = found.links.slice(0, 5000);
         count = all.filter((u) => !savedAs(u)).length;
         setNewFor(name, { at: Date.now(), count, all });
+        await updateCover(name, found.cover || "");
       } else {
         let url = await C.save.findNext(last.url);
         if (url && !savedAs(url)) {
@@ -2914,7 +2958,7 @@
       try {
         const found = await C.save.findChapters(u);
         if (!found.links.length) { toast("Couldn't find a list of chapters on that page."); return; }
-        setSource(name, u);
+        setSource(name, u, found.cover || "");
         toast("Linked to " + countLine(found.links.length).replace("page", "chapter") + " on " + C.save.siteName(u));
       } catch (e) {
         toast(e instanceof C.save.SaveError ? e.message : "Couldn't read that page. Try again.");
@@ -2930,11 +2974,34 @@
       el("p", { class: "footnote" }, "New chapters are read from its chapter list, which also finds chapters added in between."));
   }
 
-  async function setSource(name, url) {
+  async function setSource(name, url, cover) {
     for (const p of folderPages(name)) { if (url) p.source = url; else delete p.source; }
     setNewFor(name, null);
     await C.store.writeIndex(state.pages);
     renderFolder();
+    renderLibrary();
+    if (url) updateCover(name, cover);
+  }
+
+  // Keeps a linked collection's cover (its story page's picture) in step:
+  // `url` when the page was just read, else the page is read for it.
+  // Once per session for a collection that has none.
+  const coverTried = new Set();
+  async function updateCover(name, url) {
+    const list = folderPages(name);
+    const src = folderSource(list);
+    if (!list.length || !src) return;
+    if (url === undefined) {
+      const key = String(name).toLowerCase();
+      if (coverTried.has(key) || !navigator.onLine || list.some((p) => p.cover)) return;
+      coverTried.add(key);
+      try { url = (await C.save.findChapters(src)).cover || ""; } catch (e) { return; }
+    }
+    if (!url || list.some((p) => p.coverFrom === url && p.cover)) return;
+    const cover = await C.save.keepCover(url, src);
+    for (const p of folderPages(name)) { p.cover = cover; p.coverFrom = url; }
+    await C.store.writeIndex(state.pages);
+    if (state.folder && sameTag(state.folder, name)) renderFolder();
     renderLibrary();
   }
 
