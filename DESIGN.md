@@ -123,7 +123,9 @@ and the page shows above it.
   a look: "2 previews missing · Retry" in warn, or "Images online".
 - **Folder tile (Now):** 136 px wide, its first picture (or a folder
   glyph on `--preview`), the name in the serif, "3 of 12 read" and a thin
-  accent line.
+  accent line. A series with chapters not yet saved shows "2 new" as a
+  pill at the picture's top end: `--accent` fill, `--accent-ink` text,
+  meta size, semibold (0.25.0).
 - **Picking (Now):** the library and folder screens get a circle at
   each card's top end (24 px, a 2 px muted ring), filled with the accent
   and a tick once picked, and the card's border turns accent. A bar over
@@ -183,7 +185,9 @@ and the page shows above it.
 - **Folder screen (Now):** pushed like Settings. The count, the
   folder's tools, a full-width primary button to carry on, Save
   previous, then the pages as a numbered group (the next one's number in
-  the accent), then Save next.
+  the accent), then, for a series, "New chapters" (what the last check
+  found and when, in the accent when there are some, and a Check chip),
+  then Save next.
 - **Next in a folder (Now):** at the end of the page, after the licence,
   a bordered block "Next in Novel" over the title in the accent serif. In
   ⋯, Previous and Next side by side, dimmed when there's none.

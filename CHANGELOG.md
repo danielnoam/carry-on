@@ -2,6 +2,28 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.25.0] - 2026-10-03
+
+### Added
+- New chapters: a folder saved with Save next or from a chapter list
+  can look for chapters after its last one. Tap Check under the
+  folder's chapters, or let it check by itself once a day when you're
+  online (Settings, Appearance, Library). A folder with new chapters
+  shows "2 new" on its tile, and Save next saves them.
+- Royal Road, Archive of Our Own, Scribble Hub and FanFiction.net save
+  just the chapter, with the author's notes kept and set apart, and
+  without menus or comments. A story's own page gives every chapter,
+  even when the site lists them over several pages.
+- "Send page source" in a page's ⋯ menu sends the original page as a
+  file, for a site that saves badly.
+
+### Fixed
+- Royal Road chapters no longer include the hidden lines saying the
+  story was taken from Royal Road.
+- Archive of Our Own works marked for adults save instead of saving the
+  "this work could have adult content" notice.
+- FanFiction.net chapters know their next chapter.
+
 ## [0.24.0] - 2026-10-03
 
 ### Added

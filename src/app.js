@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.24.0";
+  const APP_VERSION = "0.25.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -28,6 +28,8 @@
   const SEEN_KEY = "carryon.seenVersion";
   const SORT_KEY = "carryon.sort";
   const CONTINUE_KEY = "carryon.continue";
+  const NEW_KEY = "carryon.newChapters";
+  const DAILY_KEY = "carryon.checkDaily";
 
   const $ = (id) => document.getElementById(id);
   // The filter chips move into the library's list, and out of the page
@@ -646,7 +648,7 @@
       const folders = foldersByUse();
       if (folders.length) {
         keep("h:folders", () => sectionHead("Folders"));
-        keep("folders", () => foldersStrip(folders), folders.map((f) => [f, ...folderPages(f).map((x) => x.id + readingLine(x) + (x.thumb || ""))].join("|")).join("‖"));
+        keep("folders", () => foldersStrip(folders), folders.map((f) => [f, freshCount(f), ...folderPages(f).map((x) => x.id + readingLine(x) + (x.thumb || ""))].join("|")).join("‖"));
       }
     }
     // The filters sit over the pages they filter, under the folders.
@@ -1372,17 +1374,19 @@
     const done = list.filter((p) => p.finished).length;
     const withThumb = list.find((p) => thumbUrl(p));
     const thumb = withThumb ? thumbUrl(withThumb) : null;
+    const fresh = freshCount(name);
     const tile = el("div", { class: "tile", role: "listitem", "data-ids": list.map((p) => p.id).join(",") },
-      el("button", { class: "card-open", type: "button", "aria-label": name + ", folder, " + list.length + " pages, " + done + " read",
+      el("button", { class: "card-open", type: "button", "aria-label": name + ", folder, " + list.length + " pages, " + done + " read" + (fresh ? ", " + newCountText(fresh) + " chapters" : ""),
         onclick: () => tapPages(list.map((p) => p.id), () => openFolder(name)) }),
       pickMark(),
       el("span", { class: "tile-thumb" + (thumb ? "" : " blank"), "aria-hidden": "true" },
-        thumb ? el("img", { src: thumb, alt: "", loading: "lazy" }) : null),
+        thumb ? el("img", { src: thumb, alt: "", loading: "lazy" }) : null,
+        fresh ? el("span", { class: "tile-new" }, newCountText(fresh)) : null),
       el("span", { class: "tile-name", dir: "auto" }, name),
       el("span", { class: "tile-meta" }, (done === list.length ? "All read" : done + " of " + list.length + " read") + " · " + formatSize(sizeOf(list))),
       el("span", { class: "progress thin", "aria-hidden": "true" },
         el("span", { class: "progress-fill", style: "transform: scaleX(" + done / list.length + ")" })));
-    if (!thumb) tile.querySelector(".tile-thumb").innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
+    if (!thumb) tile.querySelector(".tile-thumb").insertAdjacentHTML("afterbegin", '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>');
     return tile;
   }
 
@@ -1439,6 +1443,7 @@
               el("span", { class: "choice-note" + (p.finished ? "" : p.at > 0.02 ? " accent" : "") }, readingLine(p)))),
           folderMode === "order" ? moveButton(p, i, -1, list.length) : null,
           folderMode === "order" ? moveButton(p, i, 1, list.length) : null))),
+      folderMode || picking ? null : checkRow(list),
       folderMode || picking ? null : followControls(list[list.length - 1]));
     paintPicks();
   }
@@ -1599,6 +1604,7 @@
           menuRow(p.finished ? "Mark as unread" : "Mark as read", () => markRead([p], !p.finished).then(draw)),
           inReader ? null : menuRow("Select", () => back().then(() => startSelect([p.id]))),
           fullImagesRow(p),
+          menuRow("Send page source", (e) => sendSource(p, e.currentTarget)),
           menuRow("Delete this page", () => deletePage(p, where), "warn")));
     };
     draw();
@@ -1924,6 +1930,20 @@
     btn.disabled = false;
   }
 
+  // The original page as the site serves it, fetched again, for working
+  // out why a site saves badly.
+  async function sendSource(p, btn) {
+    if (!navigator.onLine) { toast("You're offline. Try again when you're back online."); return; }
+    btn.disabled = true;
+    try {
+      const { name, html } = await C.save.pageSource(p.url);
+      if (!(await C.platform.saveAndShare(name, html))) C.platform.download(name, new Blob([html], { type: "text/html" }));
+    } catch (e) {
+      toast(e instanceof C.save.SaveError ? e.message : "Couldn't get the page. Try again.");
+    }
+    btn.disabled = false;
+  }
+
   // A page, or a folder in its order, as an e-book (epub.js), for an
   // e-reader or Send to Kindle.
   async function sendBook(pages, btn, title) {
@@ -2233,6 +2253,7 @@
 
   // "The Wandering Inn - Chapter 1.01" → "The Wandering Inn".
   function seriesName(p) {
+    if (p.series) return cleanTag(p.series) || p.site;
     const t = p.title.replace(/[\s\-–—:|,·]*(chapter|ch\.?|part|episode|ep\.?|book|vol\.?|פרק|capítulo|chapitre|kapitel)\s*[\d.ivxl]+\b.*$/iu, "").trim();
     return cleanTag(t && t !== p.title ? t : p.title) || p.site;
   }
@@ -2360,6 +2381,134 @@
       el("div", { class: "chips" }, ...[1, 5, 10, Infinity].map(chip), pause, stop));
   }
 
+  // ---- New chapters (0.25.0) ----
+  // A series folder (one whose pages link to each other as next and
+  // previous) is checked for chapters after its last one by reading that
+  // page's next link again: the one kept when it was saved is often ""
+  // because it was the newest chapter then. Found chapters are counted by
+  // walking on, up to NEW_MAX, and the last page's `next` is updated, so
+  // the folder's Save next row appears. Results are kept per folder:
+  // { [lower-case name]: { at, count } }.
+  const NEW_MAX = 10;
+  const DAY = 864e5;
+  const newChapters = () => load(NEW_KEY, {});
+  const newFor = (name) => newChapters()[String(name).toLowerCase()] || null;
+  function setNewFor(name, entry) {
+    const all = newChapters();
+    if (entry) all[String(name).toLowerCase()] = entry; else delete all[String(name).toLowerCase()];
+    store(NEW_KEY, all);
+  }
+
+  function isSeries(list) {
+    if (list.length < 2) return false;
+    const last = list[list.length - 1];
+    if (!/^https?:/.test(last.url || "") || last.licence === "wikipedia") return false;
+    return list.some((p) => list.some((q) => q !== p && ((p.next && sameUrl(p.next, q.url)) || (p.prev && sameUrl(p.prev, q.url)))));
+  }
+
+  const checking = new Set();
+  // Resolves to the number of new chapters found (NEW_MAX meaning at
+  // least that many), or null when the site couldn't be reached.
+  async function checkNew(name, quiet) {
+    const key = String(name).toLowerCase();
+    if (checking.has(key)) return null;
+    const list = folderPages(name);
+    const last = list[list.length - 1];
+    if (!last) return null;
+    checking.add(key);
+    if (state.folder && sameTag(state.folder, name)) renderFolder();
+    let count = 0;
+    try {
+      let url = await C.save.findNext(last.url);
+      if (url && !savedAs(url)) {
+        last.next = url;
+        await C.store.writeIndex(state.pages);
+        const seen = new Set([last.url]);
+        while (url && !seen.has(url) && !savedAs(url) && count < NEW_MAX) {
+          seen.add(url);
+          count++;
+          if (count === NEW_MAX) break;
+          try { url = await C.save.findNext(url); } catch (e) { break; }
+        }
+      }
+      setNewFor(name, { at: Date.now(), count });
+    } catch (e) {
+      if (!quiet) toast("Couldn't reach " + last.site + " to look for new chapters.");
+      count = null;
+    } finally {
+      checking.delete(key);
+    }
+    if (state.folder && sameTag(state.folder, name)) renderFolder();
+    renderLibrary();
+    if (!quiet && count === 0) toast("No new chapters yet.");
+    return count;
+  }
+
+  const newCountText = (n) => (n >= NEW_MAX ? NEW_MAX + "+" : String(n)) + " new";
+
+  // The new chapters still unsaved: those saved since the check no
+  // longer count, and none are left once the last page's next is saved.
+  function freshCount(name) {
+    const entry = newFor(name);
+    if (!entry || !entry.count) return 0;
+    const list = folderPages(name);
+    const last = list[list.length - 1];
+    if (!last || !last.next || savedAs(last.next)) return 0;
+    const since = list.filter((p) => (p.savedAt || 0) > entry.at).length;
+    return Math.max(1, entry.count - since);
+  }
+
+  function checkRow(list) {
+    if (!isSeries(list)) return null;
+    const name = state.folder;
+    const entry = newFor(name);
+    const fresh = freshCount(name);
+    const busy = checking.has(String(name).toLowerCase());
+    const note = busy ? "Looking…" : !entry ? "Not checked yet"
+      : fresh ? newCountText(fresh) + " · checked " + whenText(entry.at)
+      : "None yet · checked " + whenText(entry.at);
+    const btn = el("button", { class: "chip", type: "button", onclick: () => {
+      if (!navigator.onLine) { toast("You're offline. Try again when you're back online."); return; }
+      checkNew(name, false);
+    } }, "Check");
+    btn.disabled = busy;
+    return el("div", { class: "rc-row check-new" },
+      el("span", { class: "rc-label" }, "New chapters"),
+      el("div", { class: "chips" },
+        el("span", { class: "check-note" + (fresh ? " accent" : ""), role: "status" }, note), btn));
+  }
+
+  function whenText(at) {
+    const mins = Math.round((Date.now() - at) / 6e4);
+    if (mins < 2) return "just now";
+    if (mins < 60) return mins + " min ago";
+    const hours = Math.round(mins / 60);
+    if (hours < 24) return hours + " h ago";
+    const days = Math.round(hours / 24);
+    return days === 1 ? "yesterday" : days + " days ago";
+  }
+
+  // Once a day per series folder, after the library is up and online,
+  // one folder at a time, quietly.
+  let dailyRunning = false;
+  async function dailyCheck(force) {
+    if (dailyRunning || !navigator.onLine || (!force && !load(DAILY_KEY, true))) return 0;
+    dailyRunning = true;
+    let found = 0;
+    try {
+      for (const name of allFolders()) {
+        if (!isSeries(folderPages(name))) continue;
+        const entry = newFor(name);
+        if (!force && entry && Date.now() - entry.at < DAY) continue;
+        const n = await checkNew(name, true);
+        if (n) found++;
+      }
+    } finally {
+      dailyRunning = false;
+    }
+    return found;
+  }
+
   async function renameFolder() {
     const old = state.folder;
     const raw = prompt("Rename “" + old + "”", old);
@@ -2467,8 +2616,23 @@
           el("span", { class: "choice-text" },
             el("span", { class: "choice-label" }, "Continue reading"),
             el("span", { class: "choice-note" }, "The page you read last, at the top of the library")),
-          input)));
+          input),
+        el("label", { class: "row" },
+          el("span", { class: "choice-text" },
+            el("span", { class: "choice-label" }, "Check for new chapters"),
+            el("span", { class: "choice-note" }, "Once a day, for folders saved with Save next, when you're online")),
+          el("input", { class: "switch", type: "checkbox", role: "switch", checked: load(DAILY_KEY, true),
+            onchange: (e) => store(DAILY_KEY, e.target.checked) })),
+        el("button", { class: "row", type: "button", onclick: async (e) => {
+          if (!navigator.onLine) { toast("You're offline. Try again when you're back online."); return; }
+          const b = e.currentTarget;
+          b.disabled = true;
+          const found = await dailyCheck(true);
+          b.disabled = false;
+          toast(found ? countFolders(found) + " with new chapters." : "No new chapters yet.");
+        } }, el("span", { class: "row-label accent" }, "Check all folders now"))));
   }
+  const countFolders = (n) => n + (n === 1 ? " folder" : " folders");
 
   // Folders first, biggest first, then the pages in no folder as one
   // more group; a group opens in place to its pages, biggest first.
@@ -2728,7 +2892,9 @@
     const share = C.platform.plugin("ShareTarget");
     if (share && share.addListener) share.addListener("shared", saveShared);
     saveShared();
+    setTimeout(() => dailyCheck(false), 1500);
   });
+  addEventListener("online", () => dailyCheck(false));
 
   // ---- The app updating itself (from LifeLog's 0.179.0) ----
   // A newer build is a newer APK on this repo's Releases, tagged

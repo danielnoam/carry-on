@@ -3,6 +3,36 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Site rules (0.25.0).** `SITES` in src/save.js holds a rule for
+  each serial-fiction site the general reader gets wrong, matched by
+  host and tried before it: `contents` (this page lists chapters),
+  `list` (the chapter list from any chapter, for Find chapters),
+  `chapter` (the text, title, series and author, and next or previous
+  where the site has no link for them) and `fetch`/`clean` (the address
+  fetched and the one kept). The selectors come from WebToEpub's
+  parsers (read for facts, not copied); the sandbox can't reach the
+  sites, so each rule is tested against a fixture in the e2e suite
+  built to the same markup, and "Send page source" exists so a page
+  that breaks can be handed over and a fixture made from it. Royal Road
+  hides a "stolen from Royal Road" line among the paragraphs with a
+  class its inline `<style>` sets to `display: none`, which a DOMParser
+  document doesn't apply: `removeHidden` removes what top-level rules
+  hide (rules inside `@media` are left alone). Its fiction page lists
+  every chapter in `window.chapters`, read without running the script.
+  AO3 asks adults to click through, so its pages are fetched with
+  `view_adult=true` and kept without it, which is how next links name
+  them. A page from a rule keeps `series` (the story's name) in its
+  meta, which names its folder instead of guessing from the title.
+- **New chapters (0.25.0).** A folder is a series when its pages link to
+  each other by next or previous. Its last page's next link is read
+  again from the site, since the one kept at save time is "" when it was
+  the newest chapter; a new one replaces it, so the folder's Save next
+  row appears, and the walk on from it counts up to 10. Results live in
+  `carryon.newChapters` by folder name, `{ at, count }`; the count
+  shown is that less the folder's pages saved since, and nothing once
+  the last page's next is saved, so it never needs writing back. The
+  daily check runs a moment after launch and when the phone comes back
+  online, one folder at a time, skipping any checked in the last day.
 - **Fonts, Hebrew fonts and themes (0.24.0).** The new fonts are Google
   Fonts' own Latin subsets (variable 400 to 700 where the family has
   one), so 13 families add under 1 MB. The four Hebrew faces carry only

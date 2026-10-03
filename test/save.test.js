@@ -141,4 +141,20 @@ test("the reader's iframe is sandboxed without allow-scripts", () => {
   assert.ok(!/allow-scripts|allow-top-navigation|allow-popups|allow-forms/.test(sandbox), "sandbox too loose: " + sandbox);
 });
 
+test("a script's array is read whole, brackets in strings and all", () => {
+  const html = '<script>var x = 1; window.chapters = [{"id":1,"title":"A [b] \\"c\\""},{"id":2,"title":"]}"}]; window.other = [9];</script>';
+  assert.deepStrictEqual(S.scriptJson(html, "window.chapters"), [{ id: 1, title: 'A [b] "c"' }, { id: 2, title: "]}" }]);
+  assert.strictEqual(S.scriptJson("<p>nothing</p>", "window.chapters"), null);
+  assert.strictEqual(S.scriptJson("window.chapters = [{broken", "window.chapters"), null);
+});
+
+test("sites with their own rules are matched by host", () => {
+  assert.strictEqual(S.siteRule("https://www.royalroad.com/fiction/1/x").name, "Royal Road");
+  assert.strictEqual(S.siteRule("https://archiveofourown.org/works/5").name, "Archive of Our Own");
+  assert.strictEqual(S.siteRule("https://www.scribblehub.com/series/7/x/").name, "Scribble Hub");
+  assert.strictEqual(S.siteRule("https://www.fictionpress.com/s/1/1/x").name, "FanFiction.net");
+  assert.strictEqual(S.siteRule("https://notroyalroad.com.example/fiction/1"), null);
+  assert.strictEqual(S.siteRule("not a url"), null);
+});
+
 console.log("\n" + passed + " passed");
