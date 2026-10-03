@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.25.0";
+  const APP_VERSION = "0.25.1";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -728,7 +728,7 @@
     if (meta) toast(meta.missing ? "Saved. Some previews are missing." : "Saved for offline reading");
     else if (job.contents) {
       dropFailed(job);
-      openBatch(job.contents.links.join("\n"), false, folderName(job.contents.title || job.site));
+      openBatch(job.contents.links.join("\n"), false, folderName(job.contents.title || job.site), url);
       toast("That's a list of chapters. Check them, then save.");
     }
   }
@@ -817,6 +817,7 @@
       const meta = await C.save.save(job.url, {
         mode: job.mode || load(IMAGES_KEY, "previews"),
         kind: job.kind || "article",
+        asPage: !!job.asPage,
         onProgress: (p) => {
           if (p.stage === "drawing") job.drawing = true;
           if (p.stage === "images") { job.done = p.done; job.total = p.total; }
@@ -2106,13 +2107,17 @@
   // Opens when a paste or share holds more than one link: the links (one
   // a line, editable), the folder to save them into, and Save.
 
-  function openBatch(text, fromHistory, folder) {
+  // `from` is the page read as a list of chapters, which can still be
+  // saved as one page.
+  function openBatch(text, fromHistory, folder, from) {
     if (state.batch) return;
     state.batch = true;
-    renderBatch(linksFrom(text).join("\n"), folder || null);
+    renderBatch(linksFrom(text).join("\n"), folder || null, from);
     if (!fromHistory) history.pushState({ view: "batch", folder: state.folder || undefined }, "");
+    // Set once it shows: a hidden screen keeps its old scroll.
+    const shown = pushScreen($("batchView"));
     $("batchBody").scrollTop = 0;
-    pushScreen($("batchView")).then(() => $("batchBack").focus());
+    shown.then(() => $("batchBack").focus());
   }
 
   function closeBatch() {
@@ -2123,7 +2128,7 @@
 
   const LONG_LIST = 50;
 
-  function renderBatch(text, preset) {
+  function renderBatch(text, preset, from) {
     let folder = preset;
     let mode = load(IMAGES_KEY, "previews");
     // A comic's folder saves its next chapters as comics too.
@@ -2213,7 +2218,11 @@
     const images = C.platform.native ? seg("batch-images", "Images", [
       { value: "previews", label: "Previews" }, { value: "full", label: "Full" }, { value: "links", label: "Links" },
     ], mode, (v) => { mode = v; }) : null;
-    const form = el("form", { class: "batch-form" },
+    const asPage = from ? el("section", { class: "settings-section batch-from" },
+      el("p", { class: "meta" }, "Carry-on read this page as a list of chapters."),
+      el("button", { class: "btn-quiet batch-as-page", type: "button", onclick: () => { history.back(); savePage(from, null, { asPage: true }); } },
+        "Save it as one page instead")) : null;
+    const form = el("form", { class: "batch-form" }, asPage,
       el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Links"), area, count, finder, skipRow),
       el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Save as"),
         seg("batch-kind", "Save as", [{ value: "article", label: "Article" }, { value: "comic", label: "Comic" }], kind, (v) => {

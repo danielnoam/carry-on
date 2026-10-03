@@ -198,12 +198,15 @@
 
   // A chapter's number from its link text ("Chapter 12", "Ch. 3.5",
   // "פרק 4", "12. The Fall"), or from its address; null when it has none.
-  const CHAPTER_WORD = /(?:chapter|chap\.?|ch\.?|part|episode|ep\.?|book|vol\.?|פרק|capítulo|chapitre|kapitel|глава|第)\s*(\d+(?:\.\d+)?)/iu;
+  // The word stands alone: "March 3", "Sep 12" and "step 4" aren't chapters,
+  // nor are addresses like /2025/sep/03/ or /research-2024.
+  const CHAPTER_WORD = /(?:^|[^\p{L}\p{N}])(?:chapter|chap\.?|ch\.?|part|episode|ep\.?|book|vol\.?|פרק|capítulo|chapitre|kapitel|глава)\s*(\d+(?:\.\d+)?)(?![\p{L}\p{N}])|第\s*(\d+)/iu;
   function chapterNumber(text, href) {
     const t = String(text || "").trim();
     const m = t.match(CHAPTER_WORD) || t.match(/^(\d+(?:\.\d+)?)(?:\s*[.:)\-–—]\s|$)/u) ||
-      String(href || "").match(/(?:chapter|chap|ch|episode|ep|part)[-_/]?(\d+(?:[.-]\d+)?)/i);
-    return m ? parseFloat(m[1].replace("-", ".")) : null;
+      String(href || "").match(/(?:^|[/_\-.?=&])(?:chapter|chap|ch|episode|ep|part)[-_/]?(\d+(?:[.-]\d+)?)(?![a-z\d])/i);
+    const n = m && (m[1] || m[2]);
+    return n ? parseFloat(n.replace("-", ".")) : null;
   }
 
   // The chapter list among groups of links (each [{ url, text }], one group
@@ -250,13 +253,19 @@
   // { title, links } for a page that is mostly a list of chapters (more
   // of its words are links than not, as WebToEpub's scanner counts it);
   // null for anything else.
+  // The site's menus, header and footer don't count: a news story under a
+  // big menu is still a story. Nor does a page whose own text is long.
+  const CHROME = "nav, header, footer, aside, script, style, noscript, template, [role=navigation], [role=banner], [role=contentinfo], [role=complementary]";
   function contentsOf(doc, pageUrl, title) {
-    const body = doc.body;
-    if (!body) return null;
-    const all = body.textContent.replace(/\s+/g, " ").trim().length;
-    const linked = [...body.querySelectorAll("a[href]")].reduce((n, a) => n + a.textContent.replace(/\s+/g, " ").trim().length, 0);
+    if (!doc.body) return null;
     const links = pickChapters(linkGroups(doc, pageUrl));
-    return links.length >= 5 && linked > all * 0.4 ? { title, links: links.map((l) => l.url) } : null;
+    if (links.length < 5) return null;
+    const body = doc.body.cloneNode(true);
+    body.querySelectorAll(CHROME).forEach((n) => n.remove());
+    const words = (n) => n.textContent.replace(/\s+/g, " ").trim().length;
+    const all = words(body);
+    const linked = [...body.querySelectorAll("a[href]")].reduce((n, a) => n + words(a), 0);
+    return linked > all * 0.4 && all - linked < 3000 ? { title, links: links.map((l) => l.url) } : null;
   }
 
   // A contents page's chapter links, read from the page whatever it is
@@ -649,7 +658,7 @@
   // Reads the article out of a page's HTML, or with `comic` its pictures.
   // null when there isn't enough text (or no pictures), or the page is a
   // browser check, so the caller can try drawing it.
-  function readArticle(html, finalUrl, comic, site) {
+  function readArticle(html, finalUrl, comic, site, asPage) {
     const doc = parse(html, finalUrl);
     const docTitle = (doc.querySelector("title") || {}).textContent || "";
     if (CHECK_TITLE.test(docTitle.trim())) return { check: true };
@@ -659,7 +668,7 @@
     // A comic chapter's page often lists every chapter in a menu, so it is
     // never taken for a contents page.
     const own = !comic && site && site.chapter ? site.chapter(doc, finalUrl) : null;
-    const contents = !comic && !own && !site && contentsOf(doc, finalUrl, (headline || docTitle).replace(/\s+/g, " ").trim());
+    const contents = !comic && !asPage && !own && !site && contentsOf(doc, finalUrl, (headline || docTitle).replace(/\s+/g, " ").trim());
     if (contents) return { contents };
     let next = nextLink(doc, finalUrl);
     let prev = nextLink(doc, finalUrl, true);
@@ -681,16 +690,16 @@
     return { doc, docTitle, headline, next, prev, article };
   }
 
-  async function fromAnyPage(url, onDrawing, comic) {
+  async function fromAnyPage(url, onDrawing, comic, asPage) {
     const site = siteRule(url);
     const res = await get(site && site.fetch ? site.fetch(url) : url);
     let finalUrl = res.url || url;
     if (site && site.clean) finalUrl = site.clean(finalUrl);
-    if (site && site.contents && !comic) {
+    if (site && site.contents && !comic && !asPage) {
       const own = await site.contents(parse(res.text, finalUrl), finalUrl, res.text);
       if (own && own.links.length) throw new ContentsPage(own);
     }
-    let got = readArticle(res.text, finalUrl, comic, site);
+    let got = readArticle(res.text, finalUrl, comic, site, asPage);
     // Pages that build themselves with scripts, or wait behind a browser
     // check, get drawn in a hidden WebView on Android and read again. The
     // saved copy is the same script-free HTML as any other page's.
@@ -699,7 +708,7 @@
       const drawn = await C.platform.render(finalUrl);
       if (drawn) {
         finalUrl = drawn.url;
-        got = readArticle(drawn.text, finalUrl, comic, siteRule(finalUrl));
+        got = readArticle(drawn.text, finalUrl, comic, siteRule(finalUrl), asPage);
       }
     }
     if (got && got.check) throw new SaveError("The site asked for a browser check, so Carry-on can't save it yet.");
@@ -1057,10 +1066,10 @@
   // script-built page, then images as they land. Resolves to the page's meta, which the library index lists.
   // `kind` "comic" saves the page's pictures as an image chapter instead
   // of reading an article out of it; it is chosen, never guessed.
-  async function save(url, { mode = "previews", kind = "article", onProgress } = {}) {
+  async function save(url, { mode = "previews", kind = "article", asPage = false, onProgress } = {}) {
     const wiki = kind !== "comic" && wikipediaPage(url);
     if (onProgress) onProgress({ stage: "text" });
-    const got = wiki ? await fromWikipedia(wiki) : await fromAnyPage(url, () => onProgress && onProgress({ stage: "drawing" }), kind === "comic");
+    const got = wiki ? await fromWikipedia(wiki) : await fromAnyPage(url, () => onProgress && onProgress({ stage: "drawing" }), kind === "comic", asPage);
     const out = document.implementation.createHTMLDocument("");
     const { root, media } = rebuild(got.body, got.base, got.url, out);
     if (got.comic) root.classList.add("co-comic");
