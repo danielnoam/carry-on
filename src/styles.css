@@ -230,15 +230,29 @@ button, input { font: inherit; color: inherit; }
   display: flex;
   flex-direction: column;
 }
-html.native .app { padding-top: env(safe-area-inset-top); }
-
-.top { padding: var(--s-6) var(--gutter) var(--s-2); }
-.top-row { display: flex; align-items: center; justify-content: space-between; }
+/* The library's bar stays while the list scrolls under it (0.28.0): the
+   space over it scrolls away, the bar sticks at the top. */
+#libraryView { padding-top: var(--s-5); }
+html.native #libraryView { padding-top: 0; }
+.top-bar {
+  position: sticky; top: 0; z-index: 4;
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-2);
+  padding: var(--s-2) var(--s-2) var(--s-2) var(--gutter);
+  background: var(--bg);
+  border-bottom: 1px solid transparent;
+  transition: border-color 120ms linear;
+}
+html.native .top-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top)); }
+.top-bar.scrolled { border-bottom-color: var(--line); }
+.top-bar .screen-title { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.top { padding: 0 var(--gutter) var(--s-2); }
+.top .meta:first-child { margin-top: 0; }
 .screen-title {
   margin: 0;
   font: 700 var(--fs-screen)/var(--lh-screen) var(--serif);
 }
-.top-actions { display: flex; gap: var(--s-1); }
+.top-actions { display: flex; gap: var(--s-1); flex-shrink: 0; }
+.top-actions [hidden] { display: none; }
 .meta { margin: var(--s-1) 0 0; font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--muted); }
 
 .icon-btn {
@@ -1096,3 +1110,102 @@ html { -webkit-tap-highlight-color: transparent; }
 .bar-title .book-icon { display: inline-flex; vertical-align: -2px; margin-inline-end: var(--s-1); color: var(--accent); }
 .tile-thumb .book-icon { color: var(--accent); }
 .tile-book { position: absolute; left: var(--s-1); bottom: var(--s-1); display: inline-flex; padding: var(--s-1); border-radius: var(--r-sm); background: var(--surface); }
+
+/* ---- 0.28.0: Show and Order, and the library's three layouts ---- */
+.lib-tools {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-2);
+  margin: var(--s-2) calc(-1 * var(--s-2)) 0;
+}
+.lib-tools[hidden] { display: none; }
+.lib-tools .dropdown { min-width: 0; }
+.lib-tools .dropdown-face { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.show-wrap.on .dropdown-btn { color: var(--accent); font-weight: 600; }
+.dropdown.start .dropdown-menu { right: auto; left: 0; }
+.dropdown-menu {
+  max-height: min(60vh, 26rem); overflow-y: auto; overscroll-behavior: contain;
+  scroll-margin: calc(var(--s-9) + var(--s-2)) 0 calc(var(--s-9) + var(--s-5));
+}
+.dropdown-head {
+  padding: var(--s-2) var(--s-3) var(--s-1);
+  font: 600 var(--fs-meta)/var(--lh-meta) var(--sans);
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+}
+.dropdown-head:not(:first-child) { margin-top: var(--s-1); border-top: 1px solid var(--line); }
+.tile-kind { display: none; }
+:is([data-layout="shelf"], [data-layout="grid"]) .tile-size { display: none; }
+.library > .section-head:first-child { margin-top: 0; }
+.top:has(.lib-tools:not([hidden])) + .library { padding-top: 0; }
+.tile-cover-name { display: none; }
+
+/* Continue reading: its collection's cover, standing, beside the page. */
+.card-thumb.cover { width: 80px; height: 120px; border-radius: var(--r-sm); }
+
+/* Shelf and One list: pages are rows, not boxes; a picked row tints. */
+:is([data-layout="shelf"], [data-layout="list"]) .page-card:not(.continue) {
+  padding: var(--s-3) 0;
+  background: transparent; border: 0; border-radius: 0;
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+:is([data-layout="shelf"], [data-layout="list"]) .page-card:not(.continue) .card-thumb { width: 64px; height: 64px; }
+.selecting:is([data-layout="shelf"], [data-layout="list"]) .picked.page-card:not(.continue) { box-shadow: inset 0 -2px 0 var(--accent); }
+
+/* Shelf and Grid: collections are covers, two to three wide. */
+:is([data-layout="shelf"], [data-layout="grid"]) .tile {
+  flex-basis: 112px; padding: 0; gap: var(--s-1);
+  background: transparent; border: 0; border-radius: var(--r-sm);
+}
+:is([data-layout="shelf"], [data-layout="grid"]) .tile-thumb {
+  height: auto; aspect-ratio: 2 / 3; margin-bottom: var(--s-1);
+  box-shadow: 0 1px 2px var(--shadow), 0 4px 12px var(--shadow);
+}
+:is([data-layout="shelf"], [data-layout="grid"]) .tile-thumb:not(:has(img)) {
+  flex-direction: column; align-items: flex-start; justify-content: space-between;
+  padding: var(--s-2);
+}
+:is([data-layout="shelf"], [data-layout="grid"]) .tile-cover-name {
+  display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere;
+  color: var(--ink); font: 600 var(--fs-label)/var(--lh-label) var(--serif);
+}
+:is([data-layout="shelf"], [data-layout="grid"]) .tile-name { font-size: var(--fs-meta); line-height: var(--lh-meta); font-family: var(--sans); font-weight: 600; }
+.selecting:is([data-layout="shelf"], [data-layout="grid"]) .picked.tile { box-shadow: 0 0 0 2px var(--accent); }
+[data-layout="grid"] .folder-strip {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-4) var(--s-3);
+  overflow: visible; margin: 0; padding: var(--s-1) 0 var(--s-2);
+}
+
+/* One list: a collection is a row like a page, its cover standing. */
+[data-layout="list"] .library > .tile {
+  flex: none; justify-content: center; gap: 6px;
+  min-height: calc(96px + 2 * var(--s-3)); padding: var(--s-3) 0 var(--s-3) calc(64px + 14px);
+  background: transparent; border: 0; border-radius: 0;
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+[data-layout="list"] .library > .tile .tile-thumb { position: absolute; left: 0; top: var(--s-3); width: 64px; height: 96px; margin: 0; }
+[dir="rtl"] [data-layout="list"] .library > .tile { padding: var(--s-3) calc(64px + 14px) var(--s-3) 0; }
+[dir="rtl"] [data-layout="list"] .library > .tile .tile-thumb { left: auto; right: 0; }
+[data-layout="list"] .tile-name { font-size: var(--fs-card); line-height: var(--lh-card); }
+[data-layout="list"] .tile-kind { display: inline; }
+[data-layout="list"] .tile .progress { margin-top: 0; }
+[data-layout="list"] .tile-new { top: var(--s-1); inset-inline-end: var(--s-1); padding: 0 6px; }
+.selecting[data-layout="list"] .picked.tile { box-shadow: inset 0 -2px 0 var(--accent); }
+
+/* Grid: pages are cards two wide, the picture on top. Saves in progress
+   and Continue reading take the whole width. */
+[data-layout="grid"] .library { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: var(--s-3); }
+[data-layout="grid"] .library > :is(.wide, .card:not(.page-card)) { grid-column: 1 / -1; }
+[data-layout="grid"] .page-card:not(.has-cover) { flex-direction: column; gap: 0; padding: 0; overflow: hidden; }
+[data-layout="grid"] .page-card:not(.has-cover) .card-thumb { width: 100%; height: auto; aspect-ratio: 16 / 10; border-radius: 0; }
+[data-layout="grid"] .page-card:not(.has-cover) .card-body { padding: var(--s-3); }
+[data-layout="grid"] .page-card:not(.continue) .card-title { font-size: var(--fs-label); line-height: var(--lh-label); }
+[data-layout="grid"] .continue:not(.has-cover) .card-thumb { aspect-ratio: 2 / 1; }
+[data-layout="grid"] .card-thumb.site-mark img { width: var(--s-7); height: var(--s-7); }
+
+/* At phone width rows sit edge to edge, their hairlines between them. */
+@media (max-width: 899px) {
+  :is([data-layout="shelf"], [data-layout="list"]) .library > :is(.tile, .page-card:not(.continue)) + :is(.tile, .page-card) { margin-top: calc(-1 * var(--s-3)); }
+}
+@media (min-width: 900px) {
+  :is([data-layout="shelf"], [data-layout="grid"]) .tile { flex-basis: 136px; }
+  [data-layout="grid"] .folder-strip { grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); }
+  [data-layout="grid"] .library { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

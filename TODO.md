@@ -24,20 +24,12 @@ asks from Daniel.
 
 ---
 
-## 0.27.x: Library polish (Daniel, 3 Oct 2026)
-
-Asked for after 0.27.3 (the stuck tap shipped in 0.27.4, the add
-screen's dropdowns in 0.27.5, covers and site icons in 0.27.6). Placed
-before sync; Daniel can move it.
-
-- **Library rework.** Daniel still thinks it could look better. Start
-  with a few directions on the design canvas before any code.
-
 ## Downloads (Daniel, 3 Oct 2026)
 
 Saving moves out of the library into a Downloads screen of its own.
 
-- **A Downloads button** in the top right, beside Settings: a dot on it
+- **A Downloads button** in the library's bar (the one that stays while
+  you scroll, since 0.27.7), beside Settings: a dot on it
   while anything is downloading, and a ring around it filling with the
   overall progress.
 - **The screen** lists what's downloading and what just finished, one
@@ -110,6 +102,11 @@ its link (or find it from a page's `<link rel="alternate">`), check it
 like collections are checked for new chapters, and save new items into a
 collection named after the feed, or list them to pick from. Settings per
 feed: save automatically or just show what's new.
+
+- **A sidebar** (Daniel, 3 Oct 2026). A menu button at the left of the
+  bar opens a side panel with Library and RSS feeds, and whatever comes
+  later. The bar stays the same in both views (Search, Downloads,
+  Settings on the right), only its title changes.
 
 ---
 

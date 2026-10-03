@@ -106,20 +106,38 @@ and the page shows above it.
 
 ## 5. Components
 
-- **Library (Now):** title, then Select (a tick in a circle) and
-  Settings (a gear) as 44 px icons; the count; search, always open.
-  Without a search the library is in sections, each with an overline:
-  "Continue reading" (the started page read last, one card; Settings,
-  Appearance, Library can turn it off), "Collections" (a row of tiles that
-  scrolls sideways on a phone and wraps on a desktop), then the filter
-  chips, then "Pages" or "Pages in no collection · N" with the order on the
-  right ("Newest saved", "Last read", "Longest", "Site", a dropdown with
-  an arrows icon). Unread and Finished keep collections whole: the
-  collections with an unread page (or all read) move under the filters,
-  then "Unread pages in no collection · 4". A tag lists every page it
-  matches, collection pages too, under "#trip · 3"; a search lists pages
-  only, under "Found · 2". At 900 px and wider the pages are two
-  columns.
+- **Library (Now, 0.27.7):** a bar that stays while the list scrolls
+  under it: the title, then Search (a magnifier, which goes up to the
+  field and focuses it), Select (a tick in a circle) and Settings (a gear),
+  44 px icons; a hairline under the bar once the list is under it. Above
+  the bar `--s-5` scrolls away (on the phone, the safe area instead).
+  Under it, scrolling away: the count, search (always open), then Show
+  and Order, two dropdowns on one row: Show on the start side (a lines
+  icon, "All pages", "Unread", "Finished", then a "Tags" overline and the
+  #tags; anything but All shows in `--accent`, semibold) and Order on the
+  end side ("Newest saved", "Last read", "Longest", "Site", an arrows
+  icon). Both act on everything below them, collections too: a collection
+  is ordered by its newest page, the one read last, its total length or
+  its site. Continue reading shows only under All. Unread and Finished
+  keep collections whole (one with an unread page, or all read); a tag
+  lists every page it matches, collection pages too; a search lists pages
+  only, under "Found · 2". Settings, Appearance, Library layout picks one
+  of three:
+  - **Shelf** (the default): "Continue reading" (one card; its
+    collection's cover, 80 × 120, when it has one), "Collections" (a row
+    of standing covers, 112 px wide at 2:3, 136 px at 900 px and wider),
+    then "Pages in no collection · N" as rows: no box, a hairline under
+    each, a 64 px picture.
+  - **One list:** Continue reading, then collections and pages in one
+    list of rows, in the chosen order, under overlines: Today, Yesterday,
+    This week, This month, Earlier (or Not started, under Last read) for
+    Newest saved and Last read; the site for Site; none for Longest. A
+    collection's row has its cover standing at 64 × 96 and "Collection ·
+    3 of 12 read · 4 MB".
+  - **Grid:** Continue reading as a card with its picture across the top
+    (2:1), collections as covers three across, pages as cards two across
+    (three at 900 px), the picture on top at 16:10 and a label-size title.
+  At 900 px and wider, Shelf and One list put their rows in two columns.
 - **Library card (Now):** thumbnail, site line (site, collection, #tags),
   serif title, then the reading line ("9 min", "6 min left" with a 3 px
   accent line, or "Finished") and the size. A status only when it needs
@@ -127,9 +145,10 @@ and the page shows above it.
   With no picture, the thumbnail is `--preview` with the site's icon
   centred at 32 px (`--s-6`), or the site's first letter in the serif,
   heading size, `--muted` (0.27.6).
-- **Collection tile (Now):** 136 px wide, its story page's cover when
-  it's linked to one (0.27.6), else its first picture (or a collection
-  glyph on `--preview`), the name in the serif, "3 of 12 read" and a thin
+- **Collection tile (Now):** its story page's cover when it's linked to
+  one (0.27.6), else its first picture, else a cover drawn from it: the
+  collection glyph at the top and the name in the serif at the bottom, on
+  `--preview` (0.27.7). Under it the name, "3 of 12 read" and a thin
   accent line. A series with chapters not yet saved shows "2 new" as a
   pill at the picture's top end: `--accent` fill, `--accent-ink` text,
   meta size, semibold (0.25.0).
@@ -335,11 +354,10 @@ and the page shows above it.
 - **What's new (Now):** a pushed screen; each version a serif heading
   with its date, "You have this" by the installed one, then its Added /
   Changed / Fixed as small overlines over bulleted sentences.
-- **Filter chips (Now):** under the library's meta line, scrolling edge
-  to edge: All, Unread, Finished, then "Tags ▾", which opens a second row
-  of #tags. The chosen one is filled with the accent (a chosen tag shows
-  on the Tags chip with ×); tapping it again goes back to All. Hidden while the
-  library is empty. Chips are 36 px to the eye and 44 px to the touch.
+- **Show and Order (Now, 0.27.7):** see Library. They replaced the
+  filter chips, whose tag row grew with every tag. A dropdown menu
+  scrolls past 26 rem (or 60 % of the screen) and can carry overline
+  headings between its choices.
 - **Image figure (Now):** saved preview, caption, "Full size online"
   floated to the end of the caption's first line. A credit, when the
   source gives one, goes on its own line under the caption, in meta size

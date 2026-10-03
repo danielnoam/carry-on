@@ -3,6 +3,23 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Three library layouts (0.27.7).** Daniel asked for all three
+  directions from the design canvas, Shelf by default, chosen in
+  Settings, Appearance (`carryon.layout`). They share one renderer and
+  one set of cards: `#libraryView[data-layout]` restyles them, and only
+  One list builds differently, putting each collection's tile among the
+  pages (keyed `t:<name>`) and adding group overlines (`h:g:<group>`).
+  To order collections alongside pages, `asItem()` turns one into a
+  page-like item (newest `savedAt`, latest `readAt`, total `minutes`,
+  first page's `site`) for the same `BY` comparators. The filter chips
+  became one Show dropdown beside Order, moved over the whole library
+  (in `#libTools`, under search), because the old row sat between
+  Collections and Pages yet filtered both, and its tag row grew with
+  every tag. `dropdown()` gained `{ head }` entries for the Tags heading.
+  The bar is its own sticky element (`#topBar`), not inside the header,
+  since a sticky element only sticks within its parent. The list rows'
+  cover is absolutely placed, not a grid row: a grid with `1fr` rows
+  around a spanning 96 px cover grew 23 px taller than the cover.
 - **Covers and site icons (0.27.6).** A collection's cover is its
   story page's `og:image` (Royal Road and Scribble Hub put the cover
   there), read whenever the page is: linking it, a check for new
