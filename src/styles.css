@@ -776,6 +776,7 @@ html.native .reader::before {
 .folder-actions.remove { flex-direction: column; align-items: stretch; }
 .folder-actions.remove .meta { margin: 0 0 var(--s-1); }
 .btn-quiet.danger { color: var(--warn); }
+.batch-from .meta { margin: 0 0 var(--s-2); }
 
 /* Updates in Settings, and What's new. */
 .update-row .row-label { white-space: normal; }

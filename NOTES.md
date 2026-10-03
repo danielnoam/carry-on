@@ -3,6 +3,15 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Telling a contents page from a page (0.25.1).** A chapter word
+  must stand alone ("Sep 12" was "ep 12", and /2025/sep/03/ in an
+  address was episode 3), and the share of linked text is counted
+  without nav, header, footer and aside, with at most 3,000 characters
+  of other text. 0.25.0 took news stories under a big menu, with dated
+  related links, for lists of chapters. A guess can still be wrong, so
+  Save with options opened from one offers "Save it as one page
+  instead", which saves with `asPage` and skips both the guess and the
+  site rules' `contents`.
 - **Site rules (0.25.0).** `SITES` in src/save.js holds a rule for
   each serial-fiction site the general reader gets wrong, matched by
   host and tried before it: `contents` (this page lists chapters),

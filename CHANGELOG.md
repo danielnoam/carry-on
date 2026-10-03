@@ -2,6 +2,15 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.25.1] - 2026-10-03
+
+### Fixed
+- Ordinary pages, like a news story, no longer get taken for a list of
+  chapters. Dates such as "Sep 12" and a site's menus counted as
+  chapter links.
+- When a page is read as a list of chapters, Save with options now
+  offers "Save it as one page instead".
+
 ## [0.25.0] - 2026-10-03
 
 ### Added

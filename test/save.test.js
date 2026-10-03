@@ -88,6 +88,13 @@ test("chapter numbers come from the link's words, or its address", () => {
   assert.strictEqual(S.chapterNumber("The Fall", "https://x.example/novel/chapter-9"), 9);
   assert.strictEqual(S.chapterNumber("About us", "https://x.example/about"), null);
   assert.strictEqual(S.chapterNumber("2024 in review"), null);
+  assert.strictEqual(S.chapterNumber("Published March 3"), null);
+  assert.strictEqual(S.chapterNumber("Sep 12, 2025"), null);
+  assert.strictEqual(S.chapterNumber("Step 4: mix", "https://news.example/world/2025/sep/03/story"), null);
+  assert.strictEqual(S.chapterNumber("Story", "https://news.example/research-2024/x"), null);
+  assert.strictEqual(S.chapterNumber("Ep3"), 3);
+  assert.strictEqual(S.chapterNumber("第12章"), 12);
+  assert.strictEqual(S.chapterNumber("x", "https://x.example/s/ch_4"), 4);
 });
 
 test("the chapter list is the group with the most numbered links, in reading order", () => {
