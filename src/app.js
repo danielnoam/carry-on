@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.28.1";
+  const APP_VERSION = "0.28.2";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -1399,10 +1399,10 @@
   function endLink(p) {
     if (p.preview) return null;
     const next = neighbour(p, 1);
-    if (next) return { over: "Next in " + p.folder, title: next.title, go: () => goTo(next) };
+    if (next) return { over: "Next in " + p.folder, title: next.title, go: () => goTo(next, true) };
     if (!p.next) return null;
     const had = savedAs(p.next);
-    if (had) return { over: "Next on " + p.site, title: had.title, go: () => goTo(had) };
+    if (had) return { over: "Next on " + p.site, title: had.title, go: () => goTo(had, true) };
     return { over: "Next on " + p.site, title: "Save it and read on", go: () => followAndOpen(p) };
   }
 
@@ -1410,20 +1410,24 @@
     if (!navigator.onLine) { toast("You're offline. The next page saves when you're back online."); return; }
     toast("Saving the next page…");
     const got = await follow(p, 1, true);
-    if (got && state.open === p) goTo(got);
+    if (got && state.open === p) goTo(got, true);
   }
 
   // Next or previous in a folder: the reader stays and its page changes,
   // in the same history entry, so back still leaves the reader.
-  async function goTo(p) {
+  // From the end link (0.28.2) the page turns: the one read slides away
+  // to the left and the next comes in from the right.
+  async function goTo(p, turn) {
     let html;
     try { html = await C.store.readPage(p.id); } catch (e) { html = null; }
     if (!html) { toast("This page's file is missing. Delete it and save it again."); return; }
     if (state.sheet) await new Promise((resolve) => { addEventListener("popstate", () => resolve(), { once: true }); history.back(); });
     if (positionTimer) savePositions();
     history.replaceState(readerState(p), "");
-    await show(p, html);
-    $("readerFrame").focus();
+    const frame = $("readerFrame");
+    if (turn) await M.pageOut(frame);
+    try { await show(p, html); } finally { if (turn) await M.pageIn(frame); }
+    frame.focus();
   }
 
   // Where each page was left (`at`, 0 to 1) and whether it was ever read to
@@ -2023,7 +2027,7 @@
       pickMark(),
       el("span", { class: "tile-thumb" + (thumb ? "" : " blank"), "aria-hidden": "true" },
         thumb ? el("img", { src: thumb, alt: "", loading: "lazy" }) : null,
-        fresh ? el("span", { class: "tile-new" }, newCountText(fresh)) : null),
+        fresh ? el("span", { class: "tile-new" }, "+" + (fresh >= NEW_MAX ? NEW_MAX : fresh)) : null),
       el("span", { class: "tile-name", dir: "auto" }, name),
       el("span", { class: "tile-meta" }, el("span", { class: "tile-kind" }, "Collection · "), (done === list.length ? "All read" : done + " of " + list.length + " read"), el("span", { class: "tile-size" }, " · " + formatSize(sizeOf(list)))),
       el("span", { class: "progress thin", "aria-hidden": "true" },
@@ -3973,17 +3977,18 @@
     const all = feeds.reduce((n, f) => n + waitingIn(f), 0);
     nodes.push(el("div", { class: "chips filters feed-chips", role: "group", "aria-label": "Feeds" },
       chip("All", all, !picked, () => pickFeed(null), "chip:all"),
-      ...feeds.map((f) => chip(f.title, waitingIn(f), picked === f, () => pickFeed(f.url), "chip:" + f.url)),
-      el("button", { class: "chip add-chip", type: "button", "data-key": "chip:add", onclick: () => openMenu("addFeed") },
-        feedIcon("add", 16), "Add a feed")));
+      ...feeds.map((f) => {
+        const c = chip(f.title, waitingIn(f), picked === f, () => pickFeed(f.url), "chip:" + f.url);
+        c.dataset.feed = f.url;
+        return c;
+      })));
     const checked = Math.max(0, ...(picked ? [picked] : feeds).map((f) => f.checkedAt || 0));
     const line = feedsChecking ? "Checking…" : picked && picked.error ? picked.error
       : checked ? "Checked " + whenText(checked) : "Not checked yet";
     nodes.push(el("div", { class: "feed-head" },
       el("p", { class: "meta" + (picked && picked.error && !feedsChecking ? " warn" : "") }, line),
-      el("div", { class: "feed-head-actions" },
-        el("button", { class: "btn-text", type: "button", "data-key": "check", onclick: () => checkNow(picked) }, "Check now"),
-        picked ? el("button", { class: "btn-text", type: "button", "data-key": "settings", onclick: () => openMenu("feed", picked) }, "Settings") : null)));
+      // Phones pull down to check; a pointer gets the button.
+      el("button", { class: "btn-text feed-check", type: "button", "data-key": "check", onclick: () => checkNow(picked) }, "Check now")));
     const list = (picked ? [picked] : feeds).flatMap((f) => feedPosts(f).map((it) => ({ f, it })))
       .sort((a, b) => postAt(b.it) - postAt(a.it));
     let day = null, group = null;
@@ -4109,6 +4114,8 @@
     });
   }
 
+  const withFeed = (node, f) => { node.dataset.feed = f.url; return node; };
+
   function renderSide() {
     const item = (icon, label, on, extra, onclick, cls) => {
       const b = el("button", { class: "side-item" + (cls ? " " + cls : ""), type: "button", onclick }, icon,
@@ -4129,7 +4136,7 @@
       item(feedIcon("feeds"), "Feeds", inFeeds && !state.feed, fresh ? el("span", { class: "side-pill" }, fresh + " new") : null,
         () => goPlace("feeds")),
       ...[...feeds].sort((a, b) => latest(b) - latest(a)).slice(0, SIDE_MAX).map((f) =>
-        item(feedMark(f, true), f.title, inFeeds && state.feed === f.url, count(waitingIn(f)), () => goPlace("feeds", f.url), "side-sub")),
+        withFeed(item(feedMark(f, true), f.title, inFeeds && state.feed === f.url, count(waitingIn(f)), () => goPlace("feeds", f.url), "side-sub"), f)),
       item(feedIcon("add"), "Add a feed", false, null, () => back().then(() => openMenu("addFeed")), "side-sub side-add"));
   }
 
@@ -4161,6 +4168,105 @@
     M.leave(catcher).then(() => { if (!state.side) catcher.hidden = true; });
     M.slideOut(side).then(() => { if (!state.side) side.hidden = true; });
     if (had) $("sideBtn").focus({ preventScroll: true });
+  }
+
+  // ---- Gestures (0.28.2) ----
+
+  // Holding a feed (its chip, or its row in the sidebar), or right-clicking
+  // it, opens its settings.
+  function holdFeeds(root) {
+    let timer = null, start = null, fired = false;
+    const cancel = () => { clearTimeout(timer); timer = null; };
+    const open = (node) => {
+      const f = feeds.find((x) => x.url === node.dataset.feed);
+      if (!f) return;
+      if (navigator.vibrate) navigator.vibrate(10);
+      (state.side ? back() : Promise.resolve()).then(() => openMenu("feed", f));
+    };
+    root.addEventListener("pointerdown", (e) => {
+      fired = false;
+      const node = e.button === 0 && e.target.closest("[data-feed]");
+      if (!node) return;
+      start = { x: e.clientX, y: e.clientY };
+      cancel();
+      timer = setTimeout(() => { timer = null; fired = true; open(node); }, 480);
+    });
+    root.addEventListener("pointermove", (e) => { if (timer && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 10) cancel(); });
+    for (const t of ["pointerup", "pointercancel", "pointerleave"]) root.addEventListener(t, cancel);
+    root.addEventListener("click", (e) => { if (fired) { fired = false; e.preventDefault(); e.stopPropagation(); } }, true);
+    root.addEventListener("contextmenu", (e) => {
+      const node = e.target.closest("[data-feed]");
+      if (!node) return;
+      e.preventDefault();
+      cancel();
+      if (!fired) { fired = true; open(node); }
+    });
+  }
+
+  // A swipe to the right anywhere in Library or Feeds opens the sidebar
+  // (not only from the edge, which Android keeps for Back). Rows that
+  // scroll sideways keep their swipes.
+  function swipeToSide(root) {
+    let start = null;
+    root.addEventListener("touchstart", (e) => {
+      const t = e.touches[0];
+      start = e.touches.length === 1 && !state.select && !state.menu && !state.side
+        && !e.target.closest(".filters, .folder-strip, input, textarea, .drag-handle") ? { x: t.clientX, y: t.clientY } : null;
+    }, { passive: true });
+    root.addEventListener("touchmove", (e) => {
+      if (!start) return;
+      const t = e.touches[0], dx = t.clientX - start.x, dy = Math.abs(t.clientY - start.y);
+      if (dy > 24 || dx < -24) { start = null; return; }
+      if (dx > 64 && dy < dx / 2) { start = null; openSide(); }
+    }, { passive: true });
+    root.addEventListener("touchend", () => { start = null; }, { passive: true });
+  }
+
+  // Pulling down from the top checks for what's new: in Feeds the feeds
+  // on show (all, or the picked one), in the library every collection
+  // that follows a series, for new chapters.
+  const PULL_AT = 64;
+  function pullToCheck(root) {
+    const hint = $("pullHint");
+    let start = null, pulled = 0;
+    const set = (h, settle) => {
+      hint.classList.toggle("settle", !!settle && !M.reduced());
+      hint.style.height = h + "px";
+      hint.classList.toggle("ready", h >= PULL_AT);
+    };
+    root.addEventListener("touchstart", (e) => {
+      start = !feedsChecking && !dailyRunning && scrollY <= 0 && e.touches.length === 1 && !state.side && !state.menu
+        ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null;
+      pulled = 0;
+    }, { passive: true });
+    root.addEventListener("touchmove", (e) => {
+      if (!start) return;
+      const t = e.touches[0], dy = t.clientY - start.y, dx = Math.abs(t.clientX - start.x);
+      if (dy < 0 || (pulled === 0 && dx > dy)) { start = null; if (pulled) set(0, true); pulled = 0; return; }
+      pulled = Math.min(PULL_AT * 1.4, dy * 0.5);
+      hint.hidden = false;
+      set(pulled);
+    }, { passive: true });
+    root.addEventListener("touchend", () => {
+      if (!start) return;
+      start = null;
+      if (pulled < PULL_AT) { set(0, true); pulled = 0; return; }
+      pulled = 0;
+      set(48, true);
+      hint.classList.add("busy");
+      const picked = state.feed && feeds.find((f) => f.url === state.feed);
+      const done = () => { hint.classList.remove("busy"); set(0, true); };
+      if (state.place === "feeds") { checkNow(picked || null).finally(done); return; }
+      checkChapters().finally(done);
+    }, { passive: true });
+  }
+
+  async function checkChapters() {
+    if (!navigator.onLine) { toast("You're offline. Check again when you're back online."); return; }
+    if (!allFolders().some((n) => isSeries(folderPages(n)))) { toast("No collections follow a series yet."); return; }
+    const found = await dailyCheck(true);
+    renderLibrary();
+    toast(found ? "New chapters in " + found + (found === 1 ? " collection" : " collections") + "." : "No new chapters.");
   }
 
   // ---- Add a feed, and a feed's settings ----
@@ -4271,6 +4377,11 @@
         row("Save into", into),
         row("Skip posts older than", seg("feed-days", "Skip posts older than", FEED_DAYS, String(f.days || 7), (v) => set({ days: Number(v) })))),
       el("p", { class: "footnote" + (f.error ? " warn" : "") }, f.error || (f.checkedAt ? "Checked " + whenText(f.checkedAt) + ". " : "") + rateLine(f.items) + "."),
+      el("button", { class: "sheet-row", type: "button", onclick: (e) => {
+        e.currentTarget.disabled = true;
+        e.currentTarget.textContent = "Checking…";
+        checkNow(f).then(redrawMenu);
+      } }, "Check now"),
       el("button", { class: "sheet-row danger", type: "button", onclick: () => unfollow(f) }, "Unfollow"),
       el("p", { class: "footnote" }, "Unfollowing keeps the posts you saved."));
   }
@@ -4651,6 +4762,10 @@
 
   $("settingsBtn").addEventListener("click", () => openSettings());
   $("sideBtn").addEventListener("click", openSide);
+  holdFeeds($("feeds"));
+  holdFeeds($("sidebar"));
+  swipeToSide($("libraryView"));
+  pullToCheck($("libraryView"));
   $("sideCatch").addEventListener("click", () => history.back());
   $("downloadsBtn").addEventListener("click", () => openDownloads());
   $("downloadsBack").addEventListener("click", () => history.back());

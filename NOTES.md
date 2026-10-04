@@ -3,6 +3,18 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Gestures (0.28.2).** The sidebar opens on a swipe to the right from
+  anywhere in the list, not only from the edge: Android's gesture
+  navigation keeps the left edge for Back, so an edge swipe would rarely
+  reach the app. Rows that scroll sideways (chips, the collections
+  shelf) keep their swipes. Pull to check is drawn by the app (a gap
+  with a ring over the list) since a WebView has no native refresh
+  control; it starts only at the very top, and Check now stays for a
+  mouse, where pulling isn't possible. Holding a feed reuses the 480 ms
+  long press of the library's cards. The page turn fades the reader out
+  to the left before the next page loads, and in from the right once it
+  has, so the swap itself is never seen.
+
 - **Reading a post without saving it (0.28.1).** Daniel asked for a tap on
   a post to show it in the app. `C.save.preview` runs the same reading
   pipeline as a save with pictures as links and writes nothing; the
