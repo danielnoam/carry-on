@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.27.11";
+  const APP_VERSION = "0.27.12";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -222,17 +222,31 @@
   if (darkQuery && darkQuery.addEventListener) darkQuery.addEventListener("change", () => { if (state.theme === "system") paintTheme("system"); });
 
   function formatSize(bytes) {
+    if (bytes >= 1e9) return (bytes / 1e9).toFixed(bytes >= 1e10 ? 0 : 1) + " GB";
     if (bytes >= 1e6) return (bytes / 1e6).toFixed(bytes >= 1e7 ? 0 : 1) + " MB";
     return Math.max(1, Math.round(bytes / 1e3)) + " KB";
   }
   const sizeOf = (pages) => pages.reduce((sum, p) => sum + (p.bytes || 0), 0);
   const totalBytes = () => sizeOf(state.pages);
   const countLine = (n) => n + (n === 1 ? " page" : " pages");
+  // Where the pages are kept, for the words that say so.
+  const HERE = C.platform.native ? "this phone" : "this browser";
+  const ON_HERE = (C.platform.native ? "on " : "in ") + HERE;
   const pagesLine = (n) => countLine(n) + " · " + formatSize(totalBytes());
+
+  // A browser's card pictures, read once from IndexedDB (0.27.12).
+  const webThumbs = new Map();
+  async function loadThumbs() {
+    if (C.platform.native) return;
+    const got = await C.store.readThumbs();
+    webThumbs.clear();
+    got.forEach((url, id) => webThumbs.set(id, url));
+  }
 
   function thumbUrl(p) {
     if (!p.thumb) return null;
     if (/^https?:/.test(p.thumb)) return p.thumb;
+    if (webThumbs.has(p.id)) return webThumbs.get(p.id);
     const base = C.store.pageDirUrl(p.id);
     return base ? base + p.thumb : null;
   }
@@ -1052,8 +1066,10 @@
     if (!n) {
       keep("empty", () => el("div", { class: "empty wide" },
         el("h2", { class: "empty-title" }, "Pages you take with you"),
-        el("p", { class: "empty-text" },
-          "Share a page to Carry-on from your browser, or paste its link below. It stays readable with no connection, with a link back to the original.")));
+        el("p", { class: "empty-text" }, C.platform.native
+          ? "Share a page to Carry-on from your browser, or paste its link below. It stays readable with no connection, with a link back to the original."
+          : "Paste a Wikipedia link below, or bring the pages you saved on your phone: back up there, then open the backup here."),
+        C.platform.native ? null : el("button", { class: "btn-quiet empty-open", type: "button", onclick: () => openSettings(false, "storage") }, "Open a backup")));
     }
     root.replaceChildren(...nodes);
     if (!firstRender) fresh.forEach((node) => M.arrive(node));
@@ -1099,6 +1115,7 @@
     toast("Saving. It's in Downloads.");
     const meta = await runJob(job);
     if (meta) toast(meta.missing ? "Saved. Some previews are missing." : "Saved for offline reading");
+    if (meta && !C.platform.native) C.store.keepStored();
     else if (job.contents) contentsFound(job);
   }
 
@@ -2524,7 +2541,7 @@
   async function removeFolder(withPages) {
     const name = state.folder;
     const list = folderPages(name);
-    if (withPages && !confirm("Delete “" + name + "” and its " + countLine(list.length) + " from this phone?")) return;
+    if (withPages && !confirm("Delete “" + name + "” and its " + countLine(list.length) + " from " + HERE + "?")) return;
     for (const p of list) {
       if (withPages) await C.store.removePage(p.id);
       else { delete p.folder; delete p.folderAt; }
@@ -2737,7 +2754,7 @@
 
   async function deletePicked() {
     const list = picked();
-    if (!list.length || !confirm("Delete " + countLine(list.length) + " from this phone?")) return;
+    if (!list.length || !confirm("Delete " + countLine(list.length) + " from " + HERE + "?")) return;
     for (const p of list) await C.store.removePage(p.id);
     state.pages = state.pages.filter((p) => !list.includes(p));
     await C.store.writeIndex(state.pages);
@@ -3043,6 +3060,8 @@
         state.pages = res.pages;
         await C.store.writeIndex(state.pages);
         texts.clear();
+        await loadThumbs();
+        if (res.added + res.replaced) C.store.keepStored();
         const n = res.added + res.replaced;
         toast((n ? "Restored " + countLine(n) : "Nothing new to restore") + (res.kept ? ". " + res.kept + " already here" + (res.kept === 1 ? " was" : " were") + " kept." : "."));
       } else {
@@ -3052,6 +3071,8 @@
         } else {
           state.pages.unshift(meta);
           await C.store.writeIndex(state.pages);
+          await loadThumbs();
+          C.store.keepStored();
           toast("Added “" + meta.title + "”");
         }
       }
@@ -3075,7 +3096,7 @@
         el("button", { class: "row", type: "button", onclick: (e) => backUp(e.currentTarget) },
           el("span", { class: "row-label accent" }, "Back up the library")),
         open, input),
-      el("p", { class: "footnote" }, "One file with every page, its pictures, tags, collections and where you were. Keep it off the phone. Restoring keeps whichever copy of a page was saved last. A page sent as a file opens here too."));
+      el("p", { class: "footnote" }, "One file with every page, its pictures, tags, collections and where you were. " + (C.platform.native ? "Keep it off the phone" : "Keep it somewhere other than this browser") + ". Restoring keeps whichever copy of a page was saved last. A page sent as a file opens here too."));
   }
 
   // "Save full images" for a page saved with previews or links only.
@@ -3882,7 +3903,7 @@
     }
     return el("section", { class: "settings-section" },
       el("p", { class: "storage-total" }, formatSize(totalBytes())),
-      el("p", { class: "section-lead" }, n ? countLine(n) + " on this phone. Delete a page from its menu: press and hold it in the library." : "Pages you save show here with their size."),
+      el("p", { class: "section-lead" }, n ? countLine(n) + " " + ON_HERE + ". Delete a page from its menu: press and hold it in the library." : "Pages you save show here with their size."),
       el("h2", { class: "overline" }, "By collection"),
       list);
   }
@@ -3896,9 +3917,73 @@
     list.append(el("a", { class: "row", href: releases, target: "_blank", rel: "noopener" },
       el("span", { class: "row-label accent" }, "Releases and source"),
       el("span", { class: "row-value", "aria-hidden": "true" }, "↗")));
+    const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    const installed = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+    if (!C.platform.native && !installed && installPrompt) {
+      list.prepend(el("button", { class: "row install-row", type: "button", onclick: installApp },
+        el("span", { class: "choice-text" },
+          el("span", { class: "choice-label accent" }, "Install Carry-on"),
+          el("span", { class: "choice-note" }, "Opens in its own window and works with no connection"))));
+    }
     return el("section", { class: "settings-section" },
       list,
-      el("p", { class: "footnote" }, "Pages stay on this phone. Carry-on collects nothing."));
+      !C.platform.native && !installed && !installPrompt && ios
+        ? el("p", { class: "footnote install-hint" }, "To install Carry-on, tap Share, then Add to Home Screen.") : null,
+      el("p", { class: "footnote" }, "Pages stay " + ON_HERE + ". Carry-on collects nothing."));
+  }
+
+  // The browser's own install offer (Chrome, Edge, Android), kept for the
+  // Install row in About instead of the browser's banner.
+  let installPrompt = null;
+  addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    installPrompt = e;
+    if (state.section === "about") renderSection();
+  });
+  addEventListener("appinstalled", () => {
+    installPrompt = null;
+    if (state.section === "about") renderSection();
+    toast("Installed. Carry-on is with your other apps.");
+  });
+  async function installApp() {
+    if (!installPrompt) return;
+    const offer = installPrompt;
+    installPrompt = null;
+    offer.prompt();
+    try { await offer.userChoice; } catch (e) { /* closed */ }
+    if (state.section === "about") renderSection();
+  }
+
+  // A browser's storage (0.27.12): how much it holds, and whether it may
+  // clear the pages to make space, with the ask to keep them.
+  function browserStorageGroup() {
+    if (C.platform.native) return null;
+    const box = el("section", { class: "settings-section browser-storage" });
+    box.hidden = true;
+    const draw = (info) => {
+      box.hidden = !info;
+      if (!info) return;
+      const kept = info.kept
+        ? el("div", { class: "row" }, el("span", { class: "choice-text" },
+          el("span", { class: "choice-label" }, "Kept"),
+          el("span", { class: "choice-note" }, "This browser won't clear your pages to make space.")))
+        : el("button", { class: "row keep-row", type: "button", onclick: async () => {
+          const ok = await C.store.keepStored();
+          toast(ok ? "This browser will keep your pages." : "This browser didn't agree. Installing Carry-on usually helps.");
+          draw(await C.store.storageInfo());
+        } }, el("span", { class: "choice-text" },
+          el("span", { class: "choice-label accent" }, "Keep pages from being cleared"),
+          el("span", { class: "choice-note" }, "Browsers may clear a site's data when space runs low.")));
+      box.replaceChildren(
+        el("h2", { class: "overline" }, "This browser"),
+        el("div", { class: "group" },
+          el("div", { class: "row" }, el("span", { class: "row-label" }, "Space used"),
+            el("span", { class: "row-value" }, formatSize(info.usage) + (info.quota ? " of " + formatSize(info.quota) : ""))),
+          kept),
+        el("p", { class: "footnote" }, "Pages saved here stay in this browser only. Clearing its site data deletes them, so keep a backup."));
+    };
+    C.store.storageInfo().then(draw);
+    return box;
   }
 
   // Settings is a short menu; each entry is a screen of its own.
@@ -3910,7 +3995,7 @@
       value: () => themeName(state.theme) },
     saving: { title: "Saving", build: () => [choiceGroup(SETTINGS[1])],
       value: () => SETTINGS[1].options.find((o) => o.value === SETTINGS[1].get()).label },
-    storage: { title: "Storage and backup", build: () => [storageGroup(), backupGroup()], value: () => formatSize(totalBytes()) },
+    storage: { title: "Storage and backup", build: () => [storageGroup(), browserStorageGroup(), backupGroup()], value: () => formatSize(totalBytes()) },
     updates: { title: "Updates", build: () => [updatesGroup()], value: () => (updateOut() ? upd.latest + " is out" : "") },
     about: { title: "About", build: () => [aboutGroup()], value: () => APP_VERSION },
   };
@@ -4128,7 +4213,7 @@
   }
 
   renderLibrary();
-  Promise.all([C.platform.ready, C.store.ready]).then(() => C.store.readIndex()).then((pages) => {
+  Promise.all([C.platform.ready, C.store.ready]).then(() => Promise.all([C.store.readIndex(), loadThumbs()])).then(([pages]) => {
     state.pages = Array.isArray(pages) ? pages : [];
     if (history.state && history.state.view) history.replaceState(null, "");
     renderLibrary();

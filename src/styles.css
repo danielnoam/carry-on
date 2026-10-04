@@ -1387,3 +1387,6 @@ html { -webkit-tap-highlight-color: transparent; }
 .storage-pages > .saved-view + .row { border-top: 1px solid var(--line); }
 .choice-note.warn { color: var(--warn); }
 
+/* ---- 0.27.12: the browser release ---- */
+.empty-open { margin-top: var(--s-4); }
+.install-hint { margin-top: var(--s-3); }

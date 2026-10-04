@@ -3,6 +3,22 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **The browser release, with no server (0.27.12).** Daniel chose no
+  server: a fetch proxy means hosting, accounts and an open proxy's abuse
+  and legal exposure, and an extension is a second codebase. So the
+  browser reads, saves Wikipedia (CORS allowed), and gets everything else
+  from the phone by backup. A browser has no directory for pictures, so a
+  restore puts them into the page HTML as `data:` URLs (the reader's CSP
+  already allows `data:`), and each page's card picture is kept as its
+  own IndexedDB key (`<id>:thumb`) read once at start-up; `p.thumb`
+  stays the phone's relative path so a backup made in the browser goes
+  back to the phone unchanged. The index moved to IndexedDB because a
+  phone's library can outgrow localStorage's ~5 MB, which failed
+  silently. `navigator.storage.persist()` is asked after a save or a
+  restore, and from Storage; Chrome decides without asking, Firefox asks.
+  The install offer (`beforeinstallprompt`) is kept for an Install row in
+  About rather than the browser's own banner. `imageBytes` now survives a
+  backup (`cleanMeta` dropped it).
 - **A collection is a book page (0.27.11).** Daniel picked it from three
   drawn options: the seven tiles above the chapters read as a toolbox,
   not a book. Its tools went into a ⋯ popover rather than a sheet,

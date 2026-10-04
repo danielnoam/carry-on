@@ -86,20 +86,6 @@ one and confirm it stays gone; edit tags offline on both and sync.
 
 **Depends on:** 0.18.0 (format, merge-by-URL rules).
 
-## A browser release (Daniel, 3 Oct 2026)
-
-A release of its own for the web copy, as a first-class way to use
-Carry-on rather than a preview of the app: what works without the
-phone's native fetch (CORS stops most sites, so saving needs the
-stateless server PROPOSAL.md allows, or saving stays app-only and the
-browser reads what sync brings), install as a PWA, and storage limits
-(IndexedDB quota, eviction).
-
-**Decided (Daniel, 4 Oct 2026): no server.** The browser reads
-everything, saves Wikipedia (its API allows CORS), and gets other pages
-from the phone through a backup file (later sync). A fetch worker or a
-browser extension can come later.
-
 ## RSS feeds (Daniel, 3 Oct 2026)
 
 Follow a site's RSS or Atom feed and save its new posts: add a feed by
@@ -117,6 +103,10 @@ feed: save automatically or just show what's new.
 
 ## Waiting on a decision, not on a release slot
 
+- **Saving any site in a browser (0.27.12 shipped without it).** A
+  stateless fetch worker behind a token, or a browser extension that
+  saves the open tab. Decide once there's a sense of how much gets saved
+  from a desktop.
 - **More sites (Daniel, 3 Oct 2026, "see what other sites we can
   support"):** Wattpad (text arrives in pieces from its API), and the
   comic sites Webtoon and Tapas (episode lists through their APIs).

@@ -209,6 +209,15 @@ and the page shows above it.
   Reduced motion: it turns without easing.
 - **Storage and backup (Now):** the total in the title size, the page
   count, "Pages by size" (tap one to read it), then Backup.
+- **In a browser (Now, 0.27.12):** the words say "in this browser"
+  where the app says "on this phone". Storage adds "This browser": Space
+  used ("14 KB of 872 MB") and an accent row "Keep pages from being
+  cleared" (or "Kept" once the browser agrees), with a footnote that
+  clearing site data deletes the pages. About starts with an accent row
+  "Install Carry-on" while the browser offers it, or on an iPhone a
+  footnote: "tap Share, then Add to Home Screen". The empty library says
+  what a browser can do, with a quiet "Open a backup" that goes to
+  Storage.
 - **Backup (Now):** under Storage on its screen: two
   accent rows, "Back up the library" (counting "Backing up, 12 of 80")
   and "Restore or open a file" (opening the system picker), then a
