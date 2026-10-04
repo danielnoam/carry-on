@@ -113,8 +113,8 @@ and the page shows above it.
   icons; a hairline under the bar once the list is under it. Above
   the bar `--s-5` scrolls away (on the phone, the safe area instead).
   Under it, scrolling away: the count, search (only once opened, and
-  while something is typed in it), then Show and Order on one row, with
-  Select (a text button, 0.27.10) after Order: Show on the start side (a lines
+  while something is typed in it), then Show and Order on one row (Select
+  left in 0.28.1: a long press starts it): Show on the start side (a lines
   icon, "All pages", "Unread", "Finished", then a "Tags" overline and the
   #tags; anything but All shows in `--accent`, semibold) and Order on the
   end side ("Newest saved", "Last read", "Longest", "Site", an arrows
@@ -429,16 +429,20 @@ and the page shows above it.
   from Wikipedia, CC BY-SA 4.0, by Wikipedia contributors. Read the
   original".
 
-- **Sidebar (Now, 0.28.0):** a menu button (three lines, 44 px) at the
+- **Sidebar (Now, 0.28.1):** a menu button (three lines, 44 px) at the
   start of the library's bar opens a 300 px panel (at most 85 % of the
   screen) from the start edge over `--scrim`, sliding on the sheet spring
   (reduced motion: a fade), in its own history entry, so Back and Escape
   close it. "Carry-on" in the serif, then Library (its page count, muted)
-  and Feeds (a pill in `--accent` with what's new since Feeds was last
-  open), a hairline, a FEEDS overline, each feed (its 24 px mark, what's
-  waiting in `--accent`), and "Add a feed" in the accent. The current one
-  sits on `--bar`, semibold. The bar is the same in both places; only its
-  title changes, and Feeds drops Search.
+  with the three collections touched last under it (a 24 × 32 cover,
+  new chapters in `--accent`), a hairline, then Feeds (a pill in
+  `--accent` with what's new since Feeds was last open) with the three
+  feeds that posted last under it (a 24 px mark, what's waiting in
+  `--accent`) and "Add a feed" in the accent. Items under a heading are
+  indented 44 px and 44 px tall. The current one sits on `--bar`,
+  semibold. The bar is the same in both places; only its title changes,
+  and Feeds drops Search. In Feeds the bottom field reads "Paste a site
+  or feed to follow" with Follow, and the list button goes.
 - **Feeds (Now, 0.28.0), one river:** chips per feed, "All · 12" first
   and "+ Add a feed" last, the picked one filled like any chip; under
   them "Checked 1 h ago" with Check now (and Settings, for one feed).
@@ -446,9 +450,10 @@ and the page shows above it.
   "Save all 4" at its end when two or more wait, over a group of posts:
   the feed's 32 px mark (site icon or first letter on `--preview`), the
   feed's name in meta, the title in the serif at card size (three lines
-  at most), "8 min · 2 h ago", and a 44 px + button, or "Saved" in
-  `--ok`. A tap on a post reads the saved copy, or opens the original
-  when online.
+  at most), "8 min · 2 h ago", a muted 44 px browser button (the
+  Original arrow), and a 44 px + button, or "Saved" in `--ok`. A tap on
+  a post reads the saved copy, or shows the post in the reader without
+  saving it (0.28.1), whose ⋯ offers Save and Browser.
 - **Add a feed (Now, 0.28.0):** the library's sheet: a 48 px field ("A
   site's address is enough: Carry-on finds its feed."), Find its feed,
   then the found feed as a card (mark, name, "About 2 posts a day · last

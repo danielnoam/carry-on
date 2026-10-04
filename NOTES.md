@@ -3,6 +3,17 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Reading a post without saving it (0.28.1).** Daniel asked for a tap on
+  a post to show it in the app. `C.save.preview` runs the same reading
+  pipeline as a save with pictures as links and writes nothing; the
+  reader shows it under a `preview:` id, so its position isn't kept and
+  forward navigation to it steps back instead of opening a missing page.
+  Its ⋯ is a small sheet with Save and Browser, since tags, collection
+  and delete make no sense for a page that isn't kept. The sidebar shows
+  three collections and three feeds, the ones touched last, so it stays
+  short; the library and the chips list the rest. Select left the
+  library's tools because a long press already starts it.
+
 - **Feeds, one river (0.28.0).** Daniel picked the river from three drawn
   options (a list of feeds, one river, feeds as collections). Feeds are
   fetched like pages (CapacitorHttp, no CORS), parsed with DOMParser's

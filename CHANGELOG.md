@@ -2,6 +2,18 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.28.1] - 2026-10-04
+
+### Changed
+- Tap a post in Feeds to read it in Carry-on without saving it; its ⋯
+  saves it. The new button beside + opens it in the browser.
+- The sidebar lists your three latest collections under Library and your
+  three latest feeds under Feeds.
+- In Feeds, the field at the bottom follows a site or feed instead of
+  saving a link.
+- The Select button is gone from the library: long-press a page and pick
+  Select, or long-press a collection.
+
 ## [0.28.0] - 2026-10-04
 
 ### Added

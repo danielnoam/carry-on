@@ -1260,7 +1260,6 @@ html { -webkit-tap-highlight-color: transparent; }
 /* ---- 0.27.10: Select beside Order, search behind its button ---- */
 .lib-tools-end { display: flex; align-items: center; gap: var(--s-1); min-width: 0; }
 .lib-tools-end .dropdown.sort-wrap { margin-right: 0; }
-.select-btn { flex-shrink: 0; }
 #searchBtn.on { background: var(--line); }
 
 /* ---- 0.27.11: the collection as a book page ---- */
@@ -1424,8 +1423,16 @@ html { -webkit-tap-highlight-color: transparent; }
   font: 600 var(--fs-meta)/var(--lh-meta) var(--sans);
 }
 .side-line { flex-shrink: 0; height: 1px; margin: var(--s-3) var(--s-5); border: 0; background: var(--line); }
-.side-head { margin: var(--s-1) var(--s-5) var(--s-2); }
+.side-sub { min-height: var(--tap); padding-left: var(--tap); font-size: var(--fs-label); }
+.side-sub .side-icon { color: var(--accent); }
+.side-cover {
+  flex-shrink: 0; width: var(--s-5); height: var(--s-6); overflow: hidden;
+  border-radius: var(--r-sm); background: var(--preview);
+}
+.side-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .side-add { color: var(--accent); font-weight: 500; }
+.save-form .icon-btn[hidden] { display: none; }
+[data-place="feeds"] .save-form .btn-primary { border-radius: var(--r-md); }
 
 /* A feed's mark: its site's icon, or first letter, on the preview tint. */
 .feed-mark {
@@ -1456,24 +1463,27 @@ html { -webkit-tap-highlight-color: transparent; }
   position: relative; display: flex; align-items: center; gap: var(--s-3);
   min-height: 64px; padding: var(--s-3) var(--s-2) var(--s-3) var(--s-4);
 }
+.post > .post-act + .post-act, .post > .post-act + .post-saved { margin-left: calc(-1 * var(--s-2)); }
 .post + .post { border-top: 1px solid var(--line); }
 .post-open { position: absolute; inset: 0; padding: 0; border: 0; background: transparent; cursor: pointer; }
 .post-open:active { background: var(--press); }
 .post-open:focus-visible { outline-offset: -2px; }
 .post > :not(.post-open) { position: relative; pointer-events: none; }
-.post > .post-save { pointer-events: auto; }
+.post > .post-act { pointer-events: auto; }
 .post-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .post-feed, .post-meta { font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--muted); }
 .post-title {
   font: 600 var(--fs-card)/var(--lh-card) var(--serif);
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
-.post-save {
+.post-act {
   flex-shrink: 0; width: var(--tap); height: var(--tap);
   display: inline-flex; align-items: center; justify-content: center;
-  border: 1px solid var(--line); border-radius: var(--r-md);
-  background: var(--surface); color: var(--accent); cursor: pointer;
+  border: 0; border-radius: var(--r-md);
+  background: transparent; color: var(--muted); cursor: pointer;
 }
+.post-act .side-icon { color: inherit; }
+.post-save { border: 1px solid var(--line); background: var(--surface); color: var(--accent); }
 .post-save:disabled { color: var(--muted); cursor: default; }
 .post-save .side-icon { color: inherit; }
 .post-saved { flex-shrink: 0; padding: 0 var(--s-2); font-size: var(--fs-meta); font-weight: 600; color: var(--ok); }

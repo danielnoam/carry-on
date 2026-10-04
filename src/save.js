@@ -1386,8 +1386,28 @@
     return { name, html: "<!-- " + (res.url || url).replace(/--/g, "%2D%2D") + " -->\n" + res.text };
   }
 
+  // A post read without saving it (0.28.1): the same reading copy, with
+  // its pictures left as links and nothing written to the phone.
+  async function preview(url) {
+    const wiki = wikipediaPage(url);
+    const got = wiki ? await fromWikipedia(wiki) : await fromAnyPage(url, () => {}, false, false);
+    const out = document.implementation.createHTMLDocument("");
+    const { root, media } = rebuild(got.body, got.base, got.url, out);
+    if (!root.textContent.trim()) throw new SaveError("Nothing readable was found on this page.");
+    const norm = (t) => t.replace(/\s+/g, " ").trim().toLowerCase();
+    const first = root.querySelector("h2, h3");
+    if (first && norm(first.textContent) === norm(got.title) && norm(root.textContent).startsWith(norm(first.textContent))) first.remove();
+    const meta = {
+      id: "preview:" + newId(), preview: true, url: got.url, title: got.title, site: got.site, byline: got.byline,
+      licence: got.licence, minutes: readingMinutes(root.textContent),
+      lang: wiki ? wiki.host.split(".")[0] : got.lang || "", dir: got.dir || "", mode: "links", next: "", prev: "",
+    };
+    await saveImages(meta.id, media, "links", null, got.url);
+    return { meta, html: savedPageHtml(meta, root, out) };
+  }
+
   C.save = {
-    pageSource,
+    pageSource, preview,
     save, SaveError, ContentsPage, findChapters, pageImage, siteIcon, keepCover, siteRule, removeHidden, scriptJson, chapterNumber, pickChapters, comicGroup, isPanel, retryMissing, saveFullImages, findNext, creditLine, cleanSaved, savedPageHtml, newId, textDir, isNextText, isPrevText, plainText,
     wikipediaPage, wikimediaThumb, parseSrcset, pickWidth, youtubeId, vimeoId, extOf, isTrackingPixel, readingMinutes, siteName,
   };
