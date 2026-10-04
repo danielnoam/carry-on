@@ -3,6 +3,15 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Blogger chapters cut at their headings (0.27.8).** The Zombie
+  Knight Saga posts by length, so a post can hold the end of one chapter
+  and the start of the next, and carries both labels. Each chapter starts
+  under a heading line ("Chapter Two: …") followed by a short line
+  linking to its own label ("Click to display entire chapter at once").
+  `trimToChapter()` uses those label links as anchors: everything before
+  the chapter's own heading goes (with it the blog's note to new
+  readers), and everything from the next chapter's heading on. A blog
+  without such links is left as it was.
 - **Three library layouts (0.27.7).** Daniel asked for all three
   directions from the design canvas, Shelf by default, chosen in
   Settings, Appearance (`carryon.layout`). They share one renderer and

@@ -2,6 +2,15 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.27.8] - 2026-10-04
+
+### Fixed
+- A Blogger serial that splits its posts by length (like The Zombie
+  Knight Saga) no longer saves the end of the previous chapter at the
+  start of a chapter and the start of the next one at its end. The
+  "Click to display entire chapter at once" line is gone too. Use Save
+  again on chapters saved before.
+
 ## [0.27.7] - 2026-10-03
 
 ### Added
