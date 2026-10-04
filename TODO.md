@@ -93,10 +93,10 @@ one and confirm it stays gone; edit tags offline on both and sync.
 - **Feeds: background checks and backups (0.28.0 shipped without
   them).** Feeds are checked only while the app is open, and aren't in
   backups. Add them to the backup format when sync (0.29.0) touches it.
-- **Saving any site in a browser (0.27.12 shipped without it).** A
-  stateless fetch worker behind a token, or a browser extension that
-  saves the open tab. Decide once there's a sense of how much gets saved
-  from a desktop.
+- **Saving any site in a browser: a server, later (Daniel, 4 Oct
+  2026).** A stateless fetch worker behind a token, rate-limited, storing
+  nothing, so the browser can save (and follow feeds from) sites that
+  don't allow CORS. Not slotted yet.
 - **More sites (Daniel, 3 Oct 2026, "see what other sites we can
   support"):** Wattpad (text arrives in pieces from its API), and the
   comic sites Webtoon and Tapas (episode lists through their APIs).
