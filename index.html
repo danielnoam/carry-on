@@ -7,8 +7,8 @@
   <title>Carry-on</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="src/fonts.css?v=0.27.10">
-  <link rel="stylesheet" href="src/styles.css?v=0.27.10">
+  <link rel="stylesheet" href="src/fonts.css?v=0.27.11">
+  <link rel="stylesheet" href="src/styles.css?v=0.27.11">
 </head>
 <body>
   <div class="app" id="libraryView">
@@ -121,8 +121,12 @@
       <button class="icon-btn" id="folderBack" type="button" aria-label="Back to library">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg>
       </button>
+      <button class="btn-text bar-left" id="folderCancel" type="button" hidden>Cancel</button>
       <h1 class="bar-title" id="folderTitle" dir="auto"></h1>
-      <span class="bar-spacer" aria-hidden="true"></span>
+      <button class="icon-btn bar-right" id="folderMore" type="button" aria-label="Collection" aria-haspopup="menu" aria-expanded="false">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg>
+      </button>
+      <button class="btn-text bar-right" id="folderDone" type="button" hidden>Done</button>
     </header>
     <div class="screen-body" id="folderBody"></div>
   </section>
@@ -196,14 +200,14 @@
   </div>
   <div class="toast" id="toast" role="status" hidden></div>
 
-  <script src="src/platform.js?v=0.27.10"></script>
-  <script src="src/motion.js?v=0.27.10"></script>
-  <script src="src/vendor/Readability.js?v=0.27.10"></script>
-  <script src="src/store.js?v=0.27.10"></script>
-  <script src="src/save.js?v=0.27.10"></script>
-  <script src="src/backup.js?v=0.27.10"></script>
-  <script src="src/epub.js?v=0.27.10"></script>
-  <script src="src/reader.js?v=0.27.10"></script>
-  <script src="src/app.js?v=0.27.10"></script>
+  <script src="src/platform.js?v=0.27.11"></script>
+  <script src="src/motion.js?v=0.27.11"></script>
+  <script src="src/vendor/Readability.js?v=0.27.11"></script>
+  <script src="src/store.js?v=0.27.11"></script>
+  <script src="src/save.js?v=0.27.11"></script>
+  <script src="src/backup.js?v=0.27.11"></script>
+  <script src="src/epub.js?v=0.27.11"></script>
+  <script src="src/reader.js?v=0.27.11"></script>
+  <script src="src/app.js?v=0.27.11"></script>
 </body>
 </html>

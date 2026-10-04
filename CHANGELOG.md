@@ -2,6 +2,20 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.27.11] - 2026-10-04
+
+### Changed
+- A collection opens as a book page: its cover, how much you've read and
+  the time left, Continue, new chapters to save, then its chapters with a
+  tick on the ones you've read. Its tools moved into the ⋯ menu.
+- Rename happens in place on the title, Reorder lets you drag chapters by
+  a handle (the arrows are still there), and Remove asks in a sheet.
+
+### Added
+- What's saved, for a collection and in Storage: how much of its size is
+  pictures and how much is text, which pictures are kept as links, with
+  Save again to switch them.
+
 ## [0.27.10] - 2026-10-04
 
 ### Changed
