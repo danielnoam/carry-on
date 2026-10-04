@@ -1209,3 +1209,57 @@ html { -webkit-tap-highlight-color: transparent; }
   [data-layout="grid"] .folder-strip { grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); }
   [data-layout="grid"] .library { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+
+/* ---- 0.27.9: Downloads ---- */
+/* The bar's button: a ring around the icon fills with everything being
+   downloaded together; a warning dot once only failures are left. */
+.dl-btn { position: relative; }
+.dl-ring {
+  position: absolute; inset: 0; margin: auto;
+  transform: rotate(-90deg); fill: none; stroke-width: 2.5;
+  opacity: 0; transition: opacity 200ms linear;
+}
+.dl-ring-track { stroke: var(--line); }
+.dl-ring-fill {
+  stroke: var(--accent); stroke-linecap: round;
+  stroke-dasharray: 100; stroke-dashoffset: 100;
+  transition: stroke-dashoffset 400ms var(--spring-control, ease-out);
+}
+.dl-btn.busy .dl-ring { opacity: 1; }
+.dl-dot {
+  position: absolute; top: var(--s-1); right: var(--s-1);
+  width: var(--s-2); height: var(--s-2); border-radius: var(--r-full);
+  background: var(--warn); box-shadow: 0 0 0 2px var(--bg);
+  transform: scale(0); transition: transform var(--spring-control-ms, 300ms) var(--spring-control, ease-out);
+}
+.dl-btn.failed .dl-dot { transform: scale(1); }
+@media (prefers-reduced-motion: reduce) {
+  .dl-ring, .dl-ring-fill, .dl-dot { transition: none; }
+}
+
+/* The screen: the same cards as the library, one column. */
+.downloads { display: flex; flex-direction: column; gap: var(--s-3); }
+.downloads > .section-head:first-child { margin-top: 0; }
+.downloads .empty { margin: var(--s-6) auto 0; }
+.card.done-run { cursor: default; }
+.card.done-run:active { transform: none; background-image: none; }
+.card.done-page .card-thumb { width: var(--s-8); height: var(--s-8); }
+
+/* A run's failed pages, inside its card. */
+.failed-list {
+  display: flex; flex-direction: column; gap: var(--s-2);
+  margin-top: var(--s-2); padding-top: var(--s-3);
+  border-top: 1px solid var(--line);
+}
+.failed-head {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-3);
+  font: 500 var(--fs-meta)/var(--lh-meta) var(--sans);
+}
+.failed-row { display: flex; align-items: center; gap: var(--s-2); }
+.failed-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.failed-url, .failed-why {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--fs-meta); line-height: var(--lh-meta);
+}
+.failed-why { color: var(--muted); }
+.failed-drop { flex-shrink: 0; color: var(--muted); margin-inline-start: calc(-1 * var(--s-1)); }

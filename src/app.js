@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.27.8";
+  const APP_VERSION = "0.27.9";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -121,6 +121,11 @@
     pages: [],
     // Saves in flight: { key, url, site, done, total }.
     saving: [],
+    // What finished this session, newest first, for Downloads: { key, at,
+    // run } for a run of saves, { key, at, page } for one page.
+    finished: [],
+    // Whether the Downloads screen is up.
+    downloads: false,
     open: null,
     settings: false,
     sheet: false,
@@ -278,7 +283,7 @@
         el("span", { class: "card-title", dir: "auto" }, s.url),
         el("span", { class: "card-status" }, el("span", { class: "warn" }, s.error)),
         el("span", { class: "card-actions" },
-          el("button", { class: "btn-small", type: "button", onclick: () => { dropFailed(s); savePage(s.url, s.folder, { kind: s.kind, mode: s.mode }); } }, "Try again"),
+          el("button", { class: "btn-small", type: "button", onclick: () => retryJob(s) }, "Try again"),
           el("button", { class: "btn-quiet", type: "button", onclick: () => dropFailed(s) }, "Remove"))));
   }
 
@@ -290,8 +295,8 @@
   const runs = new Set();
   let runIds = 0;
   const runFor = (folder) => [...runs].find((r) => r.folder && folder && sameTag(r.folder, folder));
-  function startRun(folder, site, total) {
-    const r = { id: ++runIds, folder, site, total, saved: 0, failed: 0, paused: false, stopped: false, current: null, wake: null };
+  function startRun(folder, site, total, again) {
+    const r = { id: ++runIds, folder, site, total, again: !!again, saved: 0, failed: 0, paused: false, stopped: false, current: null, wake: null };
     runs.add(r);
     return r;
   }
@@ -321,7 +326,18 @@
     if (!r) return;
     runs.delete(r);
     r.done = true;
+    r.at = Date.now();
+    if (r.saved || failedOf(r).length) finish({ key: "r:" + r.id, run: r });
+    renderDownloads();
   }
+
+  // Downloads keeps the last 30 finished, for this session.
+  function finish(entry) {
+    state.finished = [{ ...entry, at: Date.now() }, ...state.finished.filter((x) => x.key !== entry.key)].slice(0, 30);
+  }
+
+  // A run's pages that couldn't be saved, waiting on Try again.
+  const failedOf = (r) => state.saving.filter((s) => s.run === r && s.error);
   function runStatus(r) {
     const done = r.total ? r.saved + " of " + r.total + " saved" : r.saved + " saved";
     const failed = r.failed ? ", " + r.failed + " failed" : "";
@@ -330,9 +346,9 @@
     return done + failed + " · " + (r.current && !r.current.waiting ? savingStatus(r.current) : "Next in a moment");
   }
   function runCard(r) {
-    return el("div", { class: "card saving run wide", role: "group", "aria-label": "Saving into " + (r.folder || "the library") },
+    return el("div", { class: "card saving run wide", role: "group", "aria-label": (r.again ? "Saving again in " : "Saving into ") + (r.folder || "the library") },
       el("span", { class: "card-body" },
-        el("span", { class: "card-site" }, r.site),
+        el("span", { class: "card-site" }, r.site, r.again ? " · Saving again" : null),
         el("span", { class: "card-title", dir: "auto" }, r.folder || "Saving several"),
         el("span", { class: "progress", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": "0" },
           el("span", { class: "progress-fill" })),
@@ -341,12 +357,21 @@
           el("span", { class: "status-text" }, runStatus(r))),
         el("span", { class: "card-actions" },
           el("button", { class: "btn-small run-pause", type: "button", onclick: () => pauseRun(r, !r.paused) }, r.paused ? "Resume" : "Pause"),
-          el("button", { class: "btn-quiet danger", type: "button", onclick: () => stopRun(r) }, "Stop"))));
+          el("button", { class: "btn-quiet danger", type: "button", onclick: () => stopRun(r) }, "Stop")),
+        failedList(r)));
+  }
+  // A run's bar is the whole run when its length is known, else the page
+  // in progress.
+  function runShare(r) {
+    const page = r.current && !r.current.waiting ? savingShare(r.current) : 0;
+    if (!r.total || (page == null && !r.saved && !r.failed)) return page;
+    return Math.min(1, (r.saved + r.failed + (page || 0)) / r.total);
   }
   function updateRunCard(r) {
-    const card = $("library").querySelector('[data-key="r:' + r.id + '"]');
+    paintDownloads();
+    const card = $("downloads").querySelector('[data-key="r:' + r.id + '"]');
     if (!card) return;
-    const share = r.current && !r.current.waiting ? savingShare(r.current) : 0;
+    const share = runShare(r);
     const bar = card.querySelector(".progress");
     bar.classList.toggle("busy", share == null);
     if (share == null) bar.removeAttribute("aria-valuenow");
@@ -359,6 +384,184 @@
   function dropFailed(s) {
     state.saving = state.saving.filter((x) => x !== s);
     renderLibrary();
+  }
+
+  // A run's failed pages sit in its card, in Downloads, each with its own
+  // Try again, and Try all again over two or more.
+  function failedList(r) {
+    const list = failedOf(r);
+    if (!list.length) return null;
+    return el("span", { class: "failed-list" },
+      el("span", { class: "failed-head" },
+        el("span", { class: "warn" }, list.length === 1 ? "1 page couldn't be saved" : list.length + " pages couldn't be saved"),
+        list.length > 1 ? el("button", { class: "btn-text", type: "button", onclick: () => retryAll(list) }, "Try all again") : null),
+      ...list.map((s) => el("span", { class: "failed-row" },
+        el("span", { class: "failed-text" },
+          el("span", { class: "failed-url", dir: "auto" }, s.again ? s.again.title : s.url),
+          el("span", { class: "failed-why" }, s.error)),
+        el("button", { class: "btn-small", type: "button", onclick: () => retryJob(s) }, "Try again"),
+        dropBtn(s))));
+  }
+  function dropBtn(s) {
+    const b = el("button", { class: "icon-btn failed-drop", type: "button", "aria-label": "Remove", onclick: () => dropFailed(s) });
+    b.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+    return b;
+  }
+
+  // Saves a failed page again where it was headed: its collection, its
+  // place there, its tags, or the page it was replacing.
+  async function retryJob(s) {
+    Object.assign(s, { error: null, contents: null, done: 0, total: null, drawing: false, waiting: false });
+    renderLibrary();
+    const meta = await runJob(s);
+    if (meta) {
+      if (s.run) { s.run.saved++; s.run.failed = Math.max(0, s.run.failed - 1); }
+      toast("Saved for offline reading");
+      renderDownloads();
+    } else if (s.contents) contentsFound(s);
+    if (state.folder) renderFolder();
+    return meta;
+  }
+
+  async function retryAll(list) {
+    let n = 0;
+    for (const s of list) {
+      if (!s.error || !state.saving.includes(s)) continue;
+      if (n++) await new Promise((done) => setTimeout(done, PACE_MS));
+      await retryJob(s);
+    }
+  }
+
+  // ---- Downloads ----
+  // Its own screen, from the bar's Downloads button: what's downloading
+  // (a run of saves is one card, its failed pages inside it), single pages
+  // that couldn't be saved, and what finished this session. Kept up to
+  // date while hidden, so it's ready the moment it opens.
+  function renderDownloads() {
+    const root = $("downloads");
+    const old = new Map([...root.querySelectorAll(":scope > [data-key]")].map((n) => [n.dataset.key, n]));
+    const nodes = [], fresh = [];
+    const keep = (key, make, sig) => {
+      let node = old.get(key);
+      if (!node) { node = make(); node.dataset.key = key; fresh.push(node); }
+      else if (sig != null && node.dataset.sig !== sig) { node = make(); node.dataset.key = key; }
+      if (sig != null) node.dataset.sig = sig;
+      nodes.push(node);
+    };
+    const going = state.saving.filter((s) => !s.error && !(s.run && !s.run.done));
+    if (runs.size || going.length) keep("h:going", () => sectionHead("Downloading"));
+    for (const r of runs) keep("r:" + r.id, () => runCard(r), [r.paused, r.stopped, failedOf(r).length].join());
+    for (const s of going) keep("s:" + s.key, () => savingCard(s));
+    const shown = new Set(state.finished.map((e) => e.run).filter(Boolean));
+    const lone = state.saving.filter((s) => s.error && (!s.run || (s.run.done && !shown.has(s.run))));
+    if (lone.length) keep("h:failed", () => sectionHead("Couldn't be saved"));
+    for (const s of lone) keep("f:" + s.key, () => failedCard(s));
+    const done = state.finished.filter((e) => e.run || state.pages.some((p) => p.id === e.page));
+    if (done.length) keep("h:done", () => sectionHead("Done", el("button", { class: "btn-text", type: "button", onclick: clearFinished }, "Clear")));
+    for (const e of done) {
+      if (e.run) keep(e.key, () => doneRunCard(e), [e.run.saved, failedOf(e.run).length, whenText(e.at), !!(e.run.folder && folderPages(e.run.folder).length)].join());
+      else {
+        const p = state.pages.find((x) => x.id === e.page);
+        keep(e.key, () => donePageCard(p, e), [p.title, p.missing, whenText(e.at)].join());
+      }
+    }
+    if (!nodes.length) {
+      keep("empty", () => el("div", { class: "empty wide" },
+        el("h2", { class: "empty-title" }, "Nothing downloading"),
+        el("p", { class: "empty-text" }, "Pages you save show their progress here, and stay here once they're done until you close the app.")));
+    }
+    root.replaceChildren(...nodes);
+    for (const s of going) updateSavingCard(s);
+    for (const r of runs) updateRunCard(r);
+    if (state.downloads) fresh.forEach((node) => M.arrive(node));
+    paintDownloads();
+  }
+
+  function clearFinished() {
+    state.finished = [];
+    renderDownloads();
+    $("downloadsBack").focus();
+  }
+
+  function doneRunCard(e) {
+    const r = e.run;
+    const name = r.folder && folderPages(r.folder).length ? folderPages(r.folder)[0].folder : null;
+    const saved = r.saved ? countLine(r.saved) + (r.again ? " saved again" : " saved") : "Nothing saved";
+    return el("div", { class: "card done-run wide", role: "group", "aria-label": (r.folder || "Several pages") + ", done" },
+      el("span", { class: "card-body" },
+        el("span", { class: "card-site" }, r.site),
+        el("span", { class: "card-title", dir: "auto" }, r.folder || "Several pages"),
+        el("span", { class: "card-status" }, [saved, r.stopped ? "Stopped" : null, whenText(e.at)].filter(Boolean).join(" · ")),
+        name ? el("span", { class: "card-actions" },
+          el("button", { class: "btn-small", type: "button", onclick: () => toLibrary().then(() => openFolder(name)) }, "Open")) : null,
+        failedList(r)));
+  }
+
+  function donePageCard(p, e) {
+    const thumb = thumbUrl(p);
+    return el("div", { class: "card done-page wide" },
+      el("button", { class: "card-open", type: "button", "aria-label": p.title, onclick: () => toLibrary().then(() => openPage(p.id)) }),
+      thumb ? el("img", { class: "card-thumb", src: thumb, alt: "", loading: "lazy" }) : siteMark(p),
+      el("span", { class: "card-body" },
+        el("span", { class: "card-site", dir: "auto" }, p.site, p.folder ? " · " + p.folder : null),
+        el("span", { class: "card-title", dir: "auto" }, p.title),
+        el("span", { class: "card-status" }, "Saved " + whenText(e.at),
+          p.missing ? " · " : null, p.missing ? el("span", { class: "warn" }, p.missing + (p.missing === 1 ? " preview" : " previews") + " missing") : null)));
+  }
+
+  // The bar's Downloads button: a ring filling with everything being
+  // downloaded together, and a warning dot once only pages that couldn't
+  // be saved are left. The app's own notification (Android) says
+  // the same.
+  let toldNative = "";
+  function paintDownloads() {
+    const active = [...runs];
+    const singles = state.saving.filter((s) => !s.error && !(s.run && !s.run.done));
+    let units = 0, got = 0;
+    for (const r of active) {
+      if (r.total) { units += r.total; got += runShare(r) * r.total; }
+      else { const page = r.current && !r.current.waiting ? savingShare(r.current) || 0 : 0; units += r.saved + r.failed + 1; got += r.saved + r.failed + page; }
+    }
+    for (const s of singles) { units += 1; got += s.waiting ? 0 : savingShare(s) || 0; }
+    const busy = units > 0;
+    const share = busy ? Math.min(1, got / units) : 0;
+    const failed = !busy && state.saving.some((s) => s.error);
+    const btn = $("downloadsBtn");
+    btn.classList.toggle("busy", busy);
+    btn.classList.toggle("failed", failed);
+    btn.querySelector(".dl-ring-fill").style.strokeDashoffset = String(100 - share * 100);
+    btn.setAttribute("aria-label", busy ? "Downloads, " + Math.round(share * 100) + "% done"
+      : failed ? "Downloads, some pages couldn't be saved" : "Downloads");
+    if (!busy) {
+      if (toldNative) C.platform.downloads.stop();
+      toldNative = "";
+      return;
+    }
+    const one = active.length === 1 && !singles.length ? active[0] : null;
+    const title = one ? (one.again ? "Saving again in " : "Saving into ") + (one.folder || "your library")
+      : !active.length && singles.length === 1 ? "Saving a page from " + singles[0].site : "Saving " + Math.round(units) + " pages";
+    const text = one ? (one.total ? one.saved + one.failed + " of " + one.total + " done" : countLine(one.saved) + " saved") + (one.paused ? " · Paused" : "")
+      : Math.round(share * 100) + "% done";
+    const o = { title, text, done: Math.round(share * 1000), total: 1000 };
+    const said = JSON.stringify(o);
+    if (said === toldNative) return;
+    toldNative = said;
+    C.platform.downloads.update(o);
+  }
+
+  function openDownloads(fromHistory) {
+    if (state.downloads) return;
+    state.downloads = true;
+    renderDownloads();
+    if (!fromHistory) history.pushState({ view: "downloads" }, "");
+    $("downloadsBody").scrollTop = 0;
+    pushScreen($("downloadsView")).then(() => $("downloadsBack").focus());
+  }
+
+  function closeDownloads() {
+    if (!state.downloads) return;
+    state.downloads = false;
+    popScreen($("downloadsView"));
   }
 
   function savingCard(s) {
@@ -377,7 +580,8 @@
   // its spring instead of being redrawn at each image.
   function updateSavingCard(s) {
     if (s.run && !s.run.done) { updateRunCard(s.run); return; }
-    const card = $("library").querySelector('[data-key="' + CSS.escape("s:" + s.key) + '"]');
+    paintDownloads();
+    const card = $("downloads").querySelector('[data-key="' + CSS.escape("s:" + s.key) + '"]');
     if (!card || s.error) return;
     const share = savingShare(s);
     const bar = card.querySelector(".progress");
@@ -753,11 +957,6 @@
       if (sig != null) node.dataset.sig = sig;
       nodes.push(node);
     };
-    for (const r of runs) keep("r:" + r.id, () => runCard(r), [r.paused, r.stopped].join());
-    for (const s of state.saving) {
-      if (s.run && !s.run.done) continue;
-      keep((s.error ? "f:" : "s:") + s.key, () => (s.error ? failedCard(s) : savingCard(s)));
-    }
     const ts = terms();
     const found = new Map();
     const pages = sorted(state.pages.filter(shown).filter((p) => {
@@ -823,18 +1022,17 @@
           : state.filter === "finished" ? "Nothing finished yet." : "No pages tagged " + state.filter + "."),
         el("button", { class: "btn-quiet", type: "button", onclick: () => setFilter("all") }, "Show all")));
     }
-    if (!n && !state.saving.length) {
+    if (!n) {
       keep("empty", () => el("div", { class: "empty wide" },
         el("h2", { class: "empty-title" }, "Pages you take with you"),
         el("p", { class: "empty-text" },
           "Share a page to Carry-on from your browser, or paste its link below. It stays readable with no connection, with a link back to the original.")));
     }
     root.replaceChildren(...nodes);
-    for (const s of state.saving) updateSavingCard(s);
-    for (const r of runs) updateRunCard(r);
     if (!firstRender) fresh.forEach((node) => M.arrive(node));
     firstRender = false;
     paintPicks();
+    renderDownloads();
   }
 
   // The first link in whatever was pasted or shared ("Read this:
@@ -871,13 +1069,17 @@
     const job = { ...newJob(url, folder), ...how };
     state.saving.unshift(job);
     renderLibrary();
+    toast("Saving. It's in Downloads.");
     const meta = await runJob(job);
     if (meta) toast(meta.missing ? "Saved. Some previews are missing." : "Saved for offline reading");
-    else if (job.contents) {
-      dropFailed(job);
-      openBatch(job.contents.links.join("\n"), false, folderName(job.contents.title || job.site), url);
-      toast("That's a list of chapters. Check them, then save.");
-    }
+    else if (job.contents) contentsFound(job);
+  }
+
+  // A link that turned out to be a contents page opens as a list to check.
+  function contentsFound(job) {
+    dropFailed(job);
+    openBatch(job.contents.links.join("\n"), false, folderName(job.contents.title || job.site), job.url);
+    toast("That's a list of chapters. Check them, then save.");
   }
 
   // Saves one after another are half a second apart, as WebToEpub spaces
@@ -899,6 +1101,7 @@
     fresh.forEach((j) => { j.waiting = true; j.run = run; });
     state.saving = [...fresh, ...state.saving];
     renderLibrary();
+    if (run) toast("Saving " + countLine(fresh.length) + ". They're in Downloads.");
     let saved = 0, failed = 0, had = 0, stopped = 0;
     for (const job of jobs) {
       if (job.waiting && !state.saving.includes(job)) { stopped++; continue; }
@@ -972,12 +1175,27 @@
           updateSavingCard(job);
         },
       });
-      meta.requested = job.url;
-      if (job.folder) { meta.folder = folderName(job.folder); meta.folderAt = job.folderAt || Date.now(); if (job.source) meta.source = job.source; }
-      if (job.tags && job.tags.length) meta.tags = withTags([], job.tags);
-      state.pages.unshift(meta);
-      await C.store.writeIndex(state.pages);
+      const old = job.again;
+      if (old) {
+        // Saved again: the new copy takes the old one's place, keeping its
+        // collection, tags and read position.
+        for (const k of ["requested", "folder", "folderAt", "source", "tags", "at", "finished", "readAt"]) if (old[k] !== undefined) meta[k] = old[k];
+        const i = state.pages.indexOf(old);
+        if (i < 0) await C.store.removePage(meta.id);
+        else {
+          state.pages[i] = meta;
+          await C.store.writeIndex(state.pages);
+          await C.store.removePage(old.id);
+        }
+      } else {
+        meta.requested = job.url;
+        if (job.folder) { meta.folder = folderName(job.folder); meta.folderAt = job.folderAt || Date.now(); if (job.source) meta.source = job.source; }
+        if (job.tags && job.tags.length) meta.tags = withTags([], job.tags);
+        state.pages.unshift(meta);
+        await C.store.writeIndex(state.pages);
+      }
       state.saving = state.saving.filter((s) => s !== job);
+      if (!job.run) finish({ key: "p:" + meta.id, page: meta.id });
       renderLibrary();
       return meta;
     } catch (e) {
@@ -3069,30 +3287,32 @@
       go);
   }
 
+  // Each page is a job that knows the page it replaces, in a run of its
+  // own, so it shows in Downloads with Pause and Stop like any other.
   async function refreshFolder(name, mode, btn) {
     const list = folderPages(name).filter((p) => /^https?:/.test(p.url || ""));
     if (!list.length || !navigator.onLine) { if (!navigator.onLine) toast("You're offline. Try again when you're back online."); return; }
     btn.disabled = true;
-    let done = 0, failed = 0;
-    for (const old of list) {
+    const run = startRun(folderName(name), list[0].site, list.length, true);
+    const jobs = list.map((old) => ({ ...newJob(old.url, name), key: "again:" + old.id, again: old, mode, kind: old.comic ? "comic" : "article", waiting: true, run }));
+    state.saving = [...jobs, ...state.saving];
+    renderLibrary();
+    toast("Saving " + countLine(list.length) + " again. They're in Downloads.");
+    let done = 0, failed = 0, stopped = 0;
+    for (const job of jobs) {
       if (done + failed) await new Promise((ok) => setTimeout(ok, PACE_MS));
-      if (btn.isConnected) btn.textContent = "Saving again, " + (done + failed + 1) + " of " + list.length;
-      try {
-        const meta = await C.save.save(old.url, { mode, kind: old.comic ? "comic" : "article" });
-        for (const k of ["requested", "folder", "folderAt", "source", "tags", "at", "finished", "readAt"]) if (old[k] !== undefined) meta[k] = old[k];
-        const i = state.pages.indexOf(old);
-        if (i < 0) { await C.store.removePage(meta.id); continue; }
-        state.pages[i] = meta;
-        await C.store.writeIndex(state.pages);
-        await C.store.removePage(old.id);
-        done++;
-      } catch (e) {
-        failed++;
-      }
+      if (!(await gate(run)) || !state.saving.includes(job)) { stopped++; continue; }
+      job.waiting = false;
+      run.current = job;
+      renderLibrary();
+      if (await runJob(job)) { done++; run.saved++; } else { failed++; run.failed++; }
+      run.current = null;
+      updateRunCard(run);
     }
+    endRun(run);
     if (state.folder && sameTag(state.folder, name)) renderFolder();
     renderLibrary();
-    toast("Saved " + countLine(done) + " again" + (failed ? " · " + failed + " couldn't be saved" : "") + ".");
+    toast("Saved " + countLine(done) + " again" + (failed ? " · " + failed + " couldn't be saved" : "") + (stopped ? " · stopped before " + countLine(stopped) : "") + ".");
   }
 
   function whenText(at) {
@@ -3396,6 +3616,7 @@
     if (view !== "menu") closeMenu();
     if (view !== "select" && !(view === "menu" && s.select)) endSelect();
     if (view !== "news") closeNews();
+    if (view !== "downloads") closeDownloads();
     if (!inSettings) closeSettings();
     else if (!s.section) closeSection();
     if (view !== "batch") closeBatch();
@@ -3413,6 +3634,7 @@
     if (view === "reader" && s.sheet && state.open && state.open.id === s.page) openSheet(s.sheet, true);
     if (inSettings) { openSettings(true); if (s.section) openSection(s.section, true); }
     if (view === "news") openNews(true);
+    if (view === "downloads") openDownloads(true);
   }
 
   // Back to the library from whatever screen is up, through history so the
@@ -3421,11 +3643,15 @@
     if (!(history.state && history.state.view)) return Promise.resolve();
     return new Promise((resolve) => {
       addEventListener("popstate", () => resolve(), { once: true });
-      history.go(-[state.folder, state.open, state.sheet, state.image, state.settings, state.section, state.batch, state.news, state.select, state.menu].filter(Boolean).length || -1);
+      history.go(-[state.folder, state.open, state.sheet, state.image, state.settings, state.section, state.batch, state.news, state.select, state.menu, state.downloads].filter(Boolean).length || -1);
     });
   }
 
   $("settingsBtn").addEventListener("click", () => openSettings());
+  $("downloadsBtn").addEventListener("click", () => openDownloads());
+  $("downloadsBack").addEventListener("click", () => history.back());
+  // The notification's Stop (Android) stops every run.
+  C.platform.downloads.onStop(() => { for (const r of [...runs]) stopRun(r); });
   $("sectionBack").addEventListener("click", () => history.back());
   $("selectBtn").addEventListener("click", () => startSelect([]));
   // Search sits in the bar that stays, so it's there from anywhere in the list.

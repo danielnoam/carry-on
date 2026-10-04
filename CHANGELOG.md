@@ -2,6 +2,25 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.27.9] - 2026-10-04
+
+### Added
+- Downloads, a screen of its own behind a new button in the library's
+  bar: what's downloading, pages that couldn't be saved, and what
+  finished since you opened the app, each with Open. A collection being
+  saved is one card with Pause and Stop, its failed pages inside it with
+  Try again. The button's ring fills as everything downloads, and a
+  warning dot stays while a failed page waits.
+- On Android, saving keeps going with the app put away or the phone
+  locked, with a progress notification that has Stop. iOS lets the page
+  in progress finish for about half a minute; the rest goes on when you
+  open the app again.
+
+### Changed
+- Saving cards left the library, which now shows only saved pages.
+- Save again on a collection shows in Downloads like any other download,
+  with Pause and Stop.
+
 ## [0.27.8] - 2026-10-04
 
 ### Fixed

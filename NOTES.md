@@ -3,6 +3,36 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Downloads, and saving in the background (0.27.9).** Daniel asked for
+  saving to move out of the library into a screen of its own and to keep
+  going with the app closed or the phone locked. The TODO thought that
+  meant moving the fetching into native code. It doesn't on Android:
+  Capacitor never pauses the WebView's timers (`handlePause(keepRunning)`
+  with KeepRunning on), so the JS loop keeps running as long as the
+  process does; what stops it is Android freezing or killing a
+  background app. So `DownloadService` is only a foreground service of
+  type dataSync with a partial wake lock (leased 10 minutes, renewed by
+  each progress update) and a progress notification with Stop, started
+  by `Downloads.update()` while anything downloads and ended by `stop()`.
+  Chromium still slows a hidden page's timers to about once a second,
+  which only stretches the half-second pause between pages. Android 13
+  asks for notifications at the first download; refused, the saving
+  still goes on, only the notification is hidden. Android 15 caps
+  dataSync at six hours a day (`onTimeout` ends it). A swipe away from
+  Recents can still end it on some phones. iOS can't run the app's own
+  work in the background at all, short of rewriting the saving in Swift
+  around background `URLSession` downloads, so its plugin holds a
+  background task: the page in progress gets the half minute iOS
+  allows, and the loop picks up when the app comes back. Untested on a
+  phone from here: the CI builds it, Daniel's phone is the test.
+  In the app, Save again (`refreshFolder`) became a run of jobs that know
+  the page they replace (`job.again`), so it shows, pauses and stops like
+  any other run, and Try again on any failed page re-runs the same job
+  (`retryJob`), keeping its collection, place and tags, instead of
+  saving the link anew. Finished entries (`state.finished`) last the
+  session only: they're a receipt, not history. The plan's "dot while
+  downloading" became the ring alone, since a dot on the ring's start
+  read as clutter; the dot is kept for failures.
 - **Blogger chapters cut at their headings (0.27.8).** The Zombie
   Knight Saga posts by length, so a post can hold the end of one chapter
   and the start of the next, and carries both labels. Each chapter starts
