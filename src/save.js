@@ -610,6 +610,49 @@
     return { title: (feed.title && feed.title.$t) || "", links: labels.map((t) => labelUrl(origin, t)) };
   }
 
+  // A serial that posts by length rather than by chapter (The Zombie
+  // Knight Saga) starts each chapter partway through a post: a heading
+  // ("Chapter Two: …") over a short line linking to the chapter's label
+  // ("Click to display entire chapter at once"). A label's posts then
+  // carry the end of the chapter before and the start of the next one.
+  // Both are cut at those headings, and the links to labels go.
+  function trimToChapter(doc, content, label) {
+    const same = (t) => (labelNumber(t) != null ? labelNumber(t) === labelNumber(label) : t.toLowerCase() === label.toLowerCase());
+    const marks = [];
+    for (const a of content.querySelectorAll("a[href*='/search/label/']")) {
+      const line = a.parentElement;
+      if (!line || line === content || text(line).length > 120 || marks.some((m) => m.line === line)) continue;
+      let t;
+      try { t = bloggerLabel(new URL(a.getAttribute("href"), "https://blogger.invalid")); } catch (e) { t = null; }
+      if (t == null) continue;
+      let head = line.previousSibling;
+      while (head && (head.nodeName === "BR" || (head.nodeType === 3 && !head.textContent.trim()))) head = head.previousSibling;
+      head = head && head.nodeType === 1 && /^(chapter|ch\.?)\s/i.test(text(head)) && text(head).length < 200 ? head : null;
+      marks.push({ line, head, own: same(t) });
+    }
+    if (!marks.length) return;
+    const cut = (from, to) => {
+      const r = doc.createRange();
+      if (from) r.setStartBefore(from); else r.setStart(content, 0);
+      if (to) r.setEndBefore(to); else r.setEnd(content, content.childNodes.length);
+      r.deleteContents();
+    };
+    const own = marks.findIndex((m) => m.own);
+    if (own >= 0) cut(null, marks[own].head || marks[own].line);
+    const next = marks.find((m, i) => i > own && !m.own);
+    if (next) cut(next.head || next.line, null);
+    for (const m of marks) if (content.contains(m.line)) m.line.remove();
+    // What the cuts leave at either end: breaks, rules and empty wrappers.
+    const bare = (n) => n && (n.nodeName === "BR" || n.nodeName === "HR" || (n.nodeType === 3 && !n.textContent.trim())
+      || (n.nodeType === 1 && !text(n) && !n.querySelector("img, video, iframe, picture")));
+    for (const edge of ["firstChild", "lastChild"]) {
+      for (let box = content; box && box.nodeType === 1;) {
+        while (bare(box[edge])) box[edge].remove();
+        box = box[edge];
+      }
+    }
+  }
+
   // One chapter from its label's feed: the posts oldest first, a rule
   // between them; next and previous are the neighbouring labels when the
   // blog has them.
@@ -626,6 +669,7 @@
       part.innerHTML = e.content.$t;
       content.append(part);
     });
+    trimToChapter(doc, content, label);
     const n = labelNumber(label);
     const terms = (feed.category || []).map((c) => c.term);
     const near = (d) => { const t = n == null ? null : terms.find((x) => labelNumber(x) === n + d); return t ? labelUrl(u.origin, t) : ""; };
