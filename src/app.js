@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.27.12";
+  const APP_VERSION = "0.28.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -1076,6 +1076,8 @@
     firstRender = false;
     paintPicks();
     renderDownloads();
+    if (state.place === "feeds") renderFeeds();
+    if (state.side) renderSide();
   }
 
   // The first link in whatever was pasted or shared ("Read this:
@@ -2774,6 +2776,8 @@
     folder: { label: "Collection", build: folderSheet },
     saved: { label: "What's saved", build: savedSheet },
     remove: { label: "Remove collection", build: removeSheet },
+    addFeed: { label: "Add a feed", build: addFeedSheet },
+    feed: { label: "Feed", build: feedSheet },
   };
   let menuUnder = [];
 
@@ -3746,6 +3750,480 @@
     return true;
   }
 
+  // ---- Feeds (0.28.0) ----
+  // Following a site: its feed is read every few hours while the app is
+  // open and online, and its posts wait in one river, newest day first,
+  // until they're saved, or save themselves where the feed is set to. A
+  // post stays in the river (as Saved, once saved) until it's older than
+  // its feed's window. Feeds are kept in localStorage as [{ url, title,
+  // link, icon, mode: "show" | "save", images, folder, days, addedAt,
+  // checkedAt, error, items: [{ id, url, title, date, foundAt, tried }] }].
+  const FEEDS_KEY = "carryon.feeds";
+  const PLACE_KEY = "carryon.place";
+  const FEEDS_SEEN_KEY = "carryon.feedsSeen";
+  const FEED_EVERY = 3 * 36e5;
+  const FEED_KEEP = 100;
+  const FEED_DAYS = [{ value: "3", label: "3 days" }, { value: "7", label: "A week" }, { value: "30", label: "A month" }];
+  const FEED_ICONS = {
+    library: ICONS.book,
+    feeds: '<path d="M5 11a8 8 0 0 1 8 8M5 5a14 14 0 0 1 14 14"/><circle cx="6" cy="18" r="1.5"/>',
+    add: ICONS.add,
+  };
+  const feedIcon = (name, size = 20) => {
+    const s = el("span", { class: "side-icon", "aria-hidden": "true" });
+    s.innerHTML = '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + FEED_ICONS[name] + "</svg>";
+    return s;
+  };
+
+  let feeds = load(FEEDS_KEY, []);
+  if (!Array.isArray(feeds)) feeds = [];
+  state.place = load(PLACE_KEY, "library") === "feeds" ? "feeds" : "library";
+  // The feed picked in the river (its url), or null for all of them.
+  state.feed = null;
+  state.side = false;
+  let feedsChecking = false;
+
+  const saveFeeds = () => store(FEEDS_KEY, feeds);
+  const postAt = (it) => it.date || it.foundAt || 0;
+  const postKey = (it) => it.id || it.url;
+  const inWindow = (f, it) => postAt(it) >= Date.now() - (f.days || 7) * DAY;
+  const feedPosts = (f) => f.items.filter((it) => inWindow(f, it));
+  const savingUrl = (url) => state.saving.some((s) => !s.error && sameUrl(s.url, url));
+  const waitingIn = (f) => feedPosts(f).filter((it) => !savedAs(it.url)).length;
+  // New since Feeds was last looked at, for the sidebar's pill.
+  const freshPosts = () => {
+    const seen = load(FEEDS_SEEN_KEY, 0);
+    return feeds.reduce((n, f) => n + feedPosts(f).filter((it) => it.foundAt > seen && !savedAs(it.url)).length, 0);
+  };
+
+  // The feed's site icon, or its first letter, like a card with no picture.
+  function feedMark(f, small) {
+    const url = f.link || f.url;
+    const box = siteMark({ site: C.feeds.siteOf(url) || f.title, icon: f.icon, url });
+    box.className = "site-mark feed-mark" + (small ? " small" : "");
+    return box;
+  }
+
+  // "About 2 posts a day · last one 2 h ago", from the posts' dates.
+  function rateLine(items) {
+    const ds = items.map((it) => it.date).filter(Boolean).sort((a, b) => b - a);
+    if (!ds.length) return items.length ? countLine(items.length).replace("page", "post") : "No posts yet";
+    const last = whenText(ds[0]);
+    if (ds.length < 2) return "Last post " + last;
+    const perDay = (ds.length - 1) / Math.max((ds[0] - ds[ds.length - 1]) / DAY, 1 / 24);
+    const perWeek = perDay * 7;
+    const rate = perDay >= 1.5 ? "About " + Math.round(perDay) + " posts a day"
+      : perDay >= 0.75 ? "About a post a day"
+      : perWeek >= 1.5 ? "About " + Math.round(perWeek) + " posts a week"
+      : perWeek >= 0.75 ? "About a post a week" : "A post now and then";
+    return rate + " · last one " + last;
+  }
+
+  // Today, Yesterday, a weekday this week, then the date.
+  function dayName(t) {
+    const start = new Date().setHours(0, 0, 0, 0);
+    if (t >= start) return "Today";
+    if (t >= start - DAY) return "Yesterday";
+    const d = new Date(t);
+    if (t >= start - 6 * DAY) return d.toLocaleDateString(undefined, { weekday: "long" });
+    return d.toLocaleDateString(undefined, { day: "numeric", month: "long" });
+  }
+
+  // A feed's posts after a check: what it lists now, with when each was
+  // first seen kept, plus earlier posts it dropped while they're still
+  // inside the window.
+  function mergeFeed(f, got) {
+    const now = Date.now();
+    const had = new Map(f.items.map((it) => [postKey(it), it]));
+    const items = got.items.map((it) => {
+      const old = had.get(postKey(it));
+      const out = { id: it.id, url: it.url, title: it.title, date: it.date, foundAt: old ? old.foundAt : now };
+      if (old && old.tried) out.tried = true;
+      return out;
+    });
+    const now_ = new Set(items.map(postKey));
+    for (const old of f.items) if (!now_.has(postKey(old)) && inWindow(f, old)) items.push(old);
+    f.items = items.sort((a, b) => postAt(b) - postAt(a)).slice(0, FEED_KEEP);
+    if (got.icon) f.icon = got.icon;
+    if (got.link) f.link = got.link;
+  }
+
+  // One feed read again; a feed set to save its posts saves the new ones.
+  async function checkFeed(f) {
+    let got = null, error = "";
+    try { got = await C.feeds.readFeed(f.url); }
+    catch (e) { error = e instanceof C.feeds.FeedError ? e.message : "Couldn't check this feed. Try again later."; }
+    if (!feeds.includes(f)) return;
+    if (got) mergeFeed(f, got);
+    f.error = error;
+    f.checkedAt = Date.now();
+    saveFeeds();
+    paintFeeds();
+    if (got && f.mode === "save") autoSave(f);
+  }
+
+  // Every feed not checked in the last few hours, one at a time, quietly.
+  async function checkFeeds(force) {
+    if (feedsChecking || !navigator.onLine || !feeds.length) return;
+    feedsChecking = true;
+    paintFeeds();
+    try {
+      for (const f of [...feeds]) {
+        if (!force && f.checkedAt && Date.now() - f.checkedAt < FEED_EVERY) continue;
+        await checkFeed(f);
+      }
+    } finally {
+      feedsChecking = false;
+      paintFeeds();
+    }
+  }
+
+  // Saves run one feed after another, so two feeds saving at once don't
+  // interleave their runs.
+  let feedSaves = Promise.resolve();
+  function autoSave(f) {
+    const todo = feedPosts(f).filter((it) => !it.tried && !savedAs(it.url) && !savingUrl(it.url));
+    if (!todo.length) return;
+    todo.forEach((it) => { it.tried = true; });
+    saveFeeds();
+    saveFeedPosts(todo.map((it) => ({ f, it })));
+  }
+
+  // Into each post's feed's collection, oldest first so the collection
+  // reads in order, with the feed's pictures setting.
+  function saveFeedPosts(list) {
+    if (!navigator.onLine) { toast("You're offline. Save these when you're back online."); return feedSaves; }
+    const by = new Map();
+    for (const x of [...list].sort((a, b) => postAt(a.it) - postAt(b.it))) {
+      if (savedAs(x.it.url) || savingUrl(x.it.url)) continue;
+      if (!by.has(x.f)) by.set(x.f, []);
+      by.get(x.f).push(x.it.url);
+    }
+    for (const [f, urls] of by) {
+      const folder = f.folder ? folderName(f.folder) : null;
+      const how = { mode: C.platform.native ? f.images || load(IMAGES_KEY, "previews") : undefined };
+      feedSaves = feedSaves.then(() => urls.length === 1 ? savePage(urls[0], folder || undefined, how)
+        : saveAll(urls, folder, [], how.mode, true)).then(paintFeeds, paintFeeds);
+    }
+    paintFeeds();
+    return feedSaves;
+  }
+
+  function paintFeeds() {
+    if (state.place === "feeds") renderFeeds();
+    if (state.side) renderSide();
+    if (state.menu && state.menu.kind === "feed") redrawMenu();
+  }
+
+  // Library or Feeds under the same bar; only the title changes.
+  function paintPlace() {
+    const feedsOn = state.place === "feeds";
+    $("placeTitle").textContent = feedsOn ? "Feeds" : "Library";
+    $("libraryView").dataset.place = state.place;
+    $("library").hidden = feedsOn;
+    $("feeds").hidden = !feedsOn;
+    if (feedsOn) { if (state.query) clearSearch(); renderFeeds(); }
+    else renderLibrary();
+  }
+
+  function goPlace(place, feed) {
+    state.place = place;
+    state.feed = feed || null;
+    store(PLACE_KEY, place);
+    const done = state.side ? back() : Promise.resolve();
+    paintPlace();
+    scrollTo(0, 0);
+    return done;
+  }
+
+  function pickFeed(url) {
+    state.feed = url;
+    renderFeeds();
+  }
+
+  function renderFeeds() {
+    const root = $("feeds");
+    const picked = state.feed && feeds.find((f) => f.url === state.feed);
+    if (state.feed && !picked) state.feed = null;
+    if (document.visibilityState !== "hidden") store(FEEDS_SEEN_KEY, Date.now());
+    const active = document.activeElement && root.contains(document.activeElement)
+      ? [document.activeElement.closest("[data-key]"), document.activeElement.className] : null;
+    const chipsAt = root.querySelector(".feed-chips");
+    const scrollX = chipsAt ? chipsAt.scrollLeft : 0;
+    const nodes = [];
+    if (!feeds.length) {
+      nodes.push(el("div", { class: "empty" },
+        el("h2", { class: "empty-title" }, "Follow the sites you read"),
+        el("p", { class: "empty-text" }, C.platform.native
+          ? "Add a site and its new posts wait here for you to save, or save themselves."
+          : "Add a site and its new posts wait here. Most sites only let Carry-on on your phone read their feed."),
+        el("button", { class: "btn-primary", type: "button", onclick: () => openMenu("addFeed") }, "Add a feed")));
+      root.replaceChildren(...nodes);
+      return;
+    }
+    const chip = (label, n, on, onclick, key) => {
+      const b = el("button", { class: "chip" + (on ? " on" : ""), type: "button", "aria-pressed": String(on), "data-key": key, onclick },
+        el("span", { class: "chip-label", dir: "auto" }, label), n ? " · " + n : null);
+      return b;
+    };
+    const all = feeds.reduce((n, f) => n + waitingIn(f), 0);
+    nodes.push(el("div", { class: "chips filters feed-chips", role: "group", "aria-label": "Feeds" },
+      chip("All", all, !picked, () => pickFeed(null), "chip:all"),
+      ...feeds.map((f) => chip(f.title, waitingIn(f), picked === f, () => pickFeed(f.url), "chip:" + f.url)),
+      el("button", { class: "chip add-chip", type: "button", "data-key": "chip:add", onclick: () => openMenu("addFeed") },
+        feedIcon("add", 16), "Add a feed")));
+    const checked = Math.max(0, ...(picked ? [picked] : feeds).map((f) => f.checkedAt || 0));
+    const line = feedsChecking ? "Checking…" : picked && picked.error ? picked.error
+      : checked ? "Checked " + whenText(checked) : "Not checked yet";
+    nodes.push(el("div", { class: "feed-head" },
+      el("p", { class: "meta" + (picked && picked.error && !feedsChecking ? " warn" : "") }, line),
+      el("div", { class: "feed-head-actions" },
+        el("button", { class: "btn-text", type: "button", "data-key": "check", onclick: () => checkNow(picked) }, "Check now"),
+        picked ? el("button", { class: "btn-text", type: "button", "data-key": "settings", onclick: () => openMenu("feed", picked) }, "Settings") : null)));
+    const list = (picked ? [picked] : feeds).flatMap((f) => feedPosts(f).map((it) => ({ f, it })))
+      .sort((a, b) => postAt(b.it) - postAt(a.it));
+    let day = null, group = null;
+    for (const x of list) {
+      const d = dayName(postAt(x.it));
+      if (d !== day) {
+        day = d;
+        const open = list.filter((y) => dayName(postAt(y.it)) === d && !savedAs(y.it.url) && !savingUrl(y.it.url));
+        nodes.push(sectionHead(d, open.length > 1
+          ? el("button", { class: "btn-text", type: "button", "data-key": "all:" + d, onclick: () => saveFeedPosts(open) }, "Save all " + open.length) : null));
+        group = el("div", { class: "group feed-group" });
+        nodes.push(group);
+      }
+      group.append(postRow(x.f, x.it, !picked));
+    }
+    if (!list.length) {
+      const days = (picked || feeds[0]).days || 7;
+      nodes.push(el("div", { class: "empty" },
+        el("p", { class: "empty-text" }, (picked && picked.error) || (!checked ? "Its posts show up after the first check."
+          : "Nothing posted in the last " + (FEED_DAYS.find((o) => o.value === String(days)) || FEED_DAYS[1]).label.replace(/^A /, "").toLowerCase() + "."))));
+    }
+    root.replaceChildren(...nodes);
+    const chips = root.querySelector(".feed-chips");
+    if (chips) chips.scrollLeft = scrollX;
+    if (active && active[0]) {
+      const again = root.querySelector('[data-key="' + CSS.escape(active[0].dataset.key) + '"]');
+      const cls = String(active[1]).split(" ")[0];
+      const target = again && cls && (again.classList.contains(cls) ? again : again.querySelector("." + cls));
+      if (target) target.focus({ preventScroll: true });
+    }
+  }
+
+  async function checkNow(f) {
+    if (!navigator.onLine) { toast("You're offline. Check again when you're back online."); return; }
+    if (f) { feedsChecking = true; paintFeeds(); try { await checkFeed(f); } finally { feedsChecking = false; paintFeeds(); } }
+    else await checkFeeds(true);
+  }
+
+  // A post: a tap opens it (the saved copy, or the original online); +
+  // saves it into its feed's collection.
+  function postRow(f, it, withFeed) {
+    const saved = savedAs(it.url);
+    const busy = !saved && savingUrl(it.url);
+    const when = whenText(postAt(it));
+    const open = () => {
+      if (saved) { openPage(saved.id); return; }
+      if (!navigator.onLine) { toast("You're offline. Save it when you're back online to read it here."); return; }
+      C.platform.openOutside(it.url);
+    };
+    let right;
+    if (saved) right = el("span", { class: "post-saved" }, "Saved");
+    else {
+      right = el("button", { class: "post-save", type: "button", "aria-label": busy ? "Saving " + it.title : "Save " + it.title,
+        onclick: () => saveFeedPosts([{ f, it }]) });
+      if (busy) { right.disabled = true; right.append(el("span", { class: "spinner", "aria-hidden": "true" })); }
+      else right.append(feedIcon("add", 18));
+    }
+    return el("div", { class: "post", "data-key": "post:" + f.url + " " + postKey(it) },
+      el("button", { class: "post-open", type: "button", "aria-label": (saved ? "Read " : "Open ") + it.title, onclick: open }),
+      withFeed ? feedMark(f) : null,
+      el("span", { class: "post-body" },
+        withFeed ? el("span", { class: "post-feed", dir: "auto" }, f.title) : null,
+        el("span", { class: "post-title", dir: "auto" }, it.title),
+        el("span", { class: "post-meta" }, saved ? readingLine(saved) + " · " + when : when)),
+      right);
+  }
+
+  // ---- The sidebar ----
+  // Library, Feeds and each feed, from the bar's menu button, over a
+  // dimmed screen in its own history entry.
+  function renderSide() {
+    const item = (icon, label, on, extra, onclick, cls) => {
+      const b = el("button", { class: "side-item" + (cls ? " " + cls : ""), type: "button", onclick }, icon,
+        el("span", { class: "side-label", dir: "auto" }, label), extra || null);
+      if (on) b.setAttribute("aria-current", "page");
+      return b;
+    };
+    const fresh = freshPosts();
+    const inFeeds = state.place === "feeds";
+    fill($("sidebar"),
+      el("p", { class: "side-title" }, "Carry-on"),
+      item(feedIcon("library"), "Library", !inFeeds, state.pages.length ? el("span", { class: "side-count" }, String(state.pages.length)) : null,
+        () => goPlace("library")),
+      item(feedIcon("feeds"), "Feeds", inFeeds && !state.feed, fresh ? el("span", { class: "side-pill" }, fresh + " new") : null,
+        () => goPlace("feeds")),
+      el("hr", { class: "side-line" }),
+      feeds.length ? el("h2", { class: "overline side-head" }, "Feeds") : null,
+      ...feeds.map((f) => {
+        const n = waitingIn(f);
+        return item(feedMark(f, true), f.title, inFeeds && state.feed === f.url, n ? el("span", { class: "side-n" }, String(n)) : null,
+          () => goPlace("feeds", f.url));
+      }),
+      item(feedIcon("add"), "Add a feed", false, null, () => back().then(() => openMenu("addFeed")), "side-add"));
+  }
+
+  function openSide() {
+    if (state.side) return;
+    state.side = true;
+    history.pushState({ view: "side" }, "");
+    renderSide();
+    const side = $("sidebar");
+    $("libraryView").inert = true;
+    $("sideBtn").setAttribute("aria-expanded", "true");
+    side.style.pointerEvents = "";
+    $("sideCatch").hidden = false;
+    side.hidden = false;
+    M.arrive($("sideCatch"), 0);
+    M.slideIn(side);
+    const at = side.querySelector("[aria-current]") || side.querySelector("button");
+    if (at) at.focus({ preventScroll: true });
+  }
+
+  function closeSide() {
+    if (!state.side) return;
+    state.side = false;
+    const side = $("sidebar"), catcher = $("sideCatch");
+    const had = side.contains(document.activeElement);
+    $("libraryView").inert = false;
+    $("sideBtn").setAttribute("aria-expanded", "false");
+    side.style.pointerEvents = "none";
+    M.leave(catcher).then(() => { if (!state.side) catcher.hidden = true; });
+    M.slideOut(side).then(() => { if (!state.side) side.hidden = true; });
+    if (had) $("sideBtn").focus({ preventScroll: true });
+  }
+
+  // ---- Add a feed, and a feed's settings ----
+
+  const picturesLine = (mode) => !C.platform.native ? ""
+    : mode === "full" ? ", with full pictures" : mode === "links" ? ", with pictures as links" : ", with pictures as previews";
+
+  function addFeedSheet() {
+    let found = null, mode = "show";
+    const input = el("input", { class: "feed-input", type: "url", inputmode: "url", placeholder: "A site or its feed", "aria-label": "A site or its feed",
+      autocomplete: "off", autocapitalize: "off", spellcheck: "false", enterkeyhint: "go" });
+    const help = el("p", { class: "footnote" }, "A site's address is enough: Carry-on finds its feed.");
+    const card = el("div", { class: "found-feed" });
+    const note = el("p", { class: "footnote" });
+    const modeBox = el("div", { class: "feed-mode" },
+      el("h2", { class: "overline" }, "New posts"),
+      seg("add-feed-mode", "New posts", [{ value: "show", label: "Show them" }, { value: "save", label: "Save them" }], mode,
+        (v) => { mode = v; paintNote(); }),
+      note);
+    const go = el("button", { class: "btn-primary", type: "button" }, "Find its feed");
+    const paintNote = () => {
+      if (!found) return;
+      note.textContent = (mode === "save" ? "New posts save themselves while you're online. " : "New posts wait in Feeds for you to save. ")
+        + "Saved posts go into a collection called " + cleanTag(found.feed.title) + picturesLine(load(IMAGES_KEY, "previews")) + ".";
+    };
+    const reset = () => {
+      found = null;
+      card.hidden = true;
+      modeBox.hidden = true;
+      go.textContent = "Find its feed";
+      help.className = "footnote";
+      help.textContent = "A site's address is enough: Carry-on finds its feed.";
+    };
+    reset();
+    const find = async () => {
+      const typed = input.value.trim();
+      if (!typed) { input.focus(); return; }
+      go.disabled = true;
+      go.textContent = "Looking for its feed…";
+      try {
+        const got = await C.feeds.findFeed(linkFrom(typed) || typed);
+        const had = feeds.find((f) => sameUrl(f.url, got.url));
+        if (had) throw new C.feeds.FeedError("You already follow " + had.title + ".");
+        if (input.value.trim() !== typed) return;
+        found = got;
+        fill(card, feedMark({ url: got.url, link: got.feed.link, icon: got.feed.icon, title: got.feed.title }),
+          el("span", { class: "found-text" },
+            el("span", { class: "found-name", dir: "auto" }, got.feed.title),
+            el("span", { class: "meta" }, rateLine(got.feed.items))));
+        card.hidden = false;
+        modeBox.hidden = false;
+        help.className = "footnote";
+        help.textContent = C.feeds.siteOf(got.url) + " · " + (got.feed.items.length === 1 ? "1 post" : got.feed.items.length + " posts") + " in its feed";
+        go.textContent = "Follow";
+        paintNote();
+      } catch (e) {
+        reset();
+        help.className = "footnote warn";
+        help.textContent = e instanceof C.feeds.FeedError ? e.message : "Couldn't read that. Check the address and try again.";
+      } finally {
+        go.disabled = false;
+      }
+    };
+    const follow = async () => {
+      const got = found;
+      const f = { url: got.url, title: cleanTag(got.feed.title) || C.feeds.siteOf(got.url), link: got.feed.link, icon: got.feed.icon,
+        mode, images: load(IMAGES_KEY, "previews"), folder: cleanTag(got.feed.title) || C.feeds.siteOf(got.url), days: 7,
+        addedAt: Date.now(), checkedAt: Date.now(), error: "", items: [] };
+      mergeFeed(f, got.feed);
+      feeds.push(f);
+      saveFeeds();
+      await back();
+      await goPlace("feeds", f.url);
+      toast("Following " + f.title);
+      if (mode === "save") autoSave(f);
+    };
+    go.addEventListener("click", () => (found ? follow() : find()));
+    input.addEventListener("input", () => { if (found) reset(); });
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); go.click(); } });
+    setTimeout(() => input.focus({ preventScroll: true }), 50);
+    return el("div", { class: "page-controls add-feed" },
+      el("h2", { class: "menu-title" }, "Add a feed"),
+      el("div", { class: "feed-field" }, input, help),
+      card, modeBox, go);
+  }
+
+  function feedSheet() {
+    const f = state.menu.page;
+    const set = (change) => { Object.assign(f, change); saveFeeds(); if (state.place === "feeds") renderFeeds(); };
+    const row = (label, control) => el("div", { class: "rc-row stack" }, el("span", { class: "rc-label" }, label), control);
+    const into = el("input", { class: "tag-input", type: "text", value: f.folder || "", placeholder: "No collection", "aria-label": "Save into",
+      maxlength: "32", enterkeyhint: "done", autocapitalize: "sentences" });
+    into.addEventListener("change", () => set({ folder: cleanTag(into.value) }));
+    into.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); into.blur(); } });
+    const shortUrl = f.url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
+    return el("div", { class: "page-controls feed-sheet" },
+      el("div", { class: "menu-head" },
+        el("p", { class: "menu-title", dir: "auto" }, f.title),
+        el("p", { class: "meta" }, shortUrl)),
+      el("div", { class: "rc-list" },
+        row("New posts", seg("feed-mode", "New posts", [{ value: "show", label: "Show them" }, { value: "save", label: "Save them" }], f.mode,
+          (v) => { set({ mode: v }); if (v === "save") autoSave(f); })),
+        C.platform.native ? row("Pictures", seg("feed-images", "Pictures", [
+          { value: "previews", label: "Previews" }, { value: "full", label: "Full" }, { value: "links", label: "Links" },
+        ], f.images || load(IMAGES_KEY, "previews"), (v) => set({ images: v }))) : null,
+        row("Save into", into),
+        row("Skip posts older than", seg("feed-days", "Skip posts older than", FEED_DAYS, String(f.days || 7), (v) => set({ days: Number(v) })))),
+      el("p", { class: "footnote" + (f.error ? " warn" : "") }, f.error || (f.checkedAt ? "Checked " + whenText(f.checkedAt) + ". " : "") + rateLine(f.items) + "."),
+      el("button", { class: "sheet-row danger", type: "button", onclick: () => unfollow(f) }, "Unfollow"),
+      el("p", { class: "footnote" }, "Unfollowing keeps the posts you saved."));
+  }
+
+  async function unfollow(f) {
+    feeds = feeds.filter((x) => x !== f);
+    saveFeeds();
+    if (state.feed === f.url) state.feed = null;
+    await back();
+    paintFeeds();
+    toast("Unfollowed " + f.title + ". The posts you saved stay.");
+  }
+
   // ---- Settings ----
   // Each group is data: a new setting is a new entry here, not new markup.
 
@@ -4075,6 +4553,8 @@
     const inSettings = view === "settings" || (view === "news" && s.over === "settings");
     if (view !== "reader") closeReader();
     if (view !== "menu") closeMenu();
+    if (view !== "side") closeSide();
+    if (view === "side" && !state.side) history.back();
     if (view !== "select" && !(view === "menu" && s.select)) endSelect();
     if (view !== "news") closeNews();
     if (view !== "downloads") closeDownloads();
@@ -4104,11 +4584,13 @@
     if (!(history.state && history.state.view)) return Promise.resolve();
     return new Promise((resolve) => {
       addEventListener("popstate", () => resolve(), { once: true });
-      history.go(-[state.folder, state.open, state.sheet, state.image, state.settings, state.section, state.batch, state.news, state.select, state.menu, state.downloads].filter(Boolean).length || -1);
+      history.go(-[state.folder, state.open, state.sheet, state.image, state.settings, state.section, state.batch, state.news, state.select, state.menu, state.downloads, state.side].filter(Boolean).length || -1);
     });
   }
 
   $("settingsBtn").addEventListener("click", () => openSettings());
+  $("sideBtn").addEventListener("click", openSide);
+  $("sideCatch").addEventListener("click", () => history.back());
   $("downloadsBtn").addEventListener("click", () => openDownloads());
   $("downloadsBack").addEventListener("click", () => history.back());
   // The notification's Stop (Android) stops every run.
@@ -4190,7 +4672,7 @@
   $("readerContents").addEventListener("click", () => toggleSheet("contents"));
   $("sheetCatch").addEventListener("click", () => history.back());
   addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !e.defaultPrevented && (state.sheet || state.image || state.menu || state.select)) history.back();
+    if (e.key === "Escape" && !e.defaultPrevented && (state.sheet || state.image || state.menu || state.select || state.side)) history.back();
   });
   addEventListener("popstate", (e) => route(e.state));
   addEventListener("online", () => { showOffline(); renderLibrary(); });
@@ -4212,18 +4694,21 @@
     savePage(url);
   }
 
-  renderLibrary();
+  paintPlace();
   Promise.all([C.platform.ready, C.store.ready]).then(() => Promise.all([C.store.readIndex(), loadThumbs()])).then(([pages]) => {
     state.pages = Array.isArray(pages) ? pages : [];
     if (history.state && history.state.view) history.replaceState(null, "");
-    renderLibrary();
+    paintPlace();
     noteVersion();
     const share = C.platform.plugin("ShareTarget");
     if (share && share.addListener) share.addListener("shared", saveShared);
     saveShared();
     setTimeout(() => dailyCheck(false), 1500);
+    setTimeout(() => checkFeeds(false), 3000);
   });
-  addEventListener("online", () => dailyCheck(false));
+  addEventListener("online", () => { dailyCheck(false); checkFeeds(false); });
+  // Feeds are due every few hours; asked about while the app is open.
+  setInterval(() => checkFeeds(false), 15 * 6e4);
 
   // ---- The app updating itself (from LifeLog's 0.179.0) ----
   // A newer build is a newer APK on this repo's Releases, tagged

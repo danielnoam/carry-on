@@ -237,14 +237,14 @@ html.native #libraryView { padding-top: 0; }
 .top-bar {
   position: sticky; top: 0; z-index: 4;
   display: flex; align-items: center; justify-content: space-between; gap: var(--s-2);
-  padding: var(--s-2) var(--s-2) var(--s-2) var(--gutter);
+  padding: var(--s-2);
   background: var(--bg);
   border-bottom: 1px solid transparent;
   transition: border-color 120ms linear;
 }
 html.native .top-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top)); }
 .top-bar.scrolled { border-bottom-color: var(--line); }
-.top-bar .screen-title { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.top-bar .screen-title { flex: 1; min-width: 0; margin-left: var(--s-1); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .top { padding: 0 var(--gutter) var(--s-2); }
 .top .meta:first-child { margin-top: 0; }
 .screen-title {
@@ -1390,3 +1390,108 @@ html { -webkit-tap-highlight-color: transparent; }
 /* ---- 0.27.12: the browser release ---- */
 .empty-open { margin-top: var(--s-4); }
 .install-hint { margin-top: var(--s-3); }
+
+/* ---- 0.28.0: the sidebar and Feeds ---- */
+.library[hidden], .feeds[hidden] { display: none; }
+[data-place="feeds"] .top, [data-place="feeds"] #searchBtn { display: none; }
+
+.side-catch { z-index: 17; }
+.sidebar {
+  position: fixed; z-index: 18; top: 0; bottom: 0; left: 0;
+  width: min(300px, 85vw); overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: 2px;
+  padding: calc(var(--s-8) + env(safe-area-inset-top)) 0 calc(var(--s-5) + env(safe-area-inset-bottom));
+  background: var(--bg); border-right: 1px solid var(--line);
+  box-shadow: 8px 0 24px var(--shadow);
+}
+.sidebar[hidden] { display: none; }
+.side-title { margin: 0 var(--s-5) var(--s-4); font: 700 var(--fs-heading)/var(--lh-heading) var(--serif); }
+.side-item {
+  display: flex; align-items: center; gap: var(--s-3); flex-shrink: 0;
+  min-height: 48px; margin: 0 var(--s-2); padding: 0 var(--s-3);
+  border: 0; border-radius: var(--r-md); background: transparent; color: var(--ink);
+  font: inherit; text-align: start; cursor: pointer;
+}
+.side-item:active { background: var(--press); }
+.side-item[aria-current] { background: var(--bar); font-weight: 600; }
+.side-icon { display: inline-flex; flex-shrink: 0; color: var(--accent); }
+.side-label { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.side-count { font-size: var(--fs-meta); color: var(--muted); font-variant-numeric: tabular-nums; }
+.side-n { font-size: var(--fs-meta); font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; }
+.side-pill {
+  padding: 0 var(--s-2); border-radius: var(--r-full);
+  background: var(--accent); color: var(--accent-ink);
+  font: 600 var(--fs-meta)/var(--lh-meta) var(--sans);
+}
+.side-line { flex-shrink: 0; height: 1px; margin: var(--s-3) var(--s-5); border: 0; background: var(--line); }
+.side-head { margin: var(--s-1) var(--s-5) var(--s-2); }
+.side-add { color: var(--accent); font-weight: 500; }
+
+/* A feed's mark: its site's icon, or first letter, on the preview tint. */
+.feed-mark {
+  position: relative; flex-shrink: 0; width: var(--s-6); height: var(--s-6);
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+  border-radius: var(--r-sm); background: var(--preview);
+  color: var(--muted); font: 600 var(--fs-label)/1 var(--serif);
+}
+.feed-mark img { width: var(--s-5); height: var(--s-5); }
+.feed-mark.small { width: var(--s-5); height: var(--s-5); font-size: var(--fs-meta); }
+.feed-mark.small img { width: var(--s-4); height: var(--s-4); }
+
+/* The river: chips per feed, then the posts by day. */
+.feeds {
+  flex: 1; padding: 0 var(--gutter) var(--s-5);
+  display: flex; flex-direction: column; gap: var(--s-3);
+}
+.feeds .feed-chips { margin-top: var(--s-1); }
+.chip-label { overflow: hidden; text-overflow: ellipsis; max-width: 12rem; }
+.add-chip { color: var(--accent); }
+.add-chip .side-icon { color: inherit; }
+.feed-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); margin: calc(-1 * var(--s-2)) 0 calc(-1 * var(--s-2)); }
+.feed-head .meta { margin: 0 0 0 var(--s-1); min-width: 0; }
+.feed-head-actions { display: flex; flex-shrink: 0; }
+.feeds > .section-head { margin-bottom: calc(-1 * var(--s-2)); }
+.feeds > .section-head .btn-text { font-size: var(--fs-meta); }
+.post {
+  position: relative; display: flex; align-items: center; gap: var(--s-3);
+  min-height: 64px; padding: var(--s-3) var(--s-2) var(--s-3) var(--s-4);
+}
+.post + .post { border-top: 1px solid var(--line); }
+.post-open { position: absolute; inset: 0; padding: 0; border: 0; background: transparent; cursor: pointer; }
+.post-open:active { background: var(--press); }
+.post-open:focus-visible { outline-offset: -2px; }
+.post > :not(.post-open) { position: relative; pointer-events: none; }
+.post > .post-save { pointer-events: auto; }
+.post-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.post-feed, .post-meta { font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--muted); }
+.post-title {
+  font: 600 var(--fs-card)/var(--lh-card) var(--serif);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.post-save {
+  flex-shrink: 0; width: var(--tap); height: var(--tap);
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--surface); color: var(--accent); cursor: pointer;
+}
+.post-save:disabled { color: var(--muted); cursor: default; }
+.post-save .side-icon { color: inherit; }
+.post-saved { flex-shrink: 0; padding: 0 var(--s-2); font-size: var(--fs-meta); font-weight: 600; color: var(--ok); }
+
+/* Add a feed, and a feed's settings, in the library's sheet. */
+.feed-field { display: flex; flex-direction: column; }
+.feed-input {
+  width: 100%; height: 48px; padding: 0 var(--s-3);
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--bg); color: var(--ink); font: inherit;
+}
+.feed-input:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
+.found-feed { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3); border: 1px solid var(--line); border-radius: var(--r-md); }
+.found-feed[hidden], .feed-mode[hidden] { display: none; }
+.found-text { display: flex; flex-direction: column; min-width: 0; }
+.found-text .meta { margin: 0; }
+.found-name { font-weight: 600; }
+.feed-mode .overline { margin-top: 0; }
+.add-feed .btn-primary { width: 100%; }
+.feed-sheet .footnote { margin-top: calc(-1 * var(--s-2)); }
+.feed-sheet .footnote + .sheet-row { margin-top: 0; }
