@@ -429,6 +429,38 @@ and the page shows above it.
   from Wikipedia, CC BY-SA 4.0, by Wikipedia contributors. Read the
   original".
 
+- **Sidebar (Now, 0.28.0):** a menu button (three lines, 44 px) at the
+  start of the library's bar opens a 300 px panel (at most 85 % of the
+  screen) from the start edge over `--scrim`, sliding on the sheet spring
+  (reduced motion: a fade), in its own history entry, so Back and Escape
+  close it. "Carry-on" in the serif, then Library (its page count, muted)
+  and Feeds (a pill in `--accent` with what's new since Feeds was last
+  open), a hairline, a FEEDS overline, each feed (its 24 px mark, what's
+  waiting in `--accent`), and "Add a feed" in the accent. The current one
+  sits on `--bar`, semibold. The bar is the same in both places; only its
+  title changes, and Feeds drops Search.
+- **Feeds (Now, 0.28.0), one river:** chips per feed, "All · 12" first
+  and "+ Add a feed" last, the picked one filled like any chip; under
+  them "Checked 1 h ago" with Check now (and Settings, for one feed).
+  Then a day overline per day (Today, Yesterday, a weekday, a date) with
+  "Save all 4" at its end when two or more wait, over a group of posts:
+  the feed's 32 px mark (site icon or first letter on `--preview`), the
+  feed's name in meta, the title in the serif at card size (three lines
+  at most), "8 min · 2 h ago", and a 44 px + button, or "Saved" in
+  `--ok`. A tap on a post reads the saved copy, or opens the original
+  when online.
+- **Add a feed (Now, 0.28.0):** the library's sheet: a 48 px field ("A
+  site's address is enough: Carry-on finds its feed."), Find its feed,
+  then the found feed as a card (mark, name, "About 2 posts a day · last
+  one 2 h ago"), New posts as a segmented Show them / Save them with a
+  note naming the collection, and Follow. Errors replace the help line in
+  `--warn`.
+- **A feed's settings (Now, 0.28.0):** the same sheet: New posts, Pictures
+  (on the phone), Save into (a field; empty means no collection), Skip
+  posts older than (3 days, A week, A month), a muted line with when it
+  was checked and how often it posts, Unfollow in `--warn`, "Unfollowing
+  keeps the posts you saved."
+
 ## 6. Voice
 
 Short, plain, about the reader's situation: "Plays when you're back

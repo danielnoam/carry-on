@@ -2,6 +2,19 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.28.0] - 2026-10-04
+
+### Added
+- Follow a site's feed. Add a feed from the new sidebar (the menu button
+  at the left of the bar): a site's address is enough, Carry-on finds its
+  RSS, Atom or JSON feed.
+- Feeds shows every new post in one list, by day, with chips for each
+  feed. Tap + to save a post, or Save all for a day; saved posts go into
+  a collection named after the feed.
+- Set a feed to save its new posts by itself, and pick its pictures, its
+  collection and how old a post can be before it's skipped. Feeds are
+  checked every few hours while the app is open and online.
+
 ## [0.27.12] - 2026-10-04
 
 ### Changed

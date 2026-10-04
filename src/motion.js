@@ -52,6 +52,15 @@
     return run(el, [{ transform: "translateY(0)" }, { transform: "translateY(100%)" }], "sheet",
       [{ opacity: 1 }, { opacity: 0 }]);
   }
+  // The sidebar, from the left edge (0.28.0).
+  function slideIn(el) {
+    return run(el, [{ transform: "translateX(-100%)" }, { transform: "translateX(0)" }], "sheet",
+      [{ opacity: 0 }, { opacity: 1 }]);
+  }
+  function slideOut(el) {
+    return run(el, [{ transform: "translateX(0)" }, { transform: "translateX(-100%)" }], "sheet",
+      [{ opacity: 1 }, { opacity: 0 }]);
+  }
   // Something arriving in a list or a bar: a card, the update bar, a toast.
   function arrive(el, from = 12) {
     return run(el, [{ opacity: 0, transform: "translateY(" + from + "px) scale(0.98)" }, { opacity: 1, transform: "none" }], "sheet",
@@ -71,5 +80,5 @@
   root.setProperty("--spring-control-ms", SPRINGS.control.ms + "ms");
 
   window.CarryOn = window.CarryOn || {};
-  window.CarryOn.motion = { timing, pushIn, popOut, under, rise, sink, arrive, leave, reduced };
+  window.CarryOn.motion = { timing, pushIn, popOut, under, rise, sink, slideIn, slideOut, arrive, leave, reduced };
 })();

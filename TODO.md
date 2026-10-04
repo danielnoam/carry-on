@@ -47,18 +47,18 @@ and a trademark search.
   updater too. Renaming it relies on GitHub's redirect, so keep the name
   unless there's a reason to change it.
 
-## 0.28.0 and 0.29.0: Sync through a private GitHub repo
+## 0.29.0 and 0.30.0: Sync through a private GitHub repo
 
 Split in two because it's the riskiest work and loses data if wrong.
 
-**0.28.0, the index and text.** A fine-grained token for one repo, kept on
+**0.29.0, the index and text.** A fine-grained token for one repo, kept on
 the device. Sync `library.json` and each `page.html` + `meta.json`
 through the contents API with `sha` for conflicts, as LifeLog's
 src/storage.js does. Deletes become tombstones in `library.json` so they
 don't come back from the other device. The other device re-downloads
 previews from the original links. Reuses the 0.18.0 backup format.
 
-**0.29.0, images.** Push `images/` through the Git Data API (blobs, one
+**0.30.0, images.** Push `images/` through the Git Data API (blobs, one
 tree and one commit per save), since the contents API stops at 1 MB and
 broke LifeLog's sync. Decide first whether the repo's growth (0.5 to 1.5
 MB per illustrated page, far more for comics) is acceptable, or whether
@@ -86,23 +86,13 @@ one and confirm it stays gone; edit tags offline on both and sync.
 
 **Depends on:** 0.18.0 (format, merge-by-URL rules).
 
-## RSS feeds (Daniel, 3 Oct 2026)
-
-Follow a site's RSS or Atom feed and save its new posts: add a feed by
-its link (or find it from a page's `<link rel="alternate">`), check it
-like collections are checked for new chapters, and save new items into a
-collection named after the feed, or list them to pick from. Settings per
-feed: save automatically or just show what's new.
-
-- **A sidebar** (Daniel, 3 Oct 2026). A menu button at the left of the
-  bar opens a side panel with Library and RSS feeds, and whatever comes
-  later. The bar stays the same in both views (Search, Downloads,
-  Settings on the right), only its title changes.
-
 ---
 
 ## Waiting on a decision, not on a release slot
 
+- **Feeds: background checks and backups (0.28.0 shipped without
+  them).** Feeds are checked only while the app is open, and aren't in
+  backups. Add them to the backup format when sync (0.29.0) touches it.
 - **Saving any site in a browser (0.27.12 shipped without it).** A
   stateless fetch worker behind a token, or a browser extension that
   saves the open tab. Decide once there's a sense of how much gets saved

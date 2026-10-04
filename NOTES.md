@@ -3,6 +3,25 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Feeds, one river (0.28.0).** Daniel picked the river from three drawn
+  options (a list of feeds, one river, feeds as collections). Feeds are
+  fetched like pages (CapacitorHttp, no CORS), parsed with DOMParser's
+  XML mode (which runs nothing) into plain text, and kept in
+  localStorage (`carryon.feeds`): only id, link, title, date and when it
+  was first seen per post, at most 100 per feed. Posts a feed drops stay
+  while they're inside its window, so a busy feed doesn't lose the
+  morning's posts by evening. "New" for the sidebar's pill means first
+  seen after Feeds was last open (`carryon.feedsSeen`), so it clears by
+  looking, not by saving everything. A feed set to Save them marks each
+  post `tried` once queued, so a post that fails isn't retried on every
+  check. Saving goes through the existing `savePage`/`saveAll`, oldest
+  first, so a feed's collection reads in order and runs show in
+  Downloads; one feed's saves wait for the last one's. Checks happen
+  only while the app is open (every 15 minutes it looks for feeds not
+  checked in 3 hours); background checks would need native work like the
+  iOS downloads question. In a browser most feeds can't be read (CORS),
+  and the error says to follow in the app. Feeds aren't in backups yet.
+
 - **The browser release, with no server (0.27.12).** Daniel chose no
   server: a fetch proxy means hosting, accounts and an open proxy's abuse
   and legal exposure, and an extension is a second codebase. So the

@@ -8,13 +8,16 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="src/fonts.css?v=0.27.12">
-  <link rel="stylesheet" href="src/styles.css?v=0.27.12">
+  <link rel="stylesheet" href="src/fonts.css?v=0.28.0">
+  <link rel="stylesheet" href="src/styles.css?v=0.28.0">
 </head>
 <body>
   <div class="app" id="libraryView">
     <div class="top-bar" id="topBar">
-      <h1 class="screen-title">Library</h1>
+      <button class="icon-btn menu-btn" id="sideBtn" type="button" aria-label="Library and feeds" aria-expanded="false" aria-controls="sidebar">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
+      </button>
+      <h1 class="screen-title" id="placeTitle">Library</h1>
       <div class="top-actions">
         <button class="icon-btn" id="searchBtn" type="button" aria-label="Search" aria-expanded="false" aria-controls="searchBox" hidden>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
@@ -43,6 +46,7 @@
     </header>
 
     <main class="library" id="library" aria-live="polite"></main>
+    <main class="feeds" id="feeds" hidden></main>
 
     <footer class="save-bar">
       <div class="update-bar" id="updateBar" role="status" hidden>
@@ -194,6 +198,8 @@
     <button class="select-act" id="selRead" type="button"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg><span id="selReadLabel">Mark read</span></button>
     <button class="select-act danger" id="selDelete" type="button"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"></path></svg>Delete</button>
   </div>
+  <div class="menu-catch side-catch" id="sideCatch" hidden></div>
+  <nav class="sidebar" id="sidebar" aria-label="Library and feeds" hidden></nav>
   <div class="menu-catch" id="menuCatch" hidden></div>
   <div class="sheet menu-sheet" id="menuSheet" role="dialog" aria-modal="true" hidden>
     <span class="sheet-grip" aria-hidden="true"></span>
@@ -201,14 +207,15 @@
   </div>
   <div class="toast" id="toast" role="status" hidden></div>
 
-  <script src="src/platform.js?v=0.27.12"></script>
-  <script src="src/motion.js?v=0.27.12"></script>
-  <script src="src/vendor/Readability.js?v=0.27.12"></script>
-  <script src="src/store.js?v=0.27.12"></script>
-  <script src="src/save.js?v=0.27.12"></script>
-  <script src="src/backup.js?v=0.27.12"></script>
-  <script src="src/epub.js?v=0.27.12"></script>
-  <script src="src/reader.js?v=0.27.12"></script>
-  <script src="src/app.js?v=0.27.12"></script>
+  <script src="src/platform.js?v=0.28.0"></script>
+  <script src="src/motion.js?v=0.28.0"></script>
+  <script src="src/vendor/Readability.js?v=0.28.0"></script>
+  <script src="src/store.js?v=0.28.0"></script>
+  <script src="src/save.js?v=0.28.0"></script>
+  <script src="src/feeds.js?v=0.28.0"></script>
+  <script src="src/backup.js?v=0.28.0"></script>
+  <script src="src/epub.js?v=0.28.0"></script>
+  <script src="src/reader.js?v=0.28.0"></script>
+  <script src="src/app.js?v=0.28.0"></script>
 </body>
 </html>
