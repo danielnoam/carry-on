@@ -24,6 +24,21 @@ asks from Daniel.
 
 ---
 
+## Collection screen rework (Daniel, 4 Oct 2026)
+
+Three directions are on the design canvas ("Collection screen rework, 4
+Oct"): a book page with the cover over the chapters, Chapters and About
+tabs, or the list first with Continue along the bottom. Waiting on
+Daniel's pick. Whichever wins:
+
+- **What's saved:** what the collection's size is made of: pictures
+  kept as previews or full (count and size), the text, and pictures
+  kept as links that need a connection. Pages saved from now on record
+  their pictures' bytes (`imageBytes`); older pages get it from the
+  files on the phone once.
+- The seven action tiles go: the actions that aren't reading move
+  into a ⋯ menu in the screen's bar.
+
 ## 0.28.0 and 0.29.0: Sync through a private GitHub repo
 
 Split in two because it's the riskiest work and loses data if wrong.
