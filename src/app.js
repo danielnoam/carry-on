@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.27.10";
+  const APP_VERSION = "0.27.11";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -667,6 +667,7 @@
     if (!res) { toast("Couldn't open this page's file. Try again."); return; }
     if (res.got) {
       Object.assign(p, { missing: res.missing, thumb: res.thumb, bytes: (p.bytes || 0) + res.bytes });
+      if (p.imageBytes != null) p.imageBytes += res.bytes;
       await C.store.writeIndex(state.pages);
     }
     toast(!res.got ? "Still couldn't get them. The site may be down; the images load online."
@@ -2042,44 +2043,184 @@
 
   function closeFolder() {
     if (!state.folder) return;
+    closeFolderMenu(true);
+    folderMode = "";
     state.folder = null;
     popScreen($("folderView"));
   }
 
-  // The folder screen's mode: reading (""), "order" (move buttons on each
-  // row) or "remove" (the two ways to remove it, spelled out).
+  // The collection's screen is a book page (0.27.11): its cover and title,
+  // how far along, Continue, then its chapters. Its tools are in the ⋯
+  // menu; Rename, Reorder, the story page and Export take the screen over
+  // in place, with Cancel, Save or Done in the bar.
   let folderMode = "";
+  const FOLDER_BARS = {
+    rename: { title: "Rename", cancel: true, done: "Save" },
+    order: { title: "Reorder", done: "Done" },
+    chapters: { title: "Story page", done: "Done" },
+    export: { title: "Export", done: "Done" },
+  };
+
+  function setFolderMode(m) {
+    closeFolderMenu();
+    folderMode = m;
+    renderFolder();
+    $("folderBody").scrollTop = 0;
+    const field = $("folderBody").querySelector(".book-title-input");
+    if (field) { field.focus(); field.select(); }
+    else if (m) $("folderDone").focus({ preventScroll: true });
+    else $("folderMore").focus({ preventScroll: true });
+  }
+
+  function paintFolderBar() {
+    const bar = FOLDER_BARS[folderMode];
+    $("folderBack").hidden = !!bar;
+    $("folderMore").hidden = !!bar;
+    $("folderCancel").hidden = !(bar && bar.cancel);
+    $("folderDone").hidden = !bar;
+    if (bar) $("folderDone").textContent = bar.done;
+    if (bar) fill($("folderTitle"), bar.title);
+    else fill($("folderTitle"), folderSource(folderPages(state.folder)) ? bookIcon(18) : null, state.folder);
+    $("folderView").querySelector(".screen-bar").classList.toggle("editing", !!bar);
+    paintFolderTitle();
+  }
+
+  // The bar names the collection once its title has scrolled away.
+  function paintFolderTitle() {
+    const head = $("folderBody").querySelector(".book-title");
+    const away = !folderMode && (!head || head.getBoundingClientRect().bottom < $("folderBody").getBoundingClientRect().top);
+    $("folderView").querySelector(".screen-bar").classList.toggle("titled", !!folderMode || away);
+  }
+
+  const minutesText = (m) => (m >= 60 ? Math.floor(m / 60) + " h" + (m % 60 ? " " + (m % 60) + " min" : "") : m + " min");
+  const minutesLeft = (list) => list.filter((p) => !p.finished)
+    .reduce((sum, p) => sum + Math.max(1, Math.ceil((p.minutes || 1) * (1 - (p.at > 0.02 ? p.at : 0)))), 0);
+  const chapterWord = (list, n) => (isSeries(list) ? (n === 1 ? "chapter" : "chapters") : (n === 1 ? "page" : "pages"));
+
+  function bookCover(list) {
+    const url = coverUrl(list);
+    if (url) {
+      const img = el("img", { class: "book-cover", src: url, alt: "" });
+      img.addEventListener("error", () => img.replaceWith(drawnCover(list)), { once: true });
+      return img;
+    }
+    return drawnCover(list);
+  }
+  const drawnCover = (list) => el("div", { class: "book-cover drawn", "aria-hidden": "true" },
+    el("span", { class: "book-cover-rule" }),
+    el("span", { class: "book-cover-title", dir: "auto" }, state.folder),
+    el("span", { class: "book-cover-site" }, list[0].site || ""));
+
+  function bookHead(list, next, done) {
+    const n = list.length, name = state.folder;
+    const renaming = folderMode === "rename";
+    let title;
+    if (renaming) {
+      title = el("input", { class: "book-title-input", type: "text", value: name, "aria-label": "Collection name",
+        maxlength: "32", enterkeyhint: "done", autocapitalize: "sentences", spellcheck: "false", dir: "auto" });
+      title.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); $("folderDone").click(); }
+        else if (e.key === "Escape") { e.preventDefault(); setFolderMode(""); }
+      });
+    } else title = el("h2", { class: "book-title", dir: "auto" }, name);
+    const left = minutesLeft(list);
+    const meta = done === n ? "All " + n + " read" : done + " of " + n + " read · " + minutesText(left) + " left";
+    const bar = el("div", { class: "book-progress", role: "progressbar", "aria-label": "Read", "aria-valuemin": "0",
+      "aria-valuemax": String(n), "aria-valuenow": String(done), "aria-valuetext": done + " of " + n + " read" },
+      el("span", { class: "book-progress-fill", style: "width: " + (done / n * 100).toFixed(1) + "%" }));
+    const head = el("div", { class: "book-head" },
+      bookCover(list),
+      el("div", { class: "book-facts" },
+        el("p", { class: "book-site" }, [list[0].site, "Collection"].filter(Boolean).join(" · ")),
+        title,
+        el("p", { class: "meta folder-meta" }, meta),
+        bar));
+    if (renaming) {
+      return [head, el("p", { class: "footnote book-note" }, n === 1 ? "Renames the collection on its page." : "Renames the collection on all " + n + " of its pages.")];
+    }
+    const go = done === n ? "Read again from the start" : (next.at > 0.02 || done ? "Continue: " : "Start: ") + next.title;
+    const s = savedParts(list);
+    return [head,
+      el("button", { class: "btn-primary folder-go", type: "button", dir: "auto", onclick: () => openPage(done === n ? list[0].id : next.id) }, go),
+      saveNewButton(list),
+      el("button", { class: "book-saved", type: "button", onclick: () => openMenu("saved") },
+        el("span", null, formatSize(s.total) + " · " + picturesAs(list) + " · "),
+        el("span", { class: "accent" }, "What's saved"))];
+  }
+
+  // New chapters found by the daily check, saved from here: straight from
+  // the story page's list when it gave one, else by following the last
+  // chapter's next link.
+  function saveNewButton(list) {
+    const name = state.folder;
+    const fresh = freshCount(name);
+    if (!fresh) return null;
+    const entry = newFor(name);
+    const b = el("button", { class: "btn-quiet book-new", type: "button", onclick: () => {
+      if (!navigator.onLine) { toast("You're offline. Try again when you're back online."); return; }
+      if (runFor(name)) { toast("Already saving into " + name + ". It's in Downloads."); return; }
+      if (entry && entry.all) { saveAll(entry.all, name, [], undefined, true, undefined, folderSource(list)); return; }
+      const last = list[list.length - 1];
+      if (!sizeOk(last, fresh)) return;
+      b.disabled = true;
+      follow(last, fresh, false).then(() => { if (b.isConnected) b.disabled = false; });
+    } }, el("span", { class: "tile-icon", "aria-hidden": "true" }), "Save " + newCountText(fresh) + " " + chapterWord(list, fresh));
+    b.firstChild.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICONS.add + "</svg>";
+    return b;
+  }
 
   function renderFolder() {
     const list = folderPages(state.folder);
-    fill($("folderTitle"), folderSource(list) ? bookIcon(18) : null, state.folder);
     if (!list.length) {
+      folderMode = "";
+      paintFolderBar();
       $("folderBody").replaceChildren(el("p", { class: "empty-text" }, "This collection is empty."));
       return;
     }
-    const next = folderNext(list);
-    const done = list.filter((p) => p.finished).length;
-    const go = done === list.length ? "Read again from the start" : (next.at > 0.02 || done ? "Continue: " : "Start: ") + next.title;
     const picking = !!state.select;
     if (picking) folderMode = "";
     if (!picking && !folderMode) lookBack(list[0]);
+    const next = folderNext(list);
+    const done = list.filter((p) => p.finished).length;
+    const ordering = folderMode === "order";
+    let top;
+    if (folderMode === "chapters") top = [chaptersPanel(list)];
+    else if (folderMode === "export") top = [el("div", { class: "folder-actions export-panel" }, exportControls({ pages: list, title: state.folder }, () => setFolderMode("")))];
+    else if (ordering) {
+      top = [el("div", { class: "order-hint" },
+        el("p", { class: "meta" }, "Drag a chapter by its handle, or use the arrows."),
+        el("button", { class: "btn-quiet sort-chapters", type: "button", onclick: () => sortByChapter(list) }, "Sort by chapter"))];
+    } else top = bookHead(list, next, done);
+    const showList = folderMode !== "export";
     fill($("folderBody"),
-      el("p", { class: "meta folder-meta" }, countLine(list.length) + " · " + done + " read · " + formatSize(sizeOf(list))),
-      picking ? null : folderActions(list),
-      picking || folderMode ? null : el("button", { class: "btn-primary folder-go", type: "button", dir: "auto",
-        onclick: () => openPage(done === list.length ? list[0].id : next.id) }, go),
-      el("ol", { class: "group folder-list" + (folderMode === "order" ? " ordering" : "") },
+      ...top,
+      showList && !ordering ? sectionHead((isSeries(list) ? "Chapters" : "Pages") + " · " + list.length) : null,
+      showList ? el("ol", { class: "group folder-list" + (ordering ? " ordering" : "") },
         ...list.map((p, i) => el("li", folderMode ? { "data-id": p.id } : { "data-id": p.id, "data-ids": p.id },
-          el("button", { class: "row chapter" + (p === next && done < list.length ? " now" : ""), type: "button", onclick: () => tapPages([p.id], () => openPage(p.id)) },
+          el("button", { class: "row chapter" + (p === next && done < list.length ? " now" : ""), type: "button",
+            onclick: () => (folderMode ? null : tapPages([p.id], () => openPage(p.id))) },
             pickMark(),
             el("span", { class: "chapter-n", "aria-hidden": "true" }, String(i + 1)),
             el("span", { class: "choice-text" },
               el("span", { class: "row-label", dir: "auto" }, p.title),
-              el("span", { class: "choice-note" + (p.finished ? "" : p.at > 0.02 ? " accent" : "") }, readingLine(p)))),
-          folderMode === "order" ? moveButton(p, i, -1, list.length) : null,
-          folderMode === "order" ? moveButton(p, i, 1, list.length) : null))),
-      null);
+              ordering ? null : el("span", { class: "choice-note" + (p.finished ? "" : p.at > 0.02 ? " accent" : "") }, readingLine(p))),
+            ordering ? null : chapterMark(p)),
+          ordering ? moveButton(p, i, -1, list.length) : null,
+          ordering ? moveButton(p, i, 1, list.length) : null,
+          ordering ? dragHandle(p) : null))) : null);
+    paintFolderBar();
     paintPicks();
+  }
+
+  // A tick once read, a filling ring part way.
+  function chapterMark(p) {
+    if (p.finished) {
+      const s = el("span", { class: "chapter-mark done", "aria-hidden": "true" });
+      s.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+      return s;
+    }
+    if (p.at > 0.02) return el("span", { class: "chapter-mark ring", "aria-hidden": "true", style: "--at: " + Math.round(p.at * 360) + "deg" });
+    return el("span", { class: "chapter-mark", "aria-hidden": "true" });
   }
 
   const CHEVRON = (d) => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + d + '"/></svg>';
@@ -2093,20 +2234,77 @@
     return b;
   }
 
-  // Swaps a page with its neighbour. The folder's places are the pages'
-  // own `folderAt`s, made distinct and handed out again in the new order,
-  // so nothing else in the folder moves.
-  async function movePage(p, step) {
+  // Dragging is for fingers and mice; the arrows beside it do the same
+  // from a keyboard or a screen reader, so the handle is hidden from them.
+  function dragHandle(p) {
+    const h = el("span", { class: "drag-handle", "aria-hidden": "true" });
+    h.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 8h16M4 12h16M4 16h16"/></svg>';
+    h.addEventListener("pointerdown", (e) => dragRow(e, h, p));
+    return h;
+  }
+
+  function dragRow(e, handle, p) {
+    if (e.button > 0) return;
+    e.preventDefault();
+    const li = handle.closest("li"), body = $("folderBody");
+    const rows = [...li.parentNode.children], from = rows.indexOf(li);
+    const step = li.offsetHeight, y0 = e.clientY, s0 = body.scrollTop;
+    let to = from, y = y0;
+    handle.setPointerCapture(e.pointerId);
+    li.classList.add("lifted");
+    li.parentNode.classList.add("dragging");
+    const place = () => {
+      const dy = y - y0 + body.scrollTop - s0;
+      to = clamp(from + Math.round(dy / step), 0, rows.length - 1);
+      li.style.transform = "translateY(" + dy + "px)";
+      rows.forEach((r, i) => {
+        if (r === li) return;
+        const shift = i > from && i <= to ? -step : i < from && i >= to ? step : 0;
+        r.style.transform = shift ? "translateY(" + shift + "px)" : "";
+      });
+    };
+    const move = (ev) => {
+      y = ev.clientY;
+      const box = body.getBoundingClientRect();
+      if (y > box.bottom - 48) body.scrollTop += 12;
+      else if (y < box.top + 48) body.scrollTop -= 12;
+      place();
+    };
+    const end = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", end);
+      handle.removeEventListener("pointercancel", end);
+      li.parentNode.classList.remove("dragging");
+      li.classList.remove("lifted");
+      rows.forEach((r) => { r.style.transform = ""; });
+      if (to !== from) moveTo(p, to);
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", end);
+    handle.addEventListener("pointercancel", end);
+  }
+
+  // Moves a page to `to` in its folder. The folder's places are the
+  // pages' own `folderAt`s, made distinct and handed out again in the new
+  // order, so nothing else in the folder moves.
+  async function moveTo(p, to) {
     const list = folderPages(p.folder);
-    const i = list.indexOf(p), j = i + step;
-    if (i < 0 || j < 0 || j >= list.length) return;
+    const i = list.indexOf(p);
+    if (i < 0 || to === i || to < 0 || to >= list.length) return false;
     const places = list.map((q) => q.folderAt || q.savedAt || 0);
     for (let k = 1; k < places.length; k++) if (places[k] <= places[k - 1]) places[k] = places[k - 1] + 1;
-    [list[i], list[j]] = [list[j], list[i]];
+    list.splice(i, 1);
+    list.splice(to, 0, p);
     list.forEach((q, k) => { q.folderAt = places[k]; });
     await C.store.writeIndex(state.pages);
     renderFolder();
     renderLibrary();
+    return true;
+  }
+
+  async function movePage(p, step) {
+    const list = folderPages(p.folder);
+    if (!(await moveTo(p, list.indexOf(p) + step))) return;
     const row = $("folderBody").querySelector('li[data-id="' + p.id + '"]');
     const again = row && row.querySelector('.move[data-step="' + step + '"]');
     const focus = again && !again.disabled ? again : row && row.querySelector(".move:not(:disabled)");
@@ -2115,7 +2313,7 @@
 
   // Chapter numbers from the titles (or addresses) put the folder in
   // order; pages without one keep their place relative to each other, at
-  // the end. The folder's own places are reused, as in movePage.
+  // the end. The folder's own places are reused, as in moveTo.
   async function sortByChapter(list) {
     const nums = new Map(list.map((p) => [p, C.save.chapterNumber(p.title, p.url)]));
     if ([...nums.values()].filter((n) => n != null).length < 2) { toast("These pages don't have chapter numbers to sort by."); return; }
@@ -2133,43 +2331,192 @@
     toast(moved ? "Sorted by chapter." : "Already in chapter order.");
   }
 
-  // The folder's tools, above its pages: two rows of three on a phone,
-  // one row on a desktop. Reordering and removing take their place.
-  function folderActions(list) {
-    const n = list.length;
-    const mode = (m) => () => { folderMode = m; renderFolder(); };
-    if (folderMode === "remove") {
-      return el("div", { class: "folder-actions remove", role: "group", "aria-label": "Remove " + state.folder },
-        el("p", { class: "meta" }, "Remove “" + state.folder + "”?"),
-        el("button", { class: "sheet-row", type: "button", onclick: () => removeFolder(false) },
-          "Remove the collection, keep its " + countLine(n)),
-        el("button", { class: "sheet-row danger", type: "button", onclick: () => removeFolder(true) },
-          "Delete the collection and its " + countLine(n)),
-        el("button", { class: "btn-quiet", type: "button", onclick: mode("") }, "Cancel"));
-    }
-    if (folderMode === "order") {
-      return el("div", { class: "folder-actions order" },
-        el("p", { class: "meta" }, "Move pages with the arrows, or sort them by their chapter numbers."),
-        el("button", { class: "btn-quiet sort-chapters", type: "button", onclick: () => sortByChapter(list) }, "Sort by chapter"),
-        el("button", { class: "btn-primary", type: "button", onclick: mode("") }, "Done"));
-    }
-    if (folderMode === "export") {
-      return el("div", { class: "folder-actions export-panel" }, exportControls({ pages: list, title: state.folder }, mode("")));
-    }
-    if (folderMode === "chapters") return chaptersPanel(list, mode(""));
-    const reorder = tileButton("reorder", "Reorder", mode("order"));
-    reorder.disabled = n < 2;
+  // ---- The collection's ⋯ menu ----
+  // A popover under its button rather than a sheet: short, and every
+  // entry leads somewhere else.
+  function openFolderMenu() {
+    if ($("folderPop")) { closeFolderMenu(); return; }
+    const list = folderPages(state.folder);
+    if (!list.length) return;
     const fresh = freshCount(state.folder);
-    const chapters = tileButton("chapters", "Chapters", mode("chapters"));
-    if (fresh) chapters.append(el("span", { class: "tile-new" }, newCountText(fresh)));
-    return el("div", { class: "folder-tools", role: "group", "aria-label": "Collection" },
-      tileButton("add", "Add pages", () => openBatch("", false, state.folder)),
-      chapters,
-      tileButton("select", "Select", () => startSelect([])),
-      reorder,
-      tileButton("rename", "Rename", renameFolder),
-      tileButton("send", "Export", mode("export")),
-      tileButton("remove", "Remove", mode("remove"), "warn"));
+    const item = (icon, label, onclick, opts = {}) => {
+      const b = el("button", { class: "pop-item" + (opts.warn ? " warn" : ""), type: "button", role: "menuitem", tabindex: "-1",
+        onclick: () => { closeFolderMenu(true); onclick(); } },
+        el("span", { class: "pop-icon", "aria-hidden": "true" }), el("span", { class: "pop-label" }, label),
+        opts.note ? el("span", { class: "pop-note" + (opts.accent ? " accent" : "") }, opts.note) : null);
+      b.firstChild.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICONS[icon] + "</svg>";
+      b.disabled = !!opts.disabled;
+      return b;
+    };
+    const sep = () => el("div", { class: "pop-sep", role: "separator" });
+    const pop = el("div", { class: "pop-menu", id: "folderPop", role: "menu", "aria-label": "Collection" },
+      item("saved", "What's saved", () => openMenu("saved"), { note: formatSize(sizeOf(list)) }),
+      item("book", "Story page", () => setFolderMode("chapters"), fresh ? { note: newCountText(fresh), accent: true } : {}),
+      item("add", "Add pages", () => openBatch("", false, state.folder)),
+      sep(),
+      item("rename", "Rename", () => setFolderMode("rename")),
+      item("reorder", "Reorder", () => setFolderMode("order"), { disabled: list.length < 2 }),
+      item("select", "Select", () => startSelect([])),
+      item("send", "Export", () => setFolderMode("export")),
+      sep(),
+      item("remove", "Remove", () => openMenu("remove"), { warn: true }));
+    const more = $("folderMore"), at = more.getBoundingClientRect();
+    pop.style.top = at.bottom + 4 + "px";
+    pop.style.right = Math.max(8, innerWidth - at.right) + "px";
+    $("folderView").append(pop);
+    more.setAttribute("aria-expanded", "true");
+    M.arrive(pop, -8);
+    const items = () => [...pop.querySelectorAll(".pop-item:not(:disabled)")];
+    items()[0].focus();
+    pop.addEventListener("keydown", (e) => {
+      const all = items(), i = all.indexOf(document.activeElement);
+      const to = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: all.length - 1 }[e.key];
+      if (to !== undefined) { e.preventDefault(); all[(to + all.length) % all.length].focus(); }
+      else if (e.key === "Escape") { e.preventDefault(); closeFolderMenu(); }
+      else if (e.key === "Tab") closeFolderMenu(true);
+    });
+    setTimeout(() => addEventListener("pointerdown", outsideMenu, true));
+  }
+
+  function outsideMenu(e) {
+    const pop = $("folderPop");
+    if (pop && !pop.contains(e.target) && !$("folderMore").contains(e.target)) closeFolderMenu(true);
+  }
+
+  // Focus goes back to ⋯ unless what was picked takes it somewhere.
+  function closeFolderMenu(away) {
+    const pop = $("folderPop");
+    removeEventListener("pointerdown", outsideMenu, true);
+    if (!pop) return;
+    pop.removeAttribute("id");
+    pop.style.pointerEvents = "none";
+    $("folderMore").setAttribute("aria-expanded", "false");
+    M.leave(pop).then(() => pop.remove());
+    if (!away) $("folderMore").focus();
+  }
+
+  // ---- What's saved (0.27.11) ----
+  // A page's size split into its pictures (kept as `imageBytes` since
+  // 0.27.11, measured from its files for pages saved before) and the rest:
+  // its text, the page itself and the site's icon.
+  function savedParts(list) {
+    const s = { total: 0, pictures: 0, known: true, previews: 0, full: 0, links: 0, missing: 0 };
+    for (const p of list) {
+      const imgs = p.images || 0, miss = p.missing || 0;
+      s.total += p.bytes || 0;
+      if (p.mode === "links") s.links += imgs;
+      else {
+        s[p.mode === "full" ? "full" : "previews"] += Math.max(0, imgs - miss);
+        s.missing += miss;
+      }
+      if (p.imageBytes != null) s.pictures += p.imageBytes;
+      else if (imgs && p.mode !== "links") s.known = false;
+    }
+    s.pictures = Math.min(s.pictures, s.total);
+    s.text = s.total - s.pictures;
+    return s;
+  }
+
+  function picturesAs(list) {
+    const modes = new Set(list.filter((p) => p.images).map((p) => p.mode || "previews"));
+    if (!modes.size) return "no pictures";
+    if (modes.size > 1) return "pictures mixed";
+    return { previews: "pictures as previews", full: "pictures full size", links: "pictures as links" }[[...modes][0]];
+  }
+
+  // What one page keeps, for its row in Storage.
+  function savedNote(p) {
+    const s = savedParts([p]);
+    return [s.previews ? s.previews + (s.previews === 1 ? " preview" : " previews") : null,
+      s.full ? s.full + " full size" : null,
+      s.links ? s.links + (s.links === 1 ? " link" : " links") : null,
+      s.missing ? s.missing + " missing" : null].filter(Boolean).join(" · ") || "Text only";
+  }
+
+  function savedView(list) {
+    const s = savedParts(list);
+    const kept = s.previews + s.full;
+    const what = s.previews && s.full ? "previews and full size" : s.full ? "full size" : "previews";
+    const share = (b) => (s.total ? Math.max(b ? 2 : 0, Math.round(b / s.total * 100)) : 0);
+    const legend = (cls, label, value) => el("div", { class: "saved-row" },
+      el("span", { class: "saved-key " + cls, "aria-hidden": "true" }),
+      el("span", { class: "saved-label" + (cls === "missing" ? " warn" : "") }, label),
+      value ? el("span", { class: "saved-value" }, value) : null);
+    const lean = s.known && kept && s.pictures > s.text * 2;
+    return el("div", { class: "saved-view" },
+      el("div", { class: "saved-head" },
+        el("span", { class: "saved-title" }, "What's saved"),
+        el("span", { class: "saved-value" }, formatSize(s.total))),
+      s.known && s.total ? el("div", { class: "saved-bar", "aria-hidden": "true" },
+        el("span", { class: "pics", style: "width: " + share(s.pictures) + "%" }),
+        el("span", { class: "text", style: "width: " + share(s.text) + "%" })) : null,
+      kept ? legend("pics", "Pictures, " + what + " · " + kept, s.known ? formatSize(s.pictures) : "") : null,
+      legend("text", "Text and pages", s.known ? formatSize(s.text) : ""),
+      s.links ? legend("links", "Pictures as links · " + s.links + ", need a connection", "") : null,
+      s.missing ? legend("missing", s.missing + (s.missing === 1 ? " preview" : " previews") + " missing, shown online", "") : null,
+      !s.known ? el("p", { class: "footnote" }, C.platform.native ? "Measuring the pictures…" : "Picture sizes show for pages saved from 0.27.11 on.")
+        : lean ? el("p", { class: "footnote" }, "Most of it is pictures. Save again with Links to keep only the text, about " + formatSize(s.text) + ".") : null);
+  }
+
+  // Pages saved before 0.27.11 have their pictures measured from their
+  // files, once, the first time What's saved is shown for them.
+  const measured = new Set();
+  async function measureSizes(list, then) {
+    if (!C.platform.native) return;
+    const todo = list.filter((p) => p.imageBytes == null && p.images && p.mode !== "links" && !measured.has(p.id));
+    if (!todo.length) return;
+    let changed = false;
+    for (const p of todo) {
+      measured.add(p.id);
+      try {
+        const files = await C.store.listSized(p.id);
+        if (!files.length || files.some((f) => f.size == null)) continue;
+        p.imageBytes = files.filter((f) => f.rel.startsWith("images/")).reduce((sum, f) => sum + f.size, 0);
+        changed = true;
+      } catch (e) { /* stays unknown */ }
+    }
+    if (!changed) return;
+    await C.store.writeIndex(state.pages);
+    then();
+  }
+
+  // The collection's What's saved sheet: the breakdown, and saving it all
+  // again with pictures another way.
+  function savedSheet() {
+    const name = state.folder;
+    const list = folderPages(name);
+    const n = list.length;
+    let mode = load(IMAGES_KEY, "previews");
+    const s = savedParts(list);
+    const note = el("p", { class: "footnote" });
+    const paintNote = () => {
+      note.textContent = (mode === "links" && s.known ? "Links keeps the text only, about " + formatSize(s.text) + ". " : "") + "Your place in each " + chapterWord(list, 1) + " stays.";
+    };
+    paintNote();
+    const go = el("button", { class: "btn-primary refresh-go", type: "button", onclick: () => back().then(() => refreshFolder(name, mode, go)) },
+      "Save " + n + " " + chapterWord(list, n) + " again");
+    go.disabled = !list.some((p) => /^https?:/.test(p.url || "")) || !!runFor(name);
+    measureSizes(list, () => { if (state.menu && state.menu.kind === "saved") redrawMenu(); if (state.folder) renderFolder(); });
+    return el("div", { class: "page-controls saved-sheet" },
+      savedView(list),
+      C.platform.native ? el("h2", { class: "overline" }, "Save again with pictures as") : el("h2", { class: "overline" }, "Save again"),
+      C.platform.native ? seg("refresh-images", "Pictures", [
+        { value: "previews", label: "Previews" }, { value: "full", label: "Full" }, { value: "links", label: "Links" },
+      ], mode, (v) => { mode = v; paintNote(); }) : null,
+      note,
+      go);
+  }
+
+  function removeSheet() {
+    const list = folderPages(state.folder);
+    const n = list.length;
+    return el("div", { class: "page-controls remove-sheet" },
+      el("div", { class: "menu-head" },
+        el("p", { class: "menu-title", dir: "auto" }, "Remove “" + state.folder + "”?"),
+        el("p", { class: "meta" }, countLine(n) + " · " + formatSize(sizeOf(list)))),
+      el("button", { class: "sheet-row", type: "button", onclick: () => removeFolder(false) }, "Remove the collection, keep its " + countLine(n)),
+      el("button", { class: "sheet-row danger", type: "button", onclick: () => removeFolder(true) }, "Delete the collection and its " + countLine(n)),
+      el("button", { class: "btn-text menu-cancel", type: "button", onclick: () => history.back() }, "Cancel"));
   }
 
   // Takes the folder off its pages, or deletes them with it (asked once
@@ -2185,7 +2532,7 @@
     if (withPages) state.pages = state.pages.filter((p) => !list.includes(p));
     await C.store.writeIndex(state.pages);
     folderMode = "";
-    history.back();
+    await back(state.menu ? 2 : 1);
     renderLibrary();
     toast(withPages ? "Deleted " + name + " and its " + countLine(list.length) : "Removed " + name + ". Its pages are in the library.");
   }
@@ -2206,6 +2553,7 @@
     select: '<circle cx="12" cy="12" r="8.5"/><path d="M8.5 12.2l2.4 2.4 4.6-5"/>',
     reorder: '<path d="M8 4v16M4.5 7.5L8 4l3.5 3.5M16 20V4M12.5 16.5L16 20l3.5-3.5"/>',
     rename: '<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
+    saved: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
     book: '<path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5zM5 19.5A1.5 1.5 0 0 0 6.5 21H19"/>',
     chapters: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 5.5v2M4.5 11.5v1M4 17h1.5l-1.5 2h1.5"/>',
     remove: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>',
@@ -2407,6 +2755,8 @@
     page: { label: "Page", build: () => pageSheet(state.menu.page, "library") },
     tags: { label: "Tags", build: tagsSheet },
     folder: { label: "Collection", build: folderSheet },
+    saved: { label: "What's saved", build: savedSheet },
+    remove: { label: "Remove collection", build: removeSheet },
   };
   let menuUnder = [];
 
@@ -2748,6 +3098,7 @@
     } catch (e) { res = null; }
     if (!res) { btn.disabled = false; label.textContent = "Save full images"; toast("Couldn't open this page's file. Try again."); return; }
     Object.assign(p, { mode: "full", missing: res.missing, bytes: Math.max(0, (p.bytes || 0) + res.bytes) });
+    if (p.imageBytes != null) p.imageBytes = Math.max(0, p.imageBytes + res.bytes);
     await C.store.writeIndex(state.pages);
     renderLibrary();
     toast(res.failed ? "Saved " + res.got + " full images. " + res.failed + " kept their previews." : "Full images saved.");
@@ -3225,14 +3576,12 @@
   // Everything about a series in one place: new chapters, saving earlier
   // or later ones, the story page it's linked to, and saving the saved
   // ones again.
-  function chaptersPanel(list, done) {
+  function chaptersPanel(list) {
     const rows = [checkRow(list), followControls(list[0], true), followControls(list[list.length - 1])].filter(Boolean);
     return el("div", { class: "folder-actions chapters-panel" },
       rows.length ? el("div", { class: "chapter-tools" }, ...rows)
         : el("p", { class: "meta" }, "These pages don't link to each other, so there's nothing to look for. Link the collection to its story page below."),
-      sourceSection(list),
-      refreshSection(list),
-      el("button", { class: "btn-primary chapters-done", type: "button", onclick: done }, "Done"));
+      sourceSection(list));
   }
 
   function sourceSection(list) {
@@ -3298,21 +3647,7 @@
 
   // Saves the folder's pages again where they are, to switch their
   // pictures or pick up an author's edits; each keeps its place, tags
-  // and read position.
-  function refreshSection(list) {
-    let mode = load(IMAGES_KEY, "previews");
-    const go = el("button", { class: "btn-quiet refresh-go", type: "button", onclick: () => refreshFolder(state.folder, mode, go) },
-      "Save " + countLine(list.length) + " again");
-    go.disabled = !list.some((p) => /^https?:/.test(p.url || "")) || !!runFor(state.folder);
-    return el("section", { class: "settings-section refresh-section" },
-      el("h2", { class: "overline" }, "Save again"),
-      C.platform.native ? seg("refresh-images", "Images", [
-        { value: "previews", label: "Previews" }, { value: "full", label: "Full" }, { value: "links", label: "Links" },
-      ], mode, (v) => { mode = v; }) : null,
-      el("p", { class: "footnote" }, "Downloads the saved pages again, to switch their pictures or pick up the author's edits. Your place in each stays."),
-      go);
-  }
-
+  // and read position. Started from What's saved.
   // Each page is a job that knows the page it replaces, in a run of its
   // own, so it shows in Downloads with Pause and Stop like any other.
   async function refreshFolder(name, mode, btn) {
@@ -3372,19 +3707,22 @@
     return found;
   }
 
-  async function renameFolder() {
+  // Renamed in place on the book page; the new-chapters entry follows.
+  async function renameFolder(raw) {
     const old = state.folder;
-    const raw = prompt("Rename “" + old + "”", old);
-    const name = raw && cleanTag(raw);
-    if (!name || name === old) return;
+    const name = cleanTag(raw || "");
+    if (!name) { toast("Type a name for the collection."); return false; }
+    if (name === old) return true;
     const clash = allFolders().find((n) => sameTag(n, name) && !sameTag(n, old));
-    if (clash) { toast("There's already a collection called " + clash + "."); return; }
+    if (clash) { toast("There's already a collection called " + clash + "."); return false; }
     for (const p of folderPages(old)) p.folder = name;
+    const entry = newFor(old);
+    if (entry && !sameTag(old, name)) { setNewFor(name, entry); setNewFor(old, null); }
     await C.store.writeIndex(state.pages);
     state.folder = name;
     history.replaceState({ view: "folder", folder: name }, "");
-    renderFolder();
     renderLibrary();
+    return true;
   }
 
   // ---- Settings ----
@@ -3513,9 +3851,15 @@
       const open = storageOpen.has(g.key);
       const pages = el("div", { class: "storage-pages", id: "storage-" + g.key.replace(/[^\w-]/g, "_") });
       pages.hidden = !open;
+      if (open) {
+        pages.append(savedView(g.pages));
+        measureSizes(g.pages, remeasured);
+      }
       for (const p of [...g.pages].sort(bySize)) {
         pages.append(el("button", { class: "row", type: "button", onclick: () => toLibrary().then(() => openPage(p.id)) },
-          el("span", { class: "row-label", dir: "auto" }, p.title),
+          el("span", { class: "choice-text" },
+            el("span", { class: "row-label", dir: "auto" }, p.title),
+            el("span", { class: "choice-note" + (p.missing && p.mode !== "links" ? " warn" : "") }, savedNote(p))),
           el("span", { class: "row-value" }, formatSize(p.bytes || 0))));
       }
       const head = el("button", { class: "row storage-folder" + (g.loose ? " loose" : ""), type: "button", "aria-expanded": String(open), "aria-controls": pages.id,
@@ -3524,6 +3868,10 @@
           if (now) storageOpen.add(g.key); else storageOpen.delete(g.key);
           head.setAttribute("aria-expanded", String(now));
           pages.hidden = !now;
+          if (now && !pages.querySelector(".saved-view")) {
+            pages.prepend(savedView(g.pages));
+            measureSizes(g.pages, remeasured);
+          }
         } },
         el("span", { class: "choice-text" },
           el("span", { class: "choice-label", dir: "auto" }, g.name),
@@ -3538,6 +3886,8 @@
       el("h2", { class: "overline" }, "By collection"),
       list);
   }
+
+  const remeasured = () => { if (state.section === "storage") renderSection(); };
 
   function aboutGroup() {
     const list = el("div", { class: "group" });
@@ -3701,6 +4051,18 @@
   longPress($("folderBody"));
   $("settingsBack").addEventListener("click", () => history.back());
   $("folderBack").addEventListener("click", () => history.back());
+  $("folderMore").addEventListener("click", openFolderMenu);
+  $("folderCancel").addEventListener("click", () => setFolderMode(""));
+  $("folderDone").addEventListener("click", async () => {
+    if (folderMode === "rename" && !(await renameFolder($("folderBody").querySelector(".book-title-input").value))) return;
+    setFolderMode("");
+  });
+  $("folderBody").addEventListener("scroll", paintFolderTitle, { passive: true });
+  // Escape steps out of Reorder, the story page or Export; Rename's field
+  // handles its own.
+  $("folderView").addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !e.defaultPrevented && folderMode && !state.menu && !state.select) { e.preventDefault(); setFolderMode(""); }
+  });
   $("batchBack").addEventListener("click", () => history.back());
   // What's typed in the save field comes along, so one link can be saved
   // as a comic or with other images.

@@ -24,21 +24,6 @@ asks from Daniel.
 
 ---
 
-## Collection screen rework (Daniel, 4 Oct 2026)
-
-Three directions are on the design canvas ("Collection screen rework, 4
-Oct"): a book page with the cover over the chapters, Chapters and About
-tabs, or the list first with Continue along the bottom. Waiting on
-Daniel's pick. Whichever wins:
-
-- **What's saved:** what the collection's size is made of: pictures
-  kept as previews or full (count and size), the text, and pictures
-  kept as links that need a connection. Pages saved from now on record
-  their pictures' bytes (`imageBytes`); older pages get it from the
-  files on the phone once.
-- The seven action tiles go: the actions that aren't reading move
-  into a ⋯ menu in the screen's bar.
-
 ## Rename to Offprint (Daniel, 4 Oct 2026)
 
 The app becomes **Offprint**, store title "Offprint: Offline Reader". An
@@ -108,7 +93,12 @@ Carry-on rather than a preview of the app: what works without the
 phone's native fetch (CORS stops most sites, so saving needs the
 stateless server PROPOSAL.md allows, or saving stays app-only and the
 browser reads what sync brings), install as a PWA, and storage limits
-(IndexedDB quota, eviction). Decide the server question first.
+(IndexedDB quota, eviction).
+
+**Decided (Daniel, 4 Oct 2026): no server.** The browser reads
+everything, saves Wikipedia (its API allows CORS), and gets other pages
+from the phone through a backup file (later sync). A fetch worker or a
+browser extension can come later.
 
 ## RSS feeds (Daniel, 3 Oct 2026)
 

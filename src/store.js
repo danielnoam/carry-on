@@ -184,8 +184,9 @@
   // ---- Files for export and backup (0.18.0) ----
 
   // Every file in a page's directory, as paths inside it ("page.html",
-  // "images/0s.jpg"). Empty in a browser.
-  async function listFiles(id) {
+  // "images/0s.jpg"), with their sizes where the phone says. Empty in a
+  // browser.
+  async function listSized(id) {
     if (!FS()) return [];
     const out = [];
     async function walk(dir) {
@@ -195,12 +196,13 @@
         const name = typeof f === "string" ? f : f.name;
         const rel = (dir ? dir + "/" : "") + name;
         if (f.type === "directory") await walk(rel);
-        else out.push(rel);
+        else out.push({ rel, size: typeof f.size === "number" ? f.size : null });
       }
     }
     await walk("");
     return out;
   }
+  const listFiles = async (id) => (await listSized(id)).map((f) => f.rel);
 
   // A file in a page's directory as bytes, read through the WebView's own
   // file server like an image is.
@@ -236,5 +238,5 @@
   }
 
   window.CarryOn.store = { ready, readIndex, writeIndex, writePage, readPage, removePage, writeText, readText, download, removeFile, shrink, pageDirUrl, bytesOf,
-    listFiles, readBytes, writeBytes, cacheFile, toBase64 };
+    listFiles, listSized, readBytes, writeBytes, cacheFile, toBase64 };
 })();

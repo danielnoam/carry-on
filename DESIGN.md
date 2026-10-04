@@ -215,12 +215,18 @@ and the page shows above it.
   footnote saying what a backup holds and that the copy saved last wins.
   The result is a toast, such as "Restored 12 pages. 3 already here were
   kept."
-- **Collection screen (Now):** pushed like Settings. The count, the
-  collection's tools, a full-width primary button to carry on, Save
-  previous, then the pages as a numbered group (the next one's number in
-  the accent), then, for a series, "New chapters" (what the last check
-  found and when, in the accent when there are some, and a Check chip),
-  then Save next.
+- **Collection screen (Now, a book page since 0.27.11):** pushed like
+  Settings, the bar holding only back and ⋯ (its hairline and the
+  collection's name fade in once the title scrolls away). Then the book's
+  head: a 2:3 cover (104 px; its story page's picture, else drawn: an
+  accent rule, the name in the serif, the site), beside it "site ·
+  Collection", the name in the serif at `--fs-screen`, "12 of 42 read ·
+  4 h 10 min left" and a 4 px progress bar. Then Continue as the primary
+  button, "Save N new chapters" as a quiet button when the check found
+  some, and a 44 px line "31 MB · pictures as previews · What's saved"
+  (the last words in the accent) that opens the What's saved sheet. Then
+  "Chapters · N" over the numbered group, each row ending in a tick
+  (`--ok`) once read or an accent ring filled as far as it's read.
 - **Next in a collection (Now):** at the end of the page, after the licence,
   a bordered block "Next in Novel" over the title in the accent serif. In
   ⋯, Previous and Next side by side, dimmed when there's none.
@@ -274,19 +280,39 @@ and the page shows above it.
   a text match adds its sentence in muted meta type under the title,
   two lines at most. None found: "Nothing matches “…”." (with " in
   Finished" and the like when a filter is on) and Clear search.
-- **Collection screen tools (Now):** above the pages, the page sheet's tiles
-  (64 px, accent icon over the label) four to a row on a phone and
-  seven in one row from 600 px: Add pages, Chapters (with the "N new"
-  pill), Select, Reorder (dimmed with one page), Rename, Export, Remove
-  (icon and label in the warn colour). A collection linked to its story
-  page shows a book icon in place of the collection glyph, on its
-  header and its tile.
-- **Chapters panel (Now, 0.26.0):** in place of the tools: the check
-  row with "Save N" when there are new chapters, Save previous and
-  Save next, then "Story page" (a 44 px link field, Link or Change,
-  Unlink), then "Save again" (Previews, Full, Links as a segmented
-  control and a quiet "Save 12 pages again"), then Done as the primary
-  button.
+- **Collection ⋯ menu (Now, 0.27.11):** a popover under ⋯ (248 px,
+  `--surface`, `--line` border, the soft shadow, 48 px rows with an accent
+  icon): What's saved (its size), Story page ("N new" in the accent), Add
+  pages; a hairline; Rename, Reorder (dimmed with one page), Select,
+  Export; a hairline; Remove in the warn colour. Arrow keys, Home and End
+  move through it, Escape or a tap outside closes it. A collection linked
+  to its story page shows a book icon in the bar and on its tile.
+- **Editing a collection (Now, 0.27.11):** Rename, Reorder, Story page
+  and Export take the screen over in place; the bar shows the mode's name
+  with Done (Rename: Cancel and Save) and Escape steps out. Rename turns
+  the title into a 2 px accent field, focused, with "Renames the
+  collection on all N of its pages" under it. Reorder folds the head
+  away for a hint and Sort by chapter, and each row gets up and down
+  arrows (44 px, for keyboards and screen readers) and a drag handle;
+  the lifted row takes the soft shadow and the others slide aside on the
+  control spring (none with reduced motion).
+- **Story page (Now, 0.26.0, was the Chapters panel):** over the
+  chapters: the check row with "Save N" when there are new chapters,
+  Save previous and Save next, then "Story page" (a 44 px link field,
+  Link or Change, Unlink).
+- **What's saved (Now, 0.27.11):** a bordered `--surface` box: "What's
+  saved" and the size, an 8 px bar of pictures (accent) and text (accent
+  mixed 40% into `--line`), then a legend of 8 px keys: pictures kept and
+  their size, text and pages, pictures kept as links (an outlined key,
+  "need a connection"), missing previews (warn). When pictures are more
+  than twice the text, a footnote says how small Links would make it.
+  The collection's sheet adds "Save again with pictures as" (Previews,
+  Full, Links) and "Save 42 chapters again"; Storage shows the box when
+  a collection opens, and each page's row says what it keeps ("12
+  previews · 3 links").
+- **Remove a collection (Now, 0.27.11):** a sheet: "Remove “…”?", the
+  count and size, "Remove the collection, keep its N pages", "Delete the
+  collection and its N pages" (warn, confirmed once more), Cancel.
 - **Collection Export (Now, 0.26.0):** the page sheet's Export with the
   collection's name as its title: PDF, HTML, EPUB (picked first) and
   Markdown, no page source.

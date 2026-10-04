@@ -3,6 +3,20 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **A collection is a book page (0.27.11).** Daniel picked it from three
+  drawn options: the seven tiles above the chapters read as a toolbox,
+  not a book. Its tools went into a ⋯ popover rather than a sheet,
+  since every entry leads somewhere else. Rename, Reorder, Story page and
+  Export stay in-place modes of the screen (no history entry), with the
+  bar's Cancel, Save or Done, so Back still means leave the collection.
+  Dragging uses pointer events on the handle alone, with `touch-action:
+  none` there and nowhere else, so the list still scrolls; the arrows
+  stay for keyboards and screen readers and the handle is hidden from
+  them. What's saved needs pictures apart from the rest: saving records
+  `imageBytes` from the bytes it already counted, and pages saved before
+  are measured once from their `images/` files (readdir's sizes) when
+  What's saved first shows them. In a browser pictures are always links,
+  so nothing there needs measuring.
 - **Search behind its button, Select beside Order (0.27.10).** Daniel:
   the field needn't always show now the bar has a Search button, and
   Select didn't belong with the app's places (Search, Downloads,

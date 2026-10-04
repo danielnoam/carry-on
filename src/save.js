@@ -1282,7 +1282,8 @@
     if (got.comic) Object.assign(meta, { comic: true, minutes: Math.max(1, Math.round(media.length / 10)) });
     if (onProgress) onProgress({ stage: "images", done: 0, total: media.length });
     const res = await saveImages(id, media, mode, (done, total) => onProgress && onProgress({ stage: "images", done, total }), got.url);
-    Object.assign(meta, { images: res.total, missing: res.missing, thumb: res.thumb });
+    // imageBytes (0.27.11) splits a page's size into its pictures and the rest.
+    Object.assign(meta, { images: res.total, missing: res.missing, thumb: res.thumb, imageBytes: res.bytes });
     const icon = await keepIcon(id, got.icon || new URL("/favicon.ico", got.url).href, got.url);
     if (icon.icon) meta.icon = icon.icon;
     const html = savedPageHtml(meta, root, out);
