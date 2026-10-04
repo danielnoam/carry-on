@@ -107,12 +107,14 @@ and the page shows above it.
 ## 5. Components
 
 - **Library (Now, 0.27.7):** a bar that stays while the list scrolls
-  under it: the title, then Search (a magnifier, which goes up to the
-  field and focuses it), Select (a tick in a circle), Downloads (an
-  arrow into a tray, 0.27.9) and Settings (a gear), 44 px icons; a hairline under the bar once the list is under it. Above
+  under it: the title, then Search (a magnifier, which opens the field
+  under the bar and focuses it; `--line` behind it while open, 0.27.10),
+  Downloads (an arrow into a tray, 0.27.9) and Settings (a gear), 44 px
+  icons; a hairline under the bar once the list is under it. Above
   the bar `--s-5` scrolls away (on the phone, the safe area instead).
-  Under it, scrolling away: the count, search (always open), then Show
-  and Order, two dropdowns on one row: Show on the start side (a lines
+  Under it, scrolling away: the count, search (only once opened, and
+  while something is typed in it), then Show and Order on one row, with
+  Select (a text button, 0.27.10) after Order: Show on the start side (a lines
   icon, "All pages", "Unread", "Finished", then a "Tags" overline and the
   #tags; anything but All shows in `--accent`, semibold) and Order on the
   end side ("Newest saved", "Last read", "Longest", "Site", an arrows

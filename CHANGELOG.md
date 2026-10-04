@@ -2,6 +2,15 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.27.10] - 2026-10-04
+
+### Changed
+- Search stays out of the way until you tap its button in the bar. It
+  stays open while something is typed in it, and a second tap or Escape
+  puts it away.
+- Select moved out of the bar to beside Order, with the other tools for
+  the list.
+
 ## [0.27.9] - 2026-10-04
 
 ### Added

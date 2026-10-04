@@ -3,6 +3,12 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Search behind its button, Select beside Order (0.27.10).** Daniel:
+  the field needn't always show now the bar has a Search button, and
+  Select didn't belong with the app's places (Search, Downloads,
+  Settings). Select acts on the list, so it sits with Show and Order. The
+  field closes when it loses focus empty, not on every blur, so a typed
+  search survives scrolling and opening a page.
 - **Downloads, and saving in the background (0.27.9).** Daniel asked for
   saving to move out of the library into a screen of its own and to keep
   going with the app closed or the phone locked. The TODO thought that

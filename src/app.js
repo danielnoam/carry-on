@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.27.9";
+  const APP_VERSION = "0.27.10";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -761,6 +761,27 @@
     onSearch();
   }
 
+  // Search shows when its button is tapped, and stays while something is
+  // typed in it; empty, it goes away again (0.27.10).
+  let searchOpen = false;
+  function paintSearch() {
+    const on = !!state.pages.length && (searchOpen || !!state.query);
+    $("searchBox").hidden = !on;
+    $("searchBtn").setAttribute("aria-expanded", String(on));
+    $("searchBtn").classList.toggle("on", on);
+  }
+  function openSearch() {
+    searchOpen = true;
+    paintSearch();
+    window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    $("librarySearch").focus({ preventScroll: true });
+  }
+  function closeSearch() {
+    if (state.query) clearSearch();
+    searchOpen = false;
+    paintSearch();
+  }
+
   // ---- Filters and order ----
 
   const unread = (p) => !p.finished && !(p.at > 0.02);
@@ -798,8 +819,12 @@
         ...(tags.length ? [{ head: "Tags" }, ...tags.map((t) => ({ value: "#" + t, label: "#" + t }))] : [])],
       value: state.filter,
       onpick: setFilter,
-    }), sortControl());
+    }), el("div", { class: "lib-tools-end" }, sortControl(), selectBtn));
   }
+
+  // Select sits with Show and Order, the tools for the list, rather than
+  // in the bar with the app's places (0.27.10).
+  const selectBtn = el("button", { class: "btn-text select-btn", id: "selectBtn", type: "button", onclick: () => startSelect([]) }, "Select");
 
   const SORTS = [["saved", "Newest saved"], ["read", "Last read"], ["length", "Longest"], ["site", "Site"]];
   const BY = {
@@ -943,7 +968,8 @@
       && !allTags().some((t) => sameTag(t, state.filter.slice(1)))) { state.filter = "all"; store(FILTER_KEY, "all"); }
     renderTools();
     $("libraryMeta").textContent = n ? pagesLine(n) : "Nothing saved yet";
-    $("searchBox").hidden = $("searchBtn").hidden = $("selectBtn").hidden = !n;
+    $("searchBtn").hidden = !n;
+    paintSearch();
     const how = layout();
     $("libraryView").dataset.layout = how;
     const nodes = [];
@@ -3653,12 +3679,14 @@
   // The notification's Stop (Android) stops every run.
   C.platform.downloads.onStop(() => { for (const r of [...runs]) stopRun(r); });
   $("sectionBack").addEventListener("click", () => history.back());
-  $("selectBtn").addEventListener("click", () => startSelect([]));
-  // Search sits in the bar that stays, so it's there from anywhere in the list.
+  // Search's button sits in the bar that stays, so it's there from anywhere
+  // in the list. A second tap, with the field empty or in view, puts it away.
   $("searchBtn").addEventListener("click", () => {
-    window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
-    $("librarySearch").focus({ preventScroll: true });
+    const box = $("searchBox");
+    if (!box.hidden && (!state.query || box.getBoundingClientRect().bottom > $("topBar").offsetHeight)) closeSearch();
+    else openSearch();
   });
+  $("librarySearch").addEventListener("blur", () => { if (!state.query) { searchOpen = false; setTimeout(paintSearch, 150); } });
   // The bar gets its hairline once the list scrolls under it.
   const topBar = $("topBar");
   addEventListener("scroll", () => topBar.classList.toggle("scrolled", scrollY > 0), { passive: true });
@@ -3682,6 +3710,7 @@
     if (e.key !== "Escape") return;
     e.preventDefault();
     if (state.query) clearSearch();
+    else { closeSearch(); $("searchBtn").focus(); }
   });
   $("searchClear").addEventListener("click", () => { clearSearch(); $("librarySearch").focus(); });
   $("newsBack").addEventListener("click", () => history.back());
