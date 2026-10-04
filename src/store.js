@@ -2,8 +2,10 @@
 // data directory, `pages/<id>/` with page.html, meta.json and images/, plus
 // library.json listing them (docs/PROPOSAL.md, "Store and read").
 //
-// In a browser there is no directory: page.html goes to IndexedDB and the
-// index to localStorage, and images stay links (downloadTo returns null).
+// In a browser there is no directory: page.html, the index and a page's
+// card picture go to IndexedDB (the index was in localStorage before
+// 0.27.12), and a saved page's pictures are inside its HTML as data:
+// URLs. Pages saved in the browser keep images as links.
 (function () {
   const P = window.CarryOn.platform;
   const FS = () => P.plugin("Filesystem");
@@ -42,6 +44,10 @@
     });
   }
 
+  // In a browser the index moved from localStorage (about 5 MB, which a
+  // phone's backup can outgrow) to IndexedDB in 0.27.12; localStorage is
+  // read until the first write, and is the fallback where IndexedDB fails.
+  const IDB_INDEX = "__library";
   async function readIndex() {
     if (FS()) {
       try {
@@ -49,6 +55,10 @@
         return JSON.parse(data);
       } catch (e) { return []; }
     }
+    try {
+      const text = await idbDo("readonly", (s) => s.get(IDB_INDEX));
+      if (typeof text === "string") return JSON.parse(text);
+    } catch (e) { /* fall back */ }
     try { return JSON.parse(localStorage.getItem(INDEX_KEY)) || []; } catch (e) { return []; }
   }
 
@@ -58,7 +68,57 @@
       await FS().writeFile({ path: "library.json", data: text, directory: DIR, encoding: "utf8" });
       return;
     }
-    try { localStorage.setItem(INDEX_KEY, text); } catch (e) { /* not kept */ }
+    try {
+      await idbDo("readwrite", (s) => s.put(text, IDB_INDEX));
+      try { localStorage.removeItem(INDEX_KEY); } catch (e) { /* nothing there */ }
+    } catch (e) {
+      try { localStorage.setItem(INDEX_KEY, text); } catch (e2) { /* not kept */ }
+    }
+  }
+
+  // A browser's card pictures, as data: URLs kept beside the pages, since
+  // there's no directory to point at. All of them at once, for the library.
+  async function writeThumb(id, url) {
+    if (!FS()) await idbDo("readwrite", (s) => s.put(url, id + ":thumb"));
+  }
+  async function readThumbs() {
+    if (FS()) return new Map();
+    try {
+      const db = await idb();
+      return await new Promise((resolve) => {
+        const out = new Map();
+        const store = db.transaction("pages").objectStore("pages");
+        const keys = store.getAllKeys(IDBKeyRange.bound("", "\uffff"));
+        keys.onsuccess = () => {
+          const want = keys.result.filter((k) => typeof k === "string" && k.endsWith(":thumb"));
+          if (!want.length) { db.close(); resolve(out); return; }
+          let left = want.length;
+          for (const k of want) {
+            const r = store.get(k);
+            r.onsuccess = r.onerror = () => {
+              if (typeof r.result === "string") out.set(k.slice(0, -6), r.result);
+              if (!--left) { db.close(); resolve(out); }
+            };
+          }
+        };
+        keys.onerror = () => { db.close(); resolve(out); };
+      });
+    } catch (e) { return new Map(); }
+  }
+
+  // How much a browser keeps, and whether it may clear it when space is
+  // short. null in the app, whose pages are files.
+  async function storageInfo() {
+    if (FS() || !navigator.storage || !navigator.storage.estimate) return null;
+    try {
+      const { usage, quota } = await navigator.storage.estimate();
+      const kept = navigator.storage.persisted ? await navigator.storage.persisted() : false;
+      return { usage: usage || 0, quota: quota || 0, kept };
+    } catch (e) { return null; }
+  }
+  async function keepStored() {
+    if (FS() || !navigator.storage || !navigator.storage.persist) return false;
+    try { return await navigator.storage.persist(); } catch (e) { return false; }
   }
 
   async function writePage(id, html, meta) {
@@ -85,7 +145,7 @@
       try { await FS().rmdir({ path: "pages/" + id, directory: DIR, recursive: true }); } catch (e) { /* already gone */ }
       return;
     }
-    try { await idbDo("readwrite", (s) => { s.delete(id + ":text"); return s.delete(id); }); } catch (e) { /* already gone */ }
+    try { await idbDo("readwrite", (s) => { s.delete(id + ":text"); s.delete(id + ":thumb"); return s.delete(id); }); } catch (e) { /* already gone */ }
   }
 
   // The page's words as plain text (text.txt), for searching the library.
@@ -237,6 +297,6 @@
     return dataUrl ? dataUrl + "pages/" + id + "/" : null;
   }
 
-  window.CarryOn.store = { ready, readIndex, writeIndex, writePage, readPage, removePage, writeText, readText, download, removeFile, shrink, pageDirUrl, bytesOf,
+  window.CarryOn.store = { ready, readIndex, writeIndex, writeThumb, readThumbs, storageInfo, keepStored, writePage, readPage, removePage, writeText, readText, download, removeFile, shrink, pageDirUrl, bytesOf,
     listFiles, listSized, readBytes, writeBytes, cacheFile, toBase64 };
 })();

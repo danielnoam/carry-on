@@ -716,7 +716,7 @@
       if (/time(d)?\s?out/i.test((e && e.message) || "")) throw new SaveError("The site didn't answer. Try again, or later on a better connection.");
       throw new SaveError(C.platform.canFetchPages
         ? "Couldn't reach this page. Check the link, or try again when you're online."
-        : "This browser can't fetch that site directly. Save it from the Carry-on app.");
+        : "This browser can't reach that site directly. Save it in Carry-on on your phone, then bring it here with a backup.");
     }
     if (res.status === 429) throw new SaveError("The site asked to slow down. Try again in a few minutes.");
     if (res.status === 404 || res.status === 410) throw new SaveError("That page doesn't exist any more. Check the link.");

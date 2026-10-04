@@ -2,6 +2,22 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.27.12] - 2026-10-04
+
+### Changed
+- The web copy is a reader of its own. Open a backup from your phone and
+  its pages read here with their pictures, offline. In a browser,
+  Wikipedia saves directly; other sites say to save on the phone and
+  bring the page over with a backup.
+- A browser keeps the library in IndexedDB instead of localStorage, which
+  held only about 5 MB.
+
+### Added
+- Install Carry-on from About, where the browser offers it (on an iPhone,
+  About says how: Share, then Add to Home Screen).
+- Storage in a browser shows the space used and asks the browser to keep
+  your pages rather than clear them when space runs low.
+
 ## [0.27.11] - 2026-10-04
 
 ### Changed

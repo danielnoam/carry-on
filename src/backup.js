@@ -30,6 +30,7 @@
       at: Math.min(1, Math.max(0, num(m.at))), finished: m.finished === true,
     };
     if (num(m.readAt)) out.readAt = num(m.readAt);
+    if (typeof m.imageBytes === "number" && m.imageBytes >= 0) out.imageBytes = num(m.imageBytes);
     if (m.comic === true) out.comic = true;
     if (typeof m.next === "string") out.next = httpUrl(m.next);
     if (typeof m.prev === "string") out.prev = httpUrl(m.prev);
@@ -227,8 +228,18 @@
     const prefix = "pages/" + from + "/";
     const html = entries.get(prefix + "page.html");
     if (!C.platform.native) {
-      const page = new TextDecoder().decode(await zipRead(blob, html));
+      let page = new TextDecoder().decode(await zipRead(blob, html));
+      // A browser has nowhere to put the pictures, so they go into the page.
+      const pics = new Map();
+      for (const [name, e] of entries) {
+        if (!name.startsWith(prefix + "images/")) continue;
+        const rel = name.slice(prefix.length);
+        const bytes = await zipRead(blob, e);
+        pics.set(rel, dataUrl(bytes, imageType(bytes) || (/\.svg$/i.test(rel) ? "image/svg+xml" : "image/jpeg")));
+      }
+      if (pics.size) page = page.replace(/(\s(?:src|poster)=")(images\/[^"]+)"/g, (m, at, rel) => (pics.has(rel) ? at + pics.get(rel) + '"' : m));
       await S().writePage(meta.id, page, meta);
+      if (meta.thumb && pics.has(meta.thumb)) await S().writeThumb(meta.id, pics.get(meta.thumb));
       const words = entries.get(prefix + "text.txt");
       if (words) await S().writeText(meta.id, new TextDecoder().decode(await zipRead(blob, words)));
       return;
@@ -449,7 +460,11 @@
     for (const [i, im] of images.entries()) {
       const [head, b64] = im.data.split(",");
       const ext = (head.match(/image\/(\w+)/) || [])[1].replace("jpeg", "jpg");
-      if (!C.platform.native) { im.el.setAttribute("src", im.data); continue; }
+      if (!C.platform.native) {
+        im.el.setAttribute("src", im.data);
+        if (!thumb && !im.el.closest(".co-video")) { thumb = "images/" + i + "." + ext; await S().writeThumb(id, im.data); }
+        continue;
+      }
       const bin = Uint8Array.from(atob(b64.replace(/\s+/g, "")), (c) => c.charCodeAt(0));
       const rel = "images/" + i + "." + ext;
       await S().writeBytes(id, rel, bin);
