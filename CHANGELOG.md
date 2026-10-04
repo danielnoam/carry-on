@@ -2,6 +2,22 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.28.2] - 2026-10-04
+
+### Added
+- Swipe right in the library or Feeds to open the sidebar.
+- Pull down at the top to check for what's new: Feeds checks its feeds,
+  the library checks collections that follow a series for new chapters.
+- Hold a feed (its chip or its row in the sidebar) for its settings and
+  Check now.
+
+### Changed
+- A collection with new chapters shows "+2" on its cover.
+- Tapping the next chapter at the end of a page turns to it with a
+  slide.
+- The Add a feed chip is gone from Feeds; the field at the bottom does
+  that. On a touch screen, Check now gives way to pulling down.
+
 ## [0.28.1] - 2026-10-04
 
 ### Changed

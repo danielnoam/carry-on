@@ -442,10 +442,23 @@ and the page shows above it.
   indented 44 px and 44 px tall. The current one sits on `--bar`,
   semibold. The bar is the same in both places; only its title changes,
   and Feeds drops Search. In Feeds the bottom field reads "Paste a site
-  or feed to follow" with Follow, and the list button goes.
+  or feed to follow" with Follow, and the list button goes. A swipe to
+  the right anywhere in Library or Feeds opens it (0.28.2); holding a
+  feed's row opens its settings.
+- **Pull to check (Now, 0.28.2):** at the top of Library or Feeds, a
+  pull opens a gap over the list (half the finger's travel) with a 24 px
+  ring, `--line` with an `--accent` arc; past 64 px the ring fills in
+  `--accent`, and letting go holds a 48 px gap with the ring spinning
+  while it checks, then closes on the sheet spring. Reduced motion: no
+  spin, the gap closes at once. Feeds checks its feeds, the library its
+  series collections for new chapters ("+2" on the cover, `--accent`).
+- **Page turn (Now, 0.28.2):** the end link's next page: the reader
+  slides 16 % left as it fades (control spring), the next page comes in
+  from 16 % right (sheet spring). Reduced motion: a fade.
 - **Feeds (Now, 0.28.0), one river:** chips per feed, "All · 12" first
-  and "+ Add a feed" last, the picked one filled like any chip; under
-  them "Checked 1 h ago" with Check now (and Settings, for one feed).
+  (following a feed is the bottom field's job since 0.28.2), the picked one filled like any chip; under
+  them "Checked 1 h ago", with Check now for a mouse (pull down on a
+  touch screen). Holding a feed's chip opens its settings (0.28.2).
   Then a day overline per day (Today, Yesterday, a weekday, a date) with
   "Save all 4" at its end when two or more wait, over a group of posts:
   the feed's 32 px mark (site icon or first letter on `--preview`), the

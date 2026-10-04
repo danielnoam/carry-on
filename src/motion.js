@@ -61,6 +61,17 @@
     return run(el, [{ transform: "translateX(0)" }, { transform: "translateX(-100%)" }], "sheet",
       [{ opacity: 1 }, { opacity: 0 }]);
   }
+  // The reader turning to the next page (0.28.2): the page read leaves to
+  // the left and stays hidden until the next one comes in from the right.
+  function pageOut(el) {
+    return run(el, [{ opacity: 1, transform: "none" }, { opacity: 0, transform: "translateX(-16%)" }], "control",
+      [{ opacity: 1 }, { opacity: 0 }]).then(() => { el.style.opacity = "0"; });
+  }
+  function pageIn(el) {
+    el.style.opacity = "";
+    return run(el, [{ opacity: 0, transform: "translateX(16%)" }, { opacity: 1, transform: "none" }], "sheet",
+      [{ opacity: 0 }, { opacity: 1 }]);
+  }
   // Something arriving in a list or a bar: a card, the update bar, a toast.
   function arrive(el, from = 12) {
     return run(el, [{ opacity: 0, transform: "translateY(" + from + "px) scale(0.98)" }, { opacity: 1, transform: "none" }], "sheet",
@@ -80,5 +91,5 @@
   root.setProperty("--spring-control-ms", SPRINGS.control.ms + "ms");
 
   window.CarryOn = window.CarryOn || {};
-  window.CarryOn.motion = { timing, pushIn, popOut, under, rise, sink, slideIn, slideOut, arrive, leave, reduced };
+  window.CarryOn.motion = { timing, pushIn, popOut, under, rise, sink, slideIn, slideOut, pageOut, pageIn, arrive, leave, reduced };
 })();
