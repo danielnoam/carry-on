@@ -108,8 +108,8 @@ and the page shows above it.
 
 - **Library (Now, 0.27.7):** a bar that stays while the list scrolls
   under it: the title, then Search (a magnifier, which goes up to the
-  field and focuses it), Select (a tick in a circle) and Settings (a gear),
-  44 px icons; a hairline under the bar once the list is under it. Above
+  field and focuses it), Select (a tick in a circle), Downloads (an
+  arrow into a tray, 0.27.9) and Settings (a gear), 44 px icons; a hairline under the bar once the list is under it. Above
   the bar `--s-5` scrolls away (on the phone, the safe area instead).
   Under it, scrolling away: the count, search (always open), then Show
   and Order, two dropdowns on one row: Show on the start side (a lines
@@ -235,7 +235,24 @@ and the page shows above it.
   with ×, then an "Add a tag" field dropdown of the rest and "New tag…",
   which opens a field (straight away when there are no tags yet). Then a full-width "Save 4 pages into Novel"
   ("Nothing new to save" when all are skipped). Saving goes back to the
-  library, where two or more go as one run card.
+  library with a toast pointing to Downloads, where two or more go as one
+  run card.
+- **Downloads (Now, 0.27.9):** a screen pushed from the bar's Downloads
+  button, one column of library cards under overlines: "Downloading"
+  (run cards and saving cards), "Couldn't be saved" (failed single
+  pages) and "Done" with a Clear text button (what finished since the
+  app opened, newest first; a page's card opens it, a run's card says
+  "12 pages saved · 5 min ago" or "Stopped" and has Open for its
+  collection). A run's failed pages sit inside its card under a hairline:
+  "2 pages couldn't be saved" in `--warn` with "Try all again", then a
+  row per page (link and reason on two cut lines, Try again, × to
+  remove). Empty: "Nothing downloading". The button: a 34 px ring
+  (`--line` track, `--accent` arc from the top, round cap) fills with all
+  the downloads together while anything downloads, easing on the control
+  spring; an 8 px `--warn` dot, ringed in `--bg`, stays while a failed
+  page waits. Its label says "Downloads, 40% done". Reduced motion: the
+  ring and dot change without easing. The library itself shows only
+  saved pages.
 - **Saving card (Now):** a 12 px ring turning (accent arc on the line
   colour) before the status, a bar that sweeps while the page downloads
   and fills as images land, and "Getting the page · 12 s" once it passes
@@ -309,8 +326,9 @@ and the page shows above it.
   reads "Finding chapters…" while it looks, then the box holds the
   chapters and the collection field the novel's name.
 - **Run card (Now):** a run of saves into a collection is one wide card
-  from start to end: the site, the collection's name in the title type, the
-  page in progress's bar, one status line ("3 of 10 saved · Saving 4 of 9
+  from start to end: the site, the collection's name in the title type, a
+  bar for the whole run when its length is known (else the page in
+  progress's, sweeping until it knows), one status line ("3 of 10 saved · Saving 4 of 9
   images", "Paused · 3 of 10 saved"), then Pause or Resume (small
   button) and Stop (quiet, warn colour). Its height never changes: the
   status is one line, cut with an ellipsis. Reduced motion: as the

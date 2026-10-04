@@ -24,29 +24,6 @@ asks from Daniel.
 
 ---
 
-## Downloads (Daniel, 3 Oct 2026)
-
-Saving moves out of the library into a Downloads screen of its own.
-
-- **A Downloads button** in the library's bar (the one that stays while
-  you scroll, since 0.27.7), beside Settings: a dot on it
-  while anything is downloading, and a ring around it filling with the
-  overall progress.
-- **The screen** lists what's downloading and what just finished, one
-  card per collection being downloaded (its pages inside it) and one per
-  page saved on its own. A collection's card shows its failed or
-  incomplete pages as part of it, with Retry.
-- **Saving a collection's chapters again** (Save again, Save N new) shows
-  up there too, like any other download.
-- **Keeps going with the app closed or the phone locked.** Android: a
-  foreground service with a progress notification, as read aloud does
-  (SpeechService), so the fetching moves out of the WebView into native
-  code or a headless runner. iOS can't run arbitrary work in the
-  background: background `URLSession` downloads carry on for files, but
-  a page's text and the next link need the app; decide how far iOS goes.
-- The library then shows only saved pages; the saving and run cards
-  leave it.
-
 ## 0.28.0 and 0.29.0: Sync through a private GitHub repo
 
 Split in two because it's the riskiest work and loses data if wrong.
@@ -117,6 +94,12 @@ feed: save automatically or just show what's new.
   comic sites Webtoon and Tapas (episode lists through their APIs).
   Each is a rule in `SITES`; slot them when wanted, with a page source
   from the phone to build the fixture from.
+
+- **Downloads in the background on iOS (0.27.9).** Android keeps saving
+  with the app away; iOS gives the page in progress about half a minute,
+  then waits for the app to open. Going further means saving in Swift
+  around background `URLSession` downloads (the page, then its images),
+  a second copy of the saving code. Decide whether it's worth it.
 
 - **iOS share extension** (with Safari's JavaScript preprocessing file,
   which is also iOS's only route to script-built pages). An extension

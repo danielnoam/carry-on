@@ -6,6 +6,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Downloads (0.27.9): a data-sync service that keeps the app running
+         while pages are saved, with a progress notification. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <queries>
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
@@ -16,5 +20,9 @@
             android:name="io.github.danielnoam.carryon.share.SpeechService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+        <service
+            android:name="io.github.danielnoam.carryon.share.DownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
     </application>
 </manifest>

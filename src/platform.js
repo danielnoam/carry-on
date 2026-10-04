@@ -227,6 +227,28 @@
     },
   };
 
+  // Downloads (0.27.9). While anything is being saved the app asks to be
+  // kept running: on Android a foreground service with a progress
+  // notification and a wake lock, so saving goes on with the app put away
+  // or the phone locked; on iOS a background task, which buys the page in
+  // progress the half minute or so iOS allows. A browser has neither.
+  const downloads = {
+    // { title, text, done, total }; total 0 for a bar that sweeps.
+    update(o) {
+      const D = plugin("Downloads");
+      if (D) D.update(o).catch(() => {});
+    },
+    stop() {
+      const D = plugin("Downloads");
+      if (D) D.stop().catch(() => {});
+    },
+    // The notification's Stop.
+    onStop(f) {
+      const D = plugin("Downloads");
+      if (D) D.addListener("stop", f);
+    },
+  };
+
   async function printHtml(name, html) {
     const P = plugin("Print");
     if (P) { await P.print({ html, name }); return; }
@@ -382,6 +404,7 @@
     shareLink,
     printHtml,
     speech,
+    downloads,
     download,
     downloadUpdate,
     openInstaller,
