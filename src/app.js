@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.28.0";
+  const APP_VERSION = "0.28.1";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -834,12 +834,9 @@
         ...(tags.length ? [{ head: "Tags" }, ...tags.map((t) => ({ value: "#" + t, label: "#" + t }))] : [])],
       value: state.filter,
       onpick: setFilter,
-    }), el("div", { class: "lib-tools-end" }, sortControl(), selectBtn));
+    }), el("div", { class: "lib-tools-end" }, sortControl()));
   }
 
-  // Select sits with Show and Order, the tools for the list, rather than
-  // in the bar with the app's places (0.27.10).
-  const selectBtn = el("button", { class: "btn-text select-btn", id: "selectBtn", type: "button", onclick: () => startSelect([]) }, "Select");
 
   const SORTS = [["saved", "Newest saved"], ["read", "Last read"], ["length", "Longest"], ["site", "Site"]];
   const BY = {
@@ -1400,6 +1397,7 @@
   // What the end of a page offers: the next page in its folder, else the
   // site's next page (saved already, or to save now and open).
   function endLink(p) {
+    if (p.preview) return null;
     const next = neighbour(p, 1);
     if (next) return { over: "Next in " + p.folder, title: next.title, go: () => goTo(next) };
     if (!p.next) return null;
@@ -1756,7 +1754,7 @@
       if (speech.available) box.insertBefore(aloudControls(), box.querySelector(".reset"));
       return box;
     } },
-    page: { button: "readerMore", label: "This page", build: () => pageSheet(state.open, "reader") },
+    page: { button: "readerMore", label: "This page", build: () => state.open.preview ? previewSheet(state.open) : pageSheet(state.open, "reader") },
     contents: { button: "readerContents", label: "Contents", build: contentsList },
   };
 
@@ -3768,6 +3766,7 @@
     library: ICONS.book,
     feeds: '<path d="M5 11a8 8 0 0 1 8 8M5 5a14 14 0 0 1 14 14"/><circle cx="6" cy="18" r="1.5"/>',
     add: ICONS.add,
+    out: ICONS.original,
   };
   const feedIcon = (name, size = 20) => {
     const s = el("span", { class: "side-icon", "aria-hidden": "true" });
@@ -3922,6 +3921,11 @@
     $("libraryView").dataset.place = state.place;
     $("library").hidden = feedsOn;
     $("feeds").hidden = !feedsOn;
+    // The bottom field follows a feed in Feeds, and saves a link elsewhere.
+    $("saveUrl").placeholder = feedsOn ? "Paste a site or feed to follow" : "Paste a link to save";
+    document.querySelector('label[for="saveUrl"]').textContent = feedsOn ? "Site or feed" : "Page link";
+    $("saveForm").querySelector(".btn-primary").textContent = feedsOn ? "Follow" : "Save";
+    $("severalBtn").hidden = feedsOn;
     if (feedsOn) { if (state.query) clearSearch(); renderFeeds(); }
     else renderLibrary();
   }
@@ -4024,15 +4028,13 @@
     const saved = savedAs(it.url);
     const busy = !saved && savingUrl(it.url);
     const when = whenText(postAt(it));
-    const open = () => {
-      if (saved) { openPage(saved.id); return; }
-      if (!navigator.onLine) { toast("You're offline. Save it when you're back online to read it here."); return; }
-      C.platform.openOutside(it.url);
-    };
+    const open = () => (saved ? openPage(saved.id) : previewPost(f, it));
+    const outside = el("button", { class: "post-act", type: "button", "aria-label": "Open " + it.title + " in the browser",
+      onclick: () => C.platform.openOutside(it.url) }, feedIcon("out", 18));
     let right;
     if (saved) right = el("span", { class: "post-saved" }, "Saved");
     else {
-      right = el("button", { class: "post-save", type: "button", "aria-label": busy ? "Saving " + it.title : "Save " + it.title,
+      right = el("button", { class: "post-act post-save", type: "button", "aria-label": busy ? "Saving " + it.title : "Save " + it.title,
         onclick: () => saveFeedPosts([{ f, it }]) });
       if (busy) { right.disabled = true; right.append(el("span", { class: "spinner", "aria-hidden": "true" })); }
       else right.append(feedIcon("add", 18));
@@ -4044,12 +4046,69 @@
         withFeed ? el("span", { class: "post-feed", dir: "auto" }, f.title) : null,
         el("span", { class: "post-title", dir: "auto" }, it.title),
         el("span", { class: "post-meta" }, saved ? readingLine(saved) + " · " + when : when)),
-      right);
+      outside, right);
+  }
+
+  // A post read in the app without saving it: the reader shows it, and
+  // its ⋯ offers Save and the browser.
+  let previewing = null;
+  async function previewPost(f, it) {
+    if (!navigator.onLine) { toast("You're offline. Save posts while you're online to read them here."); return; }
+    if (previewing) return;
+    previewing = it.url;
+    toast("Opening…");
+    let got;
+    try { got = await C.save.preview(it.url); }
+    catch (e) {
+      toast(e instanceof C.save.SaveError ? e.message : C.platform.canFetchPages
+        ? "Couldn't open that post. Try the browser button." : "This browser can't reach that site. Try the browser button.");
+      return;
+    } finally { previewing = null; }
+    got.meta.feed = f.url;
+    got.meta.post = it.url;
+    history.pushState(readerState(got.meta), "");
+    const shown = show(got.meta, got.html);
+    pushScreen($("readerView"));
+    await shown;
+    $("readerFrame").focus();
+  }
+
+  function previewSheet(p) {
+    const f = feeds.find((x) => x.url === p.feed);
+    const saved = savedAs(p.post) || savedAs(p.url);
+    return el("div", { class: "page-controls" },
+      el("div", { class: "menu-head" },
+        el("p", { class: "menu-title", dir: "auto" }, p.title),
+        el("p", { class: "meta" }, [p.site, p.minutes + " min", "Not saved"].join(" · "))),
+      el("div", { class: "tile-row" },
+        tileButton("add", saved ? "Saved" : "Save", saved ? () => {} : () => {
+          if (f) saveFeedPosts([{ f, it: { url: p.post, date: Date.now() } }]);
+          else savePage(p.url);
+          history.back();
+        }),
+        tileButton("original", "Browser", () => C.platform.openOutside(p.url))));
   }
 
   // ---- The sidebar ----
-  // Library, Feeds and each feed, from the bar's menu button, over a
-  // dimmed screen in its own history entry.
+  // Library with its collections under it, then Feeds with its feeds,
+  // from the bar's menu button, over a dimmed screen in its own history
+  // entry. Each list shows the three touched last (0.28.1).
+  const SIDE_MAX = 3;
+  function sideCover(name) {
+    const list = folderPages(name);
+    const src = coverUrl(list) || list.map(thumbUrl).find(Boolean);
+    const box = el("span", { class: "side-cover", "aria-hidden": "true" });
+    if (src) box.append(el("img", { src, alt: "", loading: "lazy" }));
+    return box;
+  }
+
+  function openFromSide(name) {
+    return back().then(() => {
+      if (state.place !== "library") { state.place = "library"; store(PLACE_KEY, "library"); paintPlace(); }
+      openFolder(name);
+    });
+  }
+
   function renderSide() {
     const item = (icon, label, on, extra, onclick, cls) => {
       const b = el("button", { class: "side-item" + (cls ? " " + cls : ""), type: "button", onclick }, icon,
@@ -4057,22 +4116,21 @@
       if (on) b.setAttribute("aria-current", "page");
       return b;
     };
+    const count = (n, cls) => (n ? el("span", { class: cls || "side-n" }, String(n)) : null);
     const fresh = freshPosts();
     const inFeeds = state.place === "feeds";
+    const latest = (f) => Math.max(0, ...f.items.map(postAt));
     fill($("sidebar"),
       el("p", { class: "side-title" }, "Carry-on"),
-      item(feedIcon("library"), "Library", !inFeeds, state.pages.length ? el("span", { class: "side-count" }, String(state.pages.length)) : null,
-        () => goPlace("library")),
+      item(feedIcon("library"), "Library", !inFeeds, count(state.pages.length, "side-count"), () => goPlace("library")),
+      ...foldersByUse().slice(0, SIDE_MAX).map((name) =>
+        item(sideCover(name), name, false, count(freshCount(name)), () => openFromSide(name), "side-sub")),
+      el("hr", { class: "side-line" }),
       item(feedIcon("feeds"), "Feeds", inFeeds && !state.feed, fresh ? el("span", { class: "side-pill" }, fresh + " new") : null,
         () => goPlace("feeds")),
-      el("hr", { class: "side-line" }),
-      feeds.length ? el("h2", { class: "overline side-head" }, "Feeds") : null,
-      ...feeds.map((f) => {
-        const n = waitingIn(f);
-        return item(feedMark(f, true), f.title, inFeeds && state.feed === f.url, n ? el("span", { class: "side-n" }, String(n)) : null,
-          () => goPlace("feeds", f.url));
-      }),
-      item(feedIcon("add"), "Add a feed", false, null, () => back().then(() => openMenu("addFeed")), "side-add"));
+      ...[...feeds].sort((a, b) => latest(b) - latest(a)).slice(0, SIDE_MAX).map((f) =>
+        item(feedMark(f, true), f.title, inFeeds && state.feed === f.url, count(waitingIn(f)), () => goPlace("feeds", f.url), "side-sub")),
+      item(feedIcon("add"), "Add a feed", false, null, () => back().then(() => openMenu("addFeed")), "side-sub side-add"));
   }
 
   function openSide() {
@@ -4182,7 +4240,9 @@
     go.addEventListener("click", () => (found ? follow() : find()));
     input.addEventListener("input", () => { if (found) reset(); });
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); go.click(); } });
-    setTimeout(() => input.focus({ preventScroll: true }), 50);
+    const preset = state.menu && state.menu.page && state.menu.page.url;
+    if (preset) { input.value = preset; setTimeout(find, 0); }
+    else setTimeout(() => input.focus({ preventScroll: true }), 50);
     return el("div", { class: "page-controls add-feed" },
       el("h2", { class: "menu-title" }, "Add a feed"),
       el("div", { class: "feed-field" }, input, help),
@@ -4568,6 +4628,7 @@
     if (view === "select") startSelect([], true);
     // A sheet isn't rebuilt going forward: step back off it instead.
     if (view === "menu" && !state.menu) history.back();
+    if (view === "reader" && String(s.page).startsWith("preview:") && !(state.open && state.open.id === s.page)) { history.back(); return; }
     if (view === "reader" && (!state.open || state.open.id !== s.page)) openPage(s.page, true);
     if (state.image && !(view === "reader" && s.image)) closeImage();
     if (view === "reader" && s.image && !state.image) history.back();
@@ -4646,6 +4707,13 @@
 
   $("saveForm").addEventListener("submit", (e) => {
     e.preventDefault();
+    if (state.place === "feeds") {
+      const typed = $("saveUrl").value.trim();
+      $("saveUrl").value = "";
+      $("saveUrl").blur();
+      openMenu("addFeed", { url: typed });
+      return;
+    }
     if (linksFrom($("saveUrl").value).length > 1) {
       openBatch($("saveUrl").value);
       $("saveUrl").value = "";
