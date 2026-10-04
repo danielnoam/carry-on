@@ -39,6 +39,29 @@ Daniel's pick. Whichever wins:
 - The seven action tiles go: the actions that aren't reading move
   into a ⋯ menu in the screen's bar.
 
+## Rename to Offprint (Daniel, 4 Oct 2026)
+
+The app becomes **Offprint**, store title "Offprint: Offline Reader". An
+offprint is a separate copy of one article, which is what the app makes,
+and it fits collections shown as books better than a name about planes.
+Before this release, check Offprint against the Play Store, the App Store
+and a trademark search.
+
+- **What the user sees changes:** `appName` in capacitor.config.json, the
+  iOS display name, `name`/`short_name` in manifest.json, the `<title>`,
+  every "Carry-on" in the app's text, the Wikipedia `Api-User-Agent`,
+  the release titles, README and DESIGN.md.
+- **What stays, or installed copies break:** the app ID
+  `io.github.danielnoam.carryon` (a new ID is a new app, and the in-app
+  updater can't install over it), the `carryon` key alias, and the
+  `carryon.*` storage keys (renaming them loses settings).
+- **The APK's file name:** installed copies download `CarryOn.apk`
+  (src/platform.js `apkUrl`). Publish both `CarryOn.apk` and
+  `Offprint.apk` for a while, or keep the old file name.
+- **The repo name** (danielnoam/carry-on) is in installed copies'
+  updater too. Renaming it relies on GitHub's redirect, so keep the name
+  unless there's a reason to change it.
+
 ## 0.28.0 and 0.29.0: Sync through a private GitHub repo
 
 Split in two because it's the riskiest work and loses data if wrong.
