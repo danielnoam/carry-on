@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.28.2";
+  const APP_VERSION = "0.28.3";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -3037,12 +3037,12 @@
   }
 
   async function backUp(btn) {
-    if (!state.pages.length) { toast("There's nothing to back up yet."); return; }
+    if (!state.pages.length && !feeds.length) { toast("There's nothing to back up yet."); return; }
     btn.disabled = true;
     const label = btn.querySelector(".row-label");
     label.textContent = "Backing up…";
     try {
-      const out = await C.backup.exportLibrary(state.pages, (done, total) => { label.textContent = "Backing up, " + done + " of " + total; });
+      const out = await C.backup.exportLibrary(state.pages, (done, total) => { label.textContent = "Backing up, " + done + " of " + total; }, feeds);
       if (out.uri) await C.platform.shareFile(out.uri, out.name);
       else C.platform.download(out.name, out.blob);
     } catch (e) {
@@ -3068,8 +3068,10 @@
         texts.clear();
         await loadThumbs();
         if (res.added + res.replaced) C.store.keepStored();
+        const followed = restoreFeeds(res.feeds);
         const n = res.added + res.replaced;
-        toast((n ? "Restored " + countLine(n) : "Nothing new to restore") + (res.kept ? ". " + res.kept + " already here" + (res.kept === 1 ? " was" : " were") + " kept." : "."));
+        const what = [n ? countLine(n) : "", followed ? (followed === 1 ? "1 feed" : followed + " feeds") : ""].filter(Boolean).join(" and ");
+        toast((what ? "Restored " + what : "Nothing new to restore") + (res.kept ? ". " + res.kept + " already here" + (res.kept === 1 ? " was" : " were") + " kept." : "."));
       } else {
         const meta = await C.backup.importPage(await file.text(), (url) => !!savedAs(url));
         if (meta.already) {
@@ -3102,7 +3104,7 @@
         el("button", { class: "row", type: "button", onclick: (e) => backUp(e.currentTarget) },
           el("span", { class: "row-label accent" }, "Back up the library")),
         open, input),
-      el("p", { class: "footnote" }, "One file with every page, its pictures, tags, collections and where you were. " + (C.platform.native ? "Keep it off the phone" : "Keep it somewhere other than this browser") + ". Restoring keeps whichever copy of a page was saved last. A page sent as a file opens here too."));
+      el("p", { class: "footnote" }, "One file with every page, its pictures, tags, collections and where you were, and the feeds you follow. " + (C.platform.native ? "Keep it off the phone" : "Keep it somewhere other than this browser") + ". Restoring keeps whichever copy of a page was saved last. A page sent as a file opens here too."));
   }
 
   // "Save full images" for a page saved with previews or links only.
@@ -3849,6 +3851,24 @@
     f.items = items.sort((a, b) => postAt(b) - postAt(a)).slice(0, FEED_KEEP);
     if (got.icon) f.icon = got.icon;
     if (got.link) f.link = got.link;
+  }
+
+  // Feeds from a backup: one not followed here is followed again, with its
+  // posts; one followed already keeps its settings here. Returns how
+  // many were added.
+  function restoreFeeds(list) {
+    let added = 0;
+    for (const f of list || []) {
+      if (feeds.some((h) => sameUrl(h.url, f.url))) continue;
+      feeds.push(f);
+      added++;
+    }
+    if (added) {
+      saveFeeds();
+      paintFeeds();
+      setTimeout(() => checkFeeds(), 0);
+    }
+    return added;
   }
 
   // One feed read again; a feed set to save its posts saves the new ones.

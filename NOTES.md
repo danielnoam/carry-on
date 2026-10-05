@@ -3,6 +3,14 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Feeds in backups (0.28.3).** A backup gains `feeds.json` beside
+  `library.json`; older backups simply have none, and older versions
+  ignore it, so the format number stays 1. A restored feed comes back
+  with its posts (and which ones were already tried) but unchecked, so
+  it's read again soon after. A feed followed already isn't touched:
+  its settings here are newer than any backup's. Feeds from a file are
+  cleaned like pages: http(s) addresses only, known values only.
+
 - **Gestures (0.28.2).** The sidebar opens on a swipe to the right from
   anywhere in the list, not only from the edge: Android's gesture
   navigation keeps the left edge for Back, so an edge swipe would rarely
