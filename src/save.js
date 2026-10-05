@@ -1323,11 +1323,11 @@
         if (tag === "span" && cls.includes("co-play")) el.setAttribute("aria-hidden", "true");
         if (tag === "img") {
           const src = node.getAttribute("src") || "";
-          for (const a of ["data-full", "data-preview"]) if (https(node.getAttribute(a))) el.setAttribute(a, node.getAttribute(a));
+          for (const a of ["data-full", "data-preview", "data-thumb"]) if (https(node.getAttribute(a))) el.setAttribute(a, node.getAttribute(a));
           if (node.hasAttribute("data-credit")) el.setAttribute("data-credit", node.getAttribute("data-credit"));
           if (DATA_IMAGE.test(src)) images.push({ el, data: src });
           else if (https(src)) el.setAttribute("src", src);
-          else if (!el.hasAttribute("data-full")) continue;
+          else if (!el.hasAttribute("data-full") && !el.hasAttribute("data-thumb")) continue;
           else el.className = "co-missing";
         }
         walk(node, el);
@@ -1388,6 +1388,9 @@
       const url = mode === "full" && m.full ? m.full : m.preview;
       const fallback = m.full || url;
       if (!m.video) m.el.setAttribute("data-full", fallback);
+      // A video's picture keeps its address too, so another device (sync)
+      // can fetch it again (0.30.0).
+      else m.el.setAttribute("data-thumb", url);
       if (!native) { m.el.setAttribute("src", url); return; }
       if (mode === "links") { m.el.setAttribute("data-full", fallback); m.el.className = "co-missing"; return; }
       const rel = "images/" + m.i + "." + extOf(url);
@@ -1531,7 +1534,7 @@
     const stamp = Date.now().toString(36);
     for (const [i, img] of imgs.entries()) {
       const full = img.getAttribute("data-full") || "";
-      let url = img.getAttribute("data-preview") || full;
+      let url = img.getAttribute("data-preview") || full || img.getAttribute("data-thumb") || "";
       if (!img.hasAttribute("data-preview") && /upload\.wikimedia\.org\/.*\/thumb\//.test(full)) url = wikimediaThumb(full, WIKI_PREVIEW, 0);
       if (!/^https?:/.test(url)) continue;
       const rel = "images/r" + stamp + "-" + i + "." + extOf(url);

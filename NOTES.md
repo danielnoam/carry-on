@@ -3,6 +3,29 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Sync (0.30.0).** src/sync.js, after LifeLog's src/storage.js, which
+  Daniel says works well. A private repo `carryon-data` holds
+  library.json ({ pages, deleted, files }) and pages/<id>.html. Each sync
+  reads library.json, merges three ways against the last library this
+  device wrote or read (the base, in localStorage), sends any page text
+  GitHub lacks, writes library.json with its sha, and on a 409 merges
+  again with what the other device wrote (LifeLog's 0.180.0 lesson:
+  never write over a stale sha). Field rules: content fields go with the
+  copy saved last, reading (at, finished, readAt) with the copy read
+  last, tags merge as sets, anything else takes the side that changed.
+  One address saved on two devices becomes one page. Deletions are
+  tombstones kept 90 days, so a device joining later doesn't bring a page
+  back. Pictures never go up (Daniel, 5 Oct 2026): outgoing HTML has its
+  local pictures marked missing, keeping data-full/data-preview, and the
+  other device fetches them with retryMissing in its page's mode. A
+  video's picture now keeps its address in data-thumb for this. Pictures
+  that can't be fetched again (a Tapas panel's signed link lasts an hour)
+  stay missing there. Two traps found in testing: the sync must settle
+  its result without awaiting anything, or a change made meanwhile is
+  written over; and the app must update its page objects in place,
+  because the open page, an open menu and the position timer hold them.
+  Synced HTML isn't re-cleaned: it's the user's own repo, written by the
+  app, and the reader's sandbox is the guard either way.
 - **Favourites (0.29.2).** A mark on the page (`fav`, with `favAt` for
   the widget's order) in library.json, kept by backups and by saving a
   page again. Pages only: a collection isn't stored anywhere of its own
