@@ -184,6 +184,12 @@
     return size;
   }
 
+  // A file's size in a page's directory, 0 when it isn't there.
+  async function sizeOf(id, rel) {
+    if (!FS()) return 0;
+    try { return (await FS().stat({ path: "pages/" + id + "/" + rel, directory: DIR })).size || 0; } catch (e) { return 0; }
+  }
+
   // Deletes one file in a page's directory; resolves to the bytes freed.
   async function removeFile(id, rel) {
     if (!FS()) return 0;
@@ -303,6 +309,6 @@
     return dataUrl ? dataUrl + "pages/" + id + "/" : null;
   }
 
-  window.CarryOn.store = { ready, readIndex, writeIndex, writeIndexOnly, set onIndex(f) { onIndex = f; }, writeThumb, readThumbs, storageInfo, keepStored, writePage, readPage, removePage, writeText, readText, download, removeFile, shrink, pageDirUrl, bytesOf,
+  window.CarryOn.store = { ready, readIndex, writeIndex, writeIndexOnly, set onIndex(f) { onIndex = f; }, writeThumb, readThumbs, storageInfo, keepStored, writePage, readPage, removePage, writeText, readText, download, removeFile, sizeOf, shrink, pageDirUrl, bytesOf,
     listFiles, listSized, readBytes, writeBytes, cacheFile, toBase64 };
 })();

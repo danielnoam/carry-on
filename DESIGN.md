@@ -496,6 +496,15 @@ and the page shows above it.
   line, 12 px sides. Feeds: "Feeds" and a "3 new" pill in `--accent`, then up to three
   posts, title in serif over the feed's name. Empty: "Follow a site in
   Feeds, and its newest posts show here." Paper by day, Night by night.
+- **A page's sheet (Now, 0.30.2):** Tags: the tags on it as chips with ×,
+  then a full-width dropdown "Add a tag" (other tags, then "New tag…",
+  which opens a field that stays open for the next). Collection: a
+  dropdown, None, the collections, "New collection…". Pictures: a
+  segmented Previews / Full size / Links with what's kept under it.
+- **Library sections (Now, 0.30.2):** "Collections ›" and "Pages · N ›"
+  heads are buttons (44 px tall) that show that part alone: every
+  collection as a 3-column grid, or the pages in none; "‹ Library" in
+  `--accent` goes back.
 - **Sync (Now, 0.30.1):** Settings has Sync beside Storage and backup,
   its value On, Off or Stopped. Off: "Sync with GitHub" and a section
   lead, then one group of three numbered steps, each number a 24 px

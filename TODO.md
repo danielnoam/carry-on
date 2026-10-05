@@ -56,6 +56,19 @@ release, search Waypage in the Play Store and the App Store by hand.
   updater too. Renaming it relies on GitHub's redirect, so keep the name
   unless there's a reason to change it.
 
+## Next: 0.30.3 (Daniel, 5 Oct 2026)
+
+- **Next page comes up from the bottom** in the reader.
+- **Opening a page or collection from the library scales it up** to
+  fill the screen.
+- **A collection with no cover** shows its icon big in the middle, with
+  no name written on it, on its tile and inside it.
+- **Sidebar:** collections and feeds not indented.
+- **Sync, links only:** a setting to sync only links and marks, each
+  device saving the page itself. Default stays pages too (a page can
+  change or disappear).
+- **Sync progress** shown in Settings, Sync.
+
 ## Next: sync, what's left after 0.30.1
 
 0.30.0 syncs the library and each page's text; pictures sync as each

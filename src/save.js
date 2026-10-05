@@ -1587,6 +1587,49 @@
     return { got, failed, bytes, missing: out.missing };
   }
 
+  // A saved page's pictures kept another way (0.30.2): as previews, full
+  // size or links. Full fetches every full image; previews shrink the
+  // full ones already here and fetch any that aren't; links deletes the
+  // files (the library card keeps its picture). Resolves to { mode,
+  // missing, bytes, failed } with bytes the change in the page's size.
+  async function setPictures(meta, mode, onProgress) {
+    let failed = 0, bytes = 0;
+    if (mode === "full") {
+      ({ failed, bytes } = await saveFullImages(meta, onProgress));
+    } else {
+      const html = await C.store.readPage(meta.id);
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      const imgs = [...doc.querySelectorAll("img")];
+      for (const [i, img] of imgs.entries()) {
+        const src = img.getAttribute("src") || "";
+        if (!/^images\//.test(src)) continue;
+        if (mode === "links") {
+          if (!/^https?:/.test(img.getAttribute("data-full") || img.getAttribute("data-thumb") || "")) continue;
+          if (src !== meta.thumb) bytes -= await C.store.removeFile(meta.id, src);
+          img.removeAttribute("src");
+          img.className = "co-missing";
+        } else {
+          const was = await C.store.sizeOf(meta.id, src);
+          const got = await C.store.shrink(meta.id, src, Infinity, PREVIEW_WIDTH);
+          if (got.rel !== src) { img.setAttribute("src", got.rel); bytes += got.bytes - was; }
+        }
+        if (onProgress) onProgress(i + 1, imgs.length);
+      }
+      const missing = mode === "links" ? 0 : doc.querySelectorAll("img.co-missing").length;
+      await C.store.writePage(meta.id, "<!doctype html>\n" + doc.documentElement.outerHTML, { ...meta, mode, missing });
+      // Pictures that were links come down as previews.
+      if (mode === "previews" && missing) {
+        const res = await retryMissing({ ...meta, mode, missing }, onProgress);
+        failed = res.missing;
+        bytes += res.bytes;
+      }
+    }
+    const doc = new DOMParser().parseFromString(await C.store.readPage(meta.id), "text/html");
+    const first = doc.querySelector("img[src^='images/']");
+    const thumb = meta.thumb && (await C.store.sizeOf(meta.id, meta.thumb)) ? meta.thumb : first ? first.getAttribute("src") : null;
+    return { mode, missing: mode === "links" ? 0 : doc.querySelectorAll("img.co-missing").length, bytes, failed, thumb };
+  }
+
   // A page's next (or with `back`, previous) link, read from the original:
   // for pages saved before 0.10.0, which kept no next link, or 0.20.0,
   // which kept no previous one. "" when it has none.
@@ -1631,7 +1674,7 @@
 
   C.save = {
     pageSource, preview,
-    save, SaveError, ContentsPage, findChapters, pageImage, siteIcon, keepCover, siteRule, removeHidden, scriptJson, chapterNumber, pickChapters, comicGroup, isPanel, retryMissing, saveFullImages, findNext, creditLine, cleanSaved, savedPageHtml, newId, textDir, isNextText, isPrevText, plainText,
+    save, SaveError, ContentsPage, findChapters, pageImage, siteIcon, keepCover, siteRule, removeHidden, scriptJson, chapterNumber, pickChapters, comicGroup, isPanel, retryMissing, saveFullImages, setPictures, findNext, creditLine, cleanSaved, savedPageHtml, newId, textDir, isNextText, isPrevText, plainText,
     wikipediaPage, wikimediaThumb, parseSrcset, pickWidth, youtubeId, vimeoId, extOf, isTrackingPixel, readingMinutes, siteName,
   };
 })();

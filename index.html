@@ -8,8 +8,8 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="src/fonts.css?v=0.30.1">
-  <link rel="stylesheet" href="src/styles.css?v=0.30.1">
+  <link rel="stylesheet" href="src/fonts.css?v=0.30.2">
+  <link rel="stylesheet" href="src/styles.css?v=0.30.2">
 </head>
 <body>
   <div class="app" id="libraryView">
@@ -32,6 +32,7 @@
         </button>
       </div>
     </div>
+    <div class="pull" id="pullHint" aria-hidden="true" hidden><span class="pull-mark"></span></div>
     <header class="top">
       <p class="meta" id="libraryMeta"></p>
       <div class="search" id="searchBox" role="search" hidden>
@@ -45,7 +46,6 @@
       <div class="lib-tools" id="libTools" hidden></div>
     </header>
 
-    <div class="pull" id="pullHint" aria-hidden="true" hidden><span class="pull-mark"></span></div>
     <main class="library" id="library" aria-live="polite"></main>
     <main class="feeds" id="feeds" hidden></main>
 
@@ -70,16 +70,18 @@
 
   <section class="reader screen" id="readerView" hidden aria-label="Saved page">
     <header class="reader-bar">
-      <button class="icon-btn" id="readerBack" type="button" aria-label="Back to library">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg>
-      </button>
+      <div class="reader-start">
+        <button class="icon-btn" id="readerBack" type="button" aria-label="Back to library">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg>
+        </button>
+        <button class="icon-btn" id="readerContents" type="button" aria-label="Contents" aria-expanded="false" aria-controls="readingSheet" hidden>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M13 18h7M4.5 6h.01M4.5 12h.01M8.5 18h.01"></path></svg>
+        </button>
+      </div>
       <div class="reader-actions">
         <span class="pill" id="offlinePill" hidden>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 12h20M12 2l3 10-3 10"></path></svg>Offline
         </span>
-        <button class="icon-btn" id="readerContents" type="button" aria-label="Contents" aria-expanded="false" aria-controls="readingSheet" hidden>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M13 18h7M4.5 6h.01M4.5 12h.01M8.5 18h.01"></path></svg>
-        </button>
         <button class="icon-btn aloud-btn" id="readerAloud" type="button" aria-label="Read aloud" aria-pressed="false" hidden>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"></path></svg>
         </button>
@@ -208,17 +210,17 @@
   </div>
   <div class="toast" id="toast" role="status" hidden></div>
 
-  <script src="src/platform.js?v=0.30.1"></script>
-  <script src="src/motion.js?v=0.30.1"></script>
-  <script src="src/vendor/Readability.js?v=0.30.1"></script>
-  <script src="src/store.js?v=0.30.1"></script>
-  <script src="src/save.js?v=0.30.1"></script>
-  <script src="src/feeds.js?v=0.30.1"></script>
-  <script src="src/backup.js?v=0.30.1"></script>
-  <script src="src/sync.js?v=0.30.1"></script>
-  <script src="src/qr.js?v=0.30.1"></script>
-  <script src="src/epub.js?v=0.30.1"></script>
-  <script src="src/reader.js?v=0.30.1"></script>
-  <script src="src/app.js?v=0.30.1"></script>
+  <script src="src/platform.js?v=0.30.2"></script>
+  <script src="src/motion.js?v=0.30.2"></script>
+  <script src="src/vendor/Readability.js?v=0.30.2"></script>
+  <script src="src/store.js?v=0.30.2"></script>
+  <script src="src/save.js?v=0.30.2"></script>
+  <script src="src/feeds.js?v=0.30.2"></script>
+  <script src="src/backup.js?v=0.30.2"></script>
+  <script src="src/sync.js?v=0.30.2"></script>
+  <script src="src/qr.js?v=0.30.2"></script>
+  <script src="src/epub.js?v=0.30.2"></script>
+  <script src="src/reader.js?v=0.30.2"></script>
+  <script src="src/app.js?v=0.30.2"></script>
 </body>
 </html>

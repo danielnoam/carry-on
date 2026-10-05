@@ -2,6 +2,30 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.30.2] - 2026-10-05
+
+### Fixed
+- Pictures download on Android again. A new page's pictures never
+  saved, so they only showed online and the page said previews were
+  missing. Pages you already saved get theirs the first time Carry-on
+  opens with a connection.
+
+### Added
+- Switch how a page keeps its pictures from its sheet: Previews, Full
+  size or Links.
+- Tap Collections in the library to see every collection in a grid, or
+  Pages for the pages in none.
+
+### Changed
+- Collection and tags are picked from dropdowns in a page's sheet.
+- While a collection's new chapters save, their Save button gives way to
+  "Saving · See in Downloads".
+- Updates and About are one section: tap the version to check for a
+  newer one.
+- The reader's Contents button sits on the left, beside Back.
+- Pulling down to check opens its circle above the sorting and filters.
+- "Pages in no collection" is just "Pages".
+
 ## [0.30.1] - 2026-10-05
 
 ### Added
