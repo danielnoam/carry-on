@@ -117,3 +117,19 @@ figure .co-placeholder { border-width: 0 0 1.5px; border-radius: 0; }
   border-radius: var(--r-sm);
   -webkit-box-decoration-break: clone; box-decoration-break: clone;
 }
+
+/* Pages (0.29.0): the text in screen-wide columns, one column a page,
+   turned by src/reader.js. Each page keeps the bar's room at its top.
+   --co-col, --co-side and --co-gap are set from the frame's width so a
+   column plus its gap is exactly one screen. */
+html.co-paged { height: 100%; overflow: hidden; scroll-padding-top: 0; }
+html.co-paged body {
+  box-sizing: border-box;
+  height: 100%; max-width: none; margin: 0;
+  padding: calc(var(--co-top, 0px) + var(--s-5)) var(--co-side, 20px) var(--s-7);
+  column-width: var(--co-col, 100vw); column-gap: var(--co-gap, 40px); column-fill: auto;
+}
+html.co-paged img { max-height: calc(100vh - var(--co-top, 0px) - var(--s-5) - var(--s-7) - 48px); width: auto; margin-inline: auto; }
+html.co-paged figure img { width: auto; }
+html.co-paged figure, html.co-paged .co-next, html.co-paged .co-placeholder, html.co-paged tr { break-inside: avoid; }
+html.co-paged h1, html.co-paged h2, html.co-paged h3 { break-after: avoid; }

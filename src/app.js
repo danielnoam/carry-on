@@ -179,7 +179,7 @@
     { value: "heebo", label: "Heebo", family: '"Heebo"' },
   ];
   const MARGINS = { narrow: ["var(--s-3)", "44rem"], normal: ["20px", "38rem"], wide: ["var(--s-7)", "32rem"] };
-  const READING_DEFAULT = { size: 19, spacing: 1.6, font: "serif", hebrew: "auto", margins: "normal" };
+  const READING_DEFAULT = { size: 19, spacing: 1.6, font: "serif", hebrew: "auto", margins: "normal", layout: "scroll" };
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
   // Before 0.24.0 size was a step of five and spacing a word.
@@ -192,6 +192,7 @@
     if (!FONTS.some((f) => f.value === r.font)) r.font = READING_DEFAULT.font;
     if (!HEBREW.some((f) => f.value === r.hebrew)) r.hebrew = READING_DEFAULT.hebrew;
     if (!MARGINS[r.margins]) r.margins = READING_DEFAULT.margins;
+    if (r.layout !== "pages") r.layout = "scroll";
     return r;
   }
 
@@ -214,8 +215,10 @@
   }
 
   function setReading(change) {
+    const was = readingPrefs().layout;
     store(READING_KEY, { ...readingPrefs(), ...change });
     paintReading();
+    if (C.reader && readingPrefs().layout !== was) C.reader.setPaged(readingPrefs().layout === "pages");
     document.querySelectorAll(".reading-controls").forEach(syncReadingControls);
   }
   paintReading();
@@ -1334,6 +1337,7 @@
       onImage: openImage,
       onTap: toggleBar,
       onSelect: showReadHere,
+      pages: readingPrefs().layout === "pages",
       top: () => $("readerView").querySelector(".reader-bar").offsetHeight,
     }).then(() => { $("readerContents").hidden = C.reader.headings().length < 2; });
   }
@@ -1694,6 +1698,9 @@
     const stack = (text, control) => el("div", { class: "rc-row stack" }, label(text), control);
     const nudge = (d) => setReading({ size: clamp(readingPrefs().size + d, SIZE_MIN, SIZE_MAX) });
     const box = el("div", { class: "reading-controls" },
+      row("Layout", seg(id + "-layout", "Layout", [
+        { value: "scroll", label: "Scroll" }, { value: "pages", label: "Pages" },
+      ], r.layout, (v) => setReading({ layout: v }))),
       row("Text size", el("div", { class: "stepper" },
         el("button", { class: "step-btn small", type: "button", "data-step": "-1", "aria-label": "Smaller text", onclick: () => nudge(-1) }, "A"),
         slider("Text size", SIZE_MIN, SIZE_MAX, 1, (v) => setReading({ size: v })),
@@ -1713,7 +1720,7 @@
       withTheme ? stack("Theme", seg(id + "-theme", "Theme",
         [{ value: "system", label: "Auto", swatch: autoSwatch(), auto: true }, ...themeOptions(THEMES)],
         state.theme, (v) => { setTheme(v); syncThemeInputs(); }, "themes scroll")) : null,
-      el("button", { class: "btn-quiet reset", type: "button", onclick: () => setReading({ ...READING_DEFAULT }) }, "Reset text"));
+      el("button", { class: "btn-quiet reset", type: "button", onclick: () => setReading({ ...READING_DEFAULT, layout: readingPrefs().layout }) }, "Reset text"));
     syncReadingControls(box);
     requestAnimationFrame(() => box.querySelectorAll(".seg.scroll").forEach(showPicked));
     return box;
@@ -1736,10 +1743,11 @@
     box.querySelector('[data-value="spacing"]').textContent = r.spacing.toFixed(2);
     box.querySelector('[data-step="-1"]').disabled = r.size <= SIZE_MIN;
     box.querySelector('[data-step="1"]').disabled = r.size >= SIZE_MAX;
-    for (const k of ["margins", "font", "hebrew"]) {
+    for (const k of ["layout", "margins", "font", "hebrew"]) {
       box.querySelectorAll('input[name$="-' + k + '"]').forEach((i) => { i.checked = i.value === r[k]; });
     }
-    const dflt = Object.keys(READING_DEFAULT).every((k) => r[k] === READING_DEFAULT[k]);
+    // Reset text leaves the layout as it is.
+    const dflt = Object.keys(READING_DEFAULT).every((k) => k === "layout" || r[k] === READING_DEFAULT[k]);
     box.querySelector(".reset").disabled = dflt;
   }
 
@@ -4917,6 +4925,14 @@
   $("sheetCatch").addEventListener("click", () => history.back());
   addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !e.defaultPrevented && (state.sheet || state.image || state.menu || state.select || state.side)) history.back();
+    // In pages, the arrow keys turn them (inside the page, src/reader.js
+    // does the same).
+    if (state.open && !state.sheet && !state.image && C.reader.paged && !e.altKey && !e.ctrlKey && !e.metaKey
+      && !(e.target.closest && e.target.closest("input, textarea, select, [contenteditable]"))) {
+      const rtl = state.open.dir === "rtl";
+      const d = { ArrowRight: rtl ? -1 : 1, ArrowLeft: rtl ? 1 : -1, PageDown: 1, PageUp: -1 }[e.key];
+      if (d) { e.preventDefault(); C.reader.turn(d); }
+    }
   });
   addEventListener("popstate", (e) => route(e.state));
   addEventListener("online", () => { showOffline(); renderLibrary(); });

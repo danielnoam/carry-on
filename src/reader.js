@@ -15,6 +15,11 @@
   const NEAR = 2;
 
   let frame = null, doc = null, scrollTimer = null, scrollFrame = 0, topSpace = null;
+  // Pages (0.29.0): the text in columns a screen wide, turned instead of
+  // scrolled. `paged` is the reader's choice; a comic chapter always
+  // scrolls.
+  let paged = false, comic = false;
+  const isPaged = () => paged && !comic && !!doc;
   // The "Next" link this file adds at the end of a page in a folder; only
   // that element (not a look-alike in the page) moves on.
   let nextLink = null, onNext = null, onImage = null, onTap = null;
@@ -38,9 +43,12 @@
 
   function applyTheme() {
     if (!doc) return;
+    const at = isPaged() ? position() : 0;
     const css = getComputedStyle(document.documentElement);
     for (const t of TOKENS) doc.documentElement.style.setProperty("--" + t, css.getPropertyValue("--" + t).trim());
     doc.documentElement.style.colorScheme = css.colorScheme;
+    // A new text size or margin moves the columns: back to the same place.
+    if (isPaged()) requestAnimationFrame(() => { if (isPaged()) relayout(at); });
   }
 
   function placeholder(img) {
@@ -67,7 +75,8 @@
       const full = img.getAttribute("data-full");
       if (img.getAttribute("src") === full || (savedFull && !img.classList.contains("co-missing"))) { img.setAttribute("data-swapped", ""); continue; }
       const r = (placeholders.get(img) || img).getBoundingClientRect();
-      if (r.bottom < -h * NEAR || r.top > h * (1 + NEAR)) continue;
+      const w = frame.contentWindow.innerWidth;
+      if (isPaged() ? r.right < -w * NEAR || r.left > w * (1 + NEAR) : r.bottom < -h * NEAR || r.top > h * (1 + NEAR)) continue;
       img.setAttribute("data-swapped", "");
       const probe = new Image();
       probe.onload = () => {
@@ -156,7 +165,12 @@
     const a = e.target.closest && e.target.closest("a[href]");
     if (!a) {
       const sel = doc.getSelection();
-      if (onTap && (!sel || sel.isCollapsed) && !(e.target.closest && e.target.closest("button, summary, input, label"))) onTap();
+      if ((sel && !sel.isCollapsed) || (e.target.closest && e.target.closest("button, summary, input, label"))) return;
+      // In pages, a tap at either side turns, in the middle it's the bar.
+      const w = frame.contentWindow.innerWidth;
+      if (isPaged() && e.clientX < w * 0.3) { turn(rtl() ? 1 : -1); return; }
+      if (isPaged() && e.clientX > w * 0.7) { turn(rtl() ? -1 : 1); return; }
+      if (onTap) onTap();
       return;
     }
     e.preventDefault();
@@ -166,7 +180,8 @@
       let id = href.slice(1);
       try { id = decodeURIComponent(id); } catch (err) { /* as is */ }
       const target = doc.getElementById(id);
-      if (target) target.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+      if (target && isPaged()) goPage(pageOf(target));
+      else if (target) target.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
       return;
     }
     if (/^(https?|mailto):/.test(a.href)) C.platform.openOutside(a.href);
@@ -177,6 +192,7 @@
   function position() {
     const w = frame && frame.contentWindow;
     if (!w || !doc) return 0;
+    if (isPaged()) { const n = pages(); return n <= 1 ? 1 : Math.min(1, page() / (n - 1)); }
     const room = doc.documentElement.scrollHeight - w.innerHeight;
     return room <= 0 ? 1 : Math.min(1, Math.max(0, w.scrollY / room));
   }
@@ -187,12 +203,14 @@
     return heads.map((h) => ({ level: h.tagName === "H3" ? 3 : 2, text: clean(h) }));
   }
 
-  // The heading of the part being read: the last one above the bar's edge.
+  // The heading of the part being read: the last one above the bar's edge,
+  // or in pages, the last one on this page or before it.
   function section() {
     let cur = null;
     const edge = (topSpace ? topSpace() : 0) + 24;
+    const p = isPaged() ? page() : 0;
     for (const h of heads) {
-      if (h.getBoundingClientRect().top > edge) break;
+      if (isPaged() ? pageOf(h) > p : h.getBoundingClientRect().top > edge) break;
       cur = h;
     }
     return cur ? clean(cur) : "";
@@ -202,6 +220,7 @@
   function jumpTo(i) {
     const h = heads[i];
     if (!h || !frame) return;
+    if (isPaged()) { goPage(pageOf(h), true); return; }
     const w = frame.contentWindow;
     w.scrollTo(0, h.getBoundingClientRect().top + w.scrollY - (topSpace ? topSpace() : 0) - 8);
   }
@@ -274,7 +293,8 @@
   // The first block not yet scrolled past, where reading starts.
   function firstShown() {
     const edge = (topSpace ? topSpace() : 0) + 8;
-    const i = blocks.findIndex((b) => b.el.getBoundingClientRect().bottom > edge);
+    const p = isPaged() ? page() : 0;
+    const i = blocks.findIndex((b) => (isPaged() ? pageOf(b.el) >= p : b.el.getBoundingClientRect().bottom > edge));
     return Math.max(0, i);
   }
   function light(i) {
@@ -282,6 +302,10 @@
     lit = blocks[i] ? blocks[i].el : null;
     if (!lit || !frame) return;
     lit.classList.add("co-speaking");
+    if (isPaged()) {
+      if (pageOf(lit) !== page()) { followUntil = Date.now() + 1000; goPage(pageOf(lit)); }
+      return;
+    }
     const w = frame.contentWindow;
     const r = lit.getBoundingClientRect();
     const edge = (topSpace ? topSpace() : 0) + 8;
@@ -321,6 +345,86 @@
   // Room at the top of the page for the reader bar, which floats over it.
   function applyTop() {
     if (doc && topSpace) doc.documentElement.style.setProperty("--co-top", topSpace() + "px");
+    if (isPaged()) relayout();
+  }
+
+  // ---- Pages ----
+
+  const rtl = () => !!doc && getComputedStyle(doc.body).direction === "rtl";
+  const width = () => frame.contentWindow.innerWidth;
+  const pages = () => Math.max(1, Math.round(doc.documentElement.scrollWidth / width()));
+  const page = () => Math.round(Math.abs(frame.contentWindow.scrollX) / width());
+  // The page an element starts on, from where it sits on screen now.
+  function pageOf(el) {
+    const r = el.getBoundingClientRect(), w = width();
+    const x = rtl() ? w - r.right : r.left;
+    return Math.max(0, Math.min(pages() - 1, page() + Math.floor((x + 1) / w)));
+  }
+  function goPage(n, now) {
+    const w = frame.contentWindow;
+    const to = Math.max(0, Math.min(pages() - 1, n)) * width() * (rtl() ? -1 : 1);
+    w.scrollTo({ left: to, top: 0, behavior: now || matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  }
+  function turn(d) {
+    if (!isPaged()) return;
+    const n = page() + d;
+    if (n < 0 || n >= pages()) return;
+    goPage(n);
+  }
+
+  // Column sizes for this width: a column as wide as the reading measure
+  // allows, centred, so a column and its gap are one screen.
+  function relayout(at) {
+    const root = doc.documentElement;
+    const keep = at == null ? position() : at;
+    const probe = doc.createElement("div");
+    probe.style.cssText = "position:absolute;visibility:hidden;width:var(--reader-measure, var(--measure));padding-inline:var(--reader-pad, 20px)";
+    doc.body.append(probe);
+    const measure = probe.getBoundingClientRect().width, pad = parseFloat(getComputedStyle(probe).paddingLeft) || 20;
+    probe.remove();
+    const w = width();
+    const col = Math.floor(Math.min(measure - 2 * pad, w - 2 * pad));
+    const side = (w - col) / 2;
+    root.style.setProperty("--co-col", col + "px");
+    root.style.setProperty("--co-side", side + "px");
+    root.style.setProperty("--co-gap", 2 * side + "px");
+    const n = pages();
+    goPage(Math.round(keep * (n - 1)), true);
+  }
+
+  // Turns pages with a swipe and the arrow keys. The page can't scroll on
+  // its own (overflow hidden), so a sideways swipe is all a page turn.
+  function pagedInput() {
+    let start = null;
+    doc.addEventListener("touchstart", (e) => {
+      start = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null;
+    }, { passive: true });
+    doc.addEventListener("touchend", (e) => {
+      if (!start || !isPaged()) return;
+      const t = e.changedTouches[0], dx = t.clientX - start.x, dy = t.clientY - start.y;
+      start = null;
+      if (Math.abs(dx) < 48 || Math.abs(dy) > Math.abs(dx)) return;
+      turn((dx < 0) !== rtl() ? 1 : -1);
+    }, { passive: true });
+    doc.addEventListener("keydown", (e) => {
+      if (!isPaged() || e.altKey || e.ctrlKey || e.metaKey) return;
+      const fwd = { ArrowRight: !rtl(), ArrowLeft: rtl(), PageDown: true, " ": !e.shiftKey }[e.key];
+      const bwd = { ArrowLeft: !rtl(), ArrowRight: rtl(), PageUp: true, " ": e.shiftKey }[e.key];
+      if (fwd) { e.preventDefault(); turn(1); } else if (bwd) { e.preventDefault(); turn(-1); }
+    });
+  }
+
+  // Scroll or pages, kept where the reader was.
+  function setPaged(on) {
+    const at = doc ? position() : 0;
+    paged = !!on;
+    if (!doc || comic) return;
+    doc.documentElement.classList.toggle("co-paged", paged);
+    if (paged) relayout(at);
+    else {
+      const w = frame.contentWindow;
+      w.scrollTo(0, at * (doc.documentElement.scrollHeight - w.innerHeight));
+    }
   }
 
   // Renders `html` (a page.html) into `iframe`, scrolled to `at` (0 to 1),
@@ -329,8 +433,10 @@
   // `next` ({ over, title, go }) adds a link to the next page at the end;
   // `top` () gives the height the bar covers; onImage(info) opens a tapped
   // image.
-  function open(iframe, html, meta, { at = 0, onPosition, onScroll, next, top, onImage: image, onTap: tap, onSelect } = {}) {
+  function open(iframe, html, meta, { at = 0, onPosition, onScroll, next, top, onImage: image, onTap: tap, onSelect, pages: asPages } = {}) {
     frame = iframe;
+    paged = !!asPages;
+    comic = false;
     blocks = [];
     lit = null;
     onImage = image || null;
@@ -366,6 +472,9 @@
         }
         heads = [...doc.body.querySelectorAll("h2, h3")].filter((h) => clean(h));
         doc.addEventListener("click", onClick);
+        comic = !!doc.querySelector(".co-comic");
+        if (isPaged()) doc.documentElement.classList.add("co-paged");
+        pagedInput();
         if (onSelect) {
           let selTimer = 0;
           doc.addEventListener("selectionchange", () => {
@@ -377,7 +486,7 @@
           if (onScroll && !scrollFrame) {
             scrollFrame = requestAnimationFrame(() => {
               scrollFrame = 0;
-              if (doc) onScroll(position(), iframe.contentWindow.scrollY);
+              if (doc) onScroll(position(), isPaged() ? Math.abs(iframe.contentWindow.scrollX) : iframe.contentWindow.scrollY);
             });
           }
           clearTimeout(scrollTimer);
@@ -392,9 +501,11 @@
         ready.then(() => {
           if (!doc) return;
           const w = iframe.contentWindow;
-          if (at > 0.01 && at < 0.97) w.scrollTo(0, at * (doc.documentElement.scrollHeight - w.innerHeight));
-          else if (onPosition && position() === 1) onPosition(1);
-          if (onScroll) onScroll(position(), w.scrollY);
+          const back = at > 0.01 && at < 0.97 ? at : 0;
+          if (isPaged()) relayout(back);
+          else if (back) w.scrollTo(0, back * (doc.documentElement.scrollHeight - w.innerHeight));
+          if (!back && onPosition && position() === 1) onPosition(1);
+          if (onScroll) onScroll(position(), isPaged() ? 0 : w.scrollY);
         });
         resolve();
       };
@@ -420,5 +531,5 @@
   addEventListener("resize", applyTop);
   addEventListener("offline", applyConnection);
 
-  C.reader = { open, close, position, headings, section, jumpTo, readable, firstShown, light, following, selectionSpot, clearSelection, applyTheme, applyConnection, srcdoc, CSP };
+  C.reader = { open, close, position, setPaged, turn, get paged() { return isPaged(); }, headings, section, jumpTo, readable, firstShown, light, following, selectionSpot, clearSelection, applyTheme, applyConnection, srcdoc, CSP };
 })();
