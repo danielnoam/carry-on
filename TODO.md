@@ -24,34 +24,20 @@ asks from Daniel.
 
 ---
 
-## 0.29.0: Gestures, pages mode, widgets, more sites (Daniel, 5 Oct 2026)
+## 0.29.1: More sites, and what's left of 0.29.0 (Daniel, 5 Oct 2026)
 
-- **The back gesture opens the sidebar.** In the library and Feeds, the
-  phone's own back swipe (from the screen's edge) opens the sidebar,
-  instead of the swipe right anywhere that 0.28.2 added; that one goes.
-  On Android the back gesture comes from either edge and the app can't
-  tell which, so both open it; back again with the sidebar open leaves
-  the app as now. iOS has no back gesture at the root, so there the edge
-  swipe stays (from the left edge only).
-- **Pages mode in the reader.** A switch between scrolling and turning
-  pages: the text laid out in screen-sized columns, a tap on either side
-  or a swipe turns, the place is kept as now (`at`). The page-turn
-  animation from 0.28.2 is the turn. Needs the reader's CSS columns
-  inside the sandboxed frame, no scripts in it.
-- **Home screen widgets:** the newest posts from feeds, favourite pages
-  or a collection, and a "keep reading" widget that opens the last page
-  where you left it. Widgets are native on both systems: Android an
-  AppWidget in native/ (beside share); iOS a WidgetKit extension, which
-  like the share extension needs its own app ID and an App Group, so it
-  waits on the Apple Developer Program decision. Android first. The app
-  would write a small summary file for the widget to read. Needs a
-  "favourite" mark on pages, which doesn't exist yet.
+0.29.0 shipped Back opening the sidebar, pages mode, and the Keep reading
+and Feeds widgets on Android.
 
+- **Widgets still to come:** favourite pages or a collection (needs a
+  "favourite" mark on pages first), and every widget on iOS (WidgetKit,
+  which waits on the Apple Developer Program like the share extension).
 - **More sites (Daniel, 3 Oct 2026, "see what other sites we can
   support"):** Wattpad (text arrives in pieces from its API), and the
   comic sites Webtoon and Tapas (episode lists through their APIs).
-  Each is a rule in `SITES`, built from a page source from the phone
-  for its fixture.
+  Each is a rule in `SITES`. Waiting on a link to one chapter or episode
+  from each site from Daniel: this environment can't reach them
+  otherwise, and the rules need their real pages.
 
 ## Rename to Waypage (Daniel, 5 Oct 2026)
 

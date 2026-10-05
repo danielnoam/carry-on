@@ -3,6 +3,39 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Back opens the sidebar (0.29.0).** Daniel meant the phone's own Back
+  gesture, not a swipe inside the app. With @capacitor/app's backButton
+  listener the app decides: history to step back through goes back as
+  before; at the top of the library or Feeds Back opens the sidebar, and
+  Back with the sidebar opened that way puts the app away, so Back still
+  leaves the app. Android can't tell which edge Back came from. The
+  0.28.2 swipe from anywhere went: it fought reading sideways rows and
+  the system gesture. iOS and browsers have no Back to use, so a swipe
+  from the left 24 px opens it there.
+
+- **Pages (0.29.0).** The reader's page gets CSS columns, one a screen
+  wide: the column is as wide as the reading measure allows, centred,
+  and the gap is twice the side margin, so a column and its gap are
+  exactly one screen and page n is scrollX = n × width. The frame's
+  root has overflow hidden, so only src/reader.js moves it (taps at the
+  outer thirds, a sideways swipe, arrow keys); nothing runs inside the
+  sandboxed page. Position is the page over the last page, so `at`
+  works for both layouts and switching keeps the place. Comic chapters
+  always scroll. Images are capped to a page's height and figures don't
+  split across pages.
+
+- **Widgets (0.29.0).** Plain AppWidgetProviders drawing RemoteViews from
+  what the app hands over (Widgets plugin, preferences), so they show
+  nothing the app hasn't worked out: the page read last that isn't
+  finished, and the three newest unsaved posts. Handed over when the app
+  goes to the background and after feeds change; the closed app's feed
+  checks refresh the count. A tap opens the app with an address naming
+  what to show (carryon-widget://page/<id>, …/post, …/feeds). Colours are
+  Paper and Night tokens as resources, by the phone's dark mode, since a
+  widget can't know the app's theme. Going to the background saves the
+  reading position only when one is pending: writing the index from a
+  library that hadn't loaded yet would empty it.
+
 - **Feeds checked with the app closed (0.28.4).** Daniel picked "check
   and notify" over saving in the background: the app's JavaScript doesn't
   run with the app closed, so saving there would mean a second copy of

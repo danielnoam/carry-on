@@ -442,8 +442,9 @@ and the page shows above it.
   indented 44 px and 44 px tall. The current one sits on `--bar`,
   semibold. The bar is the same in both places; only its title changes,
   and Feeds drops Search. In Feeds the bottom field reads "Paste a site
-  or feed to follow" with Follow, and the list button goes. A swipe to
-  the right anywhere in Library or Feeds opens it (0.28.2); holding a
+  or feed to follow" with Follow, and the list button goes. On Android,
+  Back in Library or Feeds opens it, and Back again leaves the app
+  (0.29.0); elsewhere a swipe right from the left 24 px. Holding a
   feed's row opens its settings.
 - **Pull to check (Now, 0.28.2):** at the top of Library or Feeds, a
   pull opens a gap over the list (half the finger's travel) with a 24 px
@@ -452,6 +453,13 @@ and the page shows above it.
   while it checks, then closes on the sheet spring. Reduced motion: no
   spin, the gap closes at once. Feeds checks its feeds, the library its
   series collections for new chapters ("+2" on the cover, `--accent`).
+- **Pages (Now, 0.29.0):** Aa's first row, Layout: Scroll | Pages.
+  Pages lays the text in one column a screen wide, as wide as the
+  margins allow, centred; each page keeps the bar's room and the usual
+  padding. A tap on the outer third turns (the middle shows or hides the
+  bar), a sideways swipe of 48 px turns, arrow keys and Page Up/Down
+  turn; the turn is the browser's smooth scroll, and with reduced motion
+  it jumps. Reset text keeps the layout.
 - **Page turn (Now, 0.28.2):** the end link's next page: the reader
   slides 16 % left as it fades (control spring), the next page comes in
   from 16 % right (sheet spring). Reduced motion: a fade.
@@ -478,6 +486,13 @@ and the page shows above it.
   posts older than (3 days, A week, A month), a muted line with when it
   was checked and how often it posts, Unfollow in `--warn`, "Unfollowing
   keeps the posts you saved."
+- **Widgets (Now, 0.29.0, Android):** a rounded card in `--bg` with a
+  `--line` border, 16 px padding and radius. Keep reading: "Keep
+  reading" small and bold in `--muted`, the title in serif, three lines
+  at most, "site · 6 min left", and a 4 px line in `--accent` for how
+  far. Feeds: "Feeds" and a "3 new" pill in `--accent`, then up to three
+  posts, title in serif over the feed's name. Empty: "Follow a site in
+  Feeds, and its newest posts show here." Paper by day, Night by night.
 - **New posts notification (Now, 0.28.4, Android):** the Feeds icon,
   "3 new posts from The Slow Times" and "Tap to see them in Feeds.", or
   "5 new posts" and "From The Slow Times, Kitchen Table and 1 more."

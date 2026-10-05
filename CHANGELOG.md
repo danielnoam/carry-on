@@ -2,6 +2,19 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.29.0] - 2026-10-05
+
+### Added
+- Pages: read a page a screen at a time. Switch between Scroll and Pages
+  in Aa. Tap either side or swipe to turn, or use the arrow keys.
+- Home screen widgets on Android: Keep reading, which opens the page you
+  were reading where you left it, and Feeds, with the newest posts.
+
+### Changed
+- On Android, Back in the library or Feeds opens the sidebar, and Back
+  again puts the app away. The swipe from anywhere is gone; on iPhone
+  and in a browser the sidebar opens with a swipe from the left edge.
+
 ## [0.28.4] - 2026-10-05
 
 ### Added
