@@ -24,7 +24,7 @@ asks from Daniel.
 
 ---
 
-## Asks from 5 Oct 2026 (Daniel), not slotted yet
+## 0.29.0: Gestures, pages mode, widgets, more sites (Daniel, 5 Oct 2026)
 
 - **The back gesture opens the sidebar.** In the library and Feeds, the
   phone's own back swipe (from the screen's edge) opens the sidebar,
@@ -46,6 +46,12 @@ asks from Daniel.
   waits on the Apple Developer Program decision. Android first. The app
   would write a small summary file for the widget to read. Needs a
   "favourite" mark on pages, which doesn't exist yet.
+
+- **More sites (Daniel, 3 Oct 2026, "see what other sites we can
+  support"):** Wattpad (text arrives in pieces from its API), and the
+  comic sites Webtoon and Tapas (episode lists through their APIs).
+  Each is a rule in `SITES`, built from a page source from the phone
+  for its fixture.
 
 ## Rename to Waypage (Daniel, 5 Oct 2026)
 
@@ -72,18 +78,18 @@ release, search Waypage in the Play Store and the App Store by hand.
   updater too. Renaming it relies on GitHub's redirect, so keep the name
   unless there's a reason to change it.
 
-## 0.29.0 and 0.30.0: Sync through a private GitHub repo
+## 0.30.0 and 0.31.0: Sync through a private GitHub repo
 
 Split in two because it's the riskiest work and loses data if wrong.
 
-**0.29.0, the index and text.** A fine-grained token for one repo, kept on
+**0.30.0, the index and text.** A fine-grained token for one repo, kept on
 the device. Sync `library.json` and each `page.html` + `meta.json`
 through the contents API with `sha` for conflicts, as LifeLog's
 src/storage.js does. Deletes become tombstones in `library.json` so they
 don't come back from the other device. The other device re-downloads
 previews from the original links. Reuses the 0.18.0 backup format.
 
-**0.30.0, images.** Push `images/` through the Git Data API (blobs, one
+**0.31.0, images.** Push `images/` through the Git Data API (blobs, one
 tree and one commit per save), since the contents API stops at 1 MB and
 broke LifeLog's sync. Decide first whether the repo's growth (0.5 to 1.5
 MB per illustrated page, far more for comics) is acceptable, or whether
@@ -121,12 +127,6 @@ one and confirm it stays gone; edit tags offline on both and sync.
   2026).** A stateless fetch worker behind a token, rate-limited, storing
   nothing, so the browser can save (and follow feeds from) sites that
   don't allow CORS. Not slotted yet.
-- **More sites (Daniel, 3 Oct 2026, "see what other sites we can
-  support"):** Wattpad (text arrives in pieces from its API), and the
-  comic sites Webtoon and Tapas (episode lists through their APIs).
-  Each is a rule in `SITES`; slot them when wanted, with a page source
-  from the phone to build the fixture from.
-
 - **Downloads in the background on iOS (0.27.9).** Android keeps saving
   with the app away; iOS gives the page in progress about half a minute,
   then waits for the app to open. Going further means saving in Swift
