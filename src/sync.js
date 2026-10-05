@@ -14,7 +14,7 @@
 (function () {
   const C = window.CarryOn;
   const API = "https://api.github.com";
-  const CFG_KEY = "carryon.sync";        // { owner, repo, branch, token, sha, at }
+  const CFG_KEY = "carryon.sync";        // { owner, repo, branch, token, sha, at, links }
   const BASE_KEY = "carryon.syncBase";   // the library.json last written or read
   const WAIT_KEY = "carryon.syncWaiting"; // ids whose text hasn't come down yet
   const REPO = "carryon-data";
@@ -254,6 +254,7 @@
         if (!made.ok) throw new SyncError("Carry-on couldn't make its " + REPO + " repo. Make the token again with All repositories picked under Repository access, then connect.");
         cfg.branch = (await made.json()).default_branch || "main";
       } else throw await fail(repo);
+      if (was && was.links) cfg.links = true;
       keep(CFG_KEY, cfg);
       keep(BASE_KEY, null);
       keep(WAIT_KEY, null);
@@ -306,18 +307,22 @@
 
   let running = null;
   let last = { at: (cfg && cfg.at) || 0, error: "" };
+  // Where a sync is: { stage: "check" | "up" | "down", done, total }.
+  let progress = null;
 
   // Brings this device and GitHub level. `getPages()` is the library now;
   // `setPages(list)` takes the result; `sameUrl(a, b)` says two addresses
   // are one page. onProgress({ stage, done, total }). Resolves to
-  // { up, down, removed, downloads } with `downloads` the pages whose
-  // pictures this device fetches next; throws SyncError.
+  // { up, down, removed, downloads, fromLinks } with `downloads` the pages
+  // whose pictures this device fetches next and `fromLinks` the pages it
+  // saves itself from their links; throws SyncError.
   function run({ getPages, setPages, getFeeds, setFeeds, sameUrl, onProgress }) {
     if (!cfg) return Promise.resolve(null);
     if (running) return running;
+    const told = (p) => { progress = p; if (onProgress) onProgress(p); };
     running = (async () => {
       try {
-        const res = await once(getPages, setPages, sameUrl || ((a, b) => a === b), onProgress, getFeeds, setFeeds);
+        const res = await once(getPages, setPages, sameUrl || ((a, b) => a === b), told, getFeeds, setFeeds);
         last = { at: Date.now(), error: "" };
         cfg.at = last.at;
         keep(CFG_KEY, cfg);
@@ -325,8 +330,10 @@
       } catch (e) {
         last = { at: last.at, error: e instanceof SyncError ? e.message : "Sync stopped: " + (e && e.message ? e.message : e) };
         throw e;
-      } finally { running = null; }
+      } finally { running = null; progress = null; }
     })();
+    // Told once `running` is set, so what it draws says Syncing.
+    if (!progress) told({ stage: "check", done: 0, total: 0 });
     return running;
   }
 
@@ -338,6 +345,9 @@
     const view = before.map((p) => share(C.backup.cleanMeta(p, p.id) || p));
     const uploaded = {};
     const waiting = load(WAIT_KEY, []);
+    // Links only (0.30.3): this device sends no text and takes none; pages
+    // new to it are saved again from their links, here.
+    const links = !!cfg.links;
     let up = 0;
     let merged, remote;
     for (let tries = 0; ; tries++) {
@@ -349,7 +359,7 @@
       // Text this device has and GitHub doesn't: every page saved here, or
       // saved again since.
       const mine = new Map(before.map((p) => [p.id, p]));
-      const todo = merged.pages.filter((p) => mine.has(p.id) && mine.get(p.id).savedAt === p.savedAt && (!merged.files[p.id] || merged.files[p.id].at !== p.savedAt));
+      const todo = links ? [] : merged.pages.filter((p) => mine.has(p.id) && mine.get(p.id).savedAt === p.savedAt && (!merged.files[p.id] || merged.files[p.id].at !== p.savedAt));
       for (const [i, p] of todo.entries()) {
         if (onProgress) onProgress({ stage: "up", done: i, total: todo.length });
         let html;
@@ -387,15 +397,21 @@
     const decided = new Map();
     const want = [];
     const stillWaiting = [];
+    const fromLinks = [];
     const at = new Map(before.map((p) => [p.id, p]));
     for (const m of merged.pages) {
       const have = at.get(m.id);
-      if (have && have.savedAt === m.savedAt) {
+      // Saved again elsewhere, with links only: the copy here stays.
+      if (have && (have.savedAt === m.savedAt || links)) {
         const next = { ...m };
         for (const k of Object.keys(have)) if (DEVICE.includes(k) || !SYNCED.has(k)) next[k] = have[k];
         decided.set(m.id, next);
-      } else if (merged.files[m.id] && merged.files[m.id].at === m.savedAt) want.push({ m, have });
-      else if (!have) stillWaiting.push(m.id);
+      } else if (!links && merged.files[m.id] && merged.files[m.id].at === m.savedAt) want.push({ m, have });
+      else if (!have) {
+        stillWaiting.push(m.id);
+        // No text on GitHub (its device syncs links only) or not wanted.
+        if (links || !merged.files[m.id]) fromLinks.push(m);
+      }
     }
     for (const id of Object.keys(merged.deleted)) if (at.has(id)) decided.set(id, null);
     let down = 0;
@@ -446,7 +462,7 @@
     }
     await setPages(out);
     for (const id of gone) await C.store.removePage(id);
-    return { up, down, removed: gone.length, downloads };
+    return { up, down, removed: gone.length, downloads, fromLinks };
   }
 
   // A library file from GitHub, down to what Carry-on writes.
@@ -477,5 +493,8 @@
     get account() { return cfg ? cfg.owner + "/" + cfg.repo : ""; },
     get running() { return !!running; },
     get last() { return last; },
+    get progress() { return progress; },
+    get links() { return !!(cfg && cfg.links); },
+    set links(v) { if (!cfg) return; if (v) cfg.links = true; else delete cfg.links; keep(CFG_KEY, cfg); },
   };
 })();

@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.30.2";
+  const APP_VERSION = "0.30.3";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -366,7 +366,7 @@
     return el("div", { class: "card saving run wide", role: "group", "aria-label": (r.again ? "Saving again in " : "Saving into ") + (r.folder || "the library") },
       el("span", { class: "card-body" },
         el("span", { class: "card-site" }, r.site, r.again ? " · Saving again" : null),
-        el("span", { class: "card-title", dir: "auto" }, r.folder || "Saving several"),
+        el("span", { class: "card-title", dir: "auto" }, r.folder || r.label || "Saving several"),
         el("span", { class: "progress", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": "0" },
           el("span", { class: "progress-fill" })),
         el("span", { class: "card-status accent" },
@@ -507,7 +507,7 @@
     return el("div", { class: "card done-run wide", role: "group", "aria-label": (r.folder || "Several pages") + ", done" },
       el("span", { class: "card-body" },
         el("span", { class: "card-site" }, r.site),
-        el("span", { class: "card-title", dir: "auto" }, r.folder || "Several pages"),
+        el("span", { class: "card-title", dir: "auto" }, r.folder || r.label || "Several pages"),
         el("span", { class: "card-status" }, [saved, r.stopped ? "Stopped" : null, whenText(e.at)].filter(Boolean).join(" · ")),
         name ? el("span", { class: "card-actions" },
           el("button", { class: "btn-small", type: "button", onclick: () => toLibrary().then(() => openFolder(name)) }, "Open")) : null,
@@ -1238,6 +1238,7 @@
         mode: job.mode || load(IMAGES_KEY, "previews"),
         kind: job.kind || "article",
         asPage: !!job.asPage,
+        id: job.synced ? job.synced.id : undefined,
         onProgress: (p) => {
           if (p.stage === "drawing") job.drawing = true;
           if (p.stage === "images") { job.done = p.done; job.total = p.total; }
@@ -1256,6 +1257,13 @@
           await C.store.writeIndex(state.pages);
           await C.store.removePage(old.id);
         }
+      } else if (job.synced) {
+        // A synced page saved here from its link: the library's entry for
+        // it, with this copy's text and pictures.
+        for (const k of SYNCED_KEEP) if (job.synced[k] !== undefined) meta[k] = job.synced[k];
+        if (state.pages.some((p) => p.id === meta.id)) await C.store.removePage(meta.id).catch(() => {});
+        else { state.pages.unshift(meta); await C.store.writeIndex(state.pages); }
+        syncSoon();
       } else {
         meta.requested = job.url;
         if (job.folder) { meta.folder = folderName(job.folder); meta.folderAt = job.folderAt || Date.now(); if (job.source) meta.source = job.source; }
@@ -1295,6 +1303,22 @@
   // leave the screen underneath inert, taking no taps.
   const pushes = new WeakMap();
 
+  // The card just tapped in the library, so the screen it opens grows out
+  // of it. Opening a page reads its file first, hence the second's grace.
+  let tapped = null;
+  const zoomed = new WeakMap();
+  document.addEventListener("click", (e) => {
+    const open = e.target.closest && e.target.closest(".card-open");
+    const card = open && open.closest(".card, .tile");
+    tapped = card ? { rect: card.getBoundingClientRect(), at: Date.now() } : null;
+  }, true);
+  function zoomFrom(screen) {
+    const t = tapped;
+    tapped = null;
+    if (!t || Date.now() - t.at > 1500 || (screen.id !== "readerView" && screen.id !== "folderView")) return null;
+    return t.rect;
+  }
+
   function pushScreen(screen) {
     pushes.set(screen, (pushes.get(screen) || 0) + 1);
     if (screen.id === "sectionView" && wide.matches) {
@@ -1306,6 +1330,9 @@
     const under = below(screen);
     under.inert = true;
     screen.hidden = false;
+    const from = zoomFrom(screen);
+    if (from) zoomed.set(screen, from); else zoomed.delete(screen);
+    if (from) return M.zoomIn(screen, from);
     M.under(under, true);
     return M.pushIn(screen);
   }
@@ -1316,6 +1343,9 @@
     if (screen.dataset.beside) return M.leave(screen).then(hide);
     const under = below(screen);
     under.inert = false;
+    const from = zoomed.get(screen);
+    zoomed.delete(screen);
+    if (from) return M.zoomOut(screen, from).then(hide);
     M.under(under, false);
     return M.popOut(screen).then(hide);
   }
@@ -2071,12 +2101,8 @@
       for (const p of list) { delete p.cover; delete p.coverFrom; }
       updateCover(name);
     }, { once: true });
-    // No picture at all: a cover drawn from its name.
-    if (!thumb) {
-      tile.querySelector(".tile-thumb").insertAdjacentHTML("afterbegin", folderSource(list) ? bookIcon(28).outerHTML
-        : '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>');
-      tile.querySelector(".tile-thumb").append(el("span", { class: "tile-cover-name", dir: "auto" }, name));
-    }
+    // No picture at all: its icon, big, the name already under it.
+    if (!thumb) tile.querySelector(".tile-thumb").prepend(collectionIcon(list, 44));
     else if (folderSource(list)) tile.querySelector(".tile-thumb").append(el("span", { class: "tile-book" }, bookIcon(16)));
     return tile;
   }
@@ -2161,10 +2187,14 @@
     }
     return drawnCover(list);
   }
-  const drawnCover = (list) => el("div", { class: "book-cover drawn", "aria-hidden": "true" },
-    el("span", { class: "book-cover-rule" }),
-    el("span", { class: "book-cover-title", dir: "auto" }, state.folder),
-    el("span", { class: "book-cover-site" }, list[0].site || ""));
+  const drawnCover = (list) => el("div", { class: "book-cover drawn", "aria-hidden": "true" }, collectionIcon(list, 44));
+  // A story's book, or a plain folder (0.30.3: no name drawn on it).
+  function collectionIcon(list, size) {
+    if (folderSource(list)) return bookIcon(size);
+    const s = el("span", { class: "folder-icon", "aria-hidden": "true" });
+    s.innerHTML = '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
+    return s;
+  }
 
   function bookHead(list, next, done) {
     const n = list.length, name = state.folder;
@@ -3189,6 +3219,7 @@
   // every few minutes while open. Pages that came down get their pictures
   // here, one page at a time, like Retry.
   let syncTimer = null, syncQueue = [], fetchingPictures = false;
+  const SYNCED_KEEP = ["savedAt", "title", "requested", "tags", "folder", "folderAt", "source", "series", "fav", "favAt", "at", "finished", "readAt"];
   function syncSoon(ms = 4000) {
     if (!C.sync.on) return;
     clearTimeout(syncTimer);
@@ -3230,8 +3261,36 @@
     }
     if (state.section === "sync") renderSection();
     if (res && res.downloads.length) { syncQueue.push(...res.downloads.map((p) => p.id)); fetchPictures(); }
+    if (res && res.fromLinks.length) saveFromLinks(res.fromLinks);
     if (res && !quiet) toast(res.up + res.down + res.removed ? "Synced: " + [res.up ? res.up + " sent" : "", res.down ? res.down + " came in" : "", res.removed ? res.removed + " removed" : ""].filter(Boolean).join(", ") + "." : "Already in step.");
     return res;
+  }
+  // Pages that came as links only (0.30.3), saved here one after another
+  // like a run, each into its place in the library. In a browser only
+  // Wikipedia can be fetched, so the rest wait for the app.
+  async function saveFromLinks(list) {
+    const jobs = list.filter((m) => m.url && (C.platform.native || C.save.wikipediaPage(m.url))
+      && !state.pages.some((p) => p.id === m.id) && !state.saving.some((s) => s.synced && s.synced.id === m.id))
+      .map((m) => ({ ...newJob(m.url, null), key: "sync:" + m.id, synced: m, mode: m.mode, kind: m.comic ? "comic" : "article", waiting: true }));
+    if (!jobs.length) return;
+    const run = jobs.length > 1 ? Object.assign(startRun(null, jobs[0].site, jobs.length), { label: "From sync" }) : null;
+    jobs.forEach((j) => { j.run = run; });
+    state.saving = [...jobs, ...state.saving];
+    renderLibrary();
+    if (state.section === "sync") renderSection();
+    for (const [i, job] of jobs.entries()) {
+      if (i) await new Promise((done) => setTimeout(done, PACE_MS));
+      if (run && !(await gate(run))) continue;
+      if (!state.saving.includes(job)) continue;
+      job.waiting = false;
+      if (run) run.current = job;
+      renderLibrary();
+      if (await runJob(job)) { if (run) run.saved++; } else if (run) run.failed++;
+      if (run) { run.current = null; updateRunCard(run); }
+      if (state.section === "sync") renderSection();
+    }
+    endRun(run);
+    if (run) renderLibrary();
   }
   // Before 0.30.2 a new page's pictures never downloaded on Android (see
   // platform.js, folderFor). Those pages fetch them once, when online.
@@ -3258,15 +3317,19 @@
           renderLibrary();
           if (state.folder) renderFolder();
         }
+        if (state.section === "sync") renderSection();
       }
-    } finally { fetchingPictures = false; }
+    } finally {
+      fetchingPictures = false;
+      if (state.section === "sync") renderSection();
+    }
   }
 
   // Sync's settings (0.30.1 laid out as steps, with LifeLog's setup code):
   // off, the three steps to a first device and a way in for the next one;
   // on, the state and a code that sets up another device.
   function syncSections() {
-    return C.sync.on ? [syncState(), syncShare()] : [syncSteps(), syncJoin()];
+    return C.sync.on ? [syncState(), syncWhat(), syncShare()] : [syncSteps(), syncJoin()];
   }
   async function connectSync(text, btn) {
     if (btn) { btn.disabled = true; btn.textContent = "Connecting…"; }
@@ -3322,20 +3385,55 @@
     const err = await connectSync(text);
     if (err) toast(err);
   }
+  // What a sync is doing, and what this device does after it (0.30.3):
+  // pages saved from their links, pictures fetched.
+  function syncProgress() {
+    const p = C.sync.progress;
+    if (!C.sync.running || !p) return { text: "Syncing…", part: null };
+    if (p.stage === "up") return { text: "Sending pages, " + p.done + " of " + p.total, part: p.total ? p.done / p.total : null };
+    if (p.stage === "down") return { text: "Bringing pages in, " + p.done + " of " + p.total, part: p.total ? p.done / p.total : null };
+    return { text: "Checking GitHub…", part: null };
+  }
+  function syncAfter() {
+    const saving = state.saving.filter((s) => s.synced && !s.error).length;
+    const failed = state.saving.filter((s) => s.synced && s.error).length;
+    const pictures = syncQueue.length + (fetchingPictures ? 1 : 0);
+    return [saving ? "Saving " + countLine(saving) + " from their links" : "",
+      failed ? failed + " couldn't be saved, see Downloads" : "",
+      pictures ? "Getting pictures for " + countLine(pictures) : ""].filter(Boolean).join(" · ");
+  }
   function syncState() {
     const last = C.sync.last;
-    const status = C.sync.running ? "Syncing…" : last.error ? last.error : last.at ? "Synced " + whenText(last.at) : "Not synced yet";
+    const now = syncProgress();
+    const status = C.sync.running ? now.text : last.error ? last.error : last.at ? "Synced " + whenText(last.at) : "Not synced yet";
+    const after = C.sync.running ? "" : syncAfter();
     return el("section", { class: "settings-section" },
       el("h2", { class: "overline" }, "Sync with GitHub"),
       el("div", { class: "group" },
-        el("div", { class: "row" }, el("span", { class: "choice-text" },
+        el("div", { class: "row sync-status" }, el("span", { class: "choice-text" },
           el("span", { class: "row-label" }, C.sync.account),
-          el("span", { class: "choice-note" + (last.error && !C.sync.running ? " warn" : ""), role: "status" }, status))),
+          el("span", { class: "choice-note" + (last.error && !C.sync.running ? " warn" : ""), role: "status" }, status),
+          after ? el("span", { class: "choice-note accent" }, after) : null,
+          C.sync.running ? el("span", { class: "progress thin" + (now.part == null ? " busy" : ""), "aria-hidden": "true" },
+            el("span", { class: "progress-fill", style: "transform: scaleX(" + (now.part == null ? 1 : now.part) + ")" })) : null)),
         el("button", { class: "row", type: "button", ...(C.sync.running ? { disabled: "" } : {}), onclick: () => syncNow(false) },
           el("span", { class: "row-label accent" }, "Sync now")),
         el("button", { class: "row", type: "button", onclick: () => { C.sync.disconnect(); renderSection(); toast("Sync is off. Your pages stay here and on GitHub."); } },
           el("span", { class: "row-label warn" }, "Stop syncing"))),
       el("p", { class: "footnote" }, "Syncs when Carry-on opens, after a change, and every few minutes while it's open. Stopping leaves your pages here and on GitHub."));
+  }
+  // Pages too, or links only: the library and its marks always sync.
+  function syncWhat() {
+    return el("section", { class: "settings-section" },
+      el("h2", { class: "overline" }, "What this device syncs"),
+      el("div", { class: "group" },
+        el("div", { class: "rc-list" },
+          el("div", { class: "rc-row stack" }, el("span", { class: "rc-label" }, "Pages"),
+            seg("sync-what", "What this device syncs", [{ value: "pages", label: "Pages too" }, { value: "links", label: "Links only" }],
+              C.sync.links ? "links" : "pages", (v) => { C.sync.links = v === "links"; renderSection(); syncSoon(500); })))),
+      el("p", { class: "footnote" }, C.sync.links
+        ? "Only links, tags, collections and where you are go up. Pages new to this device are saved again from their links, so one that changed or went away comes back different or not at all."
+        : "Each page's text goes up with it, so another device gets the page as you saved it, even if the site changes or takes it down."));
   }
   // The setup link points at the web copy: inside the app this page is at
   // https://localhost, which no other device can open. The app's scanner
@@ -4501,7 +4599,7 @@
     const list = folderPages(name);
     const src = coverUrl(list) || list.map(thumbUrl).find(Boolean);
     const box = el("span", { class: "side-cover", "aria-hidden": "true" });
-    if (src) box.append(el("img", { src, alt: "", loading: "lazy" }));
+    box.append(src ? el("img", { src, alt: "", loading: "lazy" }) : collectionIcon(list, 16));
     return box;
   }
 

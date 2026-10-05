@@ -103,6 +103,12 @@ and the page shows above it.
   until then.
 - Nothing animates text the reader is reading.
 - `prefers-reduced-motion: reduce`: springs become a 120 ms opacity fade.
+- Screens push in from the right edge, except a page or collection opened
+  from its card in the library: it grows out of the card (translate and
+  scale from the card's corner, clipped to the card's shape, the sheet
+  spring) and shrinks back into it on Back (0.30.3).
+- The reader's page turn: the page read lifts 6% and fades (control
+  spring), the next comes up from 28% below (sheet spring) (0.30.3).
 
 ## 5. Components
 
@@ -148,9 +154,10 @@ and the page shows above it.
   centred at 32 px (`--s-6`), or the site's first letter in the serif,
   heading size, `--muted` (0.27.6).
 - **Collection tile (Now):** its story page's cover when it's linked to
-  one (0.27.6), else its first picture, else a cover drawn from it: the
-  collection glyph at the top and the name in the serif at the bottom, on
-  `--preview` (0.27.7). Under it the name, "3 of 12 read" and a thin
+  one (0.27.6), else its first picture, else its icon (the folder, or the
+  book for a story) at 44 px, centred on `--preview`, `--muted` (the book
+  `--accent`), with no name drawn: the name is under it already (0.30.3).
+  The collection's own screen and the sidebar show the same. Under it the name, "3 of 12 read" and a thin
   accent line. A series with chapters not yet saved shows "2 new" as a
   pill at the picture's top end: `--accent` fill, `--accent-ink` text,
   meta size, semibold (0.25.0).
