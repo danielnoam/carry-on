@@ -56,46 +56,19 @@ release, search Waypage in the Play Store and the App Store by hand.
   updater too. Renaming it relies on GitHub's redirect, so keep the name
   unless there's a reason to change it.
 
-## 0.30.0 and 0.31.0: Sync through a private GitHub repo
+## Next: sync, what's left after 0.30.0
 
-Split in two because it's the riskiest work and loses data if wrong.
+0.30.0 syncs the library and each page's text; pictures sync as each
+page's mode and every device fetches its own (Daniel, 5 Oct 2026), so
+the planned 0.31.0 (images through the Git Data API) is not needed.
 
-**0.30.0, the index and text.** A fine-grained token for one repo, kept on
-the device. Sync `library.json` and each `page.html` + `meta.json`
-through the contents API with `sha` for conflicts, as LifeLog's
-src/storage.js does. Deletes become tombstones in `library.json` so they
-don't come back from the other device. The other device re-downloads
-previews from the original links. Reuses the 0.18.0 backup format.
-
-**0.31.0, images (Daniel, 5 Oct 2026: "we don't need to sync the actual
-image").** Images never go to the repo. What syncs is each page's mode
-(Links, Previews or Full images); the other device downloads its own
-copies from the original links. Pictures that can't be fetched again
-(the original gone, or a Tapas panel whose signed address expired after
-an hour) stay missing there, and Retry shows as for any missing preview.
-Base it on LifeLog's sync, which works well (Daniel, 5 Oct 2026).
-
-**What syncs of the images (Daniel, 3 Oct 2026).** Each page syncs its
-images as one of three: **Links** (none, the other device loads them
-online), **Previews** (the small local copies) or **Full images**.
-- Two defaults in Settings: one for collections, one for pages not in a
-  collection.
-- A collection can override it from inside its own screen; a page not
-  in a collection can override it from the page.
-- A page in a collection always follows its collection (its default or
-  its override), never its own.
-- Anything not overridden follows the default, so changing a default
-  changes everything that never picked its own.
-This also answers the repo-size question above: a comics collection can
-sync as Links.
-
-The token is per device and stays in the app; for anyone but Daniel sync
-stays optional, with 0.18.0's backup as the no-account way.
-
-**Daniel's phones:** two devices; save on one, read on the other; delete on
-one and confirm it stays gone; edit tags offline on both and sync.
-
-**Depends on:** 0.18.0 (format, merge-by-URL rules).
+- **Feeds in sync.** The feeds you follow are on each device on their
+  own; they could join library.json.
+- **Setting up the second device with a link** (LifeLog's one-link
+  setup) instead of pasting the token again.
+- **Try it on Daniel's two phones:** save on one and read on the other;
+  delete on one and confirm it stays gone; tag on both offline, then
+  sync.
 
 ---
 

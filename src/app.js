@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.29.2";
+  const APP_VERSION = "0.30.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -2559,7 +2559,7 @@
   async function removeFolder(withPages) {
     const name = state.folder;
     const list = folderPages(name);
-    if (withPages && !confirm("Delete “" + name + "” and its " + countLine(list.length) + " from " + HERE + "?")) return;
+    if (withPages && !confirm("Delete “" + name + "” and its " + countLine(list.length) + " from " + HERE + "?" + alsoSynced())) return;
     for (const p of list) {
       if (withPages) await C.store.removePage(p.id);
       else { delete p.folder; delete p.folderAt; }
@@ -2684,8 +2684,10 @@
 
   // From the reader, back out of it; from the library's sheet, back to the
   // library (or out of a folder this emptied).
+  // With sync on, a deletion reaches every device.
+  const alsoSynced = () => (C.sync.on ? " With sync on, it goes from your other devices too." : "");
   async function deletePage(p, where) {
-    if (!confirm("Delete “" + p.title + "” from this phone?")) return;
+    if (!confirm("Delete “" + p.title + "” from " + HERE + "?" + alsoSynced())) return;
     await C.store.removePage(p.id);
     state.pages = state.pages.filter((x) => x.id !== p.id);
     await C.store.writeIndex(state.pages);
@@ -2791,7 +2793,7 @@
 
   async function deletePicked() {
     const list = picked();
-    if (!list.length || !confirm("Delete " + countLine(list.length) + " from " + HERE + "?")) return;
+    if (!list.length || !confirm("Delete " + countLine(list.length) + " from " + HERE + "?" + alsoSynced())) return;
     for (const p of list) await C.store.removePage(p.id);
     state.pages = state.pages.filter((p) => !list.includes(p));
     await C.store.writeIndex(state.pages);
@@ -3138,6 +3140,114 @@
           el("span", { class: "row-label accent" }, "Back up the library")),
         open, input),
       el("p", { class: "footnote" }, "One file with every page, its pictures, tags, collections and where you were, and the feeds you follow. " + (C.platform.native ? "Keep it off the phone" : "Keep it somewhere other than this browser") + ". Restoring keeps whichever copy of a page was saved last. A page sent as a file opens here too."));
+  }
+
+  // ---- Sync (0.30.0) ----
+  // The library kept level with a private GitHub repo (src/sync.js): at
+  // launch, coming back to the app, a few seconds after any change, and
+  // every few minutes while open. Pages that came down get their pictures
+  // here, one page at a time, like Retry.
+  let syncTimer = null, syncQueue = [], fetchingPictures = false;
+  function syncSoon(ms = 4000) {
+    if (!C.sync.on) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => { syncTimer = null; if (C.sync.running) syncSoon(ms); else syncNow(); }, ms);
+  }
+  async function syncNow(quiet = true) {
+    if (!C.sync.on) return null;
+    if (!navigator.onLine && quiet) return null;
+    clearTimeout(syncTimer);
+    syncTimer = null;
+    let res = null;
+    try {
+      res = await C.sync.run({
+        getPages: () => state.pages,
+        // The same objects are kept and updated in place: the open page,
+        // an open menu and the position timer hold on to them.
+        setPages: async (list) => {
+          const live = new Map(state.pages.map((p) => [p.id, p]));
+          state.pages = list.map((n) => {
+            const o = live.get(n.id);
+            if (!o || o === n) return n;
+            for (const k of Object.keys(o)) if (!(k in n)) delete o[k];
+            return Object.assign(o, n);
+          });
+          await C.store.writeIndexOnly(state.pages);
+          texts.clear();
+          await loadThumbs();
+          renderLibrary();
+          if (state.folder) renderFolder();
+          updateWidgets();
+        },
+        sameUrl,
+        onProgress: () => { if (state.section === "sync") renderSection(); },
+      });
+    } catch (e) {
+      if (!quiet) toast(C.sync.last.error || "Sync stopped. Try again.");
+    }
+    if (state.section === "sync") renderSection();
+    if (res && res.downloads.length) { syncQueue.push(...res.downloads.map((p) => p.id)); fetchPictures(); }
+    if (res && !quiet) toast(res.up + res.down + res.removed ? "Synced: " + [res.up ? res.up + " sent" : "", res.down ? res.down + " came in" : "", res.removed ? res.removed + " removed" : ""].filter(Boolean).join(", ") + "." : "Already in step.");
+    return res;
+  }
+  async function fetchPictures() {
+    if (fetchingPictures || !C.platform.native) return;
+    fetchingPictures = true;
+    try {
+      while (syncQueue.length && navigator.onLine) {
+        const p = state.pages.find((x) => x.id === syncQueue[0]);
+        syncQueue.shift();
+        if (!p || !p.missing) continue;
+        let res = null;
+        try { res = await C.save.retryMissing(p); } catch (e) { res = null; }
+        if (res && res.got) {
+          Object.assign(p, { missing: res.missing, thumb: res.thumb, bytes: (p.bytes || 0) + res.bytes });
+          await C.store.writeIndexOnly(state.pages);
+          renderLibrary();
+          if (state.folder) renderFolder();
+        }
+      }
+    } finally { fetchingPictures = false; }
+  }
+
+  function syncGroup() {
+    const last = C.sync.last;
+    if (!C.sync.on) {
+      const input = el("input", { class: "feed-input", type: "password", autocomplete: "off", spellcheck: "false", placeholder: "github_pat_…", "aria-label": "GitHub token" });
+      const note = el("p", { class: "footnote", role: "status" });
+      const go = el("button", { class: "btn-primary", type: "button" }, "Connect");
+      const connect = async () => {
+        go.disabled = true; go.textContent = "Connecting…"; note.textContent = "";
+        try {
+          await C.sync.connect(input.value);
+          renderSection();
+          syncNow(false);
+        } catch (e) {
+          go.disabled = false; go.textContent = "Connect";
+          note.className = "footnote warn";
+          note.textContent = e instanceof C.sync.SyncError ? e.message : "Couldn't connect. Try again.";
+        }
+      };
+      go.addEventListener("click", connect);
+      input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); connect(); } });
+      return el("section", { class: "settings-section sync-connect" },
+        el("h2", { class: "overline" }, "Sync with GitHub"),
+        el("p", { class: "footnote" }, "Keeps your pages, tags, collections, favourites and where you are the same on every device, through a private repo of yours called carryon-data. Pictures don't go: each device gets its own from the sites."),
+        el("p", { class: "footnote" }, "On GitHub, make a fine-grained token (Settings, Developer settings, Personal access tokens) with Contents: Read and write on a private repo named carryon-data, or on all repos so Carry-on can make it. Paste it here on each device."),
+        input, go, note);
+    }
+    const status = C.sync.running ? "Syncing…" : last.error ? last.error : last.at ? "Synced " + whenText(last.at) : "Not synced yet";
+    return el("section", { class: "settings-section" },
+      el("h2", { class: "overline" }, "Sync with GitHub"),
+      el("div", { class: "group" },
+        el("div", { class: "row" }, el("span", { class: "choice-text" },
+          el("span", { class: "row-label" }, C.sync.account),
+          el("span", { class: "choice-note" + (last.error && !C.sync.running ? " warn" : ""), role: "status" }, status))),
+        el("button", { class: "row", type: "button", ...(C.sync.running ? { disabled: "" } : {}), onclick: () => syncNow(false) },
+          el("span", { class: "row-label accent" }, "Sync now")),
+        el("button", { class: "row", type: "button", onclick: () => { C.sync.disconnect(); renderSection(); toast("Sync is off. Your pages stay here and on GitHub."); } },
+          el("span", { class: "row-label warn" }, "Stop syncing"))),
+      el("p", { class: "footnote" }, "Syncs when Carry-on opens, after a change, and every few minutes while it's open. Stopping leaves your pages here and on GitHub."));
   }
 
   // "Save full images" for a page saved with previews or links only.
@@ -4780,6 +4890,7 @@
       value: () => themeName(state.theme) },
     saving: { title: "Saving", build: () => [choiceGroup(SETTINGS[1])],
       value: () => SETTINGS[1].options.find((o) => o.value === SETTINGS[1].get()).label },
+    sync: { title: "Sync", build: () => [syncGroup()], value: () => (C.sync.on ? (C.sync.last.error ? "Stopped" : "On") : "Off") },
     storage: { title: "Storage and backup", build: () => [storageGroup(), browserStorageGroup(), backupGroup()], value: () => formatSize(totalBytes()) },
     updates: { title: "Updates", build: () => [updatesGroup()], value: () => (updateOut() ? upd.latest + " is out" : "") },
     about: { title: "About", build: () => [aboutGroup()], value: () => APP_VERSION },
@@ -4803,7 +4914,7 @@
             el("span", { class: "row-label accent" }, "Carry-on " + upd.latest + " is out"),
             el("button", { class: "btn-small", type: "button", onclick: () => openSection("updates") }, "View"))) : null,
         el("div", { class: "group" }, row("appearance"), row("saving")),
-        el("div", { class: "group" }, row("storage")),
+        el("div", { class: "group" }, row("storage"), row("sync")),
         el("div", { class: "group" }, row("updates"), row("about"))));
   }
 
@@ -5040,13 +5151,17 @@
     takeWidget();
     C.platform.widgets.onOpen(takeWidget);
     updateWidgets();
+    C.store.onIndex = () => syncSoon();
+    setTimeout(() => syncNow(), 2000);
     document.addEventListener("visibilitychange", () => {
-      if (document.hidden) { if (positionTimer) savePositions(); updateWidgets(); return; }
+      if (document.hidden) { if (positionTimer) savePositions(); updateWidgets(); if (syncTimer) syncNow(); return; }
       takeFeedNews();
       takeWidget();
+      syncSoon(1000);
     });
   });
-  addEventListener("online", () => { dailyCheck(false); checkFeeds(false); });
+  addEventListener("online", () => { dailyCheck(false); checkFeeds(false); syncSoon(1000); fetchPictures(); });
+  setInterval(() => { if (!document.hidden) syncNow(); }, 5 * 6e4);
   // Feeds are due every few hours; asked about while the app is open.
   setInterval(() => checkFeeds(false), 15 * 6e4);
 

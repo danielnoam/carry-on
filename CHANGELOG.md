@@ -2,6 +2,16 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.30.0] - 2026-10-05
+
+### Added
+- Sync: your library on every device, through a private GitHub repo of
+  yours. Pages, tags, collections, favourites and where you are in each
+  page stay the same everywhere; a page deleted on one device goes from
+  the others. Pictures don't go through GitHub: each device gets its own
+  from the sites, as Links, Previews or Full images like the page was
+  saved. Turn it on in Settings, Sync, with a GitHub token.
+
 ## [0.29.2] - 2026-10-05
 
 ### Added

@@ -62,7 +62,13 @@
     try { return JSON.parse(localStorage.getItem(INDEX_KEY)) || []; } catch (e) { return []; }
   }
 
+  // Told after each write, so sync (0.30.0) can send the change.
+  let onIndex = null;
   async function writeIndex(pages) {
+    await writeIndexOnly(pages);
+    if (onIndex) onIndex();
+  }
+  async function writeIndexOnly(pages) {
     const text = JSON.stringify(pages);
     if (FS()) {
       await FS().writeFile({ path: "library.json", data: text, directory: DIR, encoding: "utf8" });
@@ -297,6 +303,6 @@
     return dataUrl ? dataUrl + "pages/" + id + "/" : null;
   }
 
-  window.CarryOn.store = { ready, readIndex, writeIndex, writeThumb, readThumbs, storageInfo, keepStored, writePage, readPage, removePage, writeText, readText, download, removeFile, shrink, pageDirUrl, bytesOf,
+  window.CarryOn.store = { ready, readIndex, writeIndex, writeIndexOnly, set onIndex(f) { onIndex = f; }, writeThumb, readThumbs, storageInfo, keepStored, writePage, readPage, removePage, writeText, readText, download, removeFile, shrink, pageDirUrl, bytesOf,
     listFiles, listSized, readBytes, writeBytes, cacheFile, toBase64 };
 })();
