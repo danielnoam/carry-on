@@ -483,7 +483,7 @@
     if (has && has(meta.url)) return { already: meta.url };
     const out = document.implementation.createHTMLDocument("");
     const { root, images } = C.save.cleanSaved(doc.body, out);
-    if (!root.textContent.trim()) throw new Error("This page file is empty.");
+    if (!root.textContent.trim()) throw new Error("This clip file is empty.");
     let bytes = 0, thumb = null;
     for (const [i, im] of images.entries()) {
       const [head, b64] = im.data.split(",");
