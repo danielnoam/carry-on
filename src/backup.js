@@ -45,6 +45,25 @@
     return out;
   }
 
+  // A followed feed from a file, down to the fields Carry-on keeps. null
+  // when it has no address to read.
+  function cleanFeed(f) {
+    if (!f || typeof f !== "object" || !httpUrl(f.url)) return null;
+    const items = Array.isArray(f.items) ? f.items : [];
+    const out = {
+      url: httpUrl(f.url), title: text(f.title, 300) || httpUrl(f.url), link: httpUrl(f.link) || null, icon: httpUrl(f.icon) || null,
+      mode: f.mode === "save" ? "save" : "show", images: ["previews", "full", "links"].includes(f.images) ? f.images : "previews",
+      folder: text(f.folder, 32).replace(/\s+/g, " ").trim(), days: [3, 7, 30].includes(f.days) ? f.days : 7,
+      addedAt: num(f.addedAt) || Date.now(), checkedAt: 0, error: "",
+      items: items.filter((it) => it && httpUrl(it.url)).slice(0, 100).map((it) => {
+        const o = { id: text(it.id, 2000) || null, url: httpUrl(it.url), title: text(it.title, 300), date: num(it.date) || null, foundAt: num(it.foundAt) || Date.now() };
+        if (it.tried === true) o.tried = true;
+        return o;
+      }),
+    };
+    return out;
+  }
+
   // ---- Zip, stored ----
 
   const CRC = new Uint32Array(256).map((_, n) => {
@@ -160,14 +179,15 @@
 
   // Writes the backup and resolves to { uri } in the app (a file in its
   // cache, for the share sheet) or { blob } in a browser.
-  async function exportLibrary(pages, onProgress) {
+  async function exportLibrary(pages, onProgress, feeds) {
     const native = C.platform.native;
     const name = "carry-on-backup-" + today() + ".zip";
     const file = native ? await S().cacheFile(name) : null;
     const parts = [];
     const zip = zipWriter(native ? (b) => file.append(b) : (b) => { parts.push(b); });
-    await zip.add("carry-on.json", utf8(JSON.stringify({ format: 1, app: C.version, made: Date.now(), pages: pages.length })));
+    await zip.add("carry-on.json", utf8(JSON.stringify({ format: 1, app: C.version, made: Date.now(), pages: pages.length, feeds: (feeds || []).length })));
     await zip.add("library.json", utf8(JSON.stringify(pages)));
+    if (feeds && feeds.length) await zip.add("feeds.json", utf8(JSON.stringify(feeds)));
     let done = 0;
     for (const p of pages) {
       if (native) {
@@ -191,7 +211,8 @@
   // Merges a backup into the library: a page not here is added, one here
   // already is replaced only by a copy saved later, never the other way.
   // `same(a, b)` says whether two addresses are the same page. Resolves to
-  // { pages, added, replaced, kept } where `pages` is the new index.
+  // { pages, added, replaced, kept, feeds } where `pages` is the new index
+  // and `feeds` the backup's followed feeds, cleaned.
   async function restoreLibrary(blob, current, same, onProgress) {
     let entries;
     try { entries = await zipEntries(blob); } catch (e) { throw new Error("This file isn't a Carry-on backup."); }
@@ -221,7 +242,13 @@
       if (onProgress) onProgress(++done, list.length);
     }
     pages.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
-    return { pages, added, replaced, kept };
+    let feeds = [];
+    const feedsEntry = entries.get("feeds.json");
+    if (feedsEntry) {
+      try { feeds = JSON.parse(new TextDecoder().decode(await zipRead(blob, feedsEntry))); } catch (e) { feeds = []; }
+      feeds = Array.isArray(feeds) ? feeds.map(cleanFeed).filter(Boolean) : [];
+    }
+    return { pages, added, replaced, kept, feeds };
   }
 
   async function restorePage(blob, entries, from, meta) {
@@ -481,5 +508,5 @@
     return meta;
   }
 
-  C.backup = { cleanMeta, crc32, zipWriter, zipEntries, zipRead, exportLibrary, restoreLibrary, exportPage, exportPages, exportMarkdown, exportMarkdownAll, importPage, imageType, mdBlocks };
+  C.backup = { cleanMeta, cleanFeed, crc32, zipWriter, zipEntries, zipRead, exportLibrary, restoreLibrary, exportPage, exportPages, exportMarkdown, exportMarkdownAll, importPage, imageType, mdBlocks };
 })();

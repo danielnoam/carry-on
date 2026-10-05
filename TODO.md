@@ -24,6 +24,29 @@ asks from Daniel.
 
 ---
 
+## Asks from 5 Oct 2026 (Daniel), not slotted yet
+
+- **The back gesture opens the sidebar.** In the library and Feeds, the
+  phone's own back swipe (from the screen's edge) opens the sidebar,
+  instead of the swipe right anywhere that 0.28.2 added; that one goes.
+  On Android the back gesture comes from either edge and the app can't
+  tell which, so both open it; back again with the sidebar open leaves
+  the app as now. iOS has no back gesture at the root, so there the edge
+  swipe stays (from the left edge only).
+- **Pages mode in the reader.** A switch between scrolling and turning
+  pages: the text laid out in screen-sized columns, a tap on either side
+  or a swipe turns, the place is kept as now (`at`). The page-turn
+  animation from 0.28.2 is the turn. Needs the reader's CSS columns
+  inside the sandboxed frame, no scripts in it.
+- **Home screen widgets:** the newest posts from feeds, favourite pages
+  or a collection, and a "keep reading" widget that opens the last page
+  where you left it. Widgets are native on both systems: Android an
+  AppWidget in native/ (beside share); iOS a WidgetKit extension, which
+  like the share extension needs its own app ID and an App Group, so it
+  waits on the Apple Developer Program decision. Android first. The app
+  would write a small summary file for the widget to read. Needs a
+  "favourite" mark on pages, which doesn't exist yet.
+
 ## Rename to Waypage (Daniel, 5 Oct 2026)
 
 The app becomes **Waypage**, store title "Waypage: Offline Reader": a page
@@ -92,9 +115,8 @@ one and confirm it stays gone; edit tags offline on both and sync.
 
 ## Waiting on a decision, not on a release slot
 
-- **Feeds: background checks and backups (0.28.0 shipped without
-  them).** Feeds are checked only while the app is open, and aren't in
-  backups. Add them to the backup format when sync (0.29.0) touches it.
+- **Feeds: background checks (0.28.0 shipped without them; backups
+  came in 0.28.3).** Feeds are checked only while the app is open.
 - **Saving any site in a browser: a server, later (Daniel, 4 Oct
   2026).** A stateless fetch worker behind a token, rate-limited, storing
   nothing, so the browser can save (and follow feeds from) sites that

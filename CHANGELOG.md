@@ -2,6 +2,13 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.28.3] - 2026-10-05
+
+### Added
+- Backups include the feeds you follow, with their settings and posts.
+  Restoring follows any that aren't followed here and leaves the others
+  as they are.
+
 ## [0.28.2] - 2026-10-04
 
 ### Added
