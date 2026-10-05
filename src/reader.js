@@ -353,17 +353,35 @@
   const rtl = () => !!doc && getComputedStyle(doc.body).direction === "rtl";
   const width = () => frame.contentWindow.innerWidth;
   const pages = () => Math.max(1, Math.round(doc.documentElement.scrollWidth / width()));
-  const page = () => Math.round(Math.abs(frame.contentWindow.scrollX) / width());
+  // While a turn runs, the page is the one it's going to, so quick taps add up.
+  const page = () => (turning ? turning.to : Math.round(Math.abs(frame.contentWindow.scrollX) / width()));
   // The page an element starts on, from where it sits on screen now.
   function pageOf(el) {
     const r = el.getBoundingClientRect(), w = width();
     const x = rtl() ? w - r.right : r.left;
     return Math.max(0, Math.min(pages() - 1, page() + Math.floor((x + 1) / w)));
   }
+  // A turn is a short ease-out of its own: the WebView's smooth scroll
+  // takes most of a second for a screen's width.
+  let turning = null;
   function goPage(n, now) {
     const w = frame.contentWindow;
-    const to = Math.max(0, Math.min(pages() - 1, n)) * width() * (rtl() ? -1 : 1);
-    w.scrollTo({ left: to, top: 0, behavior: now || matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    const to = Math.max(0, Math.min(pages() - 1, n));
+    const x = to * width() * (rtl() ? -1 : 1);
+    if (turning) w.cancelAnimationFrame(turning.raf);
+    turning = null;
+    if (now || matchMedia("(prefers-reduced-motion: reduce)").matches) { w.scrollTo(x, 0); return; }
+    const from = w.scrollX, t0 = w.performance.now(), ms = 220;
+    const me = { to };
+    const step = (t) => {
+      if (turning !== me) return;
+      const k = Math.min(1, (t - t0) / ms), e = 1 - Math.pow(1 - k, 3);
+      w.scrollTo(from + (x - from) * e, 0);
+      if (k < 1) me.raf = w.requestAnimationFrame(step);
+      else turning = null;
+    };
+    me.raf = w.requestAnimationFrame(step);
+    turning = me;
   }
   function turn(d) {
     if (!isPaged()) return;
@@ -414,6 +432,9 @@
     });
   }
 
+  // Which page of how many, in pages mode; null when scrolling.
+  const pageInfo = () => (doc && isPaged() ? { page: page() + 1, pages: pages() } : null);
+
   // Scroll or pages, kept where the reader was.
   function setPaged(on) {
     const at = doc ? position() : 0;
@@ -435,6 +456,7 @@
   // image.
   function open(iframe, html, meta, { at = 0, onPosition, onScroll, next, top, onImage: image, onTap: tap, onSelect, pages: asPages } = {}) {
     frame = iframe;
+    turning = null;
     paged = !!asPages;
     comic = false;
     blocks = [];
@@ -531,5 +553,5 @@
   addEventListener("resize", applyTop);
   addEventListener("offline", applyConnection);
 
-  C.reader = { open, close, position, setPaged, turn, get paged() { return isPaged(); }, headings, section, jumpTo, readable, firstShown, light, following, selectionSpot, clearSelection, applyTheme, applyConnection, srcdoc, CSP };
+  C.reader = { open, close, position, setPaged, turn, get paged() { return isPaged(); }, pageInfo, headings, section, jumpTo, readable, firstShown, light, following, selectionSpot, clearSelection, applyTheme, applyConnection, srcdoc, CSP };
 })();

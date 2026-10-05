@@ -1357,7 +1357,9 @@
     const p = state.open;
     if (!p) return;
     $("readLeft").textContent = at >= 0.995 ? "End" : Math.max(1, Math.ceil((p.minutes || 1) * (1 - at))) + " min left";
-    $("readSection").textContent = C.reader.section();
+    const pg = C.reader.pageInfo();
+    const section = C.reader.section();
+    $("readSection").textContent = pg ? "Page " + pg.page + " of " + pg.pages + (section ? " · " + section : "") : section;
   }
 
   // The bar along the bottom fills as the page is read. The top bar slides
