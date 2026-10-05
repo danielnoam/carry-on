@@ -14,7 +14,7 @@
 (function () {
   const C = window.CarryOn;
   const API = "https://api.github.com";
-  const CFG_KEY = "carryon.sync";        // { owner, repo, branch, token, sha, at, links }
+  const CFG_KEY = "carryon.sync";        // { owner, repo, branch, token, sha, at, links, paused }
   const BASE_KEY = "carryon.syncBase";   // the library.json last written or read
   const WAIT_KEY = "carryon.syncWaiting"; // ids whose text hasn't come down yet
   const REPO = "carryon-data";
@@ -167,6 +167,9 @@
   const contents = (path) => API + "/repos/" + cfg.owner + "/" + cfg.repo + "/contents/" + path;
 
   class SyncError extends Error {}
+  // Paused part way (0.30.4): what was done so far stays, the rest waits.
+  class Paused extends Error {}
+  const halt = () => { if (cfg && cfg.paused) throw new Paused(); };
   async function fail(r) {
     let msg = "";
     try { msg = (await r.json()).message || ""; } catch (e) { /* none */ }
@@ -317,7 +320,7 @@
   // whose pictures this device fetches next and `fromLinks` the pages it
   // saves itself from their links; throws SyncError.
   function run({ getPages, setPages, getFeeds, setFeeds, sameUrl, onProgress }) {
-    if (!cfg) return Promise.resolve(null);
+    if (!cfg || cfg.paused) return Promise.resolve(null);
     if (running) return running;
     const told = (p) => { progress = p; if (onProgress) onProgress(p); };
     running = (async () => {
@@ -328,6 +331,7 @@
         keep(CFG_KEY, cfg);
         return res;
       } catch (e) {
+        if (e instanceof Paused) return null;
         last = { at: last.at, error: e instanceof SyncError ? e.message : "Sync stopped: " + (e && e.message ? e.message : e) };
         throw e;
       } finally { running = null; progress = null; }
@@ -361,6 +365,7 @@
       const mine = new Map(before.map((p) => [p.id, p]));
       const todo = links ? [] : merged.pages.filter((p) => mine.has(p.id) && mine.get(p.id).savedAt === p.savedAt && (!merged.files[p.id] || merged.files[p.id].at !== p.savedAt));
       for (const [i, p] of todo.entries()) {
+        halt();
         if (onProgress) onProgress({ stage: "up", done: i, total: todo.length });
         let html;
         try { html = await C.store.readPage(p.id); } catch (e) { html = null; }
@@ -382,6 +387,7 @@
       const gone = Object.entries((remoteDoc && remoteDoc.files) || {}).filter(([id]) => merged.deleted[id]);
       for (const [id, f] of gone) await remove("pages/" + id + ".html", f.sha).catch(() => {});
       if (remote && same(merged, remoteDoc)) break;
+      halt();
       try {
         await write("library.json", JSON.stringify(merged), remote && remote.sha, "Library: " + merged.pages.length + " pages");
         break;
@@ -417,6 +423,9 @@
     let down = 0;
     const downloads = [];
     for (const [i, { m, have }] of want.entries()) {
+      // Paused while bringing pages in: the ones in are kept, the rest
+      // come next time (they're still new to this device then).
+      if (cfg && cfg.paused) { for (const r of want.slice(i)) if (!r.have) stillWaiting.push(r.m.id); break; }
       if (onProgress) onProgress({ stage: "down", done: i, total: want.length });
       let html = null;
       try { html = await readText("pages/" + m.id + ".html"); } catch (e) { html = null; }
@@ -495,6 +504,8 @@
     get last() { return last; },
     get progress() { return progress; },
     get links() { return !!(cfg && cfg.links); },
+    get paused() { return !!(cfg && cfg.paused); },
+    set paused(v) { if (!cfg) return; if (v) cfg.paused = true; else delete cfg.paused; keep(CFG_KEY, cfg); },
     set links(v) { if (!cfg) return; if (v) cfg.links = true; else delete cfg.links; keep(CFG_KEY, cfg); },
   };
 })();

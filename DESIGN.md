@@ -103,10 +103,13 @@ and the page shows above it.
   until then.
 - Nothing animates text the reader is reading.
 - `prefers-reduced-motion: reduce`: springs become a 120 ms opacity fade.
+- Only `transform` and `opacity` move, so the GPU runs every animation;
+  anything costly an animation causes (focus, `inert`, redraws) runs after
+  its first frame (0.30.4).
 - Screens push in from the right edge, except a page or collection opened
-  from its card in the library: it grows out of the card (translate and
-  scale from the card's corner, clipped to the card's shape, the sheet
-  spring) and shrinks back into it on Back (0.30.3).
+  from its card in the library: it grows out of the card (scaled to the
+  card's width, centred on it, fading in over the first third, the sheet
+  spring) and shrinks back into it on Back (0.30.3, no clip since 0.30.4).
 - The reader's page turn: the page read lifts 6% and fades (control
   spring), the next comes up from 28% below (sheet spring) (0.30.3).
 

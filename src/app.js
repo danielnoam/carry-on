@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.30.3";
+  const APP_VERSION = "0.30.4";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -550,6 +550,14 @@
     btn.setAttribute("aria-label", busy ? "Downloads, " + Math.round(share * 100) + "% done"
       : failed ? "Downloads, some pages couldn't be saved" : "Downloads");
     if (!busy) {
+      // A sync (and its pictures) keeps the same notification while it
+      // runs, so it goes on with the app in the background (0.30.4).
+      const sync = syncNote();
+      if (sync) {
+        const said = JSON.stringify(sync);
+        if (said !== toldNative) { toldNative = said; C.platform.downloads.update(sync); }
+        return;
+      }
       if (toldNative) C.platform.downloads.stop();
       toldNative = "";
       return;
@@ -1327,27 +1335,33 @@
       return M.arrive(screen, 0);
     }
     delete screen.dataset.beside;
+    delete screen.dataset.leaving;
     const under = below(screen);
-    under.inert = true;
     screen.hidden = false;
     const from = zoomFrom(screen);
     if (from) zoomed.set(screen, from); else zoomed.delete(screen);
-    if (from) return M.zoomIn(screen, from);
-    M.under(under, true);
-    return M.pushIn(screen);
+    const moved = from ? M.zoomIn(screen, from) : M.pushIn(screen);
+    // The screen underneath goes inert once this one covers it: in a big
+    // library that restyles every card, which held the push's first frame
+    // back by a tenth of a second on a phone (0.30.4).
+    const n = pushes.get(screen);
+    moved.then(() => { if (pushes.get(screen) === n && !screen.hidden && !screen.dataset.leaving) under.inert = true; });
+    return moved;
   }
+  // Heavy work after an animation's first frame, so it starts at once.
+  const afterStart = (fn) => requestAnimationFrame(() => setTimeout(fn, 0));
 
   function popScreen(screen) {
     const n = pushes.get(screen);
     const hide = () => { if (pushes.get(screen) === n) screen.hidden = true; };
     if (screen.dataset.beside) return M.leave(screen).then(hide);
     const under = below(screen);
-    under.inert = false;
+    screen.dataset.leaving = "1";
     const from = zoomed.get(screen);
     zoomed.delete(screen);
-    if (from) return M.zoomOut(screen, from).then(hide);
-    M.under(under, false);
-    return M.popOut(screen).then(hide);
+    const moved = from ? M.zoomOut(screen, from) : M.popOut(screen);
+    afterStart(() => { under.inert = false; });
+    return moved.then(hide);
   }
 
   function showOffline() {
@@ -1509,14 +1523,19 @@
   function closeReader() {
     if (!state.open) return;
     if (positionTimer) savePositions();
-    renderLibrary();
-    if (state.folder) renderFolder();
     closeSheet(true);
     if (state.image) { state.image = false; $("imageViewer").hidden = true; $("viewerImg").removeAttribute("src"); }
     stopAloud();
     hideReadHere();
     state.open = null;
-    popScreen($("readerView")).then(() => { if (!state.open) C.reader.close(); });
+    // The library redraws (where you got to) once the reader is away, not
+    // before it moves: in a big library that held Back up (0.30.4).
+    popScreen($("readerView")).then(() => {
+      if (state.open) return;
+      C.reader.close();
+      renderLibrary();
+      if (state.folder) renderFolder();
+    });
   }
 
   // ---- Read aloud (0.27.0) ----
@@ -1841,7 +1860,7 @@
     M.rise($("readingSheet"));
     const first = kind === "contents" ? $("readingSheet").querySelector("[aria-current]") || $("readingSheet").querySelector("button")
       : $("readingSheet").querySelector("button:not(:disabled), input:checked");
-    if (first && kind !== "page") first.focus({ preventScroll: true });
+    if (first && kind !== "page") afterStart(() => { if (state.sheet === kind) first.focus({ preventScroll: true }); });
   }
 
   function closeSheet(now) {
@@ -1853,7 +1872,7 @@
     const sheet = $("readingSheet");
     if (now) { sheet.hidden = true; return; }
     M.sink(sheet).then(() => { if (!state.sheet) sheet.hidden = true; });
-    button.focus({ preventScroll: true });
+    afterStart(() => button.focus({ preventScroll: true }));
   }
 
   // ---- Image viewer ----
@@ -1881,7 +1900,7 @@
     resetView(false);
     viewer.hidden = false;
     $("readerView").classList.remove("bar-away");
-    $("viewerClose").focus({ preventScroll: true });
+    afterStart(() => { if (state.image) $("viewerClose").focus({ preventScroll: true }); });
     const grow = () => {
       if (M.reduced() || !info.rect.width) return M.arrive(viewer, 0);
       const r = img.getBoundingClientRect();
@@ -1890,7 +1909,8 @@
       const dx = info.rect.left + info.rect.width / 2 - (r.left + r.width / 2);
       const dy = info.rect.top + info.rect.height / 2 - (r.top + r.height / 2);
       const t = M.timing("sheet");
-      viewer.animate([{ backgroundColor: "transparent" }, { backgroundColor: getComputedStyle(viewer).backgroundColor }], t);
+      // Its backdrop fades: opacity on a pseudo-element, which the GPU runs.
+      viewer.animate([{ opacity: 0 }, { opacity: 1 }], { ...t, pseudoElement: "::before" });
       img.animate([{ transform: "translate(" + dx + "px," + dy + "px) scale(" + k + ")" }, { transform: "none" }], t);
     };
     if (img.complete && img.naturalWidth) grow(); else img.addEventListener("load", grow, { once: true });
@@ -1906,7 +1926,7 @@
       $("viewerImg").removeAttribute("src");
       resetView(false);
     });
-    $("readerFrame").focus({ preventScroll: true });
+    afterStart(() => $("readerFrame").focus({ preventScroll: true }));
   }
 
   function paintView(settle) {
@@ -2896,24 +2916,29 @@
       select: state.select ? true : undefined }, "");
     $("menuBody").replaceChildren(MENUS[kind].build());
     $("menuSheet").setAttribute("aria-label", MENUS[kind].label);
-    menuUnder = [state.folder ? $("folderView") : $("libraryView"), $("selectHead"), $("selectBar")].filter((n) => !n.inert);
-    menuUnder.forEach((n) => { n.inert = true; });
     $("menuCatch").hidden = false;
     $("menuSheet").hidden = false;
     M.arrive($("menuCatch"), 0);
     M.rise($("menuSheet"));
-    const first = $("menuSheet").querySelector("button:not(:disabled)");
-    if (first) first.focus({ preventScroll: true });
+    const open = state.menu;
+    afterStart(() => {
+      if (state.menu !== open) return;
+      menuUnder = [state.folder ? $("folderView") : $("libraryView"), $("selectHead"), $("selectBar")].filter((n) => !n.inert);
+      menuUnder.forEach((n) => { n.inert = true; });
+      const first = $("menuSheet").querySelector("button:not(:disabled)");
+      if (first) first.focus({ preventScroll: true });
+    });
   }
 
   function closeMenu() {
     if (!state.menu) return;
     state.menu = null;
-    menuUnder.forEach((n) => { n.inert = false; });
+    const was = menuUnder;
     menuUnder = [];
     const sheet = $("menuSheet"), catcher = $("menuCatch");
     M.leave(catcher).then(() => { if (!state.menu) catcher.hidden = true; });
     M.sink(sheet).then(() => { if (!state.menu) sheet.hidden = true; });
+    afterStart(() => was.forEach((n) => { n.inert = false; }));
   }
 
   function redrawMenu() {
@@ -3221,12 +3246,12 @@
   let syncTimer = null, syncQueue = [], fetchingPictures = false;
   const SYNCED_KEEP = ["savedAt", "title", "requested", "tags", "folder", "folderAt", "source", "series", "fav", "favAt", "at", "finished", "readAt"];
   function syncSoon(ms = 4000) {
-    if (!C.sync.on) return;
+    if (!C.sync.on || C.sync.paused) return;
     clearTimeout(syncTimer);
     syncTimer = setTimeout(() => { syncTimer = null; if (C.sync.running) syncSoon(ms); else syncNow(); }, ms);
   }
   async function syncNow(quiet = true) {
-    if (!C.sync.on) return null;
+    if (!C.sync.on || C.sync.paused) return null;
     if (!navigator.onLine && quiet) return null;
     clearTimeout(syncTimer);
     syncTimer = null;
@@ -3254,15 +3279,16 @@
         getFeeds: () => feeds,
         setFeeds: syncedFeeds,
         sameUrl,
-        onProgress: () => { if (state.section === "sync") renderSection(); },
+        onProgress: () => { if (state.section === "sync") renderSection(); paintDownloads(); },
       });
     } catch (e) {
       if (!quiet) toast(C.sync.last.error || "Sync stopped. Try again.");
     }
     if (state.section === "sync") renderSection();
+    paintDownloads();
     if (res && res.downloads.length) { syncQueue.push(...res.downloads.map((p) => p.id)); fetchPictures(); }
     if (res && res.fromLinks.length) saveFromLinks(res.fromLinks);
-    if (res && !quiet) toast(res.up + res.down + res.removed ? "Synced: " + [res.up ? res.up + " sent" : "", res.down ? res.down + " came in" : "", res.removed ? res.removed + " removed" : ""].filter(Boolean).join(", ") + "." : "Already in step.");
+    if (res && !quiet && !C.sync.paused) toast(res.up + res.down + res.removed ? "Synced: " + [res.up ? res.up + " sent" : "", res.down ? res.down + " came in" : "", res.removed ? res.removed + " removed" : ""].filter(Boolean).join(", ") + "." : "Already in step.");
     return res;
   }
   // Pages that came as links only (0.30.3), saved here one after another
@@ -3273,7 +3299,7 @@
       && !state.pages.some((p) => p.id === m.id) && !state.saving.some((s) => s.synced && s.synced.id === m.id))
       .map((m) => ({ ...newJob(m.url, null), key: "sync:" + m.id, synced: m, mode: m.mode, kind: m.comic ? "comic" : "article", waiting: true }));
     if (!jobs.length) return;
-    const run = jobs.length > 1 ? Object.assign(startRun(null, jobs[0].site, jobs.length), { label: "From sync" }) : null;
+    const run = jobs.length > 1 ? Object.assign(startRun(null, jobs[0].site, jobs.length), { label: "From sync", sync: true, paused: C.sync.paused }) : null;
     jobs.forEach((j) => { j.run = run; });
     state.saving = [...jobs, ...state.saving];
     renderLibrary();
@@ -3305,7 +3331,8 @@
     if (fetchingPictures || !C.platform.native) return;
     fetchingPictures = true;
     try {
-      while (syncQueue.length && navigator.onLine) {
+      while (syncQueue.length && navigator.onLine && !C.sync.paused) {
+        paintDownloads();
         const p = state.pages.find((x) => x.id === syncQueue[0]);
         syncQueue.shift();
         if (!p || !p.missing) continue;
@@ -3322,6 +3349,7 @@
     } finally {
       fetchingPictures = false;
       if (state.section === "sync") renderSection();
+      paintDownloads();
     }
   }
 
@@ -3329,7 +3357,7 @@
   // off, the three steps to a first device and a way in for the next one;
   // on, the state and a code that sets up another device.
   function syncSections() {
-    return C.sync.on ? [syncState(), syncWhat(), syncShare()] : [syncSteps(), syncJoin()];
+    return C.sync.on ? [syncState(), syncWhat(), syncShare(), syncLeave()] : [syncSteps(), syncJoin()];
   }
   async function connectSync(text, btn) {
     if (btn) { btn.disabled = true; btn.textContent = "Connecting…"; }
@@ -3394,6 +3422,16 @@
     if (p.stage === "down") return { text: "Bringing pages in, " + p.done + " of " + p.total, part: p.total ? p.done / p.total : null };
     return { text: "Checking GitHub…", part: null };
   }
+  function syncNote() {
+    if (!C.sync.on || C.sync.paused) return null;
+    if (C.sync.running) {
+      const p = C.sync.progress, now = syncProgress();
+      return { title: "Syncing your library", text: now.text, done: p && p.total ? p.done : 0, total: p && p.total ? p.total : 0 };
+    }
+    const left = syncQueue.length + (fetchingPictures ? 1 : 0);
+    if (left) return { title: "Syncing your library", text: "Getting pictures for " + countLine(left), done: 0, total: 0 };
+    return null;
+  }
   function syncAfter() {
     const saving = state.saving.filter((s) => s.synced && !s.error).length;
     const failed = state.saving.filter((s) => s.synced && s.error).length;
@@ -3405,7 +3443,9 @@
   function syncState() {
     const last = C.sync.last;
     const now = syncProgress();
-    const status = C.sync.running ? now.text : last.error ? last.error : last.at ? "Synced " + whenText(last.at) : "Not synced yet";
+    const paused = C.sync.paused;
+    const status = C.sync.running ? now.text : paused ? "Paused" + (last.at ? ". Last synced " + whenText(last.at) : "")
+      : last.error ? last.error : last.at ? "Synced " + whenText(last.at) : "Not synced yet";
     const after = C.sync.running ? "" : syncAfter();
     return el("section", { class: "settings-section" },
       el("h2", { class: "overline" }, "Sync with GitHub"),
@@ -3416,11 +3456,37 @@
           after ? el("span", { class: "choice-note accent" }, after) : null,
           C.sync.running ? el("span", { class: "progress thin" + (now.part == null ? " busy" : ""), "aria-hidden": "true" },
             el("span", { class: "progress-fill", style: "transform: scaleX(" + (now.part == null ? 1 : now.part) + ")" })) : null)),
-        el("button", { class: "row", type: "button", ...(C.sync.running ? { disabled: "" } : {}), onclick: () => syncNow(false) },
+        paused ? null : el("button", { class: "row", type: "button", ...(C.sync.running ? { disabled: "" } : {}), onclick: () => syncNow(false) },
           el("span", { class: "row-label accent" }, "Sync now")),
-        el("button", { class: "row", type: "button", onclick: () => { C.sync.disconnect(); renderSection(); toast("Sync is off. Your pages stay here and on GitHub."); } },
-          el("span", { class: "row-label warn" }, "Stop syncing"))),
-      el("p", { class: "footnote" }, "Syncs when Carry-on opens, after a change, and every few minutes while it's open. Stopping leaves your pages here and on GitHub."));
+        el("button", { class: "row", type: "button", onclick: () => pauseSync(!paused) },
+          el("span", { class: "row-label accent" }, paused ? "Resume syncing" : "Pause syncing"))),
+      el("p", { class: "footnote" }, paused
+        ? "Nothing syncs until you resume. What synced before stays."
+        : "Syncs when Carry-on opens, after a change, and every few minutes while it's open. Pausing stops at the next page and picks up where it left off."));
+  }
+  // Pause stops a sync at the next page and starts none until Resume;
+  // pages saving from their links and pictures wait too (0.30.4).
+  function pauseSync(on) {
+    C.sync.paused = on;
+    for (const r of runs) if (r.sync) pauseRun(r, on);
+    if (state.section === "sync") renderSection();
+    paintDownloads();
+    if (!on) { syncNow(false); fetchPictures(); }
+  }
+  function disconnectSync() {
+    if (!confirm("Disconnect from GitHub? Your pages stay on this " + (C.platform.native ? "phone" : "browser") + " and on GitHub. To sync again you'll need a setup code or a token.")) return;
+    for (const r of runs) if (r.sync) stopRun(r);
+    syncQueue = [];
+    C.sync.disconnect();
+    renderSection();
+    paintDownloads();
+    toast("Disconnected. Your pages stay here and on GitHub.");
+  }
+  function syncLeave() {
+    return el("section", { class: "settings-section" },
+      el("div", { class: "group" },
+        el("button", { class: "row", type: "button", onclick: disconnectSync }, el("span", { class: "row-label warn" }, "Disconnect from GitHub"))),
+      el("p", { class: "footnote" }, "Forgets the token on this device. Your pages stay here and on GitHub."));
   }
   // Pages too, or links only: the library and its marks always sync.
   function syncWhat() {
@@ -4641,15 +4707,19 @@
     history.pushState({ view: "side" }, "");
     renderSide();
     const side = $("sidebar");
-    $("libraryView").inert = true;
     $("sideBtn").setAttribute("aria-expanded", "true");
     side.style.pointerEvents = "";
     $("sideCatch").hidden = false;
     side.hidden = false;
     M.arrive($("sideCatch"), 0);
     M.slideIn(side);
-    const at = side.querySelector("[aria-current]") || side.querySelector("button");
-    if (at) at.focus({ preventScroll: true });
+    // Focus and inert restyle the page: after the slide has started.
+    afterStart(() => {
+      if (!state.side) return;
+      $("libraryView").inert = true;
+      const at = side.querySelector("[aria-current]") || side.querySelector("button");
+      if (at) at.focus({ preventScroll: true });
+    });
   }
 
   function closeSide() {
@@ -4658,12 +4728,15 @@
     sideByBack = false;
     const side = $("sidebar"), catcher = $("sideCatch");
     const had = side.contains(document.activeElement);
-    $("libraryView").inert = false;
     $("sideBtn").setAttribute("aria-expanded", "false");
     side.style.pointerEvents = "none";
     M.leave(catcher).then(() => { if (!state.side) catcher.hidden = true; });
     M.slideOut(side).then(() => { if (!state.side) side.hidden = true; });
-    if (had) $("sideBtn").focus({ preventScroll: true });
+    afterStart(() => {
+      if (state.side) return;
+      $("libraryView").inert = false;
+      if (had) $("sideBtn").focus({ preventScroll: true });
+    });
   }
 
   // ---- Gestures (0.28.2) ----
@@ -5280,7 +5353,10 @@
   $("downloadsBtn").addEventListener("click", () => openDownloads());
   $("downloadsBack").addEventListener("click", () => history.back());
   // The notification's Stop (Android) stops every run.
-  C.platform.downloads.onStop(() => { for (const r of [...runs]) stopRun(r); });
+  C.platform.downloads.onStop(() => {
+    for (const r of [...runs]) stopRun(r);
+    if (C.sync.on && (C.sync.running || syncQueue.length || fetchingPictures)) pauseSync(true);
+  });
   $("sectionBack").addEventListener("click", () => history.back());
   // Search's button sits in the bar that stays, so it's there from anywhere
   // in the list. A second tap, with the field empty or in view, puts it away.

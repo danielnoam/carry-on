@@ -3,6 +3,23 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Why animations stuttered (0.30.4).** Not the animations: the work
+  before them. Opening anything set `inert` on the screen underneath and
+  moved focus, and in a library of a few hundred pages each restyled
+  every card, 100 to 170 ms at a phone's speed, before the first frame;
+  Back redrew the whole library first. Now the animation starts, then
+  that work runs (`afterStart`, or once it ends), library cards off
+  screen skip style and layout (`content-visibility: auto`), and screens,
+  sheets and the sidebar carry `will-change: transform` so they aren't
+  promoted to layers and flattened back around each move. The zoom from
+  a card dropped its clip-path, which Chrome can't run on the GPU, and the
+  library no longer drifts under a pushed screen (it is the page itself,
+  so moving it repainted it). e2e/perf.js times tap to first frame on a
+  4x slower CPU.
+- **Sync pause (0.30.4).** Pause is kept in the sync config and checked
+  between pages: what was sent or brought in stays, pages not brought in
+  yet stay waiting. The downloads notification carries a running sync, so
+  Android's data-sync service keeps it going in the background.
 - **Sync, links only (0.30.3).** A device set to Links only sends no page
   text and reads none: pages new to it come back as `fromLinks` from
   sync.run and are saved again from their URLs, under the library's id

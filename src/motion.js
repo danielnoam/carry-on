@@ -36,13 +36,6 @@
     return run(el, [{ transform: "translateX(0)" }, { transform: "translateX(100%)" }], "sheet",
       [{ opacity: 1 }, { opacity: 0 }]);
   }
-  // The screen underneath drifts a little, as iOS does, so the push reads as depth.
-  function under(el, covering) {
-    const away = { transform: "translateX(-24%)", opacity: 0.6 };
-    const home = { transform: "translateX(0)", opacity: 1 };
-    if (reduced()) return Promise.resolve();
-    return run(el, covering ? [home, away] : [away, home], "sheet", []);
-  }
   // A sheet from the bottom edge (the reader's Aa).
   function rise(el) {
     return run(el, [{ transform: "translateY(100%)" }, { transform: "translateY(0)" }], "sheet",
@@ -74,28 +67,27 @@
   }
   // A page or collection opened from its card in the library (0.30.3): the
   // screen grows out of the card to fill the window, and shrinks back
-  // into it when closed. Under reduced motion, a fade.
-  function zoomFrames(el, r) {
-    const box = el.getBoundingClientRect();
-    if (!r || !box.width || !box.height || !r.width) return null;
-    const s = r.width / box.width;
-    const h = Math.min(box.height, r.height / s);
-    const small = {
-      opacity: 0.4,
-      transformOrigin: "0 0",
-      transform: "translate(" + (r.left - box.left) + "px, " + (r.top - box.top) + "px) scale(" + s + ")",
-      clipPath: "inset(0 0 " + (box.height - h) + "px 0 round " + (12 / s) + "px)",
-    };
-    const big = { opacity: 1, transformOrigin: "0 0", transform: "none", clipPath: "inset(0 0 0 0 round 0px)" };
-    return [small, big];
+  // into it when closed. Only transform and opacity, so it runs on the
+  // GPU (0.30.4: a clip-path made every frame a repaint); a screen fills
+  // the window, so its size is the window's and nothing is measured.
+  function zoomFrames(r) {
+    const w = window.innerWidth, h = window.innerHeight;
+    if (!r || !r.width || !w) return null;
+    const s = Math.max(0.2, r.width / w);
+    const x = r.left + r.width / 2 - (w * s) / 2, y = r.top + r.height / 2 - (h * s) / 2;
+    return [{ opacity: 0, transform: "translate(" + x + "px, " + y + "px) scale(" + s + ")" }, { opacity: 1, transform: "none" }];
   }
   function zoomIn(el, r) {
-    const f = zoomFrames(el, r);
-    return f ? run(el, f, "sheet", [{ opacity: 0 }, { opacity: 1 }]) : pushIn(el);
+    const f = zoomFrames(r);
+    if (!f) return pushIn(el);
+    el.style.transformOrigin = "0 0";
+    return run(el, [f[0], { opacity: 1, offset: 0.35 }, f[1]], "sheet", [{ opacity: 0 }, { opacity: 1 }]).then(() => { el.style.transformOrigin = ""; });
   }
   function zoomOut(el, r) {
-    const f = zoomFrames(el, r);
-    return f ? run(el, [f[1], { ...f[0], opacity: 0 }], "control", [{ opacity: 1 }, { opacity: 0 }]) : popOut(el);
+    const f = zoomFrames(r);
+    if (!f) return popOut(el);
+    el.style.transformOrigin = "0 0";
+    return run(el, [f[1], { opacity: 1, offset: 0.55 }, f[0]], "control", [{ opacity: 1 }, { opacity: 0 }]).then(() => { el.style.transformOrigin = ""; });
   }
   // Something arriving in a list or a bar: a card, the update bar, a toast.
   function arrive(el, from = 12) {
@@ -116,5 +108,5 @@
   root.setProperty("--spring-control-ms", SPRINGS.control.ms + "ms");
 
   window.CarryOn = window.CarryOn || {};
-  window.CarryOn.motion = { timing, pushIn, popOut, under, rise, sink, slideIn, slideOut, pageOut, pageIn, zoomIn, zoomOut, arrive, leave, reduced };
+  window.CarryOn.motion = { timing, pushIn, popOut, rise, sink, slideIn, slideOut, pageOut, pageIn, zoomIn, zoomOut, arrive, leave, reduced };
 })();
