@@ -2,6 +2,13 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.30.6] - 2026-10-05
+
+### Changed
+- Tapping Collections in the library moves the row of collections up and
+  opens it out into the grid while the pages fall away; tapping Pages
+  closes the pages up under their heading. Back plays it the other way.
+
 ## [0.30.5] - 2026-10-05
 
 ### Changed
