@@ -44,6 +44,13 @@ for (const name of ["paper", "sepia", "night", "slate", "solarized", "contrast",
       assert.ok(r >= 4.5, r.toFixed(2) + ":1");
     });
   }
+  // The reader's bars (0.30.5), a shade darker than the app's.
+  for (const fg of ["ink", "muted", "accent"]) {
+    test(name + ": --" + fg + " on --reader-bar", () => {
+      const r = ratio(t[fg], t["reader-bar"]);
+      assert.ok(r >= 4.5, r.toFixed(2) + ":1");
+    });
+  }
   test(name + ": --accent-ink on --accent", () => {
     const r = ratio(t["accent-ink"], t.accent);
     assert.ok(r >= 4.5, r.toFixed(2) + ":1");

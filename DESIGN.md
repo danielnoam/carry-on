@@ -106,10 +106,13 @@ and the page shows above it.
 - Only `transform` and `opacity` move, so the GPU runs every animation;
   anything costly an animation causes (focus, `inert`, redraws) runs after
   its first frame (0.30.4).
-- Screens push in from the right edge, except a page or collection opened
-  from its card in the library: it grows out of the card (scaled to the
-  card's width, centred on it, fading in over the first third, the sheet
-  spring) and shrinks back into it on Back (0.30.3, no clip since 0.30.4).
+- Screens come in from 18% to the right as they fade in (opaque by 40%
+  of the way, sheet spring) and leave the same way (control spring),
+  Material's shared axis (0.30.5). A page or collection opened from its
+  card in the library scales from 0.86 around the card's centre as it
+  fades in (opaque by 45%), and on Back scales to 0.9 and fades into it.
+- The sidebar follows a drag to the left; past a third of its width or
+  a flick it closes from there, short of that it springs back (0.30.5).
 - The reader's page turn: the page read lifts 6% and fades (control
   spring), the next comes up from 28% below (sheet spring) (0.30.3).
 
@@ -156,6 +159,10 @@ and the page shows above it.
   With no picture, the thumbnail is `--preview` with the site's icon
   centred at 32 px (`--s-6`), or the site's first letter in the serif,
   heading size, `--muted` (0.27.6).
+- **Reader bars (0.30.5):** top and bottom on `--reader-bar`, a shade
+  darker than `--bar`, checked for AA with ink, muted and accent. The
+  bottom bar's time or pages left sits `--gutter` + `--s-2` in from the
+  edge, centred in a bar at least `--s-7` tall.
 - **Collection tile (Now):** its story page's cover when it's linked to
   one (0.27.6), else its first picture, else its icon (the folder, or the
   book for a story) at 44 px, centred on `--preview`, `--muted` (the book

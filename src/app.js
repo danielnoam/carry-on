@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.30.4";
+  const APP_VERSION = "0.30.5";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -4730,8 +4730,10 @@
     const had = side.contains(document.activeElement);
     $("sideBtn").setAttribute("aria-expanded", "false");
     side.style.pointerEvents = "none";
+    const from = sideDragged;
+    sideDragged = 0;
     M.leave(catcher).then(() => { if (!state.side) catcher.hidden = true; });
-    M.slideOut(side).then(() => { if (!state.side) side.hidden = true; });
+    M.slideOut(side, from).then(() => { if (!state.side) side.hidden = true; });
     afterStart(() => {
       if (state.side) return;
       $("libraryView").inert = false;
@@ -4782,6 +4784,53 @@
     if (!state.side) { openSide(); sideByBack = true; return; }
     C.platform.exitApp();
   });
+
+  // The sidebar follows a finger dragging it to the left (0.30.5): let go
+  // past a third of its width, or with a flick, and it closes from there;
+  // short of that it springs back. Its rows still scroll up and down.
+  let sideDragged = 0, sideDragEnd = 0;
+  function dragSide() {
+    const side = $("sidebar"), catcher = $("sideCatch");
+    let drag = null;
+    const down = (e) => {
+      if (!state.side || e.pointerType === "mouse" || !e.isPrimary) return;
+      drag = { x: e.clientX, y: e.clientY, dx: 0, on: false, t: e.timeStamp, v: 0, w: side.offsetWidth };
+    };
+    const move = (e) => {
+      if (!drag || !e.isPrimary) return;
+      const dx = Math.min(0, e.clientX - drag.x), dy = e.clientY - drag.y;
+      if (!drag.on) {
+        if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(e.clientX - drag.x)) { drag = null; return; }
+        if (dx > -10) return;
+        drag.on = true;
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* gone */ }
+      }
+      const dt = Math.max(1, e.timeStamp - drag.t);
+      drag.v = (dx - drag.dx) / dt;
+      drag.t = e.timeStamp;
+      drag.dx = dx;
+      side.style.transform = "translateX(" + dx + "px)";
+      catcher.style.opacity = String(Math.max(0, 1 + dx / drag.w));
+    };
+    const up = () => {
+      const d = drag;
+      drag = null;
+      if (!d || !d.on) return;
+      sideDragEnd = performance.now();
+      side.style.transform = "";
+      catcher.style.opacity = "";
+      if (d.dx < -d.w / 3 || d.v < -0.5) { sideDragged = d.dx; history.back(); }
+      else M.slideBack(side, d.dx);
+    };
+    for (const n of [side, catcher]) {
+      n.addEventListener("pointerdown", down);
+      n.addEventListener("pointermove", move);
+      n.addEventListener("pointerup", up);
+      n.addEventListener("pointercancel", up);
+    }
+    // A drag that ends on the catch isn't a tap on it.
+    catcher.addEventListener("click", (e) => { if (performance.now() - sideDragEnd < 400) e.stopImmediatePropagation(); }, true);
+  }
 
   // Where there's no Back to use (iOS, a browser), a swipe to the right
   // from the left edge opens it. Rows that scroll sideways keep theirs.
@@ -5348,6 +5397,7 @@
   holdFeeds($("feeds"));
   holdFeeds($("sidebar"));
   swipeToSide($("libraryView"));
+  dragSide();
   pullToCheck($("libraryView"));
   $("sideCatch").addEventListener("click", () => history.back());
   $("downloadsBtn").addEventListener("click", () => openDownloads());
