@@ -5013,7 +5013,7 @@
     C.platform.widgets.onOpen(takeWidget);
     updateWidgets();
     document.addEventListener("visibilitychange", () => {
-      if (document.hidden) { savePositions(); updateWidgets(); return; }
+      if (document.hidden) { if (positionTimer) savePositions(); updateWidgets(); return; }
       takeFeedNews();
       takeWidget();
     });
