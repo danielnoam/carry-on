@@ -56,16 +56,13 @@ release, search Waypage in the Play Store and the App Store by hand.
   updater too. Renaming it relies on GitHub's redirect, so keep the name
   unless there's a reason to change it.
 
-## Next: sync, what's left after 0.30.0
+## Next: sync, what's left after 0.30.1
 
 0.30.0 syncs the library and each page's text; pictures sync as each
 page's mode and every device fetches its own (Daniel, 5 Oct 2026), so
 the planned 0.31.0 (images through the Git Data API) is not needed.
+0.30.1 added feeds, the step-by-step setup and the setup code.
 
-- **Feeds in sync.** The feeds you follow are on each device on their
-  own; they could join library.json.
-- **Setting up the second device with a link** (LifeLog's one-link
-  setup) instead of pasting the token again.
 - **Try it on Daniel's two phones:** save on one and read on the other;
   delete on one and confirm it stays gone; tag on both offline, then
   sync.

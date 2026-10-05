@@ -432,6 +432,39 @@
     } catch (e) { /* nothing to tidy */ }
   }
 
+  // Reading a QR code (0.30.1, sync's setup code), with
+  // @capacitor-mlkit/barcode-scanning as LifeLog does. On Android that's
+  // Google's scanner, run by Play services, so Carry-on asks for no camera
+  // permission; it's fetched at install (tools/android-manifest.js) and
+  // fetched here if it isn't there yet. On iOS the plugin opens the camera
+  // itself. Resolves to the text read, or null when backed out of.
+  const scanner = () => plugin("BarcodeScanner");
+  async function scanQr(onWait) {
+    const S = scanner();
+    if (os === "android") {
+      const { available } = await S.isGoogleBarcodeScannerModuleAvailable();
+      if (!available) {
+        if (onWait) onWait();
+        await new Promise((resolve, reject) => {
+          let handle = null;
+          const done = (fn, arg) => { if (handle) handle.remove(); fn(arg); };
+          Promise.resolve(S.addListener("googleBarcodeScannerModuleInstallProgress", (ev) => {
+            if (ev.state === 4) done(resolve);
+            else if (ev.state === 3 || ev.state === 5) done(reject, new Error("The scanner couldn't be installed."));
+          })).then((h) => { handle = h; return S.installGoogleBarcodeScannerModule(); }).catch(reject);
+        });
+      }
+    }
+    try {
+      const { barcodes } = await S.scan({ formats: ["QR_CODE"] });
+      const b = barcodes && barcodes[0];
+      return String((b && (b.rawValue || b.displayValue)) || "") || null;
+    } catch (e) {
+      if (/cancel/i.test(String((e && e.message) || e))) return null;
+      throw e;
+    }
+  }
+
   window.CarryOn = window.CarryOn || {};
   window.CarryOn.platform = {
     native,
@@ -468,5 +501,10 @@
     clearOldUpdates,
     releasesUrl() { return repo() ? "https://github.com/" + repo() + "/releases/latest" : null; },
     apkUrl() { return repo() ? "https://github.com/" + repo() + "/releases/latest/download/CarryOn.apk" : null; },
+    // The web copy the app was built from: inside the app this page is at
+    // https://localhost, which another device can't open.
+    webUrl() { return (build && build.webUrl) || null; },
+    get canScan() { return !!scanner(); },
+    scanQr,
   };
 })();

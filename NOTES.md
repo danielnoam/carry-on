@@ -3,6 +3,27 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Sync setup and feeds (0.30.1).** Step 2 links to GitHub's
+  fine-grained token form filled in by URL (name, description,
+  expires_in=none, contents=write, administration=write; documented
+  since Aug 2025). Which repos it covers can't be filled in, so the step
+  says to pick All repositories; Administration is what lets Carry-on
+  make carryon-data. No expiry because a token that runs out in 30 days
+  stops sync without anyone noticing. Another device joins with
+  LifeLog's setup link, the web copy's address plus `#t=<token>` (a
+  browser never sends the part after # to a server), shown as a QR code
+  drawn by src/qr.js (LifeLog's encoder, so the token never goes to a
+  QR service). A phone camera opens the link in the browser, which turns
+  sync on in the web copy; the app reads the code with
+  @capacitor-mlkit/barcode-scanning (Google's scanner on Android, so no
+  camera permission; iOS needs NSCameraUsageDescription and iOS 15.5).
+  The token field also takes the whole link. Feeds sync as settings
+  only (url, title, link, icon, mode, images, folder, days, addedAt) in
+  library.json's `feeds`, merged by address against the base like
+  pages; an unfollow is a tombstone in `feedsGone`, and following again
+  later (a newer addedAt) lifts it. Posts never go: each device checks
+  its feeds itself. A device on 0.30.0 sends no feeds and leaves them
+  as they are.
 - **Sync (0.30.0).** src/sync.js, after LifeLog's src/storage.js, which
   Daniel says works well. A private repo `carryon-data` holds
   library.json ({ pages, deleted, files }) and pages/<id>.html. Each sync

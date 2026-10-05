@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.30.0";
+  const APP_VERSION = "0.30.1";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -3179,6 +3179,8 @@
           if (state.folder) renderFolder();
           updateWidgets();
         },
+        getFeeds: () => feeds,
+        setFeeds: syncedFeeds,
         sameUrl,
         onProgress: () => { if (state.section === "sync") renderSection(); },
       });
@@ -3210,32 +3212,68 @@
     } finally { fetchingPictures = false; }
   }
 
-  function syncGroup() {
-    const last = C.sync.last;
-    if (!C.sync.on) {
-      const input = el("input", { class: "feed-input", type: "password", autocomplete: "off", spellcheck: "false", placeholder: "github_pat_…", "aria-label": "GitHub token" });
-      const note = el("p", { class: "footnote", role: "status" });
-      const go = el("button", { class: "btn-primary", type: "button" }, "Connect");
-      const connect = async () => {
-        go.disabled = true; go.textContent = "Connecting…"; note.textContent = "";
-        try {
-          await C.sync.connect(input.value);
-          renderSection();
-          syncNow(false);
-        } catch (e) {
-          go.disabled = false; go.textContent = "Connect";
-          note.className = "footnote warn";
-          note.textContent = e instanceof C.sync.SyncError ? e.message : "Couldn't connect. Try again.";
-        }
-      };
-      go.addEventListener("click", connect);
-      input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); connect(); } });
-      return el("section", { class: "settings-section sync-connect" },
-        el("h2", { class: "overline" }, "Sync with GitHub"),
-        el("p", { class: "footnote" }, "Keeps your pages, tags, collections, favourites and where you are the same on every device, through a private repo of yours called carryon-data. Pictures don't go: each device gets its own from the sites."),
-        el("p", { class: "footnote" }, "On GitHub, make a fine-grained token (Settings, Developer settings, Personal access tokens) with Contents: Read and write on a private repo named carryon-data, or on all repos so Carry-on can make it. Paste it here on each device."),
-        input, go, note);
+  // Sync's settings (0.30.1 laid out as steps, with LifeLog's setup code):
+  // off, the three steps to a first device and a way in for the next one;
+  // on, the state and a code that sets up another device.
+  function syncSections() {
+    return C.sync.on ? [syncState(), syncShare()] : [syncSteps(), syncJoin()];
+  }
+  async function connectSync(text, btn) {
+    if (btn) { btn.disabled = true; btn.textContent = "Connecting…"; }
+    try {
+      await C.sync.connect(text);
+    } catch (e) {
+      if (btn) { btn.disabled = false; btn.textContent = "Connect"; }
+      return e instanceof C.sync.SyncError ? e.message : "Couldn't connect. Try again.";
     }
+    if (state.section === "sync") renderSection();
+    syncNow(false);
+    return null;
+  }
+  const outRow = (href, n, label, note) => el("a", { class: "row sync-step", href, target: "_blank", rel: "noopener" },
+    el("span", { class: "step-num", "aria-hidden": "true" }, n),
+    el("span", { class: "choice-text" }, el("span", { class: "choice-label" }, label), el("span", { class: "choice-note" }, note)),
+    el("span", { class: "row-value", "aria-hidden": "true" }, "↗"));
+  function syncSteps() {
+    const input = el("input", { class: "feed-input", type: "password", autocomplete: "off", spellcheck: "false",
+      placeholder: "github_pat_… or a setup link", "aria-label": "GitHub token or setup link" });
+    const note = el("p", { class: "choice-note warn", role: "status" });
+    const go = el("button", { class: "btn-primary", type: "button" }, "Connect");
+    const connect = async () => { note.textContent = (await connectSync(input.value, go)) || ""; };
+    go.addEventListener("click", connect);
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); connect(); } });
+    return el("section", { class: "settings-section" },
+      el("h2", { class: "overline" }, "Sync with GitHub"),
+      el("p", { class: "section-lead" }, "Keeps your pages, tags, collections, favourites and where you are the same on every device, through a private repo on your GitHub. Each device gets the pictures itself."),
+      el("div", { class: "group" },
+        outRow("https://github.com/signup", "1", "Make a free GitHub account", "Skip this if you have one."),
+        outRow(C.sync.KEY_URL, "2", "Make a token for Carry-on", "GitHub fills it in. Under Repository access pick All repositories, then Generate token, and copy it."),
+        el("div", { class: "row sync-step sync-paste" },
+          el("span", { class: "step-num", "aria-hidden": "true" }, "3"),
+          el("div", { class: "choice-text" },
+            el("span", { class: "choice-label" }, "Paste it here"),
+            input, go, note))),
+      el("p", { class: "footnote" }, "The token stays on this device and goes only to GitHub. Carry-on makes a private repo called carryon-data for your library."));
+  }
+  function syncJoin() {
+    const scan = C.platform.canScan ? el("button", { class: "row", type: "button", onclick: scanSync },
+      el("span", { class: "row-label accent" }, "Scan its setup code")) : null;
+    return el("section", { class: "settings-section" },
+      el("h2", { class: "overline" }, "Already syncing on another device?"),
+      scan ? el("div", { class: "group" }, scan) : null,
+      el("p", { class: "footnote" }, (scan ? "" : "Open its setup link here, or paste it in step 3. ") + "The code and link are on that device, in Settings, Sync."));
+  }
+  async function scanSync() {
+    let text = null;
+    try { text = await C.platform.scanQr(() => toast("Getting the scanner ready…")); }
+    catch (e) { toast("Couldn't scan. Paste the setup link in step 3 instead."); return; }
+    if (!text) return;
+    if (!C.sync.tokenIn(text)) { toast("That isn't a Carry-on setup code. Show the one in Settings, Sync on a synced device."); return; }
+    const err = await connectSync(text);
+    if (err) toast(err);
+  }
+  function syncState() {
+    const last = C.sync.last;
     const status = C.sync.running ? "Syncing…" : last.error ? last.error : last.at ? "Synced " + whenText(last.at) : "Not synced yet";
     return el("section", { class: "settings-section" },
       el("h2", { class: "overline" }, "Sync with GitHub"),
@@ -3248,6 +3286,37 @@
         el("button", { class: "row", type: "button", onclick: () => { C.sync.disconnect(); renderSection(); toast("Sync is off. Your pages stay here and on GitHub."); } },
           el("span", { class: "row-label warn" }, "Stop syncing"))),
       el("p", { class: "footnote" }, "Syncs when Carry-on opens, after a change, and every few minutes while it's open. Stopping leaves your pages here and on GitHub."));
+  }
+  // The setup link points at the web copy: inside the app this page is at
+  // https://localhost, which no other device can open. The app's scanner
+  // reads only the token from it.
+  function syncShare() {
+    const link = C.sync.setupLink(C.platform.webUrl() || location.origin + location.pathname);
+    const svg = C.qr && C.qr.fits(link) ? C.qr.svg(link, { size: 200 }) : null;
+    const qr = svg ? el("div", { class: "sync-qr", role: "img", "aria-label": "Setup code" }) : null;
+    if (qr) qr.innerHTML = svg;
+    const copy = async () => {
+      try { await navigator.clipboard.writeText(link); toast("Setup link copied. Only send it to yourself."); }
+      catch (e) { toast("Couldn't copy the link."); }
+    };
+    return el("section", { class: "settings-section" },
+      el("h2", { class: "overline" }, "Add another device"),
+      el("div", { class: "group" },
+        qr,
+        el("button", { class: "row", type: "button", onclick: copy }, el("span", { class: "row-label accent" }, "Copy setup link"))),
+      el("p", { class: "footnote" }, "In Carry-on on the other device, go to Settings, Sync and scan this code, or paste the link there. A camera opens it in the web copy instead."),
+      el("p", { class: "footnote warn" }, "The code and link hold your token. Only use them on your own devices."));
+  }
+
+  // Opening the web copy from a setup link (a phone's camera on the code)
+  // turns sync on there. The token leaves the address bar first.
+  async function takeSetupLink() {
+    if (!C.sync.tokenIn(location.hash)) return;
+    const hash = location.hash;
+    history.replaceState(history.state, "", location.pathname + location.search);
+    if (C.sync.on) return;
+    const err = await connectSync(hash);
+    toast(err || "Sync is on. Your library is on its way.");
   }
 
   // "Save full images" for a page saved with previews or links only.
@@ -3932,7 +4001,34 @@
   state.side = false;
   let feedsChecking = false;
 
-  const saveFeeds = () => { store(FEEDS_KEY, feeds); watchFeeds(); updateWidgets(); };
+  // What's followed and how goes to sync (0.30.1); new posts don't.
+  const feedSig = () => JSON.stringify(feeds.map((f) => [f.url, f.title, f.mode, f.images, f.folder, f.days]));
+  let lastFeedSig = feedSig();
+  const saveFeeds = () => {
+    store(FEEDS_KEY, feeds); watchFeeds(); updateWidgets();
+    const sig = feedSig();
+    if (sig !== lastFeedSig) { lastFeedSig = sig; syncSoon(); }
+  };
+  // Feeds as sync settled them: one followed elsewhere is checked here.
+  function syncedFeeds(list) {
+    const had = new Map(feeds.map((f) => [f.url, f]));
+    const fresh = [];
+    const next = list.map((m) => {
+      const f = had.get(m.url);
+      if (!f) { const n = { ...m, folder: m.folder || "", link: m.link || null, icon: m.icon || null, checkedAt: 0, error: "", items: [] }; fresh.push(n); return n; }
+      Object.assign(f, m);
+      if (!m.folder) f.folder = "";
+      return f;
+    });
+    const before = feedSig();
+    feeds = next;
+    if (feedSig() === before && !fresh.length) return;
+    lastFeedSig = feedSig();
+    if (state.feed && !feeds.some((f) => f.url === state.feed)) state.feed = null;
+    store(FEEDS_KEY, feeds); watchFeeds(); updateWidgets();
+    paintFeeds();
+    if (fresh.length) setTimeout(() => checkFeeds(false), 0);
+  }
   // What the closed app's checks compare with: every post each feed has.
   let watchTimer = null, askToNotify = false;
   function watchFeeds() {
@@ -4368,8 +4464,7 @@
       item(feedIcon("feeds"), "Feeds", inFeeds && !state.feed, fresh ? el("span", { class: "side-pill" }, fresh + " new") : null,
         () => goPlace("feeds")),
       ...[...feeds].sort((a, b) => latest(b) - latest(a)).slice(0, SIDE_MAX).map((f) =>
-        withFeed(item(feedMark(f, true), f.title, inFeeds && state.feed === f.url, count(waitingIn(f)), () => goPlace("feeds", f.url), "side-sub"), f)),
-      item(feedIcon("add"), "Add a feed", false, null, () => back().then(() => openMenu("addFeed")), "side-sub side-add"));
+        withFeed(item(feedMark(f, true), f.title, inFeeds && state.feed === f.url, count(waitingIn(f)), () => goPlace("feeds", f.url), "side-sub"), f)));
   }
 
   function openSide() {
@@ -4890,7 +4985,7 @@
       value: () => themeName(state.theme) },
     saving: { title: "Saving", build: () => [choiceGroup(SETTINGS[1])],
       value: () => SETTINGS[1].options.find((o) => o.value === SETTINGS[1].get()).label },
-    sync: { title: "Sync", build: () => [syncGroup()], value: () => (C.sync.on ? (C.sync.last.error ? "Stopped" : "On") : "Off") },
+    sync: { title: "Sync", build: syncSections, value: () => (C.sync.on ? (C.sync.last.error ? "Stopped" : "On") : "Off") },
     storage: { title: "Storage and backup", build: () => [storageGroup(), browserStorageGroup(), backupGroup()], value: () => formatSize(totalBytes()) },
     updates: { title: "Updates", build: () => [updatesGroup()], value: () => (updateOut() ? upd.latest + " is out" : "") },
     about: { title: "About", build: () => [aboutGroup()], value: () => APP_VERSION },
@@ -5152,6 +5247,8 @@
     C.platform.widgets.onOpen(takeWidget);
     updateWidgets();
     C.store.onIndex = () => syncSoon();
+    takeSetupLink();
+    addEventListener("hashchange", takeSetupLink);
     setTimeout(() => syncNow(), 2000);
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) { if (positionTimer) savePositions(); updateWidgets(); if (syncTimer) syncNow(); return; }

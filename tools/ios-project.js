@@ -1,13 +1,18 @@
 // Adds what Carry-on needs to the generated iOS project, and stamps the
-// version. From LifeLog's tools/ios-project.js, without its widgets, QR
-// scanner and Face ID entries.
+// version. From LifeLog's tools/ios-project.js, without its widgets and
+// Face ID entries.
 //
 //   node tools/ios-project.js
 //
 // Info.plist gains ITSAppUsesNonExemptEncryption = false (the app uses only
 // the system's HTTPS), which spares a question on every TestFlight upload,
 // and the "audio" background mode, so Read aloud (0.27.0) goes on with the
-// screen locked.
+// screen locked, and NSCameraUsageDescription for scanning sync's setup
+// code (0.30.1): on iOS the scanner plugin opens the camera itself, and iOS
+// closes an app that does that without saying why.
+// The oldest iOS goes from the template's 15.0 to 15.5, in the project and
+// the Podfile alike: Google's ML Kit, which the scanner is built on, needs
+// 15.5, and pod install refuses a project asking for less than a pod.
 // project.pbxproj gets MARKETING_VERSION = APP_VERSION and
 // CURRENT_PROJECT_VERSION = the same number Android's versionCode is.
 //
@@ -20,7 +25,14 @@ const { versionCode } = require("./android-version");
 const PLIST = [
   ["ITSAppUsesNonExemptEncryption", "<false/>"],
   ["UIBackgroundModes", "<array>\n\t\t<string>audio</string>\n\t</array>"],
+  ["NSCameraUsageDescription", "<string>Carry-on uses the camera to read the sync setup code from your other device.</string>"],
 ];
+const MIN_IOS = "15.5";
+
+function raiseMinIos(podfile) {
+  if (!/platform :ios, '[\d.]+'/.test(podfile)) throw new Error("Podfile has no platform :ios line");
+  return podfile.replace(/platform :ios, '[\d.]+'/, "platform :ios, '" + MIN_IOS + "'");
+}
 
 function patchPlist(xml) {
   let out = xml;
@@ -40,7 +52,8 @@ function stampPbxproj(src, v) {
   }
   return src
     .replace(/MARKETING_VERSION = [^;]+;/g, "MARKETING_VERSION = " + v + ";")
-    .replace(/CURRENT_PROJECT_VERSION = [^;]+;/g, "CURRENT_PROJECT_VERSION = " + build + ";");
+    .replace(/CURRENT_PROJECT_VERSION = [^;]+;/g, "CURRENT_PROJECT_VERSION = " + build + ";")
+    .replace(/IPHONEOS_DEPLOYMENT_TARGET = [^;]+;/g, "IPHONEOS_DEPLOYMENT_TARGET = " + MIN_IOS + ";");
 }
 
 if (require.main === module) {
@@ -50,6 +63,8 @@ if (require.main === module) {
   const v = appVersion();
   fs.writeFileSync(plist, patchPlist(fs.readFileSync(plist, "utf8")));
   fs.writeFileSync(pbx, stampPbxproj(fs.readFileSync(pbx, "utf8"), v));
-  console.log("ios: Info.plist has " + PLIST.length + " Carry-on key(s); version " + v + " (" + versionCode(v) + ")");
+  const podfile = path.join(app, "Podfile");
+  fs.writeFileSync(podfile, raiseMinIos(fs.readFileSync(podfile, "utf8")));
+  console.log("ios: Info.plist has " + PLIST.length + " Carry-on key(s); version " + v + " (" + versionCode(v) + "); iOS " + MIN_IOS + " and later");
 }
-module.exports = { patchPlist, stampPbxproj, PLIST };
+module.exports = { patchPlist, stampPbxproj, raiseMinIos, PLIST, MIN_IOS };

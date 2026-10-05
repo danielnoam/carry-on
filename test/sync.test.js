@@ -99,4 +99,42 @@ test("nothing changed merges to the same library, so nothing is written", () => 
   assert.deepStrictEqual(m.files, remote.files);
 });
 
+// Followed feeds (0.30.1): what's followed and how, never the posts.
+const feed = (url, more) => ({ url: "https://" + url + "/feed", title: url, mode: "show", images: "previews", days: 7, addedAt: 10, ...more });
+const urls = (r) => r.feeds.map((f) => f.url).sort();
+
+test("feeds followed on either device are followed on both, without their posts", () => {
+  const m = S.merge(null, lib([], { feeds: [feed("a.example", { items: [{ url: "x" }], checkedAt: 5 })] }), lib([], { feeds: [feed("b.example")], feedsGone: {} }), NOW);
+  assert.deepStrictEqual(urls(m), ["https://a.example/feed", "https://b.example/feed"]);
+  assert.ok(!("items" in m.feeds[0]) && !("checkedAt" in m.feeds[0]));
+});
+
+test("an unfollow travels, and following again brings it back", () => {
+  const base = lib([], { feeds: [feed("a.example"), feed("b.example")], feedsGone: {} });
+  const r = S.merge(base, lib([], { feeds: [feed("b.example")] }), base, NOW);
+  assert.deepStrictEqual(urls(r), ["https://b.example/feed"]);
+  // The other device, which still follows it, stops.
+  assert.deepStrictEqual(urls(S.merge(base, lib([], { feeds: [feed("a.example"), feed("b.example")] }), r, NOW)), ["https://b.example/feed"]);
+  // A fresh device that had followed it before doesn't bring it back...
+  assert.deepStrictEqual(urls(S.merge(null, lib([], { feeds: [feed("a.example")] }), r, NOW)), ["https://b.example/feed"]);
+  // ...but following it again after the unfollow does.
+  const again = S.merge(r, lib([], { feeds: [feed("a.example", { addedAt: NOW + 1 }), feed("b.example")] }), r, NOW + 2);
+  assert.deepStrictEqual(urls(again), ["https://a.example/feed", "https://b.example/feed"]);
+  assert.ok(!again.feedsGone["https://a.example/feed"]);
+});
+
+test("a feed's settings changed on each device both stay", () => {
+  const base = lib([], { feeds: [feed("a.example")], feedsGone: {} });
+  const m = S.merge(base, lib([], { feeds: [feed("a.example", { mode: "save" })] }), lib([], { feeds: [feed("a.example", { days: 30 })], feedsGone: {} }), NOW);
+  assert.strictEqual(m.feeds[0].mode, "save");
+  assert.strictEqual(m.feeds[0].days, 30);
+});
+
+test("a device that doesn't send feeds leaves them as they are", () => {
+  const remote = lib([], { feeds: [feed("a.example")], feedsGone: { "https://c.example/feed": NOW - 5 } });
+  const m = S.merge(remote, lib([]), remote, NOW);
+  assert.deepStrictEqual(m.feeds, remote.feeds);
+  assert.deepStrictEqual(m.feedsGone, remote.feedsGone);
+});
+
 console.log("\n" + passed + " passed");
