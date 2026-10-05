@@ -2,6 +2,23 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.30.4] - 2026-10-05
+
+### Fixed
+- Animations start the moment you tap and run smoothly: opening the
+  sidebar, Settings, a page, a collection, a sheet and going back. Each
+  one waited on a tenth of a second of work first, and the page and
+  collection zoom repainted every frame.
+- The Install button in About has its label centred.
+
+### Changed
+- Sync has Pause and Resume in place of Stop syncing, which used to
+  disconnect. Disconnect from GitHub is its own button at the bottom and
+  asks first.
+- A sync shows in the notification shade while it runs, as downloads
+  do, and keeps going with Carry-on in the background on Android. Its
+  Stop pauses the sync.
+
 ## [0.30.3] - 2026-10-05
 
 ### Added
