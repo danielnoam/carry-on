@@ -249,6 +249,28 @@
     },
   };
 
+  // Feeds read with the app closed (0.28.4, Android): a job every few
+  // hours that notifies about new posts; the app still does the reading
+  // and saving itself once it's opened.
+  const feedChecks = {
+    // [{ url, title, known }]: the feeds and the post ids they have.
+    watch(feeds, ask) {
+      const F = plugin("Feeds");
+      if (F) F.watch({ feeds, ask: !!ask }).catch(() => {});
+    },
+    // { feeds: [url], open }: feeds with new posts since, and whether the
+    // notification opened the app.
+    async news() {
+      const F = plugin("Feeds");
+      if (F) { try { return await F.news(); } catch (e) { /* none */ } }
+      return { feeds: [], open: false };
+    },
+    onOpen(f) {
+      const F = plugin("Feeds");
+      if (F) F.addListener("open", f);
+    },
+  };
+
   async function printHtml(name, html) {
     const P = plugin("Print");
     if (P) { await P.print({ html, name }); return; }
@@ -405,6 +427,7 @@
     printHtml,
     speech,
     downloads,
+    feedChecks,
     download,
     downloadUpdate,
     openInstaller,
