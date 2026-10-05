@@ -24,13 +24,15 @@ asks from Daniel.
 
 ---
 
-## Rename to Offprint (Daniel, 4 Oct 2026)
+## Rename to Waypage (Daniel, 5 Oct 2026)
 
-The app becomes **Offprint**, store title "Offprint: Offline Reader". An
-offprint is a separate copy of one article, which is what the app makes,
-and it fits collections shown as books better than a name about planes.
-Before this release, check Offprint against the Play Store, the App Store
-and a trademark search.
+The app becomes **Waypage**, store title "Waypage: Offline Reader": a page
+for the way, keeping Carry-on's sense of reading on the go without tying
+the name to planes. Offprint was dropped: "Offprint: Web to PDF & EPUB"
+is already on the App Store. Web searches found no reading app called
+Waypage; waypage.com is a landing-page builder, so the domain is
+taken and the store listing should lean on "Offline Reader". Before this
+release, search Waypage in the Play Store and the App Store by hand.
 
 - **What the user sees changes:** `appName` in capacitor.config.json, the
   iOS display name, `name`/`short_name` in manifest.json, the `<title>`,
@@ -42,7 +44,7 @@ and a trademark search.
   `carryon.*` storage keys (renaming them loses settings).
 - **The APK's file name:** installed copies download `CarryOn.apk`
   (src/platform.js `apkUrl`). Publish both `CarryOn.apk` and
-  `Offprint.apk` for a while, or keep the old file name.
+  `Waypage.apk` for a while, or keep the old file name.
 - **The repo name** (danielnoam/carry-on) is in installed copies'
   updater too. Renaming it relies on GitHub's redirect, so keep the name
   unless there's a reason to change it.
