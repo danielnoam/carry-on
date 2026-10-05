@@ -24,20 +24,11 @@ asks from Daniel.
 
 ---
 
-## 0.29.1: More sites, and what's left of 0.29.0 (Daniel, 5 Oct 2026)
-
-0.29.0 shipped Back opening the sidebar, pages mode, and the Keep reading
-and Feeds widgets on Android.
+## Next: what's left of the widgets
 
 - **Widgets still to come:** favourite pages or a collection (needs a
   "favourite" mark on pages first), and every widget on iOS (WidgetKit,
   which waits on the Apple Developer Program like the share extension).
-- **More sites (Daniel, 3 Oct 2026, "see what other sites we can
-  support"):** Wattpad (text arrives in pieces from its API), and the
-  comic sites Webtoon and Tapas (episode lists through their APIs).
-  Each is a rule in `SITES`. Waiting on a link to one chapter or episode
-  from each site from Daniel: this environment can't reach them
-  otherwise, and the rules need their real pages.
 
 ## Rename to Waypage (Daniel, 5 Oct 2026)
 

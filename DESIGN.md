@@ -458,8 +458,10 @@ and the page shows above it.
   margins allow, centred; each page keeps the bar's room and the usual
   padding. A tap on the outer third turns (the middle shows or hides the
   bar), a sideways swipe of 48 px turns, arrow keys and Page Up/Down
-  turn; the turn is the browser's smooth scroll, and with reduced motion
-  it jumps. Reset text keeps the layout.
+  turn; the turn is a 220 ms ease-out of its own (0.29.1; the WebView's
+  smooth scroll took most of a second), quick turns add up, and with
+  reduced motion it jumps. The bar's bottom left reads "Page 3 of 12 ·
+  section" (0.29.1). Reset text keeps the layout.
 - **Page turn (Now, 0.28.2):** the end link's next page: the reader
   slides 16 % left as it fades (control spring), the next page comes in
   from 16 % right (sheet spring). Reduced motion: a fade.
@@ -490,7 +492,8 @@ and the page shows above it.
   `--line` border, 16 px padding and radius. Keep reading: "Keep
   reading" small and bold in `--muted`, the title in serif, three lines
   at most, "site · 6 min left", and a 4 px line in `--accent` for how
-  far. Feeds: "Feeds" and a "3 new" pill in `--accent`, then up to three
+  far. At one row high (0.29.1) it is the title on one line over a 3 px
+  line, 12 px sides. Feeds: "Feeds" and a "3 new" pill in `--accent`, then up to three
   posts, title in serif over the feed's name. Empty: "Follow a site in
   Feeds, and its newest posts show here." Paper by day, Night by night.
 - **New posts notification (Now, 0.28.4, Android):** the Feeds icon,
