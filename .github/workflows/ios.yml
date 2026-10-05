@@ -41,9 +41,13 @@ jobs:
       - name: Bundle the web app
         run: node tools/build-www.js
 
+      # `cap add` runs pod install before the Podfile can be raised to the
+      # iOS 15.5 Google's ML Kit (the setup-code scanner) needs, so that
+      # install may fail as long as the project was written; `cap sync`
+      # below installs again on the raised Podfile.
       - name: Generate the iOS project
         run: |
-          npx cap add ios --packagemanager CocoaPods
+          npx cap add ios --packagemanager CocoaPods || test -f ios/App/Podfile
           node tools/ios-project.js
 
       - name: Icon and splash

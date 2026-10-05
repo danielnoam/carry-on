@@ -8,6 +8,7 @@
     "test": "node test/run-all.js"
   },
   "devDependencies": {
+    "@capacitor-mlkit/barcode-scanning": "8.2.1",
     "@capacitor/android": "8.5.2",
     "@capacitor/app": "8.1.1",
     "@capacitor/app-launcher": "8.0.1",

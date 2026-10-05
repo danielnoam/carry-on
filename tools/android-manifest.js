@@ -1,6 +1,5 @@
 // Adds what Carry-on needs to the generated AndroidManifest.xml. From
-// LifeLog's tools/android-manifest.js, without its scanner and storage
-// entries.
+// LifeLog's tools/android-manifest.js, without its storage entries.
 //
 //   node tools/android-manifest.js
 //
@@ -15,12 +14,18 @@
 //   arrives as ACTION_SEND with the link in EXTRA_TEXT, which
 //   native/share's ShareTarget plugin hands to the page.
 //
+// - The ML Kit meta-data that has Play services fetch its barcode scanner
+//   when the app is installed (0.30.1, sync's setup code), so the first
+//   scan doesn't wait for it. The scanner is Google's own screen, which is
+//   why Carry-on needs no camera permission.
+//
 // Idempotent, and fails loudly if a tag it needs can't be found.
 const fs = require("fs");
 const path = require("path");
 
 const ENTRIES = [
   { inside: "manifest", xml: '<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />' },
+  { inside: "application", xml: '<meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="barcode_ui"/>' },
   {
     inside: "main-activity",
     xml: '<intent-filter>\n' +

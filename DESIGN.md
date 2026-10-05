@@ -496,14 +496,21 @@ and the page shows above it.
   line, 12 px sides. Feeds: "Feeds" and a "3 new" pill in `--accent`, then up to three
   posts, title in serif over the feed's name. Empty: "Follow a site in
   Feeds, and its newest posts show here." Paper by day, Night by night.
-- **Sync (Now, 0.30.0):** Settings has Sync beside Storage and backup,
-  its value On, Off or Stopped. Off: "Sync with GitHub", two footnotes
-  (what it keeps, how to make the token), a 48 px password field
-  "github_pat_…" and Connect; errors replace the note in `--warn`. On: a
-  group with the account (dan/carryon-data) over "Synced 2 min ago" (or
-  the error in `--warn`), Sync now in `--accent`, Stop syncing in
-  `--warn`. Deleting with sync on says "With sync on, it goes from your
-  other devices too."
+- **Sync (Now, 0.30.1):** Settings has Sync beside Storage and backup,
+  its value On, Off or Stopped. Off: "Sync with GitHub" and a section
+  lead, then one group of three numbered steps, each number a 24 px
+  `--accent` ring: 1 "Make a free GitHub account" (github.com/signup),
+  2 "Make a token for Carry-on" (GitHub's form filled in), both rows
+  with ↗; 3 "Paste it here" holding the 48 px field and a full-width
+  Connect, errors under them in `--warn`. Then "Already syncing on
+  another device?" with "Scan its setup code" where the app has the
+  scanner, and a footnote. On: a group with the account
+  (dan/carryon-data) over "Synced 2 min ago" (or the error in `--warn`),
+  Sync now in `--accent`, Stop syncing in `--warn`; then "Add another
+  device": the setup code, 200 px, black on `--code-paper` (white in
+  every theme, since scanners need it), over "Copy setup link", and a
+  `--warn` footnote that the code holds the token. Deleting with sync on
+  says "With sync on, it goes from your other devices too."
 - **Favourites (Now, 0.29.2):** a fourth tile in a page's sheet, the
   star, filled in `--accent` and `aria-pressed` when on. A favourite's
   card starts its site line with ★ in `--accent`. Show has Favourites

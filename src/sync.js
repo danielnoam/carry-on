@@ -93,6 +93,34 @@
     return kept;
   }
 
+  // Followed feeds (0.30.1): what's followed and how, never the posts,
+  // which each device checks for itself. Keyed by the feed's address.
+  const FEED = ["url", "title", "link", "icon", "mode", "images", "folder", "days", "addedAt"];
+  const feedShare = (f) => { const o = {}; for (const k of FEED) if (f[k] != null && f[k] !== "") o[k] = f[k]; return o; };
+  // An unfollow is kept like a deleted page; following the same address
+  // again later (a newer addedAt) brings it back.
+  function mergeFeeds(base, local, remote, gone, now) {
+    const B = new Map((base || []).map((f) => [f.url, f]));
+    const L = new Map((local || []).map((f) => [f.url, feedShare(f)]));
+    const R = new Map((remote || []).map((f) => [f.url, f]));
+    for (const u of B.keys()) if (!L.has(u)) gone[u] = gone[u] || now;
+    if (remote) for (const u of B.keys()) if (!R.has(u) && !gone[u]) gone[u] = now;
+    const out = [];
+    for (const u of new Set([...L.keys(), ...R.keys()])) {
+      const l = L.get(u), r = R.get(u);
+      const newest = Math.max((l && l.addedAt) || 0, (r && r.addedAt) || 0);
+      if (gone[u] && newest > gone[u] && !B.has(u)) delete gone[u];
+      if (gone[u]) continue;
+      if (l && r) {
+        const b = B.get(u) || {}, f = {};
+        for (const k of FEED) { const v = same(l[k], r[k]) || !same(l[k], b[k]) ? l[k] : r[k]; if (v !== undefined) f[k] = v; }
+        out.push(f);
+      } else out.push(l || r);
+    }
+    for (const [u, at] of Object.entries(gone)) if (now - at > KEEP_DELETED) delete gone[u];
+    return out.sort((a, b) => (a.addedAt || 0) - (b.addedAt || 0) || (a.url < b.url ? -1 : 1));
+  }
+
   // base, local and remote are library files ({ pages, deleted, files });
   // base and remote may be null (never synced, nothing on GitHub yet).
   // Resolves to the merged file. `same(a, b)` says two addresses are one
@@ -120,7 +148,15 @@
     const files = {};
     const fromRemote = (remote && remote.files) || {};
     for (const p of out) if (fromRemote[p.id]) files[p.id] = fromRemote[p.id];
-    return { format: 1, pages: out, deleted, files };
+    const doc = { format: 1, pages: out, deleted, files };
+    // A device from before 0.30.1 sends no feeds: they stay as they were.
+    if (local.feeds) {
+      const gone = { ...((remote && remote.feedsGone) || {}) };
+      for (const [u, at] of Object.entries((base && base.feedsGone) || {})) if (!gone[u]) gone[u] = at;
+      doc.feeds = mergeFeeds(base && base.feeds, local.feeds, remote && remote.feeds, gone, now);
+      doc.feedsGone = gone;
+    } else if (remote && remote.feeds) { doc.feeds = remote.feeds; doc.feedsGone = remote.feedsGone || {}; }
+    return doc;
   }
 
   // ---- GitHub ----
@@ -184,11 +220,29 @@
   }
 
   // Connecting: whose token it is, and the repo, made private if missing.
+  // ---- Setting up (0.30.1) ----
+
+  // GitHub's page for a new key, filled in: a fine-grained token that never
+  // expires (sync shouldn't stop in a month), allowed to make the repo
+  // (Administration) and write it (Contents). Which repos it reaches can't
+  // be filled in, so the steps say to pick All repositories.
+  const KEY_URL = "https://github.com/settings/personal-access-tokens/new?name=Carry-on+sync" +
+    "&description=Keeps+Carry-on%27s+library+in+step+through+a+private+repo+called+" + REPO +
+    "&expires_in=none&contents=write&administration=write";
+  // Another device joins from a link to the web copy with the token after
+  // the # (which a browser never sends to the server), as LifeLog's setup
+  // link does; the app takes the same link from a QR code or pasted.
+  const tokenIn = (text) => {
+    const m = /[#&]t=([^&\s]+)/.exec(String(text || ""));
+    try { return m ? decodeURIComponent(m[1]) : null; } catch (e) { return null; }
+  };
+  const setupLink = (base) => (cfg ? base + "#t=" + encodeURIComponent(cfg.token) : null);
+
   async function connect(token) {
     const was = cfg;
-    cfg = { token: String(token || "").trim(), repo: REPO, branch: "main" };
+    cfg = { token: String(tokenIn(token) || token || "").trim(), repo: REPO, branch: "main" };
     try {
-      if (!cfg.token) throw new SyncError("Paste a token first.");
+      if (!cfg.token) throw new SyncError("Paste the token first.");
       const me = await call(API + "/user", { headers: headers() });
       if (!me.ok) throw await fail(me);
       cfg.owner = (await me.json()).login;
@@ -197,7 +251,7 @@
       else if (repo.status === 404) {
         const made = await call(API + "/user/repos", { method: "POST", headers: headers({ "Content-Type": "application/json" }),
           body: JSON.stringify({ name: REPO, private: true, auto_init: true, description: "Carry-on's library" }) });
-        if (!made.ok) throw new SyncError("Carry-on couldn't make the " + REPO + " repo. Make a private repo with that name on GitHub, give the token Contents: Read and write on it, and connect again.");
+        if (!made.ok) throw new SyncError("Carry-on couldn't make its " + REPO + " repo. Make the token again with All repositories picked under Repository access, then connect.");
         cfg.branch = (await made.json()).default_branch || "main";
       } else throw await fail(repo);
       keep(CFG_KEY, cfg);
@@ -258,12 +312,12 @@
   // are one page. onProgress({ stage, done, total }). Resolves to
   // { up, down, removed, downloads } with `downloads` the pages whose
   // pictures this device fetches next; throws SyncError.
-  function run({ getPages, setPages, sameUrl, onProgress }) {
+  function run({ getPages, setPages, getFeeds, setFeeds, sameUrl, onProgress }) {
     if (!cfg) return Promise.resolve(null);
     if (running) return running;
     running = (async () => {
       try {
-        const res = await once(getPages, setPages, sameUrl || ((a, b) => a === b), onProgress);
+        const res = await once(getPages, setPages, sameUrl || ((a, b) => a === b), onProgress, getFeeds, setFeeds);
         last = { at: Date.now(), error: "" };
         cfg.at = last.at;
         keep(CFG_KEY, cfg);
@@ -276,8 +330,9 @@
     return running;
   }
 
-  async function once(getPages, setPages, sameUrl, onProgress) {
+  async function once(getPages, setPages, sameUrl, onProgress, getFeeds, setFeeds) {
     const before = getPages().map((p) => ({ ...p }));
+    const feedsBefore = getFeeds ? getFeeds().map(feedShare) : null;
     const snapshot = new Map(before.map((p) => [p.id, JSON.stringify(p)]));
     // What GitHub would hold of each page, so the two compare like for like.
     const view = before.map((p) => share(C.backup.cleanMeta(p, p.id) || p));
@@ -289,7 +344,7 @@
       remote = await readJson("library.json");
       if (remote && (!remote.data || !Array.isArray(remote.data.pages))) throw new SyncError("The library.json on GitHub isn't Carry-on's. Move it away and sync again.");
       const remoteDoc = remote && clean(remote.data);
-      merged = merge(load(BASE_KEY, null), { pages: view, waiting }, remoteDoc, Date.now(), sameUrl);
+      merged = merge(load(BASE_KEY, null), { pages: view, waiting, feeds: feedsBefore }, remoteDoc, Date.now(), sameUrl);
       for (const [id, f] of Object.entries(uploaded)) if (merged.pages.some((p) => p.id === id && p.savedAt === f.at)) merged.files[id] = f;
       // Text this device has and GitHub doesn't: every page saved here, or
       // saved again since.
@@ -375,6 +430,20 @@
     const gone = [...decided].filter(([id, d]) => d === null && !kept.has(id)).map(([id]) => id);
     out.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
     keep(WAIT_KEY, stillWaiting.length ? stillWaiting : null);
+    // Feeds the same way: one changed here while this ran keeps this
+    // device's version, which goes up next time.
+    if (setFeeds && merged.feeds) {
+      const was = new Map(feedsBefore.map((f) => [f.url, JSON.stringify(f)]));
+      const live = new Map(getFeeds().map((f) => [f.url, feedShare(f)]));
+      const changed = (u) => was.has(u) && live.has(u) && was.get(u) !== JSON.stringify(live.get(u));
+      const list = [];
+      for (const m of merged.feeds) {
+        if (changed(m.url)) list.push(live.get(m.url));
+        else if (live.has(m.url) || !was.has(m.url)) list.push(m);
+      }
+      for (const [u, f] of live) if (!was.has(u) && !list.some((m) => m.url === u)) list.push(f);
+      setFeeds(list);
+    }
     await setPages(out);
     for (const id of gone) await C.store.removePage(id);
     return { up, down, removed: gone.length, downloads };
@@ -393,11 +462,17 @@
     const deleted = {}, files = {};
     for (const [id, at] of Object.entries(doc.deleted || {})) if (typeof at === "number") deleted[id] = at;
     for (const [id, f] of Object.entries(doc.files || {})) if (f && typeof f.at === "number" && typeof f.sha === "string") files[id] = { at: f.at, sha: f.sha };
-    return { format: 1, pages, deleted, files };
+    const out = { format: 1, pages, deleted, files };
+    if (Array.isArray(doc.feeds)) {
+      out.feeds = doc.feeds.map((f) => C.backup.cleanFeed(f)).filter(Boolean).map(feedShare);
+      out.feedsGone = {};
+      for (const [u, at] of Object.entries(doc.feedsGone || {})) if (typeof at === "number") out.feedsGone[u] = at;
+    }
+    return out;
   }
 
   C.sync = {
-    merge, mergeTags, outgoing, incoming, connect, disconnect, run, SyncError,
+    merge, mergeTags, mergeFeeds, outgoing, incoming, connect, disconnect, run, SyncError, KEY_URL, tokenIn, setupLink,
     get on() { return !!cfg; },
     get account() { return cfg ? cfg.owner + "/" + cfg.repo : ""; },
     get running() { return !!running; },

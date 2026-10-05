@@ -186,6 +186,8 @@
 :root {
   --serif: "Source Serif 4", "New York", "Noto Serif", Georgia, serif;
   --sans: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* A QR code's paper, the same in every theme: scanners read black on white. */
+  --code-paper: #ffffff;
 
   --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px;
   --s-6: 32px; --s-7: 40px; --s-8: 56px; --s-9: 72px;
@@ -1432,7 +1434,6 @@ html { -webkit-tap-highlight-color: transparent; }
   border-radius: var(--r-sm); background: var(--preview);
 }
 .side-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.side-add { color: var(--accent); font-weight: 500; }
 .save-form .icon-btn[hidden] { display: none; }
 [data-place="feeds"] .save-form .btn-primary { border-radius: var(--r-md); }
 
@@ -1521,3 +1522,18 @@ html { -webkit-tap-highlight-color: transparent; }
 .add-feed .btn-primary { width: 100%; }
 .feed-sheet .footnote { margin-top: calc(-1 * var(--s-2)); }
 .feed-sheet .footnote + .sheet-row { margin-top: 0; }
+
+/* Sync's setup (0.30.1): numbered steps in one group, and the setup code. */
+.sync-step { align-items: flex-start; padding-top: var(--s-3); padding-bottom: var(--s-3); }
+.sync-step .row-value { align-self: center; }
+.step-num {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 24px; height: 24px; border-radius: var(--r-full);
+  border: 1px solid var(--accent); color: var(--accent);
+  font: 600 var(--fs-meta)/1 var(--sans);
+}
+.sync-paste { cursor: default; }
+.sync-paste .choice-text { gap: var(--s-2); }
+.sync-paste .choice-note:empty { display: none; }
+.sync-qr { display: flex; justify-content: center; padding: var(--s-5) var(--s-4); border-bottom: 1px solid var(--line); }
+.sync-qr svg { display: block; width: 200px; height: 200px; padding: var(--s-2); background: var(--code-paper); border-radius: var(--r-sm); }

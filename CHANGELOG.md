@@ -2,6 +2,20 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.30.1] - 2026-10-05
+
+### Added
+- Sync is easier to set up: Settings, Sync walks you through it in three
+  steps, with GitHub's sign-up and a token page already filled in.
+- Add another device with a setup code. Scan it in Carry-on on the other
+  phone (Settings, Sync, Scan its setup code), or copy the setup link.
+- The feeds you follow sync too, with how you follow them. Each device
+  checks them for new posts itself.
+
+### Changed
+- Settings, Sync is laid out like the rest of Settings.
+- Add a feed is no longer in the sidebar. Add one from Feeds.
+
 ## [0.30.0] - 2026-10-05
 
 ### Added
