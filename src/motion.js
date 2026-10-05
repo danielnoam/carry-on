@@ -27,13 +27,16 @@
     return a.finished.then(() => a.cancel(), () => {});
   }
 
-  // A screen pushed over the library (the reader, Settings) and popped off.
+  // A screen pushed over the library (Settings, Downloads) and popped off
+  // (0.30.5): a short slide from the right with a fade, Material's shared
+  // axis, in the same family as the zoom from a card. The screen is opaque
+  // before it has moved far, so the library never shows through for long.
   function pushIn(el) {
-    return run(el, [{ transform: "translateX(100%)" }, { transform: "translateX(0)" }], "sheet",
+    return run(el, [{ opacity: 0, transform: "translateX(18%)" }, { opacity: 1, offset: 0.4 }, { opacity: 1, transform: "none" }], "sheet",
       [{ opacity: 0 }, { opacity: 1 }]);
   }
   function popOut(el) {
-    return run(el, [{ transform: "translateX(0)" }, { transform: "translateX(100%)" }], "sheet",
+    return run(el, [{ opacity: 1, transform: "none" }, { opacity: 1, offset: 0.3 }, { opacity: 0, transform: "translateX(18%)" }], "control",
       [{ opacity: 1 }, { opacity: 0 }]);
   }
   // A sheet from the bottom edge (the reader's Aa).
@@ -45,14 +48,18 @@
     return run(el, [{ transform: "translateY(0)" }, { transform: "translateY(100%)" }], "sheet",
       [{ opacity: 1 }, { opacity: 0 }]);
   }
-  // The sidebar, from the left edge (0.28.0).
+  // The sidebar, from the left edge (0.28.0); closing goes on from where
+  // a drag left it (0.30.5), and a short drag springs back.
   function slideIn(el) {
     return run(el, [{ transform: "translateX(-100%)" }, { transform: "translateX(0)" }], "sheet",
       [{ opacity: 0 }, { opacity: 1 }]);
   }
-  function slideOut(el) {
-    return run(el, [{ transform: "translateX(0)" }, { transform: "translateX(-100%)" }], "sheet",
+  function slideOut(el, from = 0) {
+    return run(el, [{ transform: "translateX(" + from + "px)" }, { transform: "translateX(-100%)" }], from ? "control" : "sheet",
       [{ opacity: 1 }, { opacity: 0 }]);
+  }
+  function slideBack(el, from) {
+    return run(el, [{ transform: "translateX(" + from + "px)" }, { transform: "translateX(0)" }], "control", []);
   }
   // The reader turning to the next page (0.30.3): the page read lifts away
   // and stays hidden until the next one comes up from the bottom.
@@ -65,29 +72,23 @@
     return run(el, [{ opacity: 0, transform: "translateY(28%)" }, { opacity: 1, transform: "none" }], "sheet",
       [{ opacity: 0 }, { opacity: 1 }]);
   }
-  // A page or collection opened from its card in the library (0.30.3): the
-  // screen grows out of the card to fill the window, and shrinks back
-  // into it when closed. Only transform and opacity, so it runs on the
-  // GPU (0.30.4: a clip-path made every frame a repaint); a screen fills
-  // the window, so its size is the window's and nothing is measured.
-  function zoomFrames(r) {
-    const w = window.innerWidth, h = window.innerHeight;
-    if (!r || !r.width || !w) return null;
-    const s = Math.max(0.2, r.width / w);
-    const x = r.left + r.width / 2 - (w * s) / 2, y = r.top + r.height / 2 - (h * s) / 2;
-    return [{ opacity: 0, transform: "translate(" + x + "px, " + y + "px) scale(" + s + ")" }, { opacity: 1, transform: "none" }];
-  }
+  // A page or collection opened from its card in the library (0.30.5):
+  // the screen scales up from the card's centre as it fades in, as apps
+  // open what was tapped, and settles back into it on Back. Only transform
+  // and opacity, so the GPU runs it (0.30.4).
+  const origin = (el, r) => { el.style.transformOrigin = (r.left + r.width / 2) + "px " + (r.top + r.height / 2) + "px"; };
+  const clear = (el) => () => { el.style.transformOrigin = ""; };
   function zoomIn(el, r) {
-    const f = zoomFrames(r);
-    if (!f) return pushIn(el);
-    el.style.transformOrigin = "0 0";
-    return run(el, [f[0], { opacity: 1, offset: 0.35 }, f[1]], "sheet", [{ opacity: 0 }, { opacity: 1 }]).then(() => { el.style.transformOrigin = ""; });
+    if (!r || !r.width) return pushIn(el);
+    origin(el, r);
+    return run(el, [{ opacity: 0, transform: "scale(0.86)" }, { opacity: 1, offset: 0.45 }, { opacity: 1, transform: "none" }], "sheet",
+      [{ opacity: 0 }, { opacity: 1 }]).then(clear(el));
   }
   function zoomOut(el, r) {
-    const f = zoomFrames(r);
-    if (!f) return popOut(el);
-    el.style.transformOrigin = "0 0";
-    return run(el, [f[1], { opacity: 1, offset: 0.55 }, f[0]], "control", [{ opacity: 1 }, { opacity: 0 }]).then(() => { el.style.transformOrigin = ""; });
+    if (!r || !r.width) return popOut(el);
+    origin(el, r);
+    return run(el, [{ opacity: 1, transform: "none" }, { opacity: 1, offset: 0.2 }, { opacity: 0, transform: "scale(0.9)" }], "control",
+      [{ opacity: 1 }, { opacity: 0 }]).then(clear(el));
   }
   // Something arriving in a list or a bar: a card, the update bar, a toast.
   function arrive(el, from = 12) {
@@ -108,5 +109,5 @@
   root.setProperty("--spring-control-ms", SPRINGS.control.ms + "ms");
 
   window.CarryOn = window.CarryOn || {};
-  window.CarryOn.motion = { timing, pushIn, popOut, rise, sink, slideIn, slideOut, pageOut, pageIn, zoomIn, zoomOut, arrive, leave, reduced };
+  window.CarryOn.motion = { timing, pushIn, popOut, rise, sink, slideIn, slideOut, slideBack, pageOut, pageIn, zoomIn, zoomOut, arrive, leave, reduced };
 })();

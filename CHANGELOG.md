@@ -2,6 +2,18 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.30.5] - 2026-10-05
+
+### Changed
+- Opening a page or collection from the library scales it up from the
+  card you tapped as it fades in, and Back settles it into the card.
+- Settings, Downloads and the other screens slide in a short way as they
+  fade in, in the same family, instead of crossing the whole screen.
+- Drag the sidebar to the left to close it. It follows your finger, and
+  a short drag springs back.
+- The reader's top and bottom bars are a shade darker, and the time or
+  pages left sits further in from the edge, centred in its bar.
+
 ## [0.30.4] - 2026-10-05
 
 ### Fixed
