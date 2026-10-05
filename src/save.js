@@ -357,17 +357,22 @@
     if (at < 0) return null;
     const start = html.indexOf("[", at);
     if (start < 0) return null;
+    try { return JSON.parse(balanced(html, start)); } catch (e) { return null; }
+  }
+
+  // The JSON array or object starting at `start`, up to its closing
+  // bracket, or "" when it doesn't close.
+  function balanced(html, start) {
+    if (start < 0) return "";
     let depth = 0, inStr = false, esc = false;
     for (let i = start; i < html.length; i++) {
       const c = html[i];
       if (inStr) { if (esc) esc = false; else if (c === "\\") esc = true; else if (c === '"') inStr = false; continue; }
       if (c === '"') inStr = true;
       else if (c === "[" || c === "{") depth++;
-      else if ((c === "]" || c === "}") && --depth === 0) {
-        try { return JSON.parse(html.slice(start, i + 1)); } catch (e) { return null; }
-      }
+      else if ((c === "]" || c === "}") && --depth === 0) return html.slice(start, i + 1);
     }
-    return null;
+    return "";
   }
 
   const uniqueLinks = (links) => { const seen = new Set(); return links.filter((u) => u && !seen.has(u) && seen.add(u)); };
@@ -537,6 +542,62 @@
       },
     },
     {
+      name: "Wattpad",
+      host: /(^|\.)wattpad\.com$/i,
+      // A part's later pages (/page/2) are the same part.
+      clean(url) {
+        const u = new URL(url);
+        u.pathname = u.pathname.replace(/\/page\/\d+\/?$/, "");
+        return u.href;
+      },
+      // The whole part's text, every page of it, added to its page.
+      async prepare(html) {
+        const part = wattpadPart(html);
+        const from = part && part.text_url && httpUrl(part.text_url.text);
+        if (!from) return html;
+        const pages = [];
+        try {
+          for (let n = 1; n <= Math.min(part.pages || 1, 60); n++) pages.push((await get(from + n)).text);
+        } catch (e) {
+          throw new SaveError("Wattpad didn't send the whole chapter. Try again in a minute.");
+        }
+        const box = '<div id="co-wattpad-text">' + pages.join("\n") + "</div>";
+        return /<\/body>/i.test(html) ? html.replace(/<\/body>/i, box + "</body>") : html + box;
+      },
+      // A story's page lists its parts only once drawn, so they're read
+      // from its first part's page, which has them all.
+      async contents(doc, url) {
+        if (!/^\/story\/\d+/.test(new URL(url).pathname)) return null;
+        const start = [...doc.querySelectorAll("a[href]")].map((a) => absolute(a.getAttribute("href"), url)).find((h) => /^https:\/\/(www\.)?wattpad\.com\/\d+(-[^/]*)?$/.test(h || ""));
+        if (!start) return null;
+        const part = wattpadPart((await get(start)).text);
+        const links = wattpadLinks(part);
+        return links.length ? { title: (part.group && part.group.title) || text(doc.querySelector("h1")), links } : null;
+      },
+      list(doc, url, html) {
+        return wattpadLinks(wattpadPart(html || ""));
+      },
+      chapter(doc, url, html) {
+        const part = wattpadPart(html || "");
+        if (!part) return null;
+        const content = doc.createElement("div");
+        const box = doc.getElementById("co-wattpad-text");
+        if (box) content.append(...[...box.childNodes].map((n) => n.cloneNode(true)));
+        else if (part.storyText) content.innerHTML = parse("<body>" + part.storyText, url).body.textContent;
+        const links = wattpadLinks(part);
+        const at = links.indexOf(httpUrl(part.url));
+        const group = part.group || {};
+        return {
+          content,
+          title: String(part.title || "").trim(),
+          series: String(group.title || "").trim(),
+          byline: String((group.user && group.user.name) || "").trim(),
+          next: httpUrl(part.nextPart && part.nextPart.url) || (at >= 0 ? links[at + 1] || "" : undefined),
+          prev: at > 0 ? links[at - 1] : at === 0 ? "" : undefined,
+        };
+      },
+    },
+    {
       // A serial on Blogger posts each chapter in parts and tags the parts
       // with the chapter's label ("ch1", "ch2"). A label's page is saved
       // as one chapter, its posts in order, read from the blog's feed; the
@@ -591,6 +652,23 @@
       },
     },
   ];
+
+  // ---- Wattpad (0.29.1) ----
+  // A part's page carries its details in `window.prefetched` (the
+  // story's parts, the next part, how many pages of text) but only the
+  // first page of the text: the rest comes from the storytext address it
+  // names, a page at a time.
+  function wattpadPart(html) {
+    const at = html.indexOf("window.prefetched");
+    if (at < 0) return null;
+    const start = html.indexOf("{", at);
+    let all;
+    try { all = JSON.parse(balanced(html, start)); } catch (e) { return null; }
+    const key = all && Object.keys(all).find((k) => /^part\.\d+\.metadata$/.test(k));
+    return key && all[key] && all[key].data ? all[key].data : null;
+  }
+  const wattpadLinks = (part) => uniqueLinks(((part && part.group && part.group.parts) || []).map((p) => httpUrl(p && p.url)));
+  const httpUrl = (u) => { try { const x = new URL(String(u || "")); return /^https?:$/.test(x.protocol) ? x.href : ""; } catch (e) { return ""; } };
 
   // "ch12" for /search/label/ch12; null for any other page.
   function bloggerLabel(u) {
@@ -862,6 +940,7 @@
     const res = await get(site && site.fetch ? site.fetch(url) : url);
     let finalUrl = res.url || url;
     if (site && site.clean) finalUrl = site.clean(finalUrl);
+    if (site && site.prepare && !comic) res.text = await site.prepare(res.text, finalUrl);
     if (site && site.contents && !comic && !asPage) {
       const own = await site.contents(parse(res.text, finalUrl), finalUrl, res.text);
       if (own && own.links.length) throw new ContentsPage(own);
