@@ -3765,6 +3765,7 @@
   const FEEDS_KEY = "carryon.feeds";
   const PLACE_KEY = "carryon.place";
   const FEEDS_SEEN_KEY = "carryon.feedsSeen";
+  const FEEDS_ASKED_KEY = "carryon.feedsAsked";
   const FEED_EVERY = 3 * 36e5;
   const FEED_KEEP = 100;
   const FEED_DAYS = [{ value: "3", label: "3 days" }, { value: "7", label: "A week" }, { value: "30", label: "A month" }];
@@ -3788,7 +3789,17 @@
   state.side = false;
   let feedsChecking = false;
 
-  const saveFeeds = () => store(FEEDS_KEY, feeds);
+  const saveFeeds = () => { store(FEEDS_KEY, feeds); watchFeeds(); };
+  // What the closed app's checks compare with: every post each feed has.
+  let watchTimer = null, askToNotify = false;
+  function watchFeeds() {
+    clearTimeout(watchTimer);
+    watchTimer = setTimeout(() => {
+      const list = feeds.map((f) => ({ url: f.url, title: f.title, known: [...new Set(f.items.flatMap((it) => [it.id, it.url]).filter(Boolean))] }));
+      C.platform.feedChecks.watch(list, askToNotify && list.length > 0);
+      askToNotify = false;
+    }, 1000);
+  }
   const postAt = (it) => it.date || it.foundAt || 0;
   const postKey = (it) => it.id || it.url;
   const inWindow = (f, it) => postAt(it) >= Date.now() - (f.days || 7) * DAY;
@@ -3869,6 +3880,22 @@
       setTimeout(() => checkFeeds(), 0);
     }
     return added;
+  }
+
+  // Posts found with the app closed: those feeds are read again now, and
+  // the notification's tap opens Feeds.
+  async function takeFeedNews() {
+    const news = await C.platform.feedChecks.news();
+    if (news.open) {
+      await toLibrary();
+      if (state.place !== "feeds" || state.feed) await goPlace("feeds");
+    }
+    let due = false;
+    for (const url of news.feeds) {
+      const f = feeds.find((x) => x.url === url);
+      if (f) { f.checkedAt = 0; due = true; }
+    }
+    if (due) checkFeeds(false);
   }
 
   // One feed read again; a feed set to save its posts saves the new ones.
@@ -4357,6 +4384,7 @@
         addedAt: Date.now(), checkedAt: Date.now(), error: "", items: [] };
       mergeFeed(f, got.feed);
       feeds.push(f);
+      askToNotify = true;
       saveFeeds();
       await back();
       await goPlace("feeds", f.url);
@@ -4908,6 +4936,12 @@
     saveShared();
     setTimeout(() => dailyCheck(false), 1500);
     setTimeout(() => checkFeeds(false), 3000);
+    // Feeds followed before 0.28.4 are handed over once, with the ask.
+    if (feeds.length && !load(FEEDS_ASKED_KEY, false)) { store(FEEDS_ASKED_KEY, true); askToNotify = true; }
+    watchFeeds();
+    takeFeedNews();
+    C.platform.feedChecks.onOpen(takeFeedNews);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) takeFeedNews(); });
   });
   addEventListener("online", () => { dailyCheck(false); checkFeeds(false); });
   // Feeds are due every few hours; asked about while the app is open.

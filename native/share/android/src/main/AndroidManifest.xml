@@ -10,6 +10,9 @@
          while pages are saved, with a progress notification. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Feeds (0.28.4): read every few hours with the app closed, a job
+         that survives a restart. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <queries>
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
@@ -24,5 +27,9 @@
             android:name="io.github.danielnoam.carryon.share.DownloadService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+        <service
+            android:name="io.github.danielnoam.carryon.share.FeedCheckJob"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
     </application>
 </manifest>
