@@ -1023,6 +1023,8 @@ html { -webkit-tap-highlight-color: transparent; }
 }
 .tile-btn:disabled { opacity: 0.5; cursor: default; }
 .tile-icon { display: flex; color: var(--accent); }
+.tile-btn.on .tile-icon svg { fill: currentColor; }
+.card-fav { color: var(--accent); }
 .page-controls > .overline { margin: var(--s-2) 0 calc(-1 * var(--s-1)) var(--s-1); }
 .page-controls .group .row { min-height: 48px; }
 .chip.some { border-style: dashed; border-color: var(--accent); }

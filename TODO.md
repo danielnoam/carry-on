@@ -24,11 +24,12 @@ asks from Daniel.
 
 ---
 
-## Next: what's left of the widgets
+## Next: widgets on iOS, and a favourite collection
 
-- **Widgets still to come:** favourite pages or a collection (needs a
-  "favourite" mark on pages first), and every widget on iOS (WidgetKit,
-  which waits on the Apple Developer Program like the share extension).
+- Every widget on iOS (WidgetKit) waits on the Apple Developer Program,
+  like the share extension.
+- A favourite collection, or a widget for one collection, needs
+  collections stored in a file of their own first.
 
 ## Rename to Waypage (Daniel, 5 Oct 2026)
 
@@ -66,11 +67,13 @@ src/storage.js does. Deletes become tombstones in `library.json` so they
 don't come back from the other device. The other device re-downloads
 previews from the original links. Reuses the 0.18.0 backup format.
 
-**0.31.0, images.** Push `images/` through the Git Data API (blobs, one
-tree and one commit per save), since the contents API stops at 1 MB and
-broke LifeLog's sync. Decide first whether the repo's growth (0.5 to 1.5
-MB per illustrated page, far more for comics) is acceptable, or whether
-comics folders stay off sync.
+**0.31.0, images (Daniel, 5 Oct 2026: "we don't need to sync the actual
+image").** Images never go to the repo. What syncs is each page's mode
+(Links, Previews or Full images); the other device downloads its own
+copies from the original links. Pictures that can't be fetched again
+(the original gone, or a Tapas panel whose signed address expired after
+an hour) stay missing there, and Retry shows as for any missing preview.
+Base it on LifeLog's sync, which works well (Daniel, 5 Oct 2026).
 
 **What syncs of the images (Daniel, 3 Oct 2026).** Each page syncs its
 images as one of three: **Links** (none, the other device loads them
@@ -116,9 +119,6 @@ one and confirm it stays gone; edit tags offline on both and sync.
   needs its own app ID and an App Group, which sideloading with a free
   Apple account (AltStore, SideStore) makes painful: free accounts get
   3 app IDs. Decide on the Apple Developer Program first; slot it after.
-- **A new name (Daniel, 3 Oct 2026).** Find a different name for the
-  app. Check it against the App Store, Play and trademarks, and the
-  domain; then the app ID, store title, icons and repo follow.
 - **Before shipping to other people:** desktop browser version (and its
   worker) in v1 or not; Apple Developer Program or Android first; name
   checks (App Store, Play, trademark); privacy policy and store data

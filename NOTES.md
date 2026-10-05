@@ -3,6 +3,12 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Favourites (0.29.2).** A mark on the page (`fav`, with `favAt` for
+  the widget's order) in library.json, kept by backups and by saving a
+  page again. Pages only: a collection isn't stored anywhere of its own
+  (it exists while a page names it), so a favourite collection would need
+  a file for collections first. The Favourites widget shows the four
+  favourited last; its header opens the library showing Favourites.
 - **WEBTOON, Tapas and Wattpad (0.29.1).** Built from pages Daniel saved
   from each site, since this environment can't reach them. WEBTOON:
   `comic(url)` says its /viewer pages are comics, so they save as comics

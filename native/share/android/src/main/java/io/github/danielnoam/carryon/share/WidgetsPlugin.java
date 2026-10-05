@@ -13,7 +13,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
  *
  *   update({ reading: { id, title, meta, at } | null,
  *            feeds: { following, fresh, posts: [{ title, site, url }] } })
- *   take()    { kind: "page" | "post" | "feeds" | "library", id, url } once,
+ *   take()    { kind: "page" | "post" | "feeds" | "library" | "favourites", id, url } once,
  *             what a widget's tap asked to open, or {}
  *
  * and an "open" event when a tap brings the running app back.
