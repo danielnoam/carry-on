@@ -5,6 +5,8 @@
     android:previewLayout="@layout/carryon_widget_reading"
     android:minWidth="180dp"
     android:minHeight="110dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="40dp"
     android:targetCellWidth="3"
     android:targetCellHeight="2"
     android:resizeMode="horizontal|vertical"

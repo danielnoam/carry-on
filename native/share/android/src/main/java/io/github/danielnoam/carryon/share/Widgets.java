@@ -7,9 +7,14 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.util.SizeF;
 import android.view.View;
 import android.widget.RemoteViews;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -42,7 +47,7 @@ final class Widgets {
     static void refresh(Context ctx) {
         AppWidgetManager m = AppWidgetManager.getInstance(ctx);
         int[] reading = m.getAppWidgetIds(new ComponentName(ctx, ReadingWidget.class));
-        if (reading.length > 0) m.updateAppWidget(reading, reading(ctx));
+        for (int id : reading) m.updateAppWidget(id, reading(ctx, m, id));
         int[] feeds = m.getAppWidgetIds(new ComponentName(ctx, FeedsWidget.class));
         if (feeds.length > 0) m.updateAppWidget(feeds, feeds(ctx));
     }
@@ -58,8 +63,23 @@ final class Widgets {
         return PendingIntent.getActivity(ctx, code, i, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
     }
 
-    static RemoteViews reading(Context ctx) {
-        RemoteViews v = new RemoteViews(ctx.getPackageName(), R.layout.carryon_widget_reading);
+    // Keep reading shrinks to one row (0.29.1): Android 12 and later pick
+    // the layout for the size themselves; before that, it is picked from
+    // the size the widget was given, which is the height in portrait.
+    static RemoteViews reading(Context ctx, AppWidgetManager m, int id) {
+        if (Build.VERSION.SDK_INT >= 31) {
+            Map<SizeF, RemoteViews> sizes = new HashMap<>();
+            sizes.put(new SizeF(110f, 40f), reading(ctx, R.layout.carryon_widget_reading_small));
+            sizes.put(new SizeF(110f, 100f), reading(ctx, R.layout.carryon_widget_reading));
+            return new RemoteViews(sizes);
+        }
+        Bundle o = m.getAppWidgetOptions(id);
+        int h = o == null ? 0 : o.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0);
+        return reading(ctx, h > 0 && h < 100 ? R.layout.carryon_widget_reading_small : R.layout.carryon_widget_reading);
+    }
+
+    private static RemoteViews reading(Context ctx, int layout) {
+        RemoteViews v = new RemoteViews(ctx.getPackageName(), layout);
         JSONObject r = data(ctx).optJSONObject("reading");
         if (r == null || r.optString("id", "").isEmpty()) {
             v.setTextViewText(R.id.w_title, "Nothing open yet");
