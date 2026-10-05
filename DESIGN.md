@@ -558,7 +558,14 @@ and the page shows above it.
 ## 6. Voice
 
 Short, plain, about the reader's situation: "Plays when you're back
-online", "3 previews missing", "2 pages picked". Buttons are verbs ("Save",
+online", "3 previews missing", "2 clips picked".
+
+The words for things (Daniel, 5 Oct 2026): **Library** (everything),
+**Clips** (what's saved from the web; "page" only means a web page, or a
+page in the reader's Pages layout), **Files** (EPUBs, PDFs and the like
+brought in from the phone, when that comes), **Collections**, **Feeds**,
+**Tags**. Storage keys, file names and sync paths keep "page", so saved
+libraries and sync carry on unchanged. Buttons are verbs ("Save",
 "Retry"). Errors say what happened and what to do: "Couldn't reach this
 page. Check the link, or try again when you're online."
 

@@ -92,6 +92,13 @@ A safe order:
    then uninstall Carry-on.
 5. **Store listings** and the Claude project name last, once it all runs.
 
+## Naming (Daniel, 5 Oct 2026)
+
+Library · Clips (web saves) · Files (imports) · Collections · Feeds ·
+Tags. 0.30.7 renamed "pages" to "clips" in everything shown; storage
+keys, file paths and sync keep "page". The files release names imported
+documents Files. With Waypage, the set stays.
+
 ## Your files, where you want them, and a reader for any file (Daniel, 5 Oct 2026)
 
 Not reorganising the library (that's fine as it is). Two things:

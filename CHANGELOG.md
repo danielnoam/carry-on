@@ -2,6 +2,15 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.30.7] - 2026-10-05
+
+### Changed
+- What you save from the web is now called a clip, everywhere: the
+  library, sheets, Downloads, Sync, Settings and the widgets. "Page" now
+  only means a web page, or a page in the reader's Pages layout. Files
+  is kept for documents you bring in from the phone, when that comes.
+  Nothing you saved moves: storage and sync are unchanged.
+
 ## [0.30.6] - 2026-10-05
 
 ### Changed

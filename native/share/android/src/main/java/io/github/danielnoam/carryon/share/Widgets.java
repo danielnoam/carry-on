@@ -88,7 +88,7 @@ final class Widgets {
         JSONObject r = data(ctx).optJSONObject("reading");
         if (r == null || r.optString("id", "").isEmpty()) {
             v.setTextViewText(R.id.w_title, "Nothing open yet");
-            v.setTextViewText(R.id.w_meta, "Save a page, and it waits here.");
+            v.setTextViewText(R.id.w_meta, "Save a clip, and it waits here.");
             v.setViewVisibility(R.id.w_progress, View.GONE);
             v.setOnClickPendingIntent(R.id.w_root, open(ctx, 10, Uri.parse("carryon-widget://library")));
             return v;
@@ -129,7 +129,7 @@ final class Widgets {
         int n = list == null ? 0 : Math.min(list.length(), FAVS.length);
         v.setOnClickPendingIntent(R.id.w_root, open(ctx, 30, Uri.parse("carryon-widget://favourites")));
         v.setViewVisibility(R.id.w_empty, n == 0 ? View.VISIBLE : View.GONE);
-        v.setTextViewText(R.id.w_empty, "Hold a page in Carry-on and tap Favourite, and it shows here.");
+        v.setTextViewText(R.id.w_empty, "Hold a clip in Carry-on and tap Favourite, and it shows here.");
         for (int i = 0; i < FAVS.length; i++) {
             JSONObject p = i < n ? list.optJSONObject(i) : null;
             if (p == null) { v.setViewVisibility(FAVS[i], View.GONE); continue; }

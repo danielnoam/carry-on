@@ -1517,7 +1517,7 @@
       meta.bytes += C.store.bytesOf(text);
     } catch (e) {
       await C.store.removePage(id);
-      throw new SaveError("Couldn't write the page to the phone. Free some space and try again.");
+      throw new SaveError("Couldn't write the clip to the phone. Free some space and try again.");
     }
     return meta;
   }

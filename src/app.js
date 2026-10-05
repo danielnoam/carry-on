@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.30.6";
+  const APP_VERSION = "0.30.7";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -31,9 +31,9 @@
   const LAYOUT_KEY = "carryon.layout";
   // The library's three looks (0.28.0); Settings, Appearance picks one.
   const LAYOUTS = [
-    { value: "shelf", label: "Shelf", note: "Collections as a row of covers, pages listed under them" },
-    { value: "list", label: "One list", note: "Collections and pages together, grouped by date or site" },
-    { value: "grid", label: "Grid", note: "Covers three across, pages as picture cards" },
+    { value: "shelf", label: "Shelf", note: "Collections as a row of covers, clips listed under them" },
+    { value: "list", label: "One list", note: "Collections and clips together, grouped by date or site" },
+    { value: "grid", label: "Grid", note: "Covers three across, clips as picture cards" },
   ];
   const NEW_KEY = "carryon.newChapters";
   const DAILY_KEY = "carryon.checkDaily";
@@ -231,7 +231,7 @@
   }
   const sizeOf = (pages) => pages.reduce((sum, p) => sum + (p.bytes || 0), 0);
   const totalBytes = () => sizeOf(state.pages);
-  const countLine = (n) => n + (n === 1 ? " page" : " pages");
+  const countLine = (n) => n + (n === 1 ? " clip" : " clips");
   // Where the pages are kept, for the words that say so.
   const HERE = C.platform.native ? "this phone" : "this browser";
   const ON_HERE = (C.platform.native ? "on " : "in ") + HERE;
@@ -359,7 +359,7 @@
     const done = r.total ? r.saved + " of " + r.total + " saved" : r.saved + " saved";
     const failed = r.failed ? ", " + r.failed + " failed" : "";
     if (r.stopped) return done + failed + " · Stopping";
-    if (r.paused) return (r.current ? "Pausing after this page · " : "Paused · ") + done + failed;
+    if (r.paused) return (r.current ? "Pausing after this one · " : "Paused · ") + done + failed;
     return done + failed + " · " + (r.current && !r.current.waiting ? savingStatus(r.current) : "Next in a moment");
   }
   function runCard(r) {
@@ -410,7 +410,7 @@
     if (!list.length) return null;
     return el("span", { class: "failed-list" },
       el("span", { class: "failed-head" },
-        el("span", { class: "warn" }, list.length === 1 ? "1 page couldn't be saved" : list.length + " pages couldn't be saved"),
+        el("span", { class: "warn" }, list.length === 1 ? "1 clip couldn't be saved" : list.length + " clips couldn't be saved"),
         list.length > 1 ? el("button", { class: "btn-text", type: "button", onclick: () => retryAll(list) }, "Try all again") : null),
       ...list.map((s) => el("span", { class: "failed-row" },
         el("span", { class: "failed-text" },
@@ -485,7 +485,7 @@
     if (!nodes.length) {
       keep("empty", () => el("div", { class: "empty wide" },
         el("h2", { class: "empty-title" }, "Nothing downloading"),
-        el("p", { class: "empty-text" }, "Pages you save show their progress here, and stay here once they're done until you close the app.")));
+        el("p", { class: "empty-text" }, "Clips you save show their progress here, and stay here once they're done until you close the app.")));
     }
     root.replaceChildren(...nodes);
     for (const s of going) updateSavingCard(s);
@@ -504,10 +504,10 @@
     const r = e.run;
     const name = r.folder && folderPages(r.folder).length ? folderPages(r.folder)[0].folder : null;
     const saved = r.saved ? countLine(r.saved) + (r.again ? " saved again" : " saved") : "Nothing saved";
-    return el("div", { class: "card done-run wide", role: "group", "aria-label": (r.folder || "Several pages") + ", done" },
+    return el("div", { class: "card done-run wide", role: "group", "aria-label": (r.folder || "Several clips") + ", done" },
       el("span", { class: "card-body" },
         el("span", { class: "card-site" }, r.site),
-        el("span", { class: "card-title", dir: "auto" }, r.folder || r.label || "Several pages"),
+        el("span", { class: "card-title", dir: "auto" }, r.folder || r.label || "Several clips"),
         el("span", { class: "card-status" }, [saved, r.stopped ? "Stopped" : null, whenText(e.at)].filter(Boolean).join(" · ")),
         name ? el("span", { class: "card-actions" },
           el("button", { class: "btn-small", type: "button", onclick: () => toLibrary().then(() => openFolder(name)) }, "Open")) : null,
@@ -548,7 +548,7 @@
     btn.classList.toggle("failed", failed);
     btn.querySelector(".dl-ring-fill").style.strokeDashoffset = String(100 - share * 100);
     btn.setAttribute("aria-label", busy ? "Downloads, " + Math.round(share * 100) + "% done"
-      : failed ? "Downloads, some pages couldn't be saved" : "Downloads");
+      : failed ? "Downloads, some clips couldn't be saved" : "Downloads");
     if (!busy) {
       // A sync (and its pictures) keeps the same notification while it
       // runs, so it goes on with the app in the background (0.30.4).
@@ -564,7 +564,7 @@
     }
     const one = active.length === 1 && !singles.length ? active[0] : null;
     const title = one ? (one.again ? "Saving again in " : "Saving into ") + (one.folder || "your library")
-      : !active.length && singles.length === 1 ? "Saving a page from " + singles[0].site : "Saving " + Math.round(units) + " pages";
+      : !active.length && singles.length === 1 ? "Saving a clip from " + singles[0].site : "Saving " + Math.round(units) + " clips";
     const text = one ? (one.total ? one.saved + one.failed + " of " + one.total + " done" : countLine(one.saved) + " saved") + (one.paused ? " · Paused" : "")
       : Math.round(share * 100) + "% done";
     const o = { title, text, done: Math.round(share * 1000), total: 1000 };
@@ -689,7 +689,7 @@
     // A card whose content didn't change isn't rebuilt, so its button is reset here.
     btn.disabled = false;
     btn.textContent = "Retry";
-    if (!res) { toast("Couldn't open this page's file. Try again."); return; }
+    if (!res) { toast("Couldn't open this clip's file. Try again."); return; }
     if (res.got) {
       Object.assign(p, { missing: res.missing, thumb: res.thumb, bytes: (p.bytes || 0) + res.bytes });
       if (p.imageBytes != null) p.imageBytes += res.bytes;
@@ -754,7 +754,7 @@
         }
         texts.set(p.id, { text, folded: fold(text) });
         done++;
-        if (todo.length > 10 && done % 5 === 0) searchNote("Searching the text of your pages · " + done + " of " + todo.length);
+        if (todo.length > 10 && done % 5 === 0) searchNote("Searching the text of your clips · " + done + " of " + todo.length);
       }
     })().finally(() => { reading = null; });
     return reading;
@@ -843,7 +843,7 @@
     fill(libTools, dropdown({
       label: "Show", cls: "start show-wrap" + (state.filter === "all" ? "" : " on"),
       icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>',
-      options: [{ value: "all", label: "All pages" }, { value: "unread", label: "Unread" }, { value: "finished", label: "Finished" }, { value: "favourites", label: "Favourites" },
+      options: [{ value: "all", label: "All clips" }, { value: "unread", label: "Unread" }, { value: "finished", label: "Finished" }, { value: "favourites", label: "Favourites" },
         ...(tags.length ? [{ head: "Tags" }, ...tags.map((t) => ({ value: "#" + t, label: "#" + t }))] : [])],
       value: state.filter,
       onpick: setFilter,
@@ -1096,8 +1096,8 @@
         keep(part ? "folders:all" : "folders", () => { const strip = foldersStrip(names); if (part) strip.classList.add("folder-grid"); return strip; }, names.map(folderSig).join("‖"));
       }
       if (loose.length && part !== "collections") {
-        const label = (ts.length ? "Found" : state.filter === "all" ? "Pages"
-          : status && folders.length ? filterName() + " pages" : filterName()) + " · " + loose.length;
+        const label = (ts.length ? "Found" : state.filter === "all" ? "Clips"
+          : status && folders.length ? filterName() + " clips" : filterName()) + " · " + loose.length;
         if (part || ts.length || !folders.length) keep("h:pages", () => sectionHead(label), label);
         else keep("h:pages", () => partHead("pages", label), "link" + label);
       }
@@ -1118,15 +1118,15 @@
       keep("none:" + state.filter, () => el("div", { class: "empty wide" },
         el("p", { class: "empty-text" }, state.filter === "unread" ? "You've started everything you saved."
           : state.filter === "finished" ? "Nothing finished yet."
-          : state.filter === "favourites" ? "No favourites yet. Hold a page and tap Favourite." : "No pages tagged " + state.filter + "."),
+          : state.filter === "favourites" ? "No favourites yet. Hold a clip and tap Favourite." : "No clips tagged " + state.filter + "."),
         el("button", { class: "btn-quiet", type: "button", onclick: () => setFilter("all") }, "Show all")));
     }
     if (!n) {
       keep("empty", () => el("div", { class: "empty wide" },
-        el("h2", { class: "empty-title" }, "Pages you take with you"),
+        el("h2", { class: "empty-title" }, "Clips you take with you"),
         el("p", { class: "empty-text" }, C.platform.native
           ? "Share a page to Carry-on from your browser, or paste its link below. It stays readable with no connection, with a link back to the original."
-          : "Paste a Wikipedia link below, or bring the pages you saved on your phone: back up there, then open the backup here."),
+          : "Paste a Wikipedia link below, or bring the clips you saved on your phone: back up there, then open the backup here."),
         C.platform.native ? null : el("button", { class: "btn-quiet empty-open", type: "button", onclick: () => openSettings(false, "storage") }, "Open a backup")));
     }
     root.replaceChildren(...nodes);
@@ -1312,7 +1312,7 @@
       renderLibrary();
       return meta;
     } catch (e) {
-      job.error = e instanceof C.save.SaveError ? e.message : "Couldn't save this page. Try again.";
+      job.error = e instanceof C.save.SaveError ? e.message : "Couldn't save this clip. Try again.";
       if (e instanceof C.save.ContentsPage) job.contents = e.contents;
       if (!(e instanceof C.save.SaveError)) console.error(e);
       renderLibrary();
@@ -1403,7 +1403,7 @@
     let html;
     opening = id;
     try { html = await C.store.readPage(id); } catch (e) { html = null; } finally { opening = null; }
-    if (!html) { toast("This page's file is missing. Delete it and save it again."); return; }
+    if (!html) { toast("This clip's file is missing. Delete it and save it again."); return; }
     if (!fromHistory) history.pushState(readerState(p), "");
     const shown = show(p, html);
     pushScreen($("readerView"));
@@ -1521,7 +1521,7 @@
   async function goTo(p, turn) {
     let html;
     try { html = await C.store.readPage(p.id); } catch (e) { html = null; }
-    if (!html) { toast("This page's file is missing. Delete it and save it again."); return; }
+    if (!html) { toast("This clip's file is missing. Delete it and save it again."); return; }
     if (state.sheet) await new Promise((resolve) => { addEventListener("popstate", () => resolve(), { once: true }); history.back(); });
     if (positionTimer) savePositions();
     history.replaceState(readerState(p), "");
@@ -1616,7 +1616,7 @@
     const p = state.open;
     if (!p) return;
     const texts = C.reader.readable();
-    if (!texts.length) { toast("There's no text on this page to read aloud."); return; }
+    if (!texts.length) { toast("There's no text in this clip to read aloud."); return; }
     const block = spot ? spot.block : from == null ? C.reader.firstShown() : from;
     const parts = [];
     texts.forEach((text, b) => {
@@ -1741,7 +1741,7 @@
     const lang = primary(langOf(p));
     const name = (() => { try { return new Intl.DisplayNames([navigator.language || "en"], { type: "language" }).of(lang); } catch (e) { return lang; } })();
     const voiceRow = el("div", { class: "rc-row" }, el("span", { class: "rc-label" }, "Voice"), el("span", { class: "meta" }, "Looking…"));
-    const note = el("p", { class: "footnote aloud-note" }, speech.background ? "Keeps reading with the screen off. Pause it from the lock screen." : "Reads while this page is open.");
+    const note = el("p", { class: "footnote aloud-note" }, speech.background ? "Keeps reading with the screen off. Pause it from the lock screen." : "Reads while this clip is open.");
     speech.voices().then((all) => {
       const mine = all.filter((v) => primary(v.lang) === lang);
       if (!mine.length) {
@@ -1869,7 +1869,7 @@
       if (speech.available) box.insertBefore(aloudControls(), box.querySelector(".reset"));
       return box;
     } },
-    page: { button: "readerMore", label: "This page", build: () => state.open.preview ? previewSheet(state.open) : pageSheet(state.open, "reader") },
+    page: { button: "readerMore", label: "This clip", build: () => state.open.preview ? previewSheet(state.open) : pageSheet(state.open, "reader") },
     contents: { button: "readerContents", label: "Contents", build: contentsList },
   };
 
@@ -2134,7 +2134,7 @@
     const thumb = cover || (withThumb ? thumbUrl(withThumb) : null);
     const fresh = freshCount(name);
     const tile = el("div", { class: "tile", role: "listitem", "data-ids": list.map((p) => p.id).join(",") },
-      el("button", { class: "card-open", type: "button", "aria-label": name + ", collection, " + list.length + " pages, " + done + " read" + (fresh ? ", " + newCountText(fresh) + " chapters" : ""),
+      el("button", { class: "card-open", type: "button", "aria-label": name + ", collection, " + list.length + " clips, " + done + " read" + (fresh ? ", " + newCountText(fresh) + " chapters" : ""),
         onclick: () => tapPages(list.map((p) => p.id), () => openFolder(name)) }),
       pickMark(),
       el("span", { class: "tile-thumb" + (thumb ? "" : " blank"), "aria-hidden": "true" },
@@ -2224,7 +2224,7 @@
   const minutesText = (m) => (m >= 60 ? Math.floor(m / 60) + " h" + (m % 60 ? " " + (m % 60) + " min" : "") : m + " min");
   const minutesLeft = (list) => list.filter((p) => !p.finished)
     .reduce((sum, p) => sum + Math.max(1, Math.ceil((p.minutes || 1) * (1 - (p.at > 0.02 ? p.at : 0)))), 0);
-  const chapterWord = (list, n) => (isSeries(list) ? (n === 1 ? "chapter" : "chapters") : (n === 1 ? "page" : "pages"));
+  const chapterWord = (list, n) => (isSeries(list) ? (n === 1 ? "chapter" : "chapters") : (n === 1 ? "clip" : "clips"));
 
   function bookCover(list) {
     const url = coverUrl(list);
@@ -2269,7 +2269,7 @@
         el("p", { class: "meta folder-meta" }, meta),
         bar));
     if (renaming) {
-      return [head, el("p", { class: "footnote book-note" }, n === 1 ? "Renames the collection on its page." : "Renames the collection on all " + n + " of its pages.")];
+      return [head, el("p", { class: "footnote book-note" }, n === 1 ? "Renames the collection on its clip." : "Renames the collection on all " + n + " of its clips.")];
     }
     const go = done === n ? "Read again from the start" : (next.at > 0.02 || done ? "Continue: " : "Start: ") + next.title;
     const s = savedParts(list);
@@ -2335,7 +2335,7 @@
     const showList = folderMode !== "export";
     fill($("folderBody"),
       ...top,
-      showList && !ordering ? sectionHead((isSeries(list) ? "Chapters" : "Pages") + " · " + list.length) : null,
+      showList && !ordering ? sectionHead((isSeries(list) ? "Chapters" : "Clips") + " · " + list.length) : null,
       showList ? el("ol", { class: "group folder-list" + (ordering ? " ordering" : "") },
         ...list.map((p, i) => el("li", folderMode ? { "data-id": p.id } : { "data-id": p.id, "data-ids": p.id },
           el("button", { class: "row chapter" + (p === next && done < list.length ? " now" : ""), type: "button",
@@ -2457,7 +2457,7 @@
   // the end. The folder's own places are reused, as in moveTo.
   async function sortByChapter(list) {
     const nums = new Map(list.map((p) => [p, C.save.chapterNumber(p.title, p.url)]));
-    if ([...nums.values()].filter((n) => n != null).length < 2) { toast("These pages don't have chapter numbers to sort by."); return; }
+    if ([...nums.values()].filter((n) => n != null).length < 2) { toast("These clips don't have chapter numbers to sort by."); return; }
     const places = list.map((q) => q.folderAt || q.savedAt || 0);
     for (let k = 1; k < places.length; k++) if (places[k] <= places[k - 1]) places[k] = places[k - 1] + 1;
     const sorted = list.map((p, i) => [p, i]).sort((a, b) => {
@@ -2493,7 +2493,7 @@
     const pop = el("div", { class: "pop-menu", id: "folderPop", role: "menu", "aria-label": "Collection" },
       item("saved", "What's saved", () => openMenu("saved"), { note: formatSize(sizeOf(list)) }),
       item("book", "Story page", () => setFolderMode("chapters"), fresh ? { note: newCountText(fresh), accent: true } : {}),
-      item("add", "Add pages", () => openBatch("", false, state.folder)),
+      item("add", "Add clips", () => openBatch("", false, state.folder)),
       sep(),
       item("rename", "Rename", () => setFolderMode("rename")),
       item("reorder", "Reorder", () => setFolderMode("order"), { disabled: list.length < 2 }),
@@ -2592,10 +2592,10 @@
         el("span", { class: "pics", style: "width: " + share(s.pictures) + "%" }),
         el("span", { class: "text", style: "width: " + share(s.text) + "%" })) : null,
       kept ? legend("pics", "Pictures, " + what + " · " + kept, s.known ? formatSize(s.pictures) : "") : null,
-      legend("text", "Text and pages", s.known ? formatSize(s.text) : ""),
+      legend("text", "Text", s.known ? formatSize(s.text) : ""),
       s.links ? legend("links", "Pictures as links · " + s.links + ", need a connection", "") : null,
       s.missing ? legend("missing", s.missing + (s.missing === 1 ? " preview" : " previews") + " missing, shown online", "") : null,
-      !s.known ? el("p", { class: "footnote" }, C.platform.native ? "Measuring the pictures…" : "Picture sizes show for pages saved from 0.27.11 on.")
+      !s.known ? el("p", { class: "footnote" }, C.platform.native ? "Measuring the pictures…" : "Picture sizes show for clips saved from 0.27.11 on.")
         : lean ? el("p", { class: "footnote" }, "Most of it is pictures. Save again with Links to keep only the text, about " + formatSize(s.text) + ".") : null);
   }
 
@@ -2675,7 +2675,7 @@
     folderMode = "";
     await back(state.menu ? 2 : 1);
     renderLibrary();
-    toast(withPages ? "Deleted " + name + " and its " + countLine(list.length) : "Removed " + name + ". Its pages are in the library.");
+    toast(withPages ? "Deleted " + name + " and its " + countLine(list.length) : "Removed " + name + ". Its clips are in the library.");
   }
 
   // The page before or after `p` in its folder, if any.
@@ -2749,7 +2749,7 @@
           tileButton("send", "Export", () => { exporting = true; draw(); }),
           tileButton("original", "Original", () => C.platform.openOutside(p.url)),
           favTile(p, draw)),
-        el("h3", { class: "overline" }, "This page"),
+        el("h3", { class: "overline" }, "This clip"),
         tagsRow(p, draw),
         folderRow(p, draw),
         picturesRow(p, draw),
@@ -2759,7 +2759,7 @@
         el("div", { class: "group" },
           menuRow(p.finished ? "Mark as unread" : "Mark as read", () => markRead([p], !p.finished).then(draw)),
           inReader ? null : menuRow("Select", () => back().then(() => startSelect([p.id]))),
-          menuRow("Delete this page", () => deletePage(p, where), "warn")));
+          menuRow("Delete this clip", () => deletePage(p, where), "warn")));
     };
     draw();
     return box;
@@ -2869,7 +2869,7 @@
     if (!on) return;
     const list = picked();
     const scope = state.folder ? folderPages(state.folder) : onScreen;
-    $("selectCount").textContent = list.length ? countLine(list.length) + " picked" : "Pick pages";
+    $("selectCount").textContent = list.length ? countLine(list.length) + " picked" : "Pick clips";
     $("selectAll").textContent = scope.length && scope.every((p) => state.select.has(p.id)) ? "Pick none" : "Select all";
     $("selReadLabel").textContent = list.length && list.every((p) => p.finished) ? "Mark unread" : "Mark read";
     for (const id of ["selTags", "selFolder", "selRead", "selDelete"]) $(id).disabled = !list.length;
@@ -2927,7 +2927,7 @@
   // its own history entry.
 
   const MENUS = {
-    page: { label: "Page", build: () => pageSheet(state.menu.page, "library") },
+    page: { label: "Clip", build: () => pageSheet(state.menu.page, "library") },
     tags: { label: "Tags", build: tagsSheet },
     folder: { label: "Collection", build: folderSheet },
     saved: { label: "What's saved", build: savedSheet },
@@ -3263,7 +3263,7 @@
         el("button", { class: "row", type: "button", onclick: (e) => backUp(e.currentTarget) },
           el("span", { class: "row-label accent" }, "Back up the library")),
         open, input),
-      el("p", { class: "footnote" }, "One file with every page, its pictures, tags, collections and where you were, and the feeds you follow. " + (C.platform.native ? "Keep it off the phone" : "Keep it somewhere other than this browser") + ". Restoring keeps whichever copy of a page was saved last. A page sent as a file opens here too."));
+      el("p", { class: "footnote" }, "One file with every clip, its pictures, tags, collections and where you were, and the feeds you follow. " + (C.platform.native ? "Keep it off the phone" : "Keep it somewhere other than this browser") + ". Restoring keeps whichever copy of a clip was saved last. A clip sent as a file opens here too."));
   }
 
   // ---- Sync (0.30.0) ----
@@ -3413,7 +3413,7 @@
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); connect(); } });
     return el("section", { class: "settings-section" },
       el("h2", { class: "overline" }, "Sync with GitHub"),
-      el("p", { class: "section-lead" }, "Keeps your pages, tags, collections, favourites and where you are the same on every device, through a private repo on your GitHub. Each device gets the pictures itself."),
+      el("p", { class: "section-lead" }, "Keeps your clips, tags, collections, favourites and where you are the same on every device, through a private repo on your GitHub. Each device gets the pictures itself."),
       el("div", { class: "group" },
         outRow("https://github.com/signup", "1", "Make a free GitHub account", "Skip this if you have one."),
         outRow(C.sync.KEY_URL, "2", "Make a token for Carry-on", "GitHub fills it in. Under Repository access pick All repositories, then Generate token, and copy it."),
@@ -3446,8 +3446,8 @@
   function syncProgress() {
     const p = C.sync.progress;
     if (!C.sync.running || !p) return { text: "Syncing…", part: null };
-    if (p.stage === "up") return { text: "Sending pages, " + p.done + " of " + p.total, part: p.total ? p.done / p.total : null };
-    if (p.stage === "down") return { text: "Bringing pages in, " + p.done + " of " + p.total, part: p.total ? p.done / p.total : null };
+    if (p.stage === "up") return { text: "Sending clips, " + p.done + " of " + p.total, part: p.total ? p.done / p.total : null };
+    if (p.stage === "down") return { text: "Bringing clips in, " + p.done + " of " + p.total, part: p.total ? p.done / p.total : null };
     return { text: "Checking GitHub…", part: null };
   }
   function syncNote() {
@@ -3490,7 +3490,7 @@
           el("span", { class: "row-label accent" }, paused ? "Resume syncing" : "Pause syncing"))),
       el("p", { class: "footnote" }, paused
         ? "Nothing syncs until you resume. What synced before stays."
-        : "Syncs when Carry-on opens, after a change, and every few minutes while it's open. Pausing stops at the next page and picks up where it left off."));
+        : "Syncs when Carry-on opens, after a change, and every few minutes while it's open. Pausing stops at the next clip and picks up where it left off."));
   }
   // Pause stops a sync at the next page and starts none until Resume;
   // pages saving from their links and pictures wait too (0.30.4).
@@ -3502,19 +3502,19 @@
     if (!on) { syncNow(false); fetchPictures(); }
   }
   function disconnectSync() {
-    if (!confirm("Disconnect from GitHub? Your pages stay on this " + (C.platform.native ? "phone" : "browser") + " and on GitHub. To sync again you'll need a setup code or a token.")) return;
+    if (!confirm("Disconnect from GitHub? Your clips stay on this " + (C.platform.native ? "phone" : "browser") + " and on GitHub. To sync again you'll need a setup code or a token.")) return;
     for (const r of runs) if (r.sync) stopRun(r);
     syncQueue = [];
     C.sync.disconnect();
     renderSection();
     paintDownloads();
-    toast("Disconnected. Your pages stay here and on GitHub.");
+    toast("Disconnected. Your clips stay here and on GitHub.");
   }
   function syncLeave() {
     return el("section", { class: "settings-section" },
       el("div", { class: "group" },
         el("button", { class: "row", type: "button", onclick: disconnectSync }, el("span", { class: "row-label warn" }, "Disconnect from GitHub"))),
-      el("p", { class: "footnote" }, "Forgets the token on this device. Your pages stay here and on GitHub."));
+      el("p", { class: "footnote" }, "Forgets the token on this device. Your clips stay here and on GitHub."));
   }
   // Pages too, or links only: the library and its marks always sync.
   function syncWhat() {
@@ -3522,12 +3522,12 @@
       el("h2", { class: "overline" }, "What this device syncs"),
       el("div", { class: "group" },
         el("div", { class: "rc-list" },
-          el("div", { class: "rc-row stack" }, el("span", { class: "rc-label" }, "Pages"),
-            seg("sync-what", "What this device syncs", [{ value: "pages", label: "Pages too" }, { value: "links", label: "Links only" }],
+          el("div", { class: "rc-row stack" }, el("span", { class: "rc-label" }, "Clips"),
+            seg("sync-what", "What this device syncs", [{ value: "pages", label: "Clips too" }, { value: "links", label: "Links only" }],
               C.sync.links ? "links" : "pages", (v) => { C.sync.links = v === "links"; renderSection(); syncSoon(500); })))),
       el("p", { class: "footnote" }, C.sync.links
-        ? "Only links, tags, collections and where you are go up. Pages new to this device are saved again from their links, so one that changed or went away comes back different or not at all."
-        : "Each page's text goes up with it, so another device gets the page as you saved it, even if the site changes or takes it down."));
+        ? "Only links, tags, collections and where you are go up. Clips new to this device are saved again from their links, so one that changed or went away comes back different or not at all."
+        : "Each clip's text goes up with it, so another device gets the clip as you saved it, even if the site changes or takes it down."));
   }
   // The setup link points at the web copy: inside the app this page is at
   // https://localhost, which no other device can open. The app's scanner
@@ -3587,7 +3587,7 @@
     try { res = await C.save.setPictures(p, mode, (done, total) => { note.textContent = "Keeping " + word + ", " + done + " of " + total; }); }
     catch (e) { res = null; }
     changingPictures = false;
-    if (!res) { toast("Couldn't open this page's file. Try again."); redraw(); return; }
+    if (!res) { toast("Couldn't open this clip's file. Try again."); redraw(); return; }
     Object.assign(p, { mode, missing: res.missing, thumb: res.thumb, bytes: Math.max(0, (p.bytes || 0) + res.bytes) });
     if (p.imageBytes != null) p.imageBytes = Math.max(0, p.imageBytes + res.bytes);
     await C.store.writeIndex(state.pages);
@@ -3686,7 +3686,7 @@
     const skip = el("input", { class: "switch batch-skip", type: "checkbox", role: "switch", checked: true, onchange: () => sync() });
     const skipNote = el("span", { class: "choice-note" });
     const skipRow = el("div", { class: "group" }, el("label", { class: "row" },
-      el("span", { class: "choice-text" }, el("span", { class: "choice-label" }, "Skip pages already saved"), skipNote), skip));
+      el("span", { class: "choice-text" }, el("span", { class: "choice-label" }, "Skip links already saved"), skipNote), skip));
     const go = el("button", { class: "btn-primary batch-go", type: "submit" });
     const input = el("input", { class: "tag-input", type: "text", placeholder: "New collection", "aria-label": "New collection",
       maxlength: "32", enterkeyhint: "done", autocapitalize: "sentences" });
@@ -3780,7 +3780,7 @@
     const asPage = from ? el("section", { class: "settings-section batch-from" },
       el("p", { class: "meta" }, "Carry-on read this page as a list of chapters."),
       el("button", { class: "btn-quiet batch-as-page", type: "button", onclick: () => { history.back(); savePage(from, null, { asPage: true }); } },
-        "Save it as one page instead")) : null;
+        "Save it as one clip instead")) : null;
     const form = el("form", { class: "batch-form" }, asPage,
       el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Links"), area, count, finder, skipRow),
       el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Save as"),
@@ -3796,7 +3796,7 @@
         el("p", { class: "meta" }, "Full images for comics, maps and diagrams. Settings picks the usual choice.")) : null,
       el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Collection"),
         el("div", { class: "tag-edit" }, folderPick, input),
-        el("p", { class: "meta" }, "Pages in a collection keep the order of the links.")),
+        el("p", { class: "meta" }, "Clips in a collection keep the order of the links.")),
       el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Tags"), tagBox),
       go);
     form.addEventListener("submit", (e) => {
@@ -3805,7 +3805,7 @@
       const skipSaved = skip.checked && !skipRow.hidden;
       const urls = skipSaved ? all.filter((u) => !savedAs(u)) : all;
       if (!urls.length) return;
-      if (urls.length > LONG_LIST && !confirm("Save " + urls.length + " pages? They save one at a time, so a list this long takes a while. Pause and Stop are on its card.")) return;
+      if (urls.length > LONG_LIST && !confirm("Save " + urls.length + " clips? They save one at a time, so a list this long takes a while. Pause and Stop are on its card.")) return;
       history.back();
       saveAll(skipSaved ? all : urls, folder, tags, mode, skipSaved, kind, source);
     });
@@ -3941,7 +3941,7 @@
     };
     const chip = (n) => {
       const b = el("button", { class: "chip", type: "button",
-        "aria-label": n === Infinity ? "Save all the " + what + " pages from " + p.site : "Save the " + what + " " + countLine(n) + " from " + p.site,
+        "aria-label": n === Infinity ? "Save all the " + what + " clips from " + p.site : "Save the " + what + " " + countLine(n) + " from " + p.site,
         onclick: run(n) }, n === Infinity ? "All" : String(n));
       b.disabled = busy();
       return b;
@@ -4083,7 +4083,7 @@
     const rows = [checkRow(list), followControls(list[0], true), followControls(list[list.length - 1])].filter(Boolean);
     return el("div", { class: "folder-actions chapters-panel" },
       rows.length ? el("div", { class: "chapter-tools" }, ...rows)
-        : el("p", { class: "meta" }, "These pages don't link to each other, so there's nothing to look for. Link the collection to its story page below."),
+        : el("p", { class: "meta" }, "These clips don't link to each other, so there's nothing to look for. Link the collection to its story page below."),
       sourceSection(list));
   }
 
@@ -4102,7 +4102,7 @@
         const found = await C.save.findChapters(u);
         if (!found.links.length) { toast("Couldn't find a list of chapters on that page."); return; }
         setSource(name, u, found.cover || "");
-        toast("Linked to " + countLine(found.links.length).replace("page", "chapter") + " on " + C.save.siteName(u));
+        toast("Linked to " + countLine(found.links.length).replace("clip", "chapter") + " on " + C.save.siteName(u));
       } catch (e) {
         toast(e instanceof C.save.SaveError ? e.message : "Couldn't read that page. Try again.");
       } finally {
@@ -4324,7 +4324,7 @@
   // "About 2 posts a day · last one 2 h ago", from the posts' dates.
   function rateLine(items) {
     const ds = items.map((it) => it.date).filter(Boolean).sort((a, b) => b - a);
-    if (!ds.length) return items.length ? countLine(items.length).replace("page", "post") : "No posts yet";
+    if (!ds.length) return items.length ? countLine(items.length).replace("clip", "post") : "No posts yet";
     const last = whenText(ds[0]);
     if (ds.length < 2) return "Last post " + last;
     const perDay = (ds.length - 1) / Math.max((ds[0] - ds[ds.length - 1]) / DAY, 1 / 24);
@@ -5075,7 +5075,7 @@
       label: "Images",
       get: () => load(IMAGES_KEY, "previews"),
       set: (v) => { store(IMAGES_KEY, v); toast("New saves use " + v.replace("previews", "previews and links").replace("full", "full images").replace("links", "links only") + "."); },
-      footnote: "Applies to pages you save from now on.",
+      footnote: "Applies to clips you save from now on.",
       options: [
         { value: "previews", label: "Previews and links", note: "About 30 KB an image. The full image loads when you're online." },
         { value: "full", label: "Full images", note: "About 150 KB an image. For maps and diagrams." },
@@ -5145,7 +5145,7 @@
         el("label", { class: "row" },
           el("span", { class: "choice-text" },
             el("span", { class: "choice-label" }, "Continue reading"),
-            el("span", { class: "choice-note" }, "The page you read last, at the top of the library")),
+            el("span", { class: "choice-note" }, "The clip you read last, at the top of the library")),
           input),
         el("label", { class: "row" },
           el("span", { class: "choice-text" },
@@ -5211,7 +5211,7 @@
     }
     return el("section", { class: "settings-section" },
       el("p", { class: "storage-total" }, formatSize(totalBytes())),
-      el("p", { class: "section-lead" }, n ? countLine(n) + " " + ON_HERE + ". Delete a page from its menu: press and hold it in the library." : "Pages you save show here with their size."),
+      el("p", { class: "section-lead" }, n ? countLine(n) + " " + ON_HERE + ". Delete a clip from its menu: press and hold it in the library." : "Clips you save show here with their size."),
       el("h2", { class: "overline" }, "By collection"),
       list);
   }
@@ -5236,7 +5236,7 @@
       list,
       !C.platform.native && !installed && !installPrompt && ios
         ? el("p", { class: "footnote install-hint" }, "To install Carry-on, tap Share, then Add to Home Screen.") : null,
-      el("p", { class: "footnote" }, "Pages stay " + ON_HERE + ". Carry-on collects nothing."));
+      el("p", { class: "footnote" }, "Clips stay " + ON_HERE + ". Carry-on collects nothing."));
   }
 
   // The browser's own install offer (Chrome, Edge, Android), kept for the
@@ -5273,13 +5273,13 @@
       const kept = info.kept
         ? el("div", { class: "row" }, el("span", { class: "choice-text" },
           el("span", { class: "choice-label" }, "Kept"),
-          el("span", { class: "choice-note" }, "This browser won't clear your pages to make space.")))
+          el("span", { class: "choice-note" }, "This browser won't clear your clips to make space.")))
         : el("button", { class: "row keep-row", type: "button", onclick: async () => {
           const ok = await C.store.keepStored();
-          toast(ok ? "This browser will keep your pages." : "This browser didn't agree. Installing Carry-on usually helps.");
+          toast(ok ? "This browser will keep your clips." : "This browser didn't agree. Installing Carry-on usually helps.");
           draw(await C.store.storageInfo());
         } }, el("span", { class: "choice-text" },
-          el("span", { class: "choice-label accent" }, "Keep pages from being cleared"),
+          el("span", { class: "choice-label accent" }, "Keep clips from being cleared"),
           el("span", { class: "choice-note" }, "Browsers may clear a site's data when space runs low.")));
       box.replaceChildren(
         el("h2", { class: "overline" }, "This browser"),
@@ -5287,7 +5287,7 @@
           el("div", { class: "row" }, el("span", { class: "row-label" }, "Space used"),
             el("span", { class: "row-value" }, formatSize(info.usage) + (info.quota ? " of " + formatSize(info.quota) : ""))),
           kept),
-        el("p", { class: "footnote" }, "Pages saved here stay in this browser only. Clearing its site data deletes them, so keep a backup."));
+        el("p", { class: "footnote" }, "Clips saved here stay in this browser only. Clearing its site data deletes them, so keep a backup."));
     };
     C.store.storageInfo().then(draw);
     return box;

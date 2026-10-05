@@ -11,9 +11,9 @@
     <dimen name="carryon_w_radius">16dp</dimen>
     <dimen name="carryon_w_pad">16dp</dimen>
     <string name="carryon_w_reading">Keep reading</string>
-    <string name="carryon_w_reading_about">The page you were reading, one tap from where you left it.</string>
+    <string name="carryon_w_reading_about">The clip you were reading, one tap from where you left it.</string>
     <string name="carryon_w_feeds">Feeds</string>
     <string name="carryon_w_feeds_about">The newest posts from the sites you follow.</string>
     <string name="carryon_w_favourites">Favourites</string>
-    <string name="carryon_w_favourites_about">The pages you marked as favourites, one tap away.</string>
+    <string name="carryon_w_favourites_about">The clips you marked as favourites, one tap away.</string>
 </resources>
