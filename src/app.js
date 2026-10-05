@@ -4207,6 +4207,7 @@
   function closeSide() {
     if (!state.side) return;
     state.side = false;
+    sideByBack = false;
     const side = $("sidebar"), catcher = $("sideCatch");
     const had = side.contains(document.activeElement);
     $("libraryView").inert = false;
@@ -4250,14 +4251,26 @@
     });
   }
 
-  // A swipe to the right anywhere in Library or Feeds opens the sidebar
-  // (not only from the edge, which Android keeps for Back). Rows that
-  // scroll sideways keep their swipes.
+  // Android's Back in Library or Feeds opens the sidebar (0.29.0), and Back
+  // again with it open that way puts the app away. Anywhere else Back
+  // steps back through history as before.
+  let sideByBack = false;
+  const backOpens = C.platform.onBack(({ canGoBack }) => {
+    if (state.side && sideByBack) { C.platform.exitApp(); return; }
+    if (canGoBack && history.state && history.state.view) { history.back(); return; }
+    if (!state.side) { openSide(); sideByBack = true; return; }
+    C.platform.exitApp();
+  });
+
+  // Where there's no Back to use (iOS, a browser), a swipe to the right
+  // from the left edge opens it. Rows that scroll sideways keep theirs.
+  const EDGE = 24;
   function swipeToSide(root) {
+    if (backOpens) return;
     let start = null;
     root.addEventListener("touchstart", (e) => {
       const t = e.touches[0];
-      start = e.touches.length === 1 && !state.select && !state.menu && !state.side
+      start = e.touches.length === 1 && t.clientX <= EDGE && !state.select && !state.menu && !state.side
         && !e.target.closest(".filters, .folder-strip, input, textarea, .drag-handle") ? { x: t.clientX, y: t.clientY } : null;
     }, { passive: true });
     root.addEventListener("touchmove", (e) => {

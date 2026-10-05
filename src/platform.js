@@ -271,6 +271,18 @@
     },
   };
 
+  // Android's Back (0.29.0): with a listener the app decides what it does,
+  // `canGoBack` saying whether the WebView has history to step back to.
+  function onBack(f) {
+    const A = plugin("App");
+    if (A && os === "android") { A.addListener("backButton", f); return true; }
+    return false;
+  }
+  function exitApp() {
+    const A = plugin("App");
+    if (A) A.exitApp();
+  }
+
   async function printHtml(name, html) {
     const P = plugin("Print");
     if (P) { await P.print({ html, name }); return; }
@@ -428,6 +440,8 @@
     speech,
     downloads,
     feedChecks,
+    onBack,
+    exitApp,
     download,
     downloadUpdate,
     openInstaller,
