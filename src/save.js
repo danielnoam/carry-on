@@ -542,6 +542,44 @@
       },
     },
     {
+      // WEBTOON (0.29.1): an episode is a column of panels (img._images,
+      // their address in data-url); the series' list page shows ten
+      // episodes a page, newest first.
+      name: "WEBTOON",
+      host: /(^|\.)webtoons\.com$/i,
+      comic: (url) => /\/viewer\/?$/.test(new URL(url).pathname),
+      async contents(doc, url) {
+        const u = new URL(url);
+        if (!/\/list\/?$/.test(u.pathname) || !u.searchParams.get("title_no")) return null;
+        const links = await webtoonEpisodes(doc, u);
+        // The series' name breaks over lines (<br>) in its heading.
+        const h = doc.querySelector("h1.subj");
+        if (h) h.querySelectorAll("br").forEach((b) => b.replaceWith(" "));
+        return links.length ? { title: text(h) || text(doc.querySelector("title")), links } : null;
+      },
+      async list(doc, url) {
+        const u = new URL(url);
+        if (/\/list\/?$/.test(u.pathname)) return webtoonEpisodes(doc, u);
+        const a = doc.querySelector("a.subj[href*='/list'], a[href*='/list?title_no=']");
+        if (!a) return [];
+        const at = new URL(absolute(a.getAttribute("href"), url));
+        return webtoonEpisodes(parse((await get(at.href)).text, at.href), at);
+      },
+      chapter(doc, url) {
+        if (!this.comic(url)) return null;
+        const series = doc.querySelector("a.subj[href*='/list']");
+        const link = (sel) => { const a = doc.querySelector(sel); return a ? absolute(a.getAttribute("href"), url) : ""; };
+        return {
+          content: null,
+          title: text(doc.querySelector("h1.subj_episode")) || (doc.querySelector("h1.subj_episode") || { title: "" }).title,
+          series: series ? (series.getAttribute("title") || text(series)).trim() : "",
+          byline: [...doc.querySelectorAll(".author_area .author_name")].map(text).filter(Boolean).join(", "),
+          next: link("a._nextEpisode"),
+          prev: link("a._prevEpisode"),
+        };
+      },
+    },
+    {
       name: "Wattpad",
       host: /(^|\.)wattpad\.com$/i,
       // A part's later pages (/page/2) are the same part.
@@ -652,6 +690,23 @@
       },
     },
   ];
+
+  // Every episode on a WEBTOON series' list, oldest first: page after
+  // page (&page=2…) until one adds nothing new.
+  async function webtoonEpisodes(doc, u) {
+    const read = (d) => [...d.querySelectorAll("li._episodeItem a[href], #_listUl a.detail_list_link[href]")].map((a) => absolute(a.getAttribute("href"), u.href));
+    const all = new Set(read(doc));
+    for (let page = 2; page <= 200; page++) {
+      const at = new URL(u.href);
+      at.searchParams.set("page", page);
+      let more;
+      try { more = read(parse((await get(at.href)).text, at.href)).filter((l) => !all.has(l)); } catch (e) { break; }
+      if (!more.length) break;
+      more.forEach((l) => all.add(l));
+    }
+    const no = (l) => Number(new URL(l).searchParams.get("episode_no")) || 0;
+    return uniqueLinks([...all].filter(Boolean)).sort((a, b) => no(a) - no(b));
+  }
 
   // ---- Wattpad (0.29.1) ----
   // A part's page carries its details in `window.prefetched` (the
@@ -912,13 +967,15 @@
     const headline = (og && og.content) || (h1s.length === 1 ? h1s[0].textContent : "");
     // A comic chapter's page often lists every chapter in a menu, so it is
     // never taken for a contents page.
-    const own = !comic && site && site.chapter ? site.chapter(doc, finalUrl, html) : null;
+    // A site that says which of its pages are comics (WEBTOON) still names
+    // the episode, the series and the next one.
+    const own = site && site.chapter && (!comic || site.comic) ? site.chapter(doc, finalUrl, html) : null;
     const contents = !comic && !asPage && !own && !site && contentsOf(doc, finalUrl, (headline || docTitle).replace(/\s+/g, " ").trim());
     if (contents) return { contents };
     let next = nextLink(doc, finalUrl);
     let prev = nextLink(doc, finalUrl, true);
     resolveLazyImages(doc, finalUrl);
-    if (own && own.content && own.content.textContent.trim().length >= MIN_TEXT / 5) {
+    if (!comic && own && own.content && own.content.textContent.trim().length >= MIN_TEXT / 5) {
       if (own.next !== undefined) next = own.next;
       if (own.prev !== undefined) prev = own.prev;
       const t = own.content.textContent;
@@ -927,7 +984,9 @@
     }
     if (comic) {
       const panels = comicPanels(doc, finalUrl);
-      return panels ? { doc, docTitle, headline, next, prev, panels } : null;
+      if (own && own.next !== undefined) next = own.next;
+      if (own && own.prev !== undefined) prev = own.prev;
+      return panels ? { doc, docTitle, headline: (own && own.title) || headline, next, prev, panels, series: (own && own.series) || "", byline: (own && own.byline) || "" } : null;
     }
     if (typeof window.Readability !== "function") throw new SaveError("The reader part of the app didn't load. Restart Carry-on.");
     const article = new window.Readability(doc, { charThreshold: 500, keepClasses: false }).parse();
@@ -966,7 +1025,7 @@
         : "This page builds itself with JavaScript, which Carry-on can't save yet.");
     }
     if (got.panels) {
-      const { doc, docTitle, headline, next, prev, panels } = got;
+      const { doc, docTitle, headline, next, prev, panels, series, byline } = got;
       const body = doc.implementation.createHTMLDocument("").body;
       for (const src of panels) {
         const img = body.ownerDocument.createElement("img");
@@ -975,9 +1034,9 @@
         body.append(img);
       }
       return {
-        url: finalUrl, comic: true,
+        url: finalUrl, comic: true, series: series || "",
         title: (headline.trim() || docTitle || siteName(finalUrl)).trim().replace(/\s+/g, " "),
-        site: siteName(finalUrl), byline: "", body, base: finalUrl, licence: null,
+        site: site && site.comic ? site.name : siteName(finalUrl), byline: byline || "", body, base: finalUrl, licence: null,
         lang: (doc.documentElement.getAttribute("lang") || "").trim(), dir: "", next, prev, icon: siteIcon(doc, finalUrl),
       };
     }
@@ -1337,6 +1396,10 @@
   // `kind` "comic" saves the page's pictures as an image chapter instead
   // of reading an article out of it; it is chosen, never guessed.
   async function save(url, { mode = "previews", kind = "article", asPage = false, onProgress } = {}) {
+    // A site's comic pages are saved as comics, with their full pictures,
+    // whatever was picked.
+    const rule = siteRule(url);
+    if (kind !== "comic" && rule && rule.comic && rule.comic(url)) { kind = "comic"; mode = "full"; }
     const wiki = kind !== "comic" && wikipediaPage(url);
     if (onProgress) onProgress({ stage: "text" });
     const got = wiki ? await fromWikipedia(wiki) : await fromAnyPage(url, () => onProgress && onProgress({ stage: "drawing" }), kind === "comic", asPage);
