@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.30.1";
+  const APP_VERSION = "0.30.2";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -145,7 +145,7 @@
     select: null,
     // The library's sheet: { kind: "page" | "tags" | "folder", page }, or null.
     menu: null,
-    // Settings' screen up over its menu: "appearance", "saving", "storage", "updates" or "about".
+    // Settings' screen up over its menu: "appearance", "saving", "storage" or "updates" (About).
     section: null,
   };
   paintTheme(state.theme);
@@ -925,6 +925,17 @@
   }
 
   const sectionHead = (label, extra) => el("div", { class: "section-head wide" }, el("h2", { class: "overline" }, label), extra || null);
+  // A section's head that opens it alone (0.30.2): every collection in a
+  // grid, or just the pages in none.
+  const partHead = (part, label) => el("div", { class: "section-head wide" },
+    el("h2", { class: "overline" }, el("button", { class: "section-link", type: "button", onclick: () => openPart(part) },
+      label, el("span", { class: "section-chev", "aria-hidden": "true" }, "›"))));
+  function openPart(part, fromHistory) {
+    state.part = part;
+    if (!fromHistory) history.pushState({ view: "part", part }, "");
+    renderLibrary();
+    scrollTo(0, 0);
+  }
 
   // The page to carry on with: the one read last that isn't finished.
   function continuePage() {
@@ -1017,7 +1028,7 @@
     const folders = flat ? [] : allFolders().filter((f) => !status
       || (state.filter === "unread" ? folderPages(f).some(unread) : folderPages(f).every((x) => x.finished)));
     const folderSig = (f) => [f, freshCount(f), ...folderPages(f).map((x) => x.id + readingLine(x) + (x.thumb || "") + (x.cover || ""))].join("|");
-    if (!ts.length && state.filter === "all") {
+    if (!ts.length && state.filter === "all" && !state.part) {
       const going = !state.select && load(CONTINUE_KEY, true) && continuePage();
       if (going) {
         keep("h:continue", () => sectionHead("Continue reading"));
@@ -1036,17 +1047,25 @@
         else keep("t:" + x.folder, () => { const t = folderTile(x.folder); t.removeAttribute("role"); return t; }, folderSig(x.folder));
       }
     } else {
-      if (folders.length) {
+      const part = !flat && state.part;
+      const back = () => keep("h:part:" + part, () => el("div", { class: "section-head wide part-head" },
+        el("button", { class: "btn-quiet part-back", type: "button", onclick: () => history.back() },
+          el("span", { "aria-hidden": "true" }, "‹ "), "Library")));
+      if (part) back();
+      if (folders.length && part !== "pages") {
         const names = sorted(folders.map(asItem)).map((x) => x.folder);
-        keep("h:folders", () => sectionHead("Collections"));
-        keep("folders", () => foldersStrip(names), names.map(folderSig).join("‖"));
+        const label = "Collections · " + names.length;
+        if (part) keep("h:folders:all", () => sectionHead(label), label);
+        else keep("h:folders", () => partHead("collections", "Collections"));
+        keep(part ? "folders:all" : "folders", () => { const strip = foldersStrip(names); if (part) strip.classList.add("folder-grid"); return strip; }, names.map(folderSig).join("‖"));
       }
-      if (loose.length) {
-        const label = (ts.length ? "Found" : state.filter === "all" ? (n > loose.length ? "Pages in no collection" : "Pages")
-          : status && folders.length ? filterName() + " pages in no collection" : filterName()) + " · " + loose.length;
-        keep("h:pages", () => sectionHead(label), label);
+      if (loose.length && part !== "collections") {
+        const label = (ts.length ? "Found" : state.filter === "all" ? "Pages"
+          : status && folders.length ? filterName() + " pages" : filterName()) + " · " + loose.length;
+        if (part || ts.length || !folders.length) keep("h:pages", () => sectionHead(label), label);
+        else keep("h:pages", () => partHead("pages", label), "link" + label);
       }
-      for (const p of loose) {
+      if (part !== "collections") for (const p of loose) {
         if (ts.length) {
           const s = found.get(p.id);
           keep("q:" + p.id, () => pageCard(p, s), [pageSig(p), s].join("|"));
@@ -1150,6 +1169,7 @@
     fresh.forEach((j) => { j.waiting = true; j.run = run; });
     state.saving = [...fresh, ...state.saving];
     renderLibrary();
+    if (state.folder) renderFolder();
     if (run) toast("Saving " + countLine(fresh.length) + ". They're in Downloads.");
     let saved = 0, failed = 0, had = 0, stopped = 0;
     for (const job of jobs) {
@@ -2186,8 +2206,16 @@
   // New chapters found by the daily check, saved from here: straight from
   // the story page's list when it gave one, else by following the last
   // chapter's next link.
+  // Chapters saving into a collection; while they are, its Save button
+  // gives way to a line that opens Downloads (0.30.2).
+  const savingInto = (name) => state.saving.filter((s) => !s.error && s.folder && sameTag(s.folder, name)).length;
   function saveNewButton(list) {
     const name = state.folder;
+    const saving = savingInto(name);
+    if (saving) {
+      return el("button", { class: "btn-quiet book-new", type: "button", onclick: () => openDownloads() },
+        "Saving " + saving + " " + chapterWord(list, saving) + " · ", el("span", { class: "accent" }, "See in Downloads"));
+    }
     const fresh = freshCount(name);
     if (!fresh) return null;
     const entry = newFor(name);
@@ -2646,40 +2674,53 @@
         el("h3", { class: "overline" }, "This page"),
         tagsRow(p, draw),
         folderRow(p, draw),
+        picturesRow(p, draw),
         series.length ? el("h3", { class: "overline" }, "Series") : null,
         ...series,
         el("h3", { class: "overline" }, "More"),
         el("div", { class: "group" },
           menuRow(p.finished ? "Mark as unread" : "Mark as read", () => markRead([p], !p.finished).then(draw)),
           inReader ? null : menuRow("Select", () => back().then(() => startSelect([p.id]))),
-          fullImagesRow(p),
           menuRow("Delete this page", () => deletePage(p, where), "warn")));
     };
     draw();
     return box;
   }
 
+  let tagTyping = false;
   function tagsRow(p, redraw) {
     const tags = p.tags || [];
-    const others = allTags().filter((t) => !tags.some((x) => sameTag(x, t)));
-    const input = el("input", { class: "tag-input", type: "text", placeholder: "Add a tag", "aria-label": "Add a tag",
-      maxlength: "32", enterkeyhint: "done", autocapitalize: "off" });
-    const refocus = () => { const i = document.querySelector(".sheet:not([hidden]) .tag-input"); if (i) i.focus({ preventScroll: true }); };
-    const add = (raw) => {
+    const others = allTags().filter((t) => !tags.some((x) => sameTag(x, t))).sort((a, b) => a.localeCompare(b));
+    const add = (raw, typed) => {
       const t = cleanTag(raw);
       if (!t || tags.some((x) => sameTag(x, t))) return;
       const known = allTags().find((x) => sameTag(x, t));
-      setTags(p, [...tags, known || t]).then(() => { redraw(); refocus(); });
+      // Typed tags keep the field open for the next one.
+      tagTyping = !!typed;
+      setTags(p, [...tags, known || t]).then(redraw);
     };
-    input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); add(input.value); } });
+    const input = newField("new-tag", "Name the new tag", "New tag", (v) => add(v, true));
+    input.setAttribute("autocapitalize", "off");
+    if (tagTyping) {
+      tagTyping = false;
+      input.hidden = false;
+      setTimeout(() => { const i = document.querySelector(".sheet:not([hidden]) .new-tag"); if (i) i.focus({ preventScroll: true }); }, 0);
+    }
+    const pick = dropdown({
+      label: "Add a tag", cls: "field-pick", placeholder: "Add a tag",
+      options: [...others.map((t) => ({ value: t, label: t })), { value: NEW_PICK, label: "New tag…" }],
+      value: null,
+      onpick: (v) => {
+        if (v === NEW_PICK) { input.hidden = false; input.focus(); return; }
+        add(v);
+      },
+    });
     return el("div", { class: "rc-row tall" }, el("span", { class: "rc-label" }, "Tags"),
       el("div", { class: "tag-edit" },
-        el("div", { class: "chips" },
+        tags.length ? el("div", { class: "chips" },
           ...tags.map((t) => el("button", { class: "chip on", type: "button", "aria-label": "Remove tag " + t,
-            onclick: () => setTags(p, tags.filter((x) => x !== t)).then(redraw) }, t, el("span", { class: "chip-x", "aria-hidden": "true" }, "×"))),
-          input),
-        others.length ? el("div", { class: "chips" },
-          ...others.slice(0, 12).map((t) => el("button", { class: "chip", type: "button", "aria-label": "Add tag " + t, onclick: () => add(t) }, "+ " + t))) : null));
+            onclick: () => setTags(p, tags.filter((x) => x !== t)).then(redraw) }, t, el("span", { class: "chip-x", "aria-hidden": "true" }, "×")))) : null,
+        pick, input));
   }
 
   // From the reader, back out of it; from the library's sheet, back to the
@@ -3192,6 +3233,15 @@
     if (res && !quiet) toast(res.up + res.down + res.removed ? "Synced: " + [res.up ? res.up + " sent" : "", res.down ? res.down + " came in" : "", res.removed ? res.removed + " removed" : ""].filter(Boolean).join(", ") + "." : "Already in step.");
     return res;
   }
+  // Before 0.30.2 a new page's pictures never downloaded on Android (see
+  // platform.js, folderFor). Those pages fetch them once, when online.
+  const HEALED_KEY = "carryon.picturesHealed";
+  function healPictures() {
+    if (!C.platform.native || !navigator.onLine || load(HEALED_KEY, false)) return;
+    store(HEALED_KEY, true);
+    syncQueue.push(...state.pages.filter((p) => p.missing && p.mode !== "links").map((p) => p.id));
+    fetchPictures();
+  }
   async function fetchPictures() {
     if (fetchingPictures || !C.platform.native) return;
     fetchingPictures = true;
@@ -3319,55 +3369,74 @@
     toast(err || "Sync is on. Your library is on its way.");
   }
 
-  // "Save full images" for a page saved with previews or links only.
-  function fullImagesRow(p) {
-    if (!C.platform.native || p.mode === "full" || !p.images) return null;
-    return el("button", { class: "row", type: "button", onclick: (e) => saveFullImages(p, e.currentTarget) },
-      el("span", { class: "choice-text" },
-        el("span", { class: "row-label" }, "Save full images"),
-        el("span", { class: "choice-note" }, "For maps, diagrams and comics. About 150 KB an image.")));
+  // How a page keeps its pictures, switched from its sheet (0.30.2), in
+  // place of 0.17.0's "Save full images".
+  const PICTURE_MODES = [{ value: "previews", label: "Previews" }, { value: "full", label: "Full size" }, { value: "links", label: "Links" }];
+  function picturesRow(p, redraw) {
+    if (!C.platform.native || !p.images) return null;
+    const note = el("p", { class: "footnote pictures-note", role: "status" }, savedNote(p));
+    return el("div", { class: "rc-row stack" }, el("span", { class: "rc-label" }, "Pictures"),
+      seg("pictures-" + p.id, "Pictures", PICTURE_MODES, p.mode || "previews", (v) => changePictures(p, v, note, redraw)),
+      note);
   }
 
-  async function saveFullImages(p, btn) {
-    if (!navigator.onLine) { toast("You're offline. Try again when you're back online."); return; }
-    btn.disabled = true;
-    const label = btn.querySelector(".row-label");
-    label.textContent = "Saving full images…";
-    let res;
-    try {
-      res = await C.save.saveFullImages(p, (done, total) => { label.textContent = "Saving full images, " + done + " of " + total; });
-    } catch (e) { res = null; }
-    if (!res) { btn.disabled = false; label.textContent = "Save full images"; toast("Couldn't open this page's file. Try again."); return; }
-    Object.assign(p, { mode: "full", missing: res.missing, bytes: Math.max(0, (p.bytes || 0) + res.bytes) });
+  let changingPictures = false;
+  async function changePictures(p, mode, note, redraw) {
+    if (changingPictures) return;
+    if (mode !== "links" && !navigator.onLine && (mode === "full" || p.mode === "links")) {
+      toast("You're offline. Try again when you're back online.");
+      redraw();
+      return;
+    }
+    changingPictures = true;
+    const word = { previews: "previews", full: "full images", links: "links" }[mode];
+    note.textContent = "Keeping " + word + "…";
+    let res = null;
+    try { res = await C.save.setPictures(p, mode, (done, total) => { note.textContent = "Keeping " + word + ", " + done + " of " + total; }); }
+    catch (e) { res = null; }
+    changingPictures = false;
+    if (!res) { toast("Couldn't open this page's file. Try again."); redraw(); return; }
+    Object.assign(p, { mode, missing: res.missing, thumb: res.thumb, bytes: Math.max(0, (p.bytes || 0) + res.bytes) });
     if (p.imageBytes != null) p.imageBytes = Math.max(0, p.imageBytes + res.bytes);
     await C.store.writeIndex(state.pages);
+    texts.clear();
+    await loadThumbs();
     renderLibrary();
-    toast(res.failed ? "Saved " + res.got + " full images. " + res.failed + " kept their previews." : "Full images saved.");
-    if (state.menu && state.menu.page === p) redrawMenu();
+    if (state.folder) renderFolder();
+    toast(res.failed ? res.failed + (res.failed === 1 ? " picture" : " pictures") + " couldn't be fetched. They show online." : mode === "links" ? "Pictures are links now. They show when you're online." : "Pictures saved as " + word + ".");
+    redraw();
     if (state.open !== p) return;
-    if (state.sheet === "page") $("readingBody").replaceChildren(SHEETS.page.build());
     const html = await C.store.readPage(p.id).catch(() => null);
     if (html) show(p, html);
   }
 
-  function folderRow(p, redraw) {
-    const others = allFolders().filter((n) => !(p.folder && sameTag(n, p.folder)));
-    const input = el("input", { class: "tag-input", type: "text", "aria-label": p.folder ? "Move to a new collection" : "Add to a new collection",
-      placeholder: p.folder ? "New collection" : "Add to a new collection", maxlength: "32", enterkeyhint: "done", autocapitalize: "sentences" });
+  // Collection and tags are picked from dropdowns (0.30.2), with a field
+  // for a new one.
+  const NEW_PICK = "\u0000new";
+  function newField(cls, placeholder, label, then) {
+    const input = el("input", { class: "tag-input new-pick " + cls, type: "text", placeholder, "aria-label": label,
+      maxlength: "32", enterkeyhint: "done", autocapitalize: "sentences", hidden: "" });
     input.addEventListener("keydown", (e) => {
       if (e.key !== "Enter") return;
       e.preventDefault();
-      if (cleanTag(input.value)) setFolder(p, input.value).then(redraw);
+      if (cleanTag(input.value)) then(input.value);
+    });
+    return input;
+  }
+  function folderRow(p, redraw) {
+    const input = newField("new-collection", "Name the new collection", "New collection", (v) => setFolder(p, v).then(redraw));
+    const names = allFolders().sort((a, b) => a.localeCompare(b));
+    const pick = dropdown({
+      label: "Collection", cls: "field-pick",
+      options: [{ value: "", label: "None" }, ...names.map((n) => ({ value: n, label: n })), { value: NEW_PICK, label: "New collection…" }],
+      value: p.folder && names.find((n) => sameTag(n, p.folder)) || "",
+      onpick: (v) => {
+        if (v === NEW_PICK) { input.hidden = false; input.focus(); return; }
+        setFolder(p, v || null).then(redraw);
+      },
     });
     return el("div", { class: "rc-row tall" }, el("span", { class: "rc-label" }, "Collection"),
-      el("div", { class: "tag-edit" },
-        el("div", { class: "chips" },
-          p.folder ? el("button", { class: "chip on", type: "button", "aria-label": "Take out of " + p.folder,
-            onclick: () => setFolder(p, null).then(redraw) }, p.folder, el("span", { class: "chip-x", "aria-hidden": "true" }, "×")) : null,
-          input),
-        others.length ? el("div", { class: "chips" },
-          ...others.slice(0, 8).map((n) => el("button", { class: "chip", type: "button", "aria-label": (p.folder ? "Move to " : "Add to ") + n,
-            onclick: () => setFolder(p, n).then(redraw) }, (p.folder ? "→ " : "+ ") + n))) : null));
+      el("div", { class: "tag-edit" }, pick, input));
   }
 
   function neighbours(p) {
@@ -3602,6 +3671,7 @@
       state.saving.unshift(job);
       if (run) run.current = job;
       renderLibrary();
+      if (state.folder) renderFolder();
       const meta = await runJob(job);
       if (run) run.current = null;
       if (!meta) { failed = true; if (run) run.failed++; break; }
@@ -3803,7 +3873,7 @@
     btn.disabled = busy;
     // From a story page, the new ones are saved straight from its list,
     // each at its place among those already saved.
-    const take = entry && entry.all && fresh ? el("button", { class: "chip on save-new", type: "button", onclick: () => {
+    const take = entry && entry.all && fresh && !savingInto(name) ? el("button", { class: "chip on save-new", type: "button", onclick: () => {
       if (!navigator.onLine) { toast("You're offline. Try again when you're back online."); return; }
       saveAll(entry.all, name, [], undefined, true, undefined, folderSource(list));
     } }, "Save " + fresh) : null;
@@ -4903,7 +4973,6 @@
   function aboutGroup() {
     const list = el("div", { class: "group" });
     const releases = C.platform.releasesUrl() || "https://github.com/danielnoam/carry-on/releases/latest";
-    list.append(el("div", { class: "row" }, el("span", { class: "row-label" }, "Version"), el("span", { class: "row-value" }, APP_VERSION)));
     list.append(el("a", { class: "row", href: releases, target: "_blank", rel: "noopener" },
       el("span", { class: "row-label accent" }, "Releases and source"),
       el("span", { class: "row-value", "aria-hidden": "true" }, "↗")));
@@ -4928,11 +4997,11 @@
   addEventListener("beforeinstallprompt", (e) => {
     e.preventDefault();
     installPrompt = e;
-    if (state.section === "about") renderSection();
+    if (state.section === "updates") renderSection();
   });
   addEventListener("appinstalled", () => {
     installPrompt = null;
-    if (state.section === "about") renderSection();
+    if (state.section === "updates") renderSection();
     toast("Installed. Carry-on is with your other apps.");
   });
   async function installApp() {
@@ -4941,7 +5010,7 @@
     installPrompt = null;
     offer.prompt();
     try { await offer.userChoice; } catch (e) { /* closed */ }
-    if (state.section === "about") renderSection();
+    if (state.section === "updates") renderSection();
   }
 
   // A browser's storage (0.27.12): how much it holds, and whether it may
@@ -4987,8 +5056,7 @@
       value: () => SETTINGS[1].options.find((o) => o.value === SETTINGS[1].get()).label },
     sync: { title: "Sync", build: syncSections, value: () => (C.sync.on ? (C.sync.last.error ? "Stopped" : "On") : "Off") },
     storage: { title: "Storage and backup", build: () => [storageGroup(), browserStorageGroup(), backupGroup()], value: () => formatSize(totalBytes()) },
-    updates: { title: "Updates", build: () => [updatesGroup()], value: () => (updateOut() ? upd.latest + " is out" : "") },
-    about: { title: "About", build: () => [aboutGroup()], value: () => APP_VERSION },
+    updates: { title: "About", build: () => [updatesGroup(), aboutGroup()], value: () => (updateOut() ? upd.latest + " is out" : APP_VERSION) },
   };
 
   function renderSettings() {
@@ -5010,7 +5078,7 @@
             el("button", { class: "btn-small", type: "button", onclick: () => openSection("updates") }, "View"))) : null,
         el("div", { class: "group" }, row("appearance"), row("saving")),
         el("div", { class: "group" }, row("storage"), row("sync")),
-        el("div", { class: "group" }, row("updates"), row("about"))));
+        el("div", { class: "group" }, row("updates"))));
   }
 
   function renderSection() {
@@ -5075,6 +5143,8 @@
     else if (!s.section) closeSection();
     if (view !== "batch") closeBatch();
     if (view === "batch") openBatch("", true, s.folder);
+    const part = (view === "part" && s.part) || (["folder", "reader", "menu", "select"].includes(view) && state.part) || null;
+    if (part !== state.part) { state.part = part; renderLibrary(); }
     const folder = ["folder", "reader", "batch", "select", "menu"].includes(view) && s.folder;
     if (!folder) closeFolder();
     else if (!state.folder) openFolder(folder, true);
@@ -5098,7 +5168,7 @@
     if (!(history.state && history.state.view)) return Promise.resolve();
     return new Promise((resolve) => {
       addEventListener("popstate", () => resolve(), { once: true });
-      history.go(-[state.folder, state.open, state.sheet, state.image, state.settings, state.section, state.batch, state.news, state.select, state.menu, state.downloads, state.side].filter(Boolean).length || -1);
+      history.go(-[state.folder, state.open, state.sheet, state.image, state.settings, state.section, state.batch, state.news, state.select, state.menu, state.downloads, state.side, state.part].filter(Boolean).length || -1);
     });
   }
 
@@ -5248,6 +5318,7 @@
     updateWidgets();
     C.store.onIndex = () => syncSoon();
     takeSetupLink();
+    setTimeout(healPictures, 4000);
     addEventListener("hashchange", takeSetupLink);
     setTimeout(() => syncNow(), 2000);
     document.addEventListener("visibilitychange", () => {
@@ -5375,28 +5446,29 @@
     paintUpdateBar();
   }
 
+  // Updates and About in one (0.30.2): the version is the button that
+  // checks for a newer one, then What's new.
   function updatesGroup() {
-    const list = el("div", { class: "group" },
-      el("div", { class: "row" }, el("span", { class: "row-label" }, "This version"), el("span", { class: "row-value" }, APP_VERSION)));
+    const list = el("div", { class: "group" });
     if (C.platform.native) {
       const out = ["available", "downloading", "ready"].includes(upd.phase);
       const status = {
-        idle: "Not checked yet", checking: "Checking…", current: "You have the latest version",
+        idle: "Tap to check for updates", checking: "Checking…", current: "You have the latest version",
         failed: upd.error, available: "Carry-on " + upd.latest + " is out",
         downloading: "Downloading " + upd.latest + " · " + upd.pct + "%", ready: "Carry-on " + upd.latest + " is ready to install",
       }[upd.phase];
-      const action = out ? el("button", { class: "btn-small", type: "button", onclick: startUpdate },
-        upd.phase === "downloading" ? upd.pct + "%" : C.platform.ios ? "Get it" : upd.phase === "ready" ? "Install" : "Update") : null;
-      if (action && upd.phase === "downloading") action.disabled = true;
-      list.append(el("div", { class: "row update-row" + (out ? " out" : "") },
-        upd.phase === "checking" || upd.phase === "downloading" ? el("span", { class: "spinner", "aria-hidden": "true" }) : null,
-        el("span", { class: "row-label" + (out ? " accent" : upd.phase === "failed" ? " warn" : "") , role: "status" }, status), action));
+      const busy = upd.phase === "checking" || upd.phase === "downloading";
+      const version = el("button", { class: "row update-row" + (out ? " out" : ""), type: "button", onclick: () => (out ? startUpdate() : checkForNewerApp()) },
+        busy ? el("span", { class: "spinner", "aria-hidden": "true" }) : null,
+        el("span", { class: "choice-text" },
+          el("span", { class: "row-label" }, "Version " + APP_VERSION),
+          el("span", { class: "choice-note" + (out ? " accent" : upd.phase === "failed" ? " warn" : ""), role: "status" }, status)),
+        out ? el("span", { class: "btn-small", "aria-hidden": "true" }, upd.phase === "downloading" ? upd.pct + "%" : C.platform.ios ? "Get it" : upd.phase === "ready" ? "Install" : "Update") : null);
+      version.disabled = busy;
+      list.append(version);
       if (out && upd.error) list.append(el("div", { class: "row" }, el("span", { class: "row-label warn" }, upd.error)));
-      if (out && upd.notes) list.append(el("div", { class: "update-notes" }, el("p", { class: "overline" }, "What's in " + upd.latest), ...notesView(changelogEntries("## [" + upd.latest + "]\n" + upd.notes))));
-      const check = el("button", { class: "row", type: "button", onclick: () => checkForNewerApp() },
-        el("span", { class: "row-label accent" }, "Check for updates"));
-      check.disabled = upd.phase === "checking" || upd.phase === "downloading";
-      list.append(check);
+    } else {
+      list.append(el("div", { class: "row" }, el("span", { class: "row-label" }, "Version"), el("span", { class: "row-value" }, APP_VERSION)));
     }
     list.append(el("button", { class: "row", type: "button", onclick: () => openNews() },
       el("span", { class: "row-label accent" }, "What's new"), el("span", { class: "row-value", "aria-hidden": "true" }, "›")));

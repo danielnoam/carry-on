@@ -764,7 +764,7 @@ html.native .reader::before {
   border-bottom: 1px solid var(--line);
 }
 .group .reading-controls, .group .rc-list { padding: var(--s-3) var(--s-4) var(--s-4); }
-.reader-actions { display: flex; align-items: center; gap: var(--s-1); }
+.reader-start, .reader-actions { display: flex; align-items: center; gap: var(--s-1); }
 .pill {
   height: 28px; padding: 0 10px;
   display: inline-flex; align-items: center; gap: 6px;
@@ -1537,3 +1537,19 @@ html { -webkit-tap-highlight-color: transparent; }
 .sync-paste .choice-note:empty { display: none; }
 .sync-qr { display: flex; justify-content: center; padding: var(--s-5) var(--s-4); border-bottom: 1px solid var(--line); }
 .sync-qr svg { display: block; width: 200px; height: 200px; padding: var(--s-2); background: var(--code-paper); border-radius: var(--r-sm); }
+
+/* A library section opened alone (0.30.2). */
+.section-link {
+  display: inline-flex; align-items: center; gap: var(--s-1); min-height: 44px; margin: calc(-1 * var(--s-2)) 0;
+  padding: 0; border: 0; background: none; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer;
+}
+.section-chev { font-size: var(--fs-label); line-height: 1; color: var(--accent); }
+.part-back { border: 0; padding: 0 var(--s-1); color: var(--accent); }
+.folder-strip.folder-grid {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-4) var(--s-3);
+  overflow: visible; margin: 0; padding: var(--s-1) 0 var(--s-2);
+}
+.folder-grid .tile { flex: none; }
+@media (min-width: 900px) {
+  .folder-strip.folder-grid { grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); }
+}

@@ -3,6 +3,17 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Pictures never downloaded on Android (0.30.2).** @capacitor/filesystem
+  8's Android downloadFile (LegacyFilesystemImplementation) opens a
+  FileOutputStream on the path and ignores `recursive`, so a download into
+  a folder that doesn't exist fails with ENOENT. A new page's
+  pages/<id>/images/ never exists when its pictures download, so every
+  picture of every page failed and was kept as a link, which the reader
+  shows online; it looked like it worked. platform.downloadTo now makes
+  the folder first (FS.mkdir, recursive). e2e/dirs.js mocks the failure.
+  Pages saved before 0.30.2 fetch their missing pictures once
+  (carryon.picturesHealed). The e2e mocks never caught it because their
+  downloadFile wrote anywhere.
 - **Sync setup and feeds (0.30.1).** Step 2 links to GitHub's
   fine-grained token form filled in by URL (name, description,
   expires_in=none, contents=write, administration=write; documented
