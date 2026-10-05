@@ -2,6 +2,14 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.28.4] - 2026-10-05
+
+### Added
+- On Android, feeds are read every few hours with the app closed, and a
+  notification says when there are new posts. Tapping it opens Feeds,
+  which reads those feeds again. Posts set to save themselves still save
+  when the app is open.
+
 ## [0.28.3] - 2026-10-05
 
 ### Added

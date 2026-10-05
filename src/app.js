@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.28.3";
+  const APP_VERSION = "0.28.4";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;

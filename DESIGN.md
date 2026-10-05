@@ -478,6 +478,11 @@ and the page shows above it.
   posts older than (3 days, A week, A month), a muted line with when it
   was checked and how often it posts, Unfollow in `--warn`, "Unfollowing
   keeps the posts you saved."
+- **New posts notification (Now, 0.28.4, Android):** the Feeds icon,
+  "3 new posts from The Slow Times" and "Tap to see them in Feeds.", or
+  "5 new posts" and "From The Slow Times, Kitchen Table and 1 more."
+  Channel "New posts", default importance, one notification that counts
+  up until the app is opened, then goes.
 
 ## 6. Voice
 

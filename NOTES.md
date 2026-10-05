@@ -3,6 +3,23 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Feeds checked with the app closed (0.28.4).** Daniel picked "check
+  and notify" over saving in the background: the app's JavaScript doesn't
+  run with the app closed, so saving there would mean a second copy of
+  the saving code in Java. FeedCheckJob is a JobScheduler job (built in,
+  no WorkManager dependency), every 3 hours with a network, kept across
+  restarts. It only reads each feed and compares its posts' ids (guid or
+  id, and the link) with the ones the app hands over in feeds.json after
+  every change; a post none of whose ids is known is new. The ids it
+  announced go in feeds-told.json, so a post that the app and the job
+  spell differently is announced once at most, never every run. What's
+  waiting stays in preferences until the app takes it (on start, on
+  coming back, or the notification's tap), marks those feeds due and
+  reads them itself. Android 13 asks for notifications on the first
+  follow, or on the first launch for feeds followed before. iOS has no
+  equivalent worth building: background refresh runs when iOS decides,
+  often not for days.
+
 - **Feeds in backups (0.28.3).** A backup gains `feeds.json` beside
   `library.json`; older backups simply have none, and older versions
   ignore it, so the format number stays 1. A restored feed comes back
