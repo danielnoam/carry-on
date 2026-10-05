@@ -111,6 +111,10 @@ and the page shows above it.
   Material's shared axis (0.30.5). A page or collection opened from its
   card in the library scales from 0.86 around the card's centre as it
   fades in (opaque by 45%), and on Back scales to 0.9 and fades into it.
+- Collections and Pages opening alone in the library are a view
+  transition: the collections' row, its heading, the Pages heading and
+  the cards on screen are named, so they move to their new places on the
+  sheet spring and everything else crossfades (0.30.6).
 - The sidebar follows a drag to the left; past a third of its width or
   a flick it closes from there, short of that it springs back (0.30.5).
 - The reader's page turn: the page read lifts 6% and fades (control

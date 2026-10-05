@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.30.5";
+  const APP_VERSION = "0.30.6";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -939,10 +939,38 @@
     el("h2", { class: "overline" }, el("button", { class: "section-link", type: "button", onclick: () => openPart(part) },
       label, el("span", { class: "section-chev", "aria-hidden": "true" }, "›"))));
   function openPart(part, fromHistory) {
-    state.part = part;
     if (!fromHistory) history.pushState({ view: "part", part }, "");
-    renderLibrary();
-    scrollTo(0, 0);
+    changePart(part);
+  }
+  // Collections or Pages opening alone, and back (0.30.5): a view
+  // transition, so the collections' strip rises and opens out into the
+  // grid while the pages fall away, and the pages close up under their
+  // head while the collections fade. Only what's on screen is named.
+  function changePart(part) {
+    const go = () => { state.part = part; renderLibrary(); if (part) scrollTo(0, 0); };
+    if (!document.startViewTransition || M.reduced()) { go(); return; }
+    const name = () => {
+      const named = [];
+      const tag = (node, n) => { if (node) { node.style.viewTransitionName = n; named.push(node); } };
+      const seen = (node) => { const r = node.getBoundingClientRect(); return r.bottom > -200 && r.top < innerHeight + 200; };
+      const lib = $("library");
+      tag(lib.querySelector(".folder-strip"), "part-collections");
+      for (const h of lib.querySelectorAll(".section-head")) {
+        const t = h.textContent;
+        if (/^Collections/.test(t)) tag(h, "part-collections-head");
+        else if (/Pages|Found/.test(t) && !h.classList.contains("part-head")) tag(h, "part-pages-head");
+      }
+      const ids = new Set();
+      for (const c of lib.querySelectorAll(":scope > .page-card:not(.continue)")) {
+        if (!seen(c) || ids.has(c.dataset.ids)) continue;
+        ids.add(c.dataset.ids);
+        tag(c, "part-p-" + c.dataset.ids);
+      }
+      return named;
+    };
+    let before = name();
+    const t = document.startViewTransition(() => { before.forEach((n) => { n.style.viewTransitionName = ""; }); go(); before = name(); });
+    t.finished.finally(() => before.forEach((n) => { n.style.viewTransitionName = ""; }));
   }
 
   // The page to carry on with: the one read last that isn't finished.
@@ -5364,7 +5392,7 @@
     if (view !== "batch") closeBatch();
     if (view === "batch") openBatch("", true, s.folder);
     const part = (view === "part" && s.part) || (["folder", "reader", "menu", "select"].includes(view) && state.part) || null;
-    if (part !== state.part) { state.part = part; renderLibrary(); }
+    if (part !== state.part) { if (view === "part" || !part) changePart(part); else { state.part = part; renderLibrary(); } }
     const folder = ["folder", "reader", "batch", "select", "menu"].includes(view) && s.folder;
     if (!folder) closeFolder();
     else if (!state.folder) openFolder(folder, true);

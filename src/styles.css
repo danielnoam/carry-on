@@ -831,6 +831,10 @@ html { -webkit-tap-highlight-color: transparent; }
 }
 
 ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 260ms; }
+/* Collections and Pages opening alone (0.30.5): what moves springs. */
+::view-transition-group(*) { animation-duration: var(--spring-sheet-ms, 520ms); animation-timing-function: var(--spring-sheet, ease-out); }
+::view-transition-image-pair(part-collections) { isolation: auto; }
+::view-transition-old(part-collections), ::view-transition-new(part-collections) { animation-duration: 200ms; height: 100%; object-fit: cover; object-position: top; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 1ms !important; animation-duration: 1ms !important; }
