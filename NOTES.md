@@ -3,6 +3,21 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Sync, links only (0.30.3).** A device set to Links only sends no page
+  text and reads none: pages new to it come back as `fromLinks` from
+  sync.run and are saved again from their URLs, under the library's id
+  and savedAt, so the next sync sees the same page and not a new one. A
+  device with Pages too also saves from the link any page GitHub has no
+  text for (it came from a links-only device), then sends that text up
+  itself. In a browser only Wikipedia can be fetched, so other pages wait
+  there. The setting is per device, kept in the sync config, since one
+  device might be short of space and another not.
+- **Growing out of the card (0.30.3).** The tap's card is remembered
+  from a capture-phase click on `.card-open`, for a second and a half
+  (opening a page reads its file first); pushScreen then zooms instead of
+  sliding, and popScreen shrinks back to the same rectangle. A uniform
+  scale keeps the text undistorted; clip-path crops the screen to the
+  card's height while it's small.
 - **Pictures never downloaded on Android (0.30.2).** @capacitor/filesystem
   8's Android downloadFile (LegacyFilesystemImplementation) opens a
   FileOutputStream on the path and ignores `recursive`, so a download into
@@ -155,8 +170,8 @@ bold title and its version so a search finds it.
   control; it starts only at the very top, and Check now stays for a
   mouse, where pulling isn't possible. Holding a feed reuses the 480 ms
   long press of the library's cards. The page turn fades the reader out
-  to the left before the next page loads, and in from the right once it
-  has, so the swap itself is never seen.
+  before the next page loads, and in once it has, so the swap itself is
+  never seen (up and from the bottom since 0.30.3).
 
 - **Reading a post without saving it (0.28.1).** Daniel asked for a tap on
   a post to show it in the app. `C.save.preview` runs the same reading

@@ -1475,7 +1475,7 @@
   // script-built page, then images as they land. Resolves to the page's meta, which the library index lists.
   // `kind` "comic" saves the page's pictures as an image chapter instead
   // of reading an article out of it; it is chosen, never guessed.
-  async function save(url, { mode = "previews", kind = "article", asPage = false, onProgress } = {}) {
+  async function save(url, { mode = "previews", kind = "article", asPage = false, onProgress, id: keepId } = {}) {
     // A site's comic pages are saved as comics, with their full pictures,
     // whatever was picked.
     const rule = siteRule(url);
@@ -1494,7 +1494,7 @@
     const first = root.querySelector("h2, h3");
     if (first && norm(first.textContent) === norm(got.title) && norm(root.textContent).startsWith(norm(first.textContent))) first.remove();
 
-    const id = newId();
+    const id = keepId || newId();
     const meta = {
       id, url: got.url, title: got.title, site: got.site, byline: got.byline,
       licence: got.licence, savedAt: Date.now(), minutes: readingMinutes(root.textContent),

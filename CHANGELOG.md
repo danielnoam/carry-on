@@ -2,6 +2,25 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.30.3] - 2026-10-05
+
+### Added
+- Sync can send links only: Settings, Sync, Pages, Links only. That
+  device sends and takes no page text and saves pages new to it from
+  their links. Pages too stays the default, since a page can change or
+  go away.
+- Settings, Sync shows what a sync is doing (sending or bringing in
+  pages, with a bar) and what follows it: pages saving from their links
+  and pictures being fetched.
+
+### Changed
+- The next page in the reader comes up from the bottom.
+- A page or collection opened from the library grows out of its card,
+  and shrinks back into it.
+- A collection with no cover shows its icon, big and centred, on its
+  tile, inside it and in the sidebar, with no name drawn on it.
+- The sidebar's collections and feeds line up with Library.
+
 ## [0.30.2] - 2026-10-05
 
 ### Fixed
