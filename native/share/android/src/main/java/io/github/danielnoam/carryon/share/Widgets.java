@@ -31,6 +31,9 @@ final class Widgets {
     private static final int[] POSTS = { R.id.w_post0, R.id.w_post1, R.id.w_post2 };
     private static final int[] TITLES = { R.id.w_post0_title, R.id.w_post1_title, R.id.w_post2_title };
     private static final int[] SITES = { R.id.w_post0_site, R.id.w_post1_site, R.id.w_post2_site };
+    private static final int[] FAVS = { R.id.w_fav0, R.id.w_fav1, R.id.w_fav2, R.id.w_fav3 };
+    private static final int[] FAV_TITLES = { R.id.w_fav0_title, R.id.w_fav1_title, R.id.w_fav2_title, R.id.w_fav3_title };
+    private static final int[] FAV_METAS = { R.id.w_fav0_meta, R.id.w_fav1_meta, R.id.w_fav2_meta, R.id.w_fav3_meta };
 
     private Widgets() {}
 
@@ -50,6 +53,8 @@ final class Widgets {
         for (int id : reading) m.updateAppWidget(id, reading(ctx, m, id));
         int[] feeds = m.getAppWidgetIds(new ComponentName(ctx, FeedsWidget.class));
         if (feeds.length > 0) m.updateAppWidget(feeds, feeds(ctx));
+        int[] favs = m.getAppWidgetIds(new ComponentName(ctx, FavouritesWidget.class));
+        if (favs.length > 0) m.updateAppWidget(favs, favourites(ctx));
     }
 
     // `what` goes in the intent's address so each tap is its own
@@ -114,6 +119,24 @@ final class Widgets {
             v.setTextViewText(TITLES[i], p.optString("title", ""));
             v.setTextViewText(SITES[i], p.optString("site", ""));
             v.setOnClickPendingIntent(POSTS[i], open(ctx, 21 + i, Uri.parse("carryon-widget://post").buildUpon().appendQueryParameter("url", p.optString("url", "")).build()));
+        }
+        return v;
+    }
+
+    static RemoteViews favourites(Context ctx) {
+        RemoteViews v = new RemoteViews(ctx.getPackageName(), R.layout.carryon_widget_favourites);
+        JSONArray list = data(ctx).optJSONArray("favourites");
+        int n = list == null ? 0 : Math.min(list.length(), FAVS.length);
+        v.setOnClickPendingIntent(R.id.w_root, open(ctx, 30, Uri.parse("carryon-widget://favourites")));
+        v.setViewVisibility(R.id.w_empty, n == 0 ? View.VISIBLE : View.GONE);
+        v.setTextViewText(R.id.w_empty, "Hold a page in Carry-on and tap Favourite, and it shows here.");
+        for (int i = 0; i < FAVS.length; i++) {
+            JSONObject p = i < n ? list.optJSONObject(i) : null;
+            if (p == null) { v.setViewVisibility(FAVS[i], View.GONE); continue; }
+            v.setViewVisibility(FAVS[i], View.VISIBLE);
+            v.setTextViewText(FAV_TITLES[i], p.optString("title", ""));
+            v.setTextViewText(FAV_METAS[i], p.optString("meta", ""));
+            v.setOnClickPendingIntent(FAVS[i], open(ctx, 31 + i, Uri.parse("carryon-widget://page/" + Uri.encode(p.optString("id", "")))));
         }
         return v;
     }

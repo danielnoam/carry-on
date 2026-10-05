@@ -2,6 +2,15 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.29.2] - 2026-10-05
+
+### Added
+- Favourites: tap Favourite in a page's sheet (hold it in the library, or
+  ⋯ in the reader). Favourites get a star on their card and their own
+  choice in Show.
+- A Favourites widget on Android: the four pages you favourited last, one
+  tap from reading.
+
 ## [0.29.1] - 2026-10-05
 
 ### Added

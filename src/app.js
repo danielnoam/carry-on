@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.29.1";
+  const APP_VERSION = "0.29.2";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -643,7 +643,7 @@
       cover ? el("img", { class: "card-thumb cover", src: cover, alt: "", loading: "lazy" })
         : thumb ? el("img", { class: "card-thumb", src: thumb, alt: "", loading: "lazy" }) : siteMark(p),
       el("span", { class: "card-body" },
-        el("span", { class: "card-site", dir: "auto" }, p.site, p.folder ? " · " + p.folder : null, ...(p.tags || []).map((t) => el("span", { class: "card-tag" }, " · #" + t))),
+        el("span", { class: "card-site", dir: "auto" }, p.fav ? el("span", { class: "card-fav", role: "img", "aria-label": "Favourite" }, "★ ") : null, p.site, p.folder ? " · " + p.folder : null, ...(p.tags || []).map((t) => el("span", { class: "card-tag" }, " · #" + t))),
         el("span", { class: "card-title", dir: "auto" }, p.title),
         found ? el("span", { class: "card-found", dir: "auto" }, found) : null,
         el("span", { class: "card-status" }, facts, status ? " · " : null, status, retry ? " · " : null, retry),
@@ -807,11 +807,13 @@
     const f = state.filter;
     if (f === "unread") return unread(p);
     if (f === "finished") return !!p.finished;
+    if (f === "favourites") return !!p.fav;
     if (f.startsWith("#")) return (p.tags || []).some((t) => sameTag(t, f.slice(1)));
     return true;
   }
 
-  const filterName = () => (state.filter === "unread" ? "Unread" : state.filter === "finished" ? "Finished" : state.filter);
+  const FILTER_NAMES = { unread: "Unread", finished: "Finished", favourites: "Favourites" };
+  const filterName = () => FILTER_NAMES[state.filter] || state.filter;
 
   function setFilter(f) {
     state.filter = f;
@@ -833,7 +835,7 @@
     fill(libTools, dropdown({
       label: "Show", cls: "start show-wrap" + (state.filter === "all" ? "" : " on"),
       icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>',
-      options: [{ value: "all", label: "All pages" }, { value: "unread", label: "Unread" }, { value: "finished", label: "Finished" },
+      options: [{ value: "all", label: "All pages" }, { value: "unread", label: "Unread" }, { value: "finished", label: "Finished" }, { value: "favourites", label: "Favourites" },
         ...(tags.length ? [{ head: "Tags" }, ...tags.map((t) => ({ value: "#" + t, label: "#" + t }))] : [])],
       value: state.filter,
       onpick: setFilter,
@@ -960,7 +962,7 @@
 
   const layout = () => { const v = load(LAYOUT_KEY, "shelf"); return LAYOUTS.some((l) => l.value === v) ? v : "shelf"; };
 
-  const pageSig = (p) => [p.title, readingLine(p), p.missing, p.thumb, Math.round((p.at || 0) * 50), navigator.onLine, (p.tags || []).join(","), p.folder, p.mode].join("|");
+  const pageSig = (p) => [p.title, readingLine(p), p.missing, p.thumb, Math.round((p.at || 0) * 50), navigator.onLine, (p.tags || []).join(","), p.folder, p.mode, !!p.fav].join("|");
 
   // The pages the library is showing, for Select all.
   let onScreen = [];
@@ -1060,7 +1062,8 @@
     } else if (n && !loose.length && !folders.length) {
       keep("none:" + state.filter, () => el("div", { class: "empty wide" },
         el("p", { class: "empty-text" }, state.filter === "unread" ? "You've started everything you saved."
-          : state.filter === "finished" ? "Nothing finished yet." : "No pages tagged " + state.filter + "."),
+          : state.filter === "finished" ? "Nothing finished yet."
+          : state.filter === "favourites" ? "No favourites yet. Hold a page and tap Favourite." : "No pages tagged " + state.filter + "."),
         el("button", { class: "btn-quiet", type: "button", onclick: () => setFilter("all") }, "Show all")));
     }
     if (!n) {
@@ -1225,7 +1228,7 @@
       if (old) {
         // Saved again: the new copy takes the old one's place, keeping its
         // collection, tags and read position.
-        for (const k of ["requested", "folder", "folderAt", "source", "tags", "at", "finished", "readAt"]) if (old[k] !== undefined) meta[k] = old[k];
+        for (const k of ["requested", "folder", "folderAt", "source", "tags", "at", "finished", "readAt", "fav", "favAt"]) if (old[k] !== undefined) meta[k] = old[k];
         const i = state.pages.indexOf(old);
         if (i < 0) await C.store.removePage(meta.id);
         else {
@@ -2589,11 +2592,29 @@
     book: '<path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5zM5 19.5A1.5 1.5 0 0 0 6.5 21H19"/>',
     chapters: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 5.5v2M4.5 11.5v1M4 17h1.5l-1.5 2h1.5"/>',
     remove: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>',
+    star: '<path d="M12 3.5l2.6 5.3 5.9.9-4.25 4.1 1 5.85L12 16.9l-5.25 2.75 1-5.85L3.5 9.7l5.9-.9z"/>',
   };
   function tileButton(icon, label, onclick, cls) {
     const b = el("button", { class: "tile-btn" + (cls ? " " + cls : ""), type: "button", onclick }, el("span", { class: "tile-icon", "aria-hidden": "true" }), label);
     b.firstChild.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICONS[icon] + "</svg>";
     return b;
+  }
+  // Favourite (0.29.2): a mark on the page, shown in the library's Show
+  // menu and in the Favourites widget.
+  function favTile(p, redraw) {
+    const b = tileButton("star", "Favourite", () => setFavourite([p], !p.fav).then(redraw), p.fav ? "on" : "");
+    b.setAttribute("aria-pressed", p.fav ? "true" : "false");
+    return b;
+  }
+  async function setFavourite(list, on) {
+    for (const p of list) {
+      if (on && !p.fav) { p.fav = true; p.favAt = Date.now(); }
+      else if (!on) { delete p.fav; delete p.favAt; }
+    }
+    await C.store.writeIndex(state.pages);
+    renderLibrary();
+    if (state.folder) renderFolder();
+    updateWidgets();
   }
   const menuRow = (label, onclick, cls) => el("button", { class: "row", type: "button", onclick }, el("span", { class: "row-label" + (cls ? " " + cls : "") }, label));
 
@@ -2620,7 +2641,8 @@
           inReader ? null : tileButton("open", "Open", () => back().then(() => openPage(p.id))),
           tileButton("share", "Share", () => shareLink(p)),
           tileButton("send", "Export", () => { exporting = true; draw(); }),
-          tileButton("original", "Original", () => C.platform.openOutside(p.url))),
+          tileButton("original", "Original", () => C.platform.openOutside(p.url)),
+          favTile(p, draw)),
         el("h3", { class: "overline" }, "This page"),
         tagsRow(p, draw),
         folderRow(p, draw),
@@ -3895,7 +3917,8 @@
 
   // ---- Home screen widgets (0.29.0, Android) ----
   // Keep reading shows the page read last that isn't finished (or the
-  // last one at all); Feeds the three newest posts not saved yet. Handed
+  // last one at all); Feeds the three newest posts not saved yet;
+  // Favourites (0.29.2) the four favourited last. Handed
   // over whenever the app goes to the background, and after changes.
   let widgetTimer = null;
   function updateWidgets() {
@@ -3910,6 +3933,8 @@
         reading: p ? { id: p.id, title: p.title, at: p.at || 0,
           meta: [p.site, (p.at || 0) >= 0.995 ? "Finished" : Math.max(1, Math.ceil((p.minutes || 1) * (1 - (p.at || 0)))) + " min left"].filter(Boolean).join(" · ") } : null,
         feeds: { following: feeds.length > 0, fresh: freshPosts(), posts },
+        favourites: state.pages.filter((x) => x.fav).sort((a, b) => (b.favAt || 0) - (a.favAt || 0)).slice(0, 4)
+          .map((x) => ({ id: x.id, title: x.title, meta: [x.site, readingLine(x)].filter(Boolean).join(" · ") })),
       });
     }, 800);
   }
@@ -3929,6 +3954,7 @@
       return;
     }
     if (got.kind === "feeds" || got.kind === "library") await goPlace(got.kind);
+    if (got.kind === "favourites") { await goPlace("library"); setFilter("favourites"); }
   }
 
   // Posts found with the app closed: those feeds are read again now, and

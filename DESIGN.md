@@ -496,6 +496,14 @@ and the page shows above it.
   line, 12 px sides. Feeds: "Feeds" and a "3 new" pill in `--accent`, then up to three
   posts, title in serif over the feed's name. Empty: "Follow a site in
   Feeds, and its newest posts show here." Paper by day, Night by night.
+- **Favourites (Now, 0.29.2):** a fourth tile in a page's sheet, the
+  star, filled in `--accent` and `aria-pressed` when on. A favourite's
+  card starts its site line with ★ in `--accent`. Show has Favourites
+  after Finished; empty: "No favourites yet. Hold a page and tap
+  Favourite." The Favourites widget is Keep reading's card with
+  "Favourites" over up to four rows (title in serif on one line, "site ·
+  6 min left"), each row at least 44 dp; empty: "Hold a page in Carry-on
+  and tap Favourite, and it shows here."
 - **New posts notification (Now, 0.28.4, Android):** the Feeds icon,
   "3 new posts from The Slow Times" and "Tap to see them in Feeds.", or
   "5 new posts" and "From The Slow Times, Kitchen Table and 1 more."

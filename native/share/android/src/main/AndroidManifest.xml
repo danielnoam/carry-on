@@ -54,5 +54,16 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/carryon_widget_feeds_info" />
         </receiver>
+        <receiver
+            android:name="io.github.danielnoam.carryon.share.FavouritesWidget"
+            android:exported="false"
+            android:label="@string/carryon_w_favourites">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/carryon_widget_favourites_info" />
+        </receiver>
     </application>
 </manifest>

@@ -32,6 +32,7 @@
     if (num(m.readAt)) out.readAt = num(m.readAt);
     if (typeof m.imageBytes === "number" && m.imageBytes >= 0) out.imageBytes = num(m.imageBytes);
     if (m.comic === true) out.comic = true;
+    if (m.fav === true) { out.fav = true; out.favAt = num(m.favAt) || out.savedAt; }
     if (typeof m.next === "string") out.next = httpUrl(m.next);
     if (typeof m.prev === "string") out.prev = httpUrl(m.prev);
     if (httpUrl(m.requested)) out.requested = httpUrl(m.requested);
