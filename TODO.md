@@ -121,8 +121,9 @@ one and confirm it stays gone; edit tags offline on both and sync.
 
 ## Waiting on a decision, not on a release slot
 
-- **Feeds: background checks (0.28.0 shipped without them; backups
-  came in 0.28.3).** Feeds are checked only while the app is open.
+- **Feeds on iOS with the app closed.** Android checks them and notifies
+  (0.28.4); iOS checks only while the app is open. Background refresh
+  there runs when iOS decides. Decide whether it's worth trying.
 - **Saving any site in a browser: a server, later (Daniel, 4 Oct
   2026).** A stateless fetch worker behind a token, rate-limited, storing
   nothing, so the browser can save (and follow feeds from) sites that
