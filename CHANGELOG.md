@@ -2,6 +2,20 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.29.1] - 2026-10-05
+
+### Added
+- Saves from WEBTOON, Tapas and Wattpad. A WEBTOON or Tapas episode saves
+  as a comic with every panel, its series, its creators and the next
+  episode; a series' page offers its episodes as chapters. A Wattpad
+  chapter saves whole, every page of it, and a story's page offers its
+  parts. Tapas novels save as text.
+- Pages shows which page of how many at the bottom left of the bar.
+
+### Changed
+- Pages turn much faster, and quick taps add up.
+- The Keep reading widget can shrink to one row: the title and how far in.
+
 ## [0.29.0] - 2026-10-05
 
 ### Added

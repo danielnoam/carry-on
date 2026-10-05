@@ -3,6 +3,30 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **WEBTOON, Tapas and Wattpad (0.29.1).** Built from pages Daniel saved
+  from each site, since this environment can't reach them. WEBTOON:
+  `comic(url)` says its /viewer pages are comics, so they save as comics
+  (full pictures) whatever was picked; the list page shows ten episodes a
+  page and is read with `&page=N` until nothing new. Tapas keeps comics
+  and novels at the same /episode/ addresses, so `comic(url, html)` looks
+  at the fetched page (og:type `comicpanda:webcomic_episode`); next and
+  previous come from the episode's data-next-id/data-prev-id. Its series
+  page shows twenty episodes and the rest come from
+  `/series/<id>/episodes?page=N&sort=OLDEST` as JSON with the list's HTML
+  in data.body; that address is from how Tapas's own page loads more and
+  isn't checked against the live site, so if it fails the twenty are
+  kept. The page's own series id is in its tracking data
+  (data-tiara-page-meta-id), skipping the recommended series beside it.
+  Wattpad sends a chapter's first page only; the new `prepare(html, url)`
+  hook fetches the rest from the part's text_url before the page is read.
+- **Quicker page turns (0.29.1).** The WebView's smooth scroll took most
+  of a second for a screen's width, and a second tap during it read the
+  half-scrolled position. A turn is now a 220 ms ease-out on
+  requestAnimationFrame, and while it runs `page()` is the page it is
+  going to, so taps add up.
+- **One-row Keep reading (0.29.1).** On Android 12 and later the widget
+  hands the launcher a layout per size (RemoteViews from a SizeF map);
+  before that it picks from the height it was given, on every resize.
 - **Back opens the sidebar (0.29.0).** Daniel meant the phone's own Back
   gesture, not a swipe inside the app. With @capacitor/app's backButton
   listener the app decides: history to step back through goes back as
