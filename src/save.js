@@ -580,6 +580,40 @@
       },
     },
     {
+      // Tapas (0.29.1): a comic episode is a column of panels
+      // (img.content__img, address in data-src); its page names the next
+      // and previous episodes by id. Novels live at the same addresses,
+      // so a page is a comic by what it says it is, not by its address.
+      name: "Tapas",
+      host: /(^|\.)tapas\.io$/i,
+      comic: (url, html) => /^\/episode\/\d+/.test(new URL(url).pathname) && !!html
+        && (/property="og:type" content="comicpanda:webcomic_episode"/.test(html) || (html.match(/class="content__img/g) || []).length >= 4),
+      async contents(doc, url) {
+        if (!/^\/series\/[^/]+(\/(info|episodes))?\/?$/.test(new URL(url).pathname)) return null;
+        const links = await tapasEpisodes(doc, url);
+        return links.length ? { title: tapasSeries(doc) || text(doc.querySelector("title")), links } : null;
+      },
+      async list(doc, url) {
+        if (/^\/series\//.test(new URL(url).pathname)) return tapasEpisodes(doc, url);
+        const a = doc.querySelector("a[href*='/series/'][href$='/info'], a[href*='/series/'][href$='/episodes']");
+        if (!a) return [];
+        const at = absolute(a.getAttribute("href"), url);
+        return tapasEpisodes(parse((await get(at)).text, at), at);
+      },
+      chapter(doc, url) {
+        const wrap = doc.querySelector(".js-episode-wrap[data-ep-id]");
+        if (!wrap) return null;
+        return {
+          content: null,
+          title: (wrap.getAttribute("data-ep-title") || text(doc.querySelector(".viewer__header .title"))).trim(),
+          series: tapasSeries(doc),
+          byline: [...new Set([...doc.querySelectorAll(".viewer-section--episode a.name")].map(text).filter(Boolean))].join(", "),
+          next: tapasEpisode(wrap.getAttribute("data-next-id")),
+          prev: tapasEpisode(wrap.getAttribute("data-prev-id")),
+        };
+      },
+    },
+    {
       name: "Wattpad",
       host: /(^|\.)wattpad\.com$/i,
       // A part's later pages (/page/2) are the same part.
@@ -724,6 +758,45 @@
   }
   const wattpadLinks = (part) => uniqueLinks(((part && part.group && part.group.parts) || []).map((p) => httpUrl(p && p.url)));
   const httpUrl = (u) => { try { const x = new URL(String(u || "")); return /^https?:$/.test(x.protocol) ? x.href : ""; } catch (e) { return ""; } };
+
+  // ---- Tapas (0.29.1) ----
+  // A series' page lists its first twenty episodes, oldest first; the
+  // rest come from its episodes address a page at a time, as JSON with
+  // the list's HTML in data.body. If that fails, the twenty are kept.
+  // The page's own series (its tracking data names it), not one of the
+  // series it recommends.
+  const tapasSeriesId = (doc) => {
+    const n = doc.querySelector("[data-tiara-page-meta-type='series_id'][data-tiara-page-meta-id]:not(.js-recommended-series)");
+    return n ? n.getAttribute("data-tiara-page-meta-id") : "";
+  };
+  const tapasSeries = (doc) => {
+    const id = tapasSeriesId(doc);
+    const n = id && [...doc.querySelectorAll("[data-tiara-event-meta-series]:not(.js-recommended-series)")].find((e) =>
+      e.getAttribute("data-tiara-event-meta-series-id") === id || (e.getAttribute("data-tiara-event-meta-type") === "series_id" && e.getAttribute("data-tiara-event-meta-id") === id));
+    return n ? n.getAttribute("data-tiara-event-meta-series").trim() : "";
+  };
+  const tapasEpisode = (id) => (Number(id) > 0 ? "https://tapas.io/episode/" + Number(id) : "");
+  async function tapasEpisodes(doc, url) {
+    const read = (d, base) => [...d.querySelectorAll("a[href*='/episode/']")]
+      .filter((a) => a.closest(".episode-list, .js-episode-list") || a.classList.contains("episode-item"))
+      .map((a) => absolute(a.getAttribute("href"), base));
+    const all = read(doc, url);
+    const more = doc.querySelector(".js-episode-loading-indicator[data-has-next='true']");
+    const id = tapasSeriesId(doc);
+    if (more && /^\d+$/.test(id || "")) {
+      const since = more.getAttribute("data-since") || "";
+      for (let page = Number(more.getAttribute("data-page")) || 2; page <= 100; page++) {
+        const at = "https://tapas.io/series/" + id + "/episodes?page=" + page + "&sort=OLDEST&init_load=0&since=" + encodeURIComponent(since) + "&max_limit=20";
+        let data;
+        try { data = JSON.parse((await get(at)).text).data; } catch (e) { break; }
+        if (!data || typeof data.body !== "string") break;
+        const got = read(parse("<body><ul class='episode-list'>" + data.body + "</ul>", at), at).filter((l) => !all.includes(l));
+        all.push(...got);
+        if (!got.length || !(data.pagination && data.pagination.has_next)) break;
+      }
+    }
+    return uniqueLinks(all.filter(Boolean));
+  }
 
   // "ch12" for /search/label/ch12; null for any other page.
   function bloggerLabel(u) {
@@ -991,7 +1064,9 @@
     if (typeof window.Readability !== "function") throw new SaveError("The reader part of the app didn't load. Restart Carry-on.");
     const article = new window.Readability(doc, { charThreshold: 500, keepClasses: false }).parse();
     if (!article || (article.textContent || "").trim().length < MIN_TEXT) return null;
-    return { doc, docTitle, headline, next, prev, article };
+    if (own && own.next !== undefined) next = own.next;
+    if (own && own.prev !== undefined) prev = own.prev;
+    return { doc, docTitle, headline: (own && own.title) || headline, next, prev, article, series: (own && own.series) || "" };
   }
 
   async function fromAnyPage(url, onDrawing, comic, asPage) {
@@ -999,6 +1074,8 @@
     const res = await get(site && site.fetch ? site.fetch(url) : url);
     let finalUrl = res.url || url;
     if (site && site.clean) finalUrl = site.clean(finalUrl);
+    // Some sites keep comics and novels at the same addresses (Tapas).
+    if (!comic && site && site.comic && site.comic(finalUrl, res.text)) comic = true;
     if (site && site.prepare && !comic) res.text = await site.prepare(res.text, finalUrl);
     if (site && site.contents && !comic && !asPage) {
       const own = await site.contents(parse(res.text, finalUrl), finalUrl, res.text);
@@ -1403,6 +1480,7 @@
     const wiki = kind !== "comic" && wikipediaPage(url);
     if (onProgress) onProgress({ stage: "text" });
     const got = wiki ? await fromWikipedia(wiki) : await fromAnyPage(url, () => onProgress && onProgress({ stage: "drawing" }), kind === "comic", asPage);
+    if (got.comic && kind !== "comic") mode = "full";
     const out = document.implementation.createHTMLDocument("");
     const { root, media } = rebuild(got.body, got.base, got.url, out);
     if (got.comic) root.classList.add("co-comic");
