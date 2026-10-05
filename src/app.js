@@ -1447,6 +1447,7 @@
   function savePositions() {
     clearTimeout(positionTimer);
     positionTimer = null;
+    updateWidgets();
     return C.store.writeIndex(state.pages).catch(() => {});
   }
 
@@ -3797,7 +3798,7 @@
   state.side = false;
   let feedsChecking = false;
 
-  const saveFeeds = () => { store(FEEDS_KEY, feeds); watchFeeds(); };
+  const saveFeeds = () => { store(FEEDS_KEY, feeds); watchFeeds(); updateWidgets(); };
   // What the closed app's checks compare with: every post each feed has.
   let watchTimer = null, askToNotify = false;
   function watchFeeds() {
@@ -3888,6 +3889,44 @@
       setTimeout(() => checkFeeds(), 0);
     }
     return added;
+  }
+
+  // ---- Home screen widgets (0.29.0, Android) ----
+  // Keep reading shows the page read last that isn't finished (or the
+  // last one at all); Feeds the three newest posts not saved yet. Handed
+  // over whenever the app goes to the background, and after changes.
+  let widgetTimer = null;
+  function updateWidgets() {
+    clearTimeout(widgetTimer);
+    widgetTimer = setTimeout(() => {
+      const read = state.pages.filter((p) => p.readAt).sort((a, b) => b.readAt - a.readAt);
+      const p = read.find((x) => !x.finished) || read[0];
+      const posts = feeds.flatMap((f) => feedPosts(f).filter((it) => !savedAs(it.url)).map((it) => ({ f, it })))
+        .sort((a, b) => postAt(b.it) - postAt(a.it)).slice(0, 3)
+        .map(({ f, it }) => ({ title: it.title, site: f.title, url: it.url, feed: f.url }));
+      C.platform.widgets.update({
+        reading: p ? { id: p.id, title: p.title, at: p.at || 0,
+          meta: [p.site, (p.at || 0) >= 0.995 ? "Finished" : Math.max(1, Math.ceil((p.minutes || 1) * (1 - (p.at || 0)))) + " min left"].filter(Boolean).join(" · ") } : null,
+        feeds: { following: feeds.length > 0, fresh: freshPosts(), posts },
+      });
+    }, 800);
+  }
+
+  // A widget's tap: the page to keep reading, a post, or Feeds.
+  async function takeWidget() {
+    const got = await C.platform.widgets.take();
+    if (!got || !got.kind) return;
+    await toLibrary();
+    if (got.kind === "page" && state.pages.some((p) => p.id === got.id)) { openPage(got.id); return; }
+    if (got.kind === "post" && got.url) {
+      await goPlace("feeds");
+      const f = feeds.find((x) => x.items.some((it) => it.url === got.url));
+      const saved = savedAs(got.url);
+      if (saved) openPage(saved.id);
+      else if (f) previewPost(f, f.items.find((it) => it.url === got.url));
+      return;
+    }
+    if (got.kind === "feeds" || got.kind === "library") await goPlace(got.kind);
   }
 
   // Posts found with the app closed: those feeds are read again now, and
@@ -4970,7 +5009,14 @@
     watchFeeds();
     takeFeedNews();
     C.platform.feedChecks.onOpen(takeFeedNews);
-    document.addEventListener("visibilitychange", () => { if (!document.hidden) takeFeedNews(); });
+    takeWidget();
+    C.platform.widgets.onOpen(takeWidget);
+    updateWidgets();
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) { savePositions(); updateWidgets(); return; }
+      takeFeedNews();
+      takeWidget();
+    });
   });
   addEventListener("online", () => { dailyCheck(false); checkFeeds(false); });
   // Feeds are due every few hours; asked about while the app is open.
