@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Home screen widgets (0.29.0), in Paper's tokens (src/styles.css);
+     values-night has Night's. -->
+<resources>
+    <color name="carryon_w_bg">#F7F4EE</color>
+    <color name="carryon_w_surface">#FFFFFF</color>
+    <color name="carryon_w_ink">#1C1B19</color>
+    <color name="carryon_w_muted">#5E5A53</color>
+    <color name="carryon_w_accent">#2F5D8A</color>
+    <color name="carryon_w_line">#E4DED3</color>
+    <dimen name="carryon_w_radius">16dp</dimen>
+    <dimen name="carryon_w_pad">16dp</dimen>
+    <string name="carryon_w_reading">Keep reading</string>
+    <string name="carryon_w_reading_about">The page you were reading, one tap from where you left it.</string>
+    <string name="carryon_w_feeds">Feeds</string>
+    <string name="carryon_w_feeds_about">The newest posts from the sites you follow.</string>
+</resources>

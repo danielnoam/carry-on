@@ -31,5 +31,28 @@
             android:name="io.github.danielnoam.carryon.share.FeedCheckJob"
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />
+        <!-- Home screen widgets (0.29.0). -->
+        <receiver
+            android:name="io.github.danielnoam.carryon.share.ReadingWidget"
+            android:exported="false"
+            android:label="@string/carryon_w_reading">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/carryon_widget_reading_info" />
+        </receiver>
+        <receiver
+            android:name="io.github.danielnoam.carryon.share.FeedsWidget"
+            android:exported="false"
+            android:label="@string/carryon_w_feeds">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/carryon_widget_feeds_info" />
+        </receiver>
     </application>
 </manifest>

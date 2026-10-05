@@ -138,8 +138,9 @@ public class FeedCheckJob extends JobService {
         }
         if (!found) return;
         writeJson(toldFile, told.toString());
-        prefs.edit().putString("waiting", waiting.toString()).apply();
+        prefs.edit().putString("waiting", waiting.toString()).commit();
         notify(this, waiting);
+        Widgets.refresh(this);
     }
 
     // ---- Reading a feed: each post as the set of ids it can go by ----
@@ -291,7 +292,8 @@ public class FeedCheckJob extends JobService {
     }
 
     static void clear(Context ctx) {
-        ctx.getSharedPreferences(PREFS, MODE_PRIVATE).edit().remove("waiting").apply();
+        ctx.getSharedPreferences(PREFS, MODE_PRIVATE).edit().remove("waiting").commit();
+        Widgets.refresh(ctx);
         NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
         nm.cancel(NOTE);
     }

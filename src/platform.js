@@ -271,6 +271,25 @@
     },
   };
 
+  // Home screen widgets (0.29.0, Android): the app hands over what they
+  // show, and a widget's tap comes back as what to open.
+  const widgets = {
+    update(data) {
+      const W = plugin("Widgets");
+      if (W) W.update(data).catch(() => {});
+    },
+    // { kind: "page" | "post" | "feeds" | "library", id, url }, or {}.
+    async take() {
+      const W = plugin("Widgets");
+      if (W) { try { return await W.take(); } catch (e) { /* none */ } }
+      return {};
+    },
+    onOpen(f) {
+      const W = plugin("Widgets");
+      if (W) W.addListener("open", f);
+    },
+  };
+
   // Android's Back (0.29.0): with a listener the app decides what it does,
   // `canGoBack` saying whether the WebView has history to step back to.
   function onBack(f) {
@@ -440,6 +459,7 @@
     speech,
     downloads,
     feedChecks,
+    widgets,
     onBack,
     exitApp,
     download,
