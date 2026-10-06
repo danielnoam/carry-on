@@ -3,6 +3,14 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **What sync leaves per device (0.30.10).** Daniel, 6 Oct 2026:
+  settings stay on each device (a phone and a tablet want different type
+  and themes), and nothing syncs while the app is closed. When Feeds was
+  last looked at does sync (`feedsSeen` in library.json, the latest wins),
+  and it only changes when there was something new to clear, so an open
+  river doesn't write to GitHub on every sync. New-chapter counts aren't
+  synced: each device checks for itself, and the count already drops
+  chapters saved anywhere once sync brings them in.
 - **A favourite collection is a mark on its clips (0.30.9).** There is no
   collections file: a collection is the clips whose `folder` names it.
   So its favourite is `folderFav` (and `folderFavAt`) on each of its

@@ -160,6 +160,10 @@
       doc.feeds = mergeFeeds(base && base.feeds, local.feeds, remote && remote.feeds, gone, now);
       doc.feedsGone = gone;
     } else if (remote && remote.feeds) { doc.feeds = remote.feeds; doc.feedsGone = remote.feedsGone || {}; }
+    // When Feeds was last looked at on any device (0.30.10), so a post seen
+    // on one isn't counted new on another. The latest wins.
+    const seen = Math.max(local.feedsSeen || 0, (remote && remote.feedsSeen) || 0);
+    if (seen) doc.feedsSeen = seen;
     return doc;
   }
 
@@ -323,13 +327,13 @@
   // { up, down, removed, downloads, fromLinks } with `downloads` the pages
   // whose pictures this device fetches next and `fromLinks` the pages it
   // saves itself from their links; throws SyncError.
-  function run({ getPages, setPages, getFeeds, setFeeds, sameUrl, onProgress }) {
+  function run({ getPages, setPages, getFeeds, setFeeds, getSeen, setSeen, sameUrl, onProgress }) {
     if (!cfg || cfg.paused) return Promise.resolve(null);
     if (running) return running;
     const told = (p) => { progress = p; if (onProgress) onProgress(p); };
     running = (async () => {
       try {
-        const res = await once(getPages, setPages, sameUrl || ((a, b) => a === b), told, getFeeds, setFeeds);
+        const res = await once(getPages, setPages, sameUrl || ((a, b) => a === b), told, getFeeds, setFeeds, getSeen, setSeen);
         last = { at: Date.now(), error: "" };
         cfg.at = last.at;
         keep(CFG_KEY, cfg);
@@ -345,7 +349,7 @@
     return running;
   }
 
-  async function once(getPages, setPages, sameUrl, onProgress, getFeeds, setFeeds) {
+  async function once(getPages, setPages, sameUrl, onProgress, getFeeds, setFeeds, getSeen, setSeen) {
     const before = getPages().map((p) => ({ ...p }));
     const feedsBefore = getFeeds ? getFeeds().map(feedShare) : null;
     const snapshot = new Map(before.map((p) => [p.id, JSON.stringify(p)]));
@@ -362,7 +366,7 @@
       remote = await readJson("library.json");
       if (remote && (!remote.data || !Array.isArray(remote.data.pages))) throw new SyncError("The library.json on GitHub isn't Carry-on's. Move it away and sync again.");
       const remoteDoc = remote && clean(remote.data);
-      merged = merge(load(BASE_KEY, null), { pages: view, waiting, feeds: feedsBefore }, remoteDoc, Date.now(), sameUrl);
+      merged = merge(load(BASE_KEY, null), { pages: view, waiting, feeds: feedsBefore, feedsSeen: getSeen ? getSeen() : 0 }, remoteDoc, Date.now(), sameUrl);
       for (const [id, f] of Object.entries(uploaded)) if (merged.pages.some((p) => p.id === id && p.savedAt === f.at)) merged.files[id] = f;
       // Text this device has and GitHub doesn't: every page saved here, or
       // saved again since.
@@ -473,6 +477,7 @@
       for (const [u, f] of live) if (!was.has(u) && !list.some((m) => m.url === u)) list.push(f);
       setFeeds(list);
     }
+    if (setSeen && merged.feedsSeen && merged.feedsSeen > (getSeen() || 0)) setSeen(merged.feedsSeen);
     await setPages(out);
     for (const id of gone) await C.store.removePage(id);
     return { up, down, removed: gone.length, downloads, fromLinks };
@@ -497,6 +502,7 @@
       out.feedsGone = {};
       for (const [u, at] of Object.entries(doc.feedsGone || {})) if (typeof at === "number") out.feedsGone[u] = at;
     }
+    if (typeof doc.feedsSeen === "number" && doc.feedsSeen > 0) out.feedsSeen = doc.feedsSeen;
     return out;
   }
 
