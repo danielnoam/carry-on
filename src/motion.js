@@ -20,84 +20,109 @@
     return { duration: s.ms, easing: hasLinear ? s.curve : FALLBACK };
   }
 
-  function run(el, frames, kind, fadeFrames) {
-    if (!el || !el.animate) return Promise.resolve();
-    const t = timing(kind);
-    const a = el.animate(reduced() ? fadeFrames : frames, { ...t, fill: "both" });
-    return a.finished.then(() => a.cancel(), () => {});
-  }
+  // Opacity never rides the spring (0.30.8). A spring's curve is most of
+  // the way there in its first fifth, so a fade on it was over in a few
+  // frames and read as a cut. Fades run on their own clock with a plain
+  // ease, beside the movement, as iOS and Material time theirs.
+  const FADE_IN = "cubic-bezier(0.2, 0, 0.2, 1)";
+  const FADE_OUT = "cubic-bezier(0.4, 0, 1, 1)";
 
-  // A screen pushed over the library (Settings, Downloads) and popped off
-  // (0.30.5): a short slide from the right with a fade, Material's shared
-  // axis, in the same family as the zoom from a card. The screen is opaque
-  // before it has moved far, so the library never shows through for long.
+  // frames move (transform only, on the spring); fade is [from, to, ms,
+  // delay]; under reduced motion only the 120 ms fade runs.
+  function run(el, frames, kind, fade) {
+    if (!el || !el.animate) return Promise.resolve();
+    const done = [];
+    if (reduced()) {
+      if (fade) done.push(el.animate([{ opacity: fade[0] }, { opacity: fade[1] }], { duration: 120, easing: "linear", fill: "both" }));
+    } else {
+      if (frames) done.push(el.animate(frames, { ...timing(kind), fill: "both" }));
+      if (fade) done.push(el.animate([{ opacity: fade[0] }, { opacity: fade[1] }],
+        { duration: fade[2], delay: fade[3] || 0, easing: fade[1] > fade[0] ? FADE_IN : FADE_OUT, fill: "both" }));
+    }
+    return Promise.all(done.map((a) => a.finished)).then(() => done.forEach((a) => a.cancel()), () => {});
+  }
+  const shift = () => Math.round(Math.min(72, innerWidth * 0.18)) + "px";
+
+  // A screen pushed over the library (Settings, Downloads) and popped off:
+  // a short slide from the right as it fades in, Material's shared axis.
   function pushIn(el) {
-    return run(el, [{ opacity: 0, transform: "translateX(18%)" }, { opacity: 1, offset: 0.4 }, { opacity: 1, transform: "none" }], "sheet",
-      [{ opacity: 0 }, { opacity: 1 }]);
+    return run(el, [{ transform: "translateX(" + shift() + ")" }, { transform: "none" }], "sheet", [0, 1, 220]);
   }
   function popOut(el) {
-    return run(el, [{ opacity: 1, transform: "none" }, { opacity: 1, offset: 0.3 }, { opacity: 0, transform: "translateX(18%)" }], "control",
-      [{ opacity: 1 }, { opacity: 0 }]);
+    return run(el, [{ transform: "none" }, { transform: "translateX(" + shift() + ")" }], "control", [1, 0, 180]);
   }
   // A sheet from the bottom edge (the reader's Aa).
   function rise(el) {
-    return run(el, [{ transform: "translateY(100%)" }, { transform: "translateY(0)" }], "sheet",
-      [{ opacity: 0 }, { opacity: 1 }]);
+    return run(el, [{ transform: "translateY(100%)" }, { transform: "translateY(0)" }], "sheet", reduced() ? [0, 1] : null);
   }
   function sink(el) {
-    return run(el, [{ transform: "translateY(0)" }, { transform: "translateY(100%)" }], "sheet",
-      [{ opacity: 1 }, { opacity: 0 }]);
+    return run(el, [{ transform: "translateY(0)" }, { transform: "translateY(100%)" }], "sheet", reduced() ? [1, 0] : null);
   }
   // The sidebar, from the left edge (0.28.0); closing goes on from where
   // a drag left it (0.30.5), and a short drag springs back.
   function slideIn(el) {
-    return run(el, [{ transform: "translateX(-100%)" }, { transform: "translateX(0)" }], "sheet",
-      [{ opacity: 0 }, { opacity: 1 }]);
+    return run(el, [{ transform: "translateX(-100%)" }, { transform: "translateX(0)" }], "sheet", reduced() ? [0, 1] : null);
   }
   function slideOut(el, from = 0) {
-    return run(el, [{ transform: "translateX(" + from + "px)" }, { transform: "translateX(-100%)" }], from ? "control" : "sheet",
-      [{ opacity: 1 }, { opacity: 0 }]);
+    return run(el, [{ transform: "translateX(" + from + "px)" }, { transform: "translateX(-100%)" }], from ? "control" : "sheet", reduced() ? [1, 0] : null);
   }
   function slideBack(el, from) {
-    return run(el, [{ transform: "translateX(" + from + "px)" }, { transform: "translateX(0)" }], "control", []);
+    return run(el, [{ transform: "translateX(" + from + "px)" }, { transform: "translateX(0)" }], "control", null);
   }
   // The reader turning to the next page (0.30.3): the page read lifts away
   // and stays hidden until the next one comes up from the bottom.
   function pageOut(el) {
-    return run(el, [{ opacity: 1, transform: "none" }, { opacity: 0, transform: "translateY(-6%)" }], "control",
-      [{ opacity: 1 }, { opacity: 0 }]).then(() => { el.style.opacity = "0"; });
+    return run(el, [{ transform: "none" }, { transform: "translateY(-6%)" }], "control", [1, 0, 160])
+      .then(() => { el.style.opacity = "0"; });
   }
   function pageIn(el) {
     el.style.opacity = "";
-    return run(el, [{ opacity: 0, transform: "translateY(28%)" }, { opacity: 1, transform: "none" }], "sheet",
-      [{ opacity: 0 }, { opacity: 1 }]);
+    return run(el, [{ transform: "translateY(28%)" }, { transform: "none" }], "sheet", [0, 1, 240]);
   }
-  // A page or collection opened from its card in the library (0.30.5):
-  // the screen scales up from the card's centre as it fades in, as apps
-  // open what was tapped, and settles back into it on Back. Only transform
-  // and opacity, so the GPU runs it (0.30.4).
-  const origin = (el, r) => { el.style.transformOrigin = (r.left + r.width / 2) + "px " + (r.top + r.height / 2) + "px"; };
-  const clear = (el) => () => { el.style.transformOrigin = ""; };
+  // A clip or collection opened from its card (0.30.3, back in 0.30.8):
+  // the screen grows out of the card to fill the window, fading in as it
+  // grows, and shrinks back into the card on Back, fading as it lands.
+  // Transform and opacity only, so the GPU runs it (0.30.4).
+  function zoomFrom(r) {
+    const w = innerWidth, h = innerHeight;
+    if (!r || !r.width || !w) return null;
+    const s = Math.max(0.3, r.width / w);
+    const x = r.left + r.width / 2 - (w * s) / 2, y = r.top + r.height / 2 - (h * s) / 2;
+    return "translate(" + x + "px, " + y + "px) scale(" + s + ")";
+  }
   function zoomIn(el, r) {
-    if (!r || !r.width) return pushIn(el);
-    origin(el, r);
-    return run(el, [{ opacity: 0, transform: "scale(0.86)" }, { opacity: 1, offset: 0.45 }, { opacity: 1, transform: "none" }], "sheet",
-      [{ opacity: 0 }, { opacity: 1 }]).then(clear(el));
+    const small = zoomFrom(r);
+    if (!small) return pushIn(el);
+    el.style.transformOrigin = "0 0";
+    return run(el, [{ transform: small }, { transform: "none" }], "sheet", [0, 1, 240])
+      .then(() => { el.style.transformOrigin = ""; });
   }
   function zoomOut(el, r) {
-    if (!r || !r.width) return popOut(el);
-    origin(el, r);
-    return run(el, [{ opacity: 1, transform: "none" }, { opacity: 1, offset: 0.2 }, { opacity: 0, transform: "scale(0.9)" }], "control",
-      [{ opacity: 1 }, { opacity: 0 }]).then(clear(el));
+    const small = zoomFrom(r);
+    if (!small) return popOut(el);
+    el.style.transformOrigin = "0 0";
+    return run(el, [{ transform: "none" }, { transform: small }], "sheet", [1, 0, 220, 120])
+      .then(() => { el.style.transformOrigin = ""; });
   }
   // Something arriving in a list or a bar: a card, the update bar, a toast.
   function arrive(el, from = 12) {
-    return run(el, [{ opacity: 0, transform: "translateY(" + from + "px) scale(0.98)" }, { opacity: 1, transform: "none" }], "sheet",
-      [{ opacity: 0 }, { opacity: 1 }]);
+    return run(el, [{ transform: "translateY(" + from + "px) scale(0.98)" }, { transform: "none" }], "sheet", [0, 1, 200]);
   }
   function leave(el) {
-    return run(el, [{ opacity: 1, transform: "none" }, { opacity: 0, transform: "scale(0.96)" }], "control",
-      [{ opacity: 1 }, { opacity: 0 }]);
+    return run(el, [{ transform: "none" }, { transform: "scale(0.96)" }], "control", [1, 0, 160]);
+  }
+  // Collections or Clips opening alone, and back (0.30.8): the library
+  // fades through, Material's fade through. What was there fades out at
+  // once, the new part is drawn while nothing shows, then fades in as it
+  // grows from just under full size.
+  function through(el, change) {
+    if (!el || !el.animate) { change(); return Promise.resolve(); }
+    return run(el, null, "control", [1, 0, reduced() ? 60 : 90]).then(() => {
+      el.style.opacity = "0";
+      change();
+      el.style.opacity = "";
+      return run(el, [{ transform: "scale(0.96)" }, { transform: "none" }], "sheet", [0, 1, 210]);
+    });
   }
 
   // The spring as CSS custom properties, for transitions styles.css owns
@@ -107,7 +132,8 @@
   root.setProperty("--spring-sheet-ms", SPRINGS.sheet.ms + "ms");
   root.setProperty("--spring-control", hasLinear ? SPRINGS.control.curve : FALLBACK);
   root.setProperty("--spring-control-ms", SPRINGS.control.ms + "ms");
+  root.setProperty("--fade-in", FADE_IN);
 
   window.CarryOn = window.CarryOn || {};
-  window.CarryOn.motion = { timing, pushIn, popOut, rise, sink, slideIn, slideOut, slideBack, pageOut, pageIn, zoomIn, zoomOut, arrive, leave, reduced };
+  window.CarryOn.motion = { timing, pushIn, popOut, rise, sink, slideIn, slideOut, slideBack, pageOut, pageIn, zoomIn, zoomOut, arrive, leave, through, reduced, FADE_IN };
 })();

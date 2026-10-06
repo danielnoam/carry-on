@@ -12,7 +12,6 @@
   --line: #E4DED3;
   --preview: #D9E2EA;
   --bar: #EDE8DF;
-  --reader-bar: #E3DCCF;
   --ok: #1F6F5C;
   --warn: #8A4B22;
   --video: #3A4048;
@@ -33,7 +32,6 @@
   --line: #E0D2B8;
   --preview: #E3D5BC;
   --bar: #E7DAC0;
-  --reader-bar: #E3D5B9;
   --ok: #3F6B2E;
   --warn: #8A4B22;
   --video: #4A3F33;
@@ -54,7 +52,6 @@
   --line: #252B33;
   --preview: #232A33;
   --bar: #181C22;
-  --reader-bar: #0A0D10;
   --ok: #7CC4A8;
   --warn: #E0A46E;
   --video: #262C34;
@@ -75,7 +72,6 @@
   --line: #D9DDE3;
   --preview: #D6DEE6;
   --bar: #E3E6EB;
-  --reader-bar: #D8DCE2;
   --ok: #1F6F5C;
   --warn: #8A4B22;
   --video: #3A4048;
@@ -96,7 +92,6 @@
   --line: #EEE8D5;
   --preview: #EBE5D3;
   --bar: #F3EBD6;
-  --reader-bar: #F0E8D0;
   --ok: #5C6A00;
   --warn: #A4331A;
   --video: #3D4F55;
@@ -117,7 +112,6 @@
   --line: #8A8A8A;
   --preview: #DADADA;
   --bar: #EBEBEB;
-  --reader-bar: #DEDEDE;
   --ok: #0B5B3A;
   --warn: #8A2F00;
   --video: #222222;
@@ -138,7 +132,6 @@
   --line: #24272C;
   --preview: #1C1F24;
   --bar: #0A0A0B;
-  --reader-bar: #050506;
   --ok: #7CC4A8;
   --warn: #E0A46E;
   --video: #1C1F24;
@@ -159,7 +152,6 @@
   --line: #3A332D;
   --preview: #332C26;
   --bar: #241F1B;
-  --reader-bar: #16120F;
   --ok: #A3C78F;
   --warn: #EE9F7E;
   --video: #332C26;
@@ -180,7 +172,6 @@
   --line: #0E4552;
   --preview: #0A3D4A;
   --bar: #04313D;
-  --reader-bar: #00222B;
   --ok: #A5B53A;
   --warn: #F08060;
   --video: #0A3D4A;
@@ -483,7 +474,7 @@ html.native .screen-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top
 .choice-check {
   display: inline-flex; color: var(--accent);
   opacity: 0; transform: scale(0.6);
-  transition: opacity var(--spring-control-ms, 300ms) var(--spring-control, ease-out), transform var(--spring-control-ms, 300ms) var(--spring-control, ease-out);
+  transition: opacity 180ms var(--fade-in, ease-out), transform var(--spring-control-ms, 300ms) var(--spring-control, ease-out);
 }
 .choice input:checked ~ .choice-check { opacity: 1; transform: none; }
 .row-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -564,7 +555,7 @@ html.native .reader-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top
 /* The bar stays live over the catch, so Aa and ⋯ swap or close their sheet. */
 .reader-bar {
   position: absolute; top: 0; left: 0; right: 0; z-index: 3;
-  background: var(--reader-bar);
+  background: var(--bar);
   transition: transform var(--spring-control-ms, 300ms) var(--spring-control, ease-out);
 }
 /* Reading on down: the bar slides up out of the way, back on a scroll up
@@ -614,7 +605,7 @@ html.native .reader::before {
   display: flex; align-items: center; justify-content: space-between; gap: var(--s-3);
   min-height: var(--s-7); margin: 0;
   padding: var(--s-2) calc(var(--gutter) + var(--s-2)) calc(var(--s-2) + env(safe-area-inset-bottom));
-  background: var(--reader-bar); color: var(--muted);
+  background: var(--bar); color: var(--muted);
   font-size: var(--fs-meta); line-height: var(--lh-meta); font-variant-numeric: tabular-nums;
   transition: transform var(--spring-control-ms, 300ms) var(--spring-control, ease-out), opacity 120ms linear;
 }
@@ -831,10 +822,6 @@ html { -webkit-tap-highlight-color: transparent; }
 }
 
 ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 260ms; }
-/* Collections and Pages opening alone (0.30.5): what moves springs. */
-::view-transition-group(*) { animation-duration: var(--spring-sheet-ms, 520ms); animation-timing-function: var(--spring-sheet, ease-out); }
-::view-transition-image-pair(part-collections) { isolation: auto; }
-::view-transition-old(part-collections), ::view-transition-new(part-collections) { animation-duration: 200ms; height: 100%; object-fit: cover; object-position: top; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 1ms !important; animation-duration: 1ms !important; }
@@ -1291,7 +1278,7 @@ html { -webkit-tap-highlight-color: transparent; }
 #folderView .screen-bar > * { grid-row: 1; }
 #folderView .screen-bar { border-bottom-color: transparent; transition: border-color 120ms linear; }
 #folderView .screen-bar.titled { border-bottom-color: var(--line); }
-#folderTitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: opacity var(--spring-control-ms, 300ms) var(--spring-control, ease-out); }
+#folderTitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: opacity 180ms var(--fade-in, ease-out); }
 #folderView .screen-bar:not(.titled) #folderTitle { opacity: 0; }
 @media (prefers-reduced-motion: reduce) { #folderTitle { transition: none; } }
 

@@ -3,6 +3,19 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Why the fades didn't fade, and the lag on Collections (0.30.8).**
+  A spring's curve is 90% of the way there in its first fifth, and the
+  fades rode the same curve as the movement, so opacity went from 0 to 1
+  in two or three frames. Fades now run as their own animation with a
+  plain ease (`run()` in motion.js takes a fade beside the frames).
+  Collections and Clips used a view transition, which holds the screen
+  still while it takes its pictures (140–270 ms on a 4x slower CPU), then
+  animates the groups' size on the main thread; the whole new list also
+  gave each card its own arrive animation, 250 at once. Now the library
+  fades through (out 90 ms, redraw while it is blank, in 210 ms) and only
+  a handful of fresh cards animate. `inert` on the library, which
+  restyles every card, waits 300 ms (`afterSettle`) instead of the first
+  frame, which put a 50–60 ms stall right at the start of the sidebar.
 - **Why animations stuttered (0.30.4).** Not the animations: the work
   before them. Opening anything set `inert` on the screen underneath and
   moved focus, and in a library of a few hundred pages each restyled

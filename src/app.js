@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.30.7";
+  const APP_VERSION = "0.30.8";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -942,35 +942,16 @@
     if (!fromHistory) history.pushState({ view: "part", part }, "");
     changePart(part);
   }
-  // Collections or Pages opening alone, and back (0.30.5): a view
-  // transition, so the collections' strip rises and opens out into the
-  // grid while the pages fall away, and the pages close up under their
-  // head while the collections fade. Only what's on screen is named.
+  // Collections or Clips opening alone, and back: the library fades
+  // through (0.30.8). The view transition before it froze the screen to
+  // take its pictures, then laid the page out again every frame.
+  let parting = 0;
   function changePart(part) {
-    const go = () => { state.part = part; renderLibrary(); if (part) scrollTo(0, 0); };
-    if (!document.startViewTransition || M.reduced()) { go(); return; }
-    const name = () => {
-      const named = [];
-      const tag = (node, n) => { if (node) { node.style.viewTransitionName = n; named.push(node); } };
-      const seen = (node) => { const r = node.getBoundingClientRect(); return r.bottom > -200 && r.top < innerHeight + 200; };
-      const lib = $("library");
-      tag(lib.querySelector(".folder-strip"), "part-collections");
-      for (const h of lib.querySelectorAll(".section-head")) {
-        const t = h.textContent;
-        if (/^Collections/.test(t)) tag(h, "part-collections-head");
-        else if (/Pages|Found/.test(t) && !h.classList.contains("part-head")) tag(h, "part-pages-head");
-      }
-      const ids = new Set();
-      for (const c of lib.querySelectorAll(":scope > .page-card:not(.continue)")) {
-        if (!seen(c) || ids.has(c.dataset.ids)) continue;
-        ids.add(c.dataset.ids);
-        tag(c, "part-p-" + c.dataset.ids);
-      }
-      return named;
-    };
-    let before = name();
-    const t = document.startViewTransition(() => { before.forEach((n) => { n.style.viewTransitionName = ""; }); go(); before = name(); });
-    t.finished.finally(() => before.forEach((n) => { n.style.viewTransitionName = ""; }));
+    const n = ++parting;
+    M.through($("library"), () => {
+      if (n !== parting) return;
+      state.part = part; renderLibrary(); if (part) scrollTo(0, 0);
+    });
   }
 
   // The page to carry on with: the one read last that isn't finished.
@@ -1130,7 +1111,10 @@
         C.platform.native ? null : el("button", { class: "btn-quiet empty-open", type: "button", onclick: () => openSettings(false, "storage") }, "Open a backup")));
     }
     root.replaceChildren(...nodes);
-    if (!firstRender) fresh.forEach((node) => M.arrive(node));
+    // A card or two arriving springs in; a whole new list (Collections or
+    // Clips alone, a filter) comes in with the library's fade instead, as
+    // two hundred animations at once dropped it to a few frames a second.
+    if (!firstRender && fresh.length <= 6) fresh.forEach((node) => M.arrive(node));
     firstRender = false;
     paintPicks();
     renderDownloads();
@@ -1378,6 +1362,10 @@
   }
   // Heavy work after an animation's first frame, so it starts at once.
   const afterStart = (fn) => requestAnimationFrame(() => setTimeout(fn, 0));
+  // Making the library inert, or live again, restyles every card: a long
+  // frame that stalled the sidebar and sheets just after they set off
+  // (0.30.8). It waits until the spring has all but landed.
+  const afterSettle = (fn) => setTimeout(fn, M.reduced() ? 130 : 300);
 
   function popScreen(screen) {
     const n = pushes.get(screen);
@@ -1388,7 +1376,7 @@
     const from = zoomed.get(screen);
     zoomed.delete(screen);
     const moved = from ? M.zoomOut(screen, from) : M.popOut(screen);
-    afterStart(() => { under.inert = false; });
+    afterSettle(() => { if (pushes.get(screen) === n) under.inert = false; });
     return moved.then(hide);
   }
 
@@ -1938,7 +1926,7 @@
       const dy = info.rect.top + info.rect.height / 2 - (r.top + r.height / 2);
       const t = M.timing("sheet");
       // Its backdrop fades: opacity on a pseudo-element, which the GPU runs.
-      viewer.animate([{ opacity: 0 }, { opacity: 1 }], { ...t, pseudoElement: "::before" });
+      viewer.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 240, easing: M.FADE_IN, pseudoElement: "::before" });
       img.animate([{ transform: "translate(" + dx + "px," + dy + "px) scale(" + k + ")" }, { transform: "none" }], t);
     };
     if (img.complete && img.naturalWidth) grow(); else img.addEventListener("load", grow, { once: true });
@@ -2949,12 +2937,12 @@
     M.arrive($("menuCatch"), 0);
     M.rise($("menuSheet"));
     const open = state.menu;
-    afterStart(() => {
+    afterSettle(() => {
       if (state.menu !== open) return;
       menuUnder = [state.folder ? $("folderView") : $("libraryView"), $("selectHead"), $("selectBar")].filter((n) => !n.inert);
       menuUnder.forEach((n) => { n.inert = true; });
       const first = $("menuSheet").querySelector("button:not(:disabled)");
-      if (first) first.focus({ preventScroll: true });
+      if (first && !$("menuSheet").contains(document.activeElement)) first.focus({ preventScroll: true });
     });
   }
 
@@ -2966,7 +2954,7 @@
     const sheet = $("menuSheet"), catcher = $("menuCatch");
     M.leave(catcher).then(() => { if (!state.menu) catcher.hidden = true; });
     M.sink(sheet).then(() => { if (!state.menu) sheet.hidden = true; });
-    afterStart(() => was.forEach((n) => { n.inert = false; }));
+    afterSettle(() => was.forEach((n) => { n.inert = false; }));
   }
 
   function redrawMenu() {
@@ -4741,8 +4729,7 @@
     side.hidden = false;
     M.arrive($("sideCatch"), 0);
     M.slideIn(side);
-    // Focus and inert restyle the page: after the slide has started.
-    afterStart(() => {
+    afterSettle(() => {
       if (!state.side) return;
       $("libraryView").inert = true;
       const at = side.querySelector("[aria-current]") || side.querySelector("button");
@@ -4762,7 +4749,7 @@
     sideDragged = 0;
     M.leave(catcher).then(() => { if (!state.side) catcher.hidden = true; });
     M.slideOut(side, from).then(() => { if (!state.side) side.hidden = true; });
-    afterStart(() => {
+    afterSettle(() => {
       if (state.side) return;
       $("libraryView").inert = false;
       if (had) $("sideBtn").focus({ preventScroll: true });
