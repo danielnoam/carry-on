@@ -60,12 +60,8 @@ native code.
   (say Books) in Settings; each time Waypage opens or the library is
   refreshed it looks there and brings in any file it hasn't seen, without
   asking copy-or-outside each time. Android reuses the folder access
-  0.33.0's "a folder you pick" already has; iOS needs the bookmark below.
-- **iOS, reading from a file where it is:** a Files plugin for iOS
-  (UIDocumentPicker and a security-scoped bookmark), so the choice shows
-  there too. Until then iOS always copies, and "Open a file" is the only
-  way in; Open in from Files and Mail wants document types in Info.plist
-  and the app's open-URL event.
+  0.33.0's "a folder you pick" already has; iOS needs the bookmark in
+  the iOS release.
 - **Exporting a clip that reads from a file:** its pictures are slots, so
   an EPUB or HTML export of one would come out without them. The Export
   tile is hidden on those clips for now; filling the slots first would
@@ -82,8 +78,6 @@ native code.
 
 ### Still open on where Waypage keeps its files (0.33.0 shipped it)
 
-- **iOS: a folder you pick,** kept as a security-scoped bookmark. 0.33.0
-  only shows the app's own storage in the Files app (On My iPhone).
 - **A cleaner reinstall for Documents/Waypage:** Android won't let a
   reinstalled app read the files its last install made there, so the
   setting says to pick that folder with the third option. Spotting a
@@ -114,6 +108,13 @@ on the program first; this release comes after.
   background `URLSession` downloads (the page, then its images), a second
   copy of the saving code. The heaviest item: last, or dropped if the
   half minute is enough in practice.
+- **iOS, reading from a file where it is:** a Files plugin for iOS
+  (UIDocumentPicker and a security-scoped bookmark), so the choice shows
+  there too. Until then iOS always copies, and "Open a file" is the only
+  way in; Open in from Files and Mail wants document types in Info.plist
+  and the app's open-URL event.
+- **iOS: a folder you pick,** kept as a security-scoped bookmark. 0.33.0
+  only shows the app's own storage in the Files app (On My iPhone).
 - **Try it on an iPhone:** the setup-code scanner (0.30.1, needs the
   camera prompt), Read aloud with the screen locked, and the updater's
   "Get it" link.
