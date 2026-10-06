@@ -3,6 +3,16 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **The reader's settings in three parts (0.34.0).** Daniel asked for a
+  gear instead of Aa and Layout, Text and Read aloud kept apart. In the
+  sheet they're tabs (a segmented control), and all three share one grid
+  cell with the hidden ones kept in place (`visibility: hidden`), so the
+  sheet is always as tall as its tallest part and doesn't jump when you
+  switch. Settings shows Layout and Text one under the other, with
+  headings. Fonts became the app's own drop-down, each name in its face.
+  The speed slider applies on `change`, not `input`: a phone's voice
+  restarts its sentence on each new rate. Notes are skipped by default
+  now; before, a Wikipedia reflist was read out in full.
 - **Where your library is (0.33.0).** Three places, Daniel's call: inside
   the app (default; private, quickest, gone on uninstall), Documents/
   Carry-on (Android 11+, plain files through Capacitor's Filesystem with

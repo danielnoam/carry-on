@@ -283,11 +283,42 @@
   }
   // Inside a closed spoiler: not read, as it isn't shown.
   const hidden = (el) => { const d = el.closest("details:not([open])"); return !!d && !el.closest("summary"); };
-  function readable() {
+
+  // What Read aloud leaves out (0.34.0). `footnotes`: the notes at the end
+  // (a Wikipedia reflist, a site's footnotes, a "Notes" or "References"
+  // heading and what follows it) are read only when asked. `edges`: the
+  // clip's own title, the site's header and footer left in the page,
+  // captions, and a PDF's page marks are skipped when asked.
+  let readOpts = { footnotes: false, edges: false };
+  const NOTES = ".references, .reflist, .mw-references-wrap, .footnotes, .footnote, #footnotes, .endnotes, [role=doc-endnotes], [role=doc-footnote], aside.fn";
+  const NOTES_HEAD = /^(notes?|footnotes?|end ?notes|references|citations|sources|bibliography)$/i;
+  const EDGES = ".co-head, header, footer, [role=banner], [role=contentinfo], figcaption, .co-credit, .co-page";
+  function notesFrom() {
+    // A heading named for notes, and everything up to the next heading of
+    // its rank or higher.
+    const out = new Set();
+    for (const h of doc.body.querySelectorAll("h2, h3, h4")) {
+      if (!NOTES_HEAD.test(h.textContent.trim())) continue;
+      out.add(h);
+      const rank = Number(h.tagName[1]);
+      for (let n = h.nextElementSibling; n; n = n.nextElementSibling) {
+        if (/^H[1-6]$/.test(n.tagName) && Number(n.tagName[1]) <= rank) break;
+        const inner = n.querySelector && n.querySelector("h1, h2, h3, h4, h5, h6");
+        if (inner && Number(inner.tagName[1]) <= rank) break;
+        out.add(n);
+      }
+    }
+    return out;
+  }
+  function readable(opts) {
     if (!doc) return [];
+    if (opts) readOpts = { ...readOpts, ...opts };
     wrapLoose();
+    const notes = readOpts.footnotes ? null : notesFrom();
+    const inNotes = (el) => !!notes && (!!el.closest(NOTES) || [...notes].some((n) => n === el || n.contains(el)));
     blocks = [...doc.body.querySelectorAll(BLOCKS + ", .co-run")].filter((el) => !el.closest(SKIP)
-      && !el.querySelector(BLOCKS) && !hidden(el)).map((el) => ({ el, text: speechText(el) })).filter((b) => /[\p{L}\p{N}]/u.test(b.text));
+      && !el.querySelector(BLOCKS) && !hidden(el) && !inNotes(el) && !(readOpts.edges && el.closest(EDGES)))
+      .map((el) => ({ el, text: speechText(el) })).filter((b) => /[\p{L}\p{N}]/u.test(b.text));
     return blocks.map((b) => b.text);
   }
   // The first block not yet scrolled past, where reading starts.

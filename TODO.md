@@ -31,38 +31,6 @@ asks from Daniel.
   owns that its clips can't carry, still wants collections in a file of
   their own first.
 
-## Reader settings sheet (Daniel, 6 Oct 2026)
-
-- **A gear, not Aa:** the reader's top-bar button (`#readerAa`,
-  index.html) becomes a gear icon, labelled "Reader settings".
-- **Three parts, kept apart:** Layout (scroll or pages, width, margins),
-  Text (font, size, spacing, theme) and Read aloud (voice, speed, the
-  checkboxes below), each under its own heading, or as tabs if the sheet
-  gets long. Today they share one "Text and theme" sheet
-  (`reading` in app.js, around line 1879).
-- **Fonts as drop-downs:** the font choices become a select instead of
-  the row of buttons, in the sheet and in Settings › Appearance alike.
-- **Speed as a slider:** Read aloud's speed becomes a slider (about 0.5×
-  to 3×, steps of 0.1, the value shown beside it) instead of the
-  segmented 0.75×/1×/… buttons (`RATES`, app.js around line 1784).
-- **Read footnotes:** a checkbox in Read aloud. Off: footnote marks
-  ([1], [a]) and the notes themselves are skipped. On: each note is read
-  where its mark is, or at the end of its paragraph. Today reader.js
-  drops bracketed `<sup>` marks for speech (`readable()`, around line
-  234) and reads a notes list at the bottom as ordinary text.
-- **Skip headers and footers:** a checkbox in Read aloud. On: running
-  heads, page numbers, captions and the clip's own header and credit
-  line aren't read, just the body. Matters most for PDFs (whose page
-  heads 0.32.0 already drops) and for sites that leave a footer behind.
-
-## Pull to refresh checks for an update too (Daniel, 6 Oct 2026)
-
-- Pulling down the library or Feeds (app.js, the touchend around line
-  5088) also runs `checkForNewerApp()`, so a new release shows in the
-  update bar without opening About. Today the pull checks only new
-  chapters (library) or feeds. Its "No collections follow a series yet"
-  toast should give way to "Up to date" when there's nothing else to say.
-
 ## Rename to Waypage (Daniel, 5 Oct 2026)
 
 The app becomes **Waypage**, store title "Waypage: Offline Reader": a page

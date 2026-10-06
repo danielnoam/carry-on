@@ -504,8 +504,7 @@ html.native .screen-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top
 html.native .reader-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top)); }
 .reader { z-index: 11; }
 .icon-btn[hidden] { display: none; }
-.aa-btn { font: 600 var(--fs-label)/1 var(--serif); letter-spacing: -0.01em; }
-.aa-btn[aria-expanded="true"] { background: var(--line); }
+#readerAa[aria-expanded="true"] { background: var(--line); }
 .aloud-btn[aria-pressed="true"] { color: var(--accent); background: var(--line); }
 
 /* Read aloud (0.27.0): previous, play or pause, next, in the middle of
@@ -768,6 +767,22 @@ html.native .reader::before {
 }
 .range:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-sm); }
 .reading-controls .reset { align-self: flex-start; }
+/* Reader settings (0.34.0): Layout, Text and Read aloud, each its own part. */
+.rc-part { display: flex; flex-direction: column; gap: var(--s-3); }
+.rc-part[hidden] { display: none; }
+.rc-part > .overline { margin: var(--s-2) 0 calc(-1 * var(--s-1)) var(--s-1); }
+.reader-settings { display: flex; flex-direction: column; gap: var(--s-4); }
+.reader-settings .rc-part > .overline { display: none; }
+/* The parts share one cell, so the sheet keeps the tallest one's height
+   and doesn't jump between tabs; the others are kept hidden in place. */
+.reader-settings .reading-controls { display: grid; grid-template-columns: minmax(0, 1fr); }
+.reader-settings .rc-part { grid-area: 1 / 1; align-self: start; min-width: 0; }
+.reader-settings .rc-part[hidden] { display: flex; visibility: hidden; }
+.font-pick { flex: 1; min-width: 0; display: flex; }
+.font-pick .dropdown-btn { width: 100%; }
+.switch-row { cursor: pointer; min-height: var(--tap); }
+.switch-row .choice-text { flex: 1; min-width: 0; }
+.switch-row .choice-text .rc-label { width: auto; color: var(--ink); font-size: var(--fs-label); }
 .reading-controls .reset:disabled { opacity: 0.5; cursor: default; }
 .reading-sample {
   margin: 0; padding: var(--s-3) var(--s-4);

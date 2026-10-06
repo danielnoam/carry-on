@@ -2,6 +2,23 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.34.0] - 2026-10-06
+
+### Changed
+- The reader's settings are behind a gear now, not Aa, and come in three
+  parts: Layout (scroll or pages, margins), Text (font, size, spacing,
+  theme) and Read aloud. The part you used last opens next time.
+- Fonts are picked from a drop-down, each name shown in its own face, in
+  the reader and in Settings.
+- Read aloud's speed is a slider, from 0.5× to 3×.
+- Pulling down to refresh also checks for a new version of Carry-on.
+
+### Added
+- Read aloud: "Read footnotes" reads the notes at the end of a clip,
+  which are now skipped unless you turn it on. "Skip headers and footers"
+  leaves out the title, captions and whatever header or footer the site
+  left in, and reads just the body.
+
 ## [0.33.0] - 2026-10-06
 
 ### Added
