@@ -34,11 +34,6 @@ road icon (NOTES.md has what kept its old name and why). Left to do:
   it), bring the library over by sync or "Send your library to
   Waypage", check pictures, positions and feeds, then remove Carry-on.
   Re-add the home screen widgets.
-- **The signing key (Daniel, later):** a new keystore under an alias of
-  his choice, set as ANDROID_KEYSTORE_B64 and ANDROID_KEYSTORE_PASSWORD,
-  and the alias in tools/sign-apk.sh. Do it before installing Waypage on
-  more devices: each install only takes updates signed with the key it
-  was installed with.
 - **Store listings and this Claude project's name,** last, once it runs.
   Search Waypage in the Play Store and the App Store by hand first.
 
