@@ -55,6 +55,14 @@ asks from Daniel.
   line aren't read, just the body. Matters most for PDFs (whose page
   heads 0.32.0 already drops) and for sites that leave a footer behind.
 
+## Pull to refresh checks for an update too (Daniel, 6 Oct 2026)
+
+- Pulling down the library or Feeds (app.js, the touchend around line
+  5088) also runs `checkForNewerApp()`, so a new release shows in the
+  update bar without opening About. Today the pull checks only new
+  chapters (library) or feeds. Its "No collections follow a series yet"
+  toast should give way to "Up to date" when there's nothing else to say.
+
 ## Rename to Waypage (Daniel, 5 Oct 2026)
 
 The app becomes **Waypage**, store title "Waypage: Offline Reader": a page
