@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.30.8";
+  const APP_VERSION = "0.30.9";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -1041,10 +1041,13 @@
     // Unread and Finished keep collections whole: a collection shows when
     // it has an unread page, or when all of it is read.
     const status = state.filter === "unread" || state.filter === "finished";
-    const flat = ts.length || (state.filter !== "all" && !status);
-    const folders = flat ? [] : allFolders().filter((f) => !status
+    // Favourites shows the favourite collections, then every favourite
+    // clip, in a collection or not (0.30.9).
+    const favs = state.filter === "favourites";
+    const flat = ts.length || (state.filter !== "all" && !status && !favs);
+    const folders = flat ? [] : allFolders().filter((f) => favs ? folderFav(f) : !status
       || (state.filter === "unread" ? folderPages(f).some(unread) : folderPages(f).every((x) => x.finished)));
-    const folderSig = (f) => [f, freshCount(f), ...folderPages(f).map((x) => x.id + readingLine(x) + (x.thumb || "") + (x.cover || ""))].join("|");
+    const folderSig = (f) => [f, freshCount(f), folderFav(f), ...folderPages(f).map((x) => x.id + readingLine(x) + (x.thumb || "") + (x.cover || ""))].join("|");
     if (!ts.length && state.filter === "all" && !state.part) {
       const going = !state.select && load(CONTINUE_KEY, true) && continuePage();
       if (going) {
@@ -1052,7 +1055,7 @@
         keep("c:" + going.id, () => pageCard(going, null, true), pageSig(going));
       }
     }
-    const loose = flat ? pages : pages.filter((p) => !p.folder);
+    const loose = flat || favs ? pages : pages.filter((p) => !p.folder);
     if (how === "list" && !flat) {
       const items = sorted([...folders.map(asItem), ...loose]);
       let group = null;
@@ -1078,7 +1081,7 @@
       }
       if (loose.length && part !== "collections") {
         const label = (ts.length ? "Found" : state.filter === "all" ? "Clips"
-          : status && folders.length ? filterName() + " clips" : filterName()) + " · " + loose.length;
+          : (status || favs) && folders.length ? filterName() + " clips" : filterName()) + " · " + loose.length;
         if (part || ts.length || !folders.length) keep("h:pages", () => sectionHead(label), label);
         else keep("h:pages", () => partHead("pages", label), "link" + label);
       }
@@ -1099,7 +1102,7 @@
       keep("none:" + state.filter, () => el("div", { class: "empty wide" },
         el("p", { class: "empty-text" }, state.filter === "unread" ? "You've started everything you saved."
           : state.filter === "finished" ? "Nothing finished yet."
-          : state.filter === "favourites" ? "No favourites yet. Hold a clip and tap Favourite." : "No clips tagged " + state.filter + "."),
+          : state.filter === "favourites" ? "No favourites yet. Hold a clip, or open a collection's ⋯, and tap Favourite." : "No clips tagged " + state.filter + "."),
         el("button", { class: "btn-quiet", type: "button", onclick: () => setFilter("all") }, "Show all")));
     }
     if (!n) {
@@ -1197,7 +1200,7 @@
       const existing = savedAs(job.url);
       if (existing) {
         had++;
-        if (name) { existing.folder = name; existing.folderAt = Date.now(); if (source) existing.source = source; }
+        if (name) { joinFav(existing, name); existing.folder = name; existing.folderAt = Date.now(); if (source) existing.source = source; }
         if (tags.length) existing.tags = withTags(existing.tags, tags);
         if (name || tags.length) { await C.store.writeIndex(state.pages); renderLibrary(); if (state.folder) renderFolder(); }
         continue;
@@ -1269,7 +1272,7 @@
       if (old) {
         // Saved again: the new copy takes the old one's place, keeping its
         // collection, tags and read position.
-        for (const k of ["requested", "folder", "folderAt", "source", "tags", "at", "finished", "readAt", "fav", "favAt"]) if (old[k] !== undefined) meta[k] = old[k];
+        for (const k of ["requested", "folder", "folderAt", "folderFav", "folderFavAt", "source", "tags", "at", "finished", "readAt", "fav", "favAt"]) if (old[k] !== undefined) meta[k] = old[k];
         const i = state.pages.indexOf(old);
         if (i < 0) await C.store.removePage(meta.id);
         else {
@@ -2089,6 +2092,23 @@
     return names;
   }
 
+  // A favourite collection (0.30.9): a mark on its clips, so it goes
+  // wherever they go, through a rename, a backup and sync, like a clip's.
+  // Any of its clips carrying it makes the collection a favourite.
+  const folderFav = (name) => folderPages(name).some((p) => p.folderFav);
+  function setFolderFav(name, on) {
+    const now = Date.now();
+    for (const p of folderPages(name)) {
+      if (on) { p.folderFav = true; p.folderFavAt = p.folderFavAt || now; }
+      else { delete p.folderFav; delete p.folderFavAt; }
+    }
+  }
+  // A clip moving to another collection takes that one's mark, or none.
+  function joinFav(p, name) {
+    const on = name && folderPages(name).some((x) => x !== p && x.folderFav);
+    if (on) { p.folderFav = true; p.folderFavAt = Date.now(); } else { delete p.folderFav; delete p.folderFavAt; }
+  }
+
   // A folder's name as already spelled, if one by that name exists.
   const folderName = (name) => allFolders().find((n) => sameTag(n, cleanTag(name))) || cleanTag(name);
 
@@ -2103,9 +2123,11 @@
       if (p.folder && sameTag(p.folder, clean)) return;
       p.folder = folderName(clean);
       p.folderAt = Date.now();
+      joinFav(p, p.folder);
     } else {
       delete p.folder;
       delete p.folderAt;
+      joinFav(p, null);
     }
     await C.store.writeIndex(state.pages);
     renderLibrary();
@@ -2121,15 +2143,16 @@
     const cover = coverUrl(list);
     const thumb = cover || (withThumb ? thumbUrl(withThumb) : null);
     const fresh = freshCount(name);
+    const fav = list.some((p) => p.folderFav);
     const tile = el("div", { class: "tile", role: "listitem", "data-ids": list.map((p) => p.id).join(",") },
-      el("button", { class: "card-open", type: "button", "aria-label": name + ", collection, " + list.length + " clips, " + done + " read" + (fresh ? ", " + newCountText(fresh) + " chapters" : ""),
+      el("button", { class: "card-open", type: "button", "aria-label": name + (fav ? ", favourite" : "") + ", collection, " + list.length + " clips, " + done + " read" + (fresh ? ", " + newCountText(fresh) + " chapters" : ""),
         onclick: () => tapPages(list.map((p) => p.id), () => openFolder(name)) }),
       pickMark(),
       el("span", { class: "tile-thumb" + (thumb ? "" : " blank"), "aria-hidden": "true" },
         thumb ? el("img", { src: thumb, alt: "", loading: "lazy" }) : null,
         fresh ? el("span", { class: "tile-new" }, "+" + (fresh >= NEW_MAX ? NEW_MAX : fresh)) : null),
       el("span", { class: "tile-name", dir: "auto" }, name),
-      el("span", { class: "tile-meta" }, el("span", { class: "tile-kind" }, "Collection · "), (done === list.length ? "All read" : done + " of " + list.length + " read"), el("span", { class: "tile-size" }, " · " + formatSize(sizeOf(list)))),
+      el("span", { class: "tile-meta" }, fav ? el("span", { class: "card-fav", role: "img", "aria-label": "Favourite" }, "★ ") : null, el("span", { class: "tile-kind" }, "Collection · "), (done === list.length ? "All read" : done + " of " + list.length + " read"), el("span", { class: "tile-size" }, " · " + formatSize(sizeOf(list)))),
       el("span", { class: "progress thin", "aria-hidden": "true" },
         el("span", { class: "progress-fill", style: "transform: scaleX(" + done / list.length + ")" })));
     // A cover whose file is gone (a restored backup) is read again.
@@ -2487,6 +2510,7 @@
       item("reorder", "Reorder", () => setFolderMode("order"), { disabled: list.length < 2 }),
       item("select", "Select", () => startSelect([])),
       item("send", "Export", () => setFolderMode("export")),
+      item("star", folderFav(state.folder) ? "Unfavourite" : "Favourite", () => favFolder(state.folder, !folderFav(state.folder))),
       sep(),
       item("remove", "Remove", () => openMenu("remove"), { warn: true }));
     const more = $("folderMore"), at = more.getBoundingClientRect();
@@ -2656,7 +2680,7 @@
     if (withPages && !confirm("Delete “" + name + "” and its " + countLine(list.length) + " from " + HERE + "?" + alsoSynced())) return;
     for (const p of list) {
       if (withPages) await C.store.removePage(p.id);
-      else { delete p.folder; delete p.folderAt; }
+      else { delete p.folder; delete p.folderAt; delete p.folderFav; delete p.folderFavAt; }
     }
     if (withPages) state.pages = state.pages.filter((p) => !list.includes(p));
     await C.store.writeIndex(state.pages);
@@ -2699,6 +2723,13 @@
     const b = tileButton("star", "Favourite", () => setFavourite([p], !p.fav).then(redraw), p.fav ? "on" : "");
     b.setAttribute("aria-pressed", p.fav ? "true" : "false");
     return b;
+  }
+  async function favFolder(name, on) {
+    setFolderFav(name, on);
+    await C.store.writeIndex(state.pages);
+    renderLibrary();
+    if (state.folder) renderFolder();
+    toast(on ? name + " is a favourite" : name + " is no longer a favourite");
   }
   async function setFavourite(list, on) {
     for (const p of list) {
@@ -3009,8 +3040,9 @@
       const target = name && cleanTag(name) ? folderName(name) : null;
       const now = Date.now();
       [...list].sort((a, b) => (a.folderAt || a.savedAt || 0) - (b.folderAt || b.savedAt || 0)).forEach((p, i) => {
-        if (!target) { delete p.folder; delete p.folderAt; return; }
+        if (!target) { delete p.folder; delete p.folderAt; joinFav(p, null); return; }
         if (p.folder && sameTag(p.folder, target)) return;
+        joinFav(p, target);
         p.folder = target;
         p.folderAt = now + i;
       });
@@ -3260,7 +3292,7 @@
   // every few minutes while open. Pages that came down get their pictures
   // here, one page at a time, like Retry.
   let syncTimer = null, syncQueue = [], fetchingPictures = false;
-  const SYNCED_KEEP = ["savedAt", "title", "requested", "tags", "folder", "folderAt", "source", "series", "fav", "favAt", "at", "finished", "readAt"];
+  const SYNCED_KEEP = ["savedAt", "title", "requested", "tags", "folder", "folderAt", "source", "series", "fav", "favAt", "folderFav", "folderFavAt", "at", "finished", "readAt"];
   function syncSoon(ms = 4000) {
     if (!C.sync.on || C.sync.paused) return;
     clearTimeout(syncTimer);
@@ -4708,7 +4740,7 @@
     fill($("sidebar"),
       el("p", { class: "side-title" }, "Carry-on"),
       item(feedIcon("library"), "Library", !inFeeds, count(state.pages.length, "side-count"), () => goPlace("library")),
-      ...foldersByUse().slice(0, SIDE_MAX).map((name) =>
+      ...[...foldersByUse().filter(folderFav), ...foldersByUse().filter((f) => !folderFav(f))].slice(0, SIDE_MAX).map((name) =>
         item(sideCover(name), name, false, count(freshCount(name)), () => openFromSide(name), "side-sub")),
       el("hr", { class: "side-line" }),
       item(feedIcon("feeds"), "Feeds", inFeeds && !state.feed, fresh ? el("span", { class: "side-pill" }, fresh + " new") : null,

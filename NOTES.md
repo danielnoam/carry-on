@@ -3,6 +3,15 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **A favourite collection is a mark on its clips (0.30.9).** There is no
+  collections file: a collection is the clips whose `folder` names it.
+  So its favourite is `folderFav` (and `folderFavAt`) on each of its
+  clips, and any one carrying it makes the collection a favourite. That
+  way it follows a rename, and goes through backup and sync, merged field
+  by field, with no new file. A clip moving into a collection takes that
+  collection's mark, or loses its own. Favourites in the library shows the
+  favourite collections, then every favourite clip, in a collection or
+  not; the sidebar lists favourite collections first.
 - **Why the fades didn't fade, and the lag on Collections (0.30.8).**
   A spring's curve is 90% of the way there in its first fifth, and the
   fades rode the same curve as the movement, so opacity went from 0 to 1

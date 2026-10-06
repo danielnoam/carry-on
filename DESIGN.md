@@ -183,7 +183,8 @@ and the page shows above it.
   The collection's own screen and the sidebar show the same. Under it the name, "3 of 12 read" and a thin
   accent line. A series with chapters not yet saved shows "2 new" as a
   pill at the picture's top end: `--accent` fill, `--accent-ink` text,
-  meta size, semibold (0.25.0).
+  meta size, semibold (0.25.0). A favourite collection has a ★ before
+  "3 of 12 read", as a favourite clip has before its site (0.30.9).
 - **Picking (Now):** the library and collection screens get a circle at
   each card's top end (24 px, a 2 px muted ring), filled with the accent
   and a tick once picked, and the card's border turns accent. A bar over

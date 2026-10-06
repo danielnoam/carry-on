@@ -2,6 +2,14 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.30.9] - 2026-10-06
+
+### Added
+- A collection can be a favourite: open it, tap ⋯ and Favourite. It
+  wears a star on its tile, shows under Favourites in the library with
+  your favourite clips, and comes first in the sidebar. It keeps its star
+  through a rename, a backup and sync.
+
 ## [0.30.8] - 2026-10-06
 
 ### Changed
