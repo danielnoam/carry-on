@@ -2,6 +2,18 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.34.2] - 2026-10-06
+
+### Changed
+- Voices for read aloud are easier to tell apart: grouped by country,
+  the best ones first, and each one says what sets it apart (natural,
+  female or male where the phone says, online). Google's online copy of
+  a voice the phone already has is left out.
+- The voice picker is a field like the font pickers.
+
+### Fixed
+- Hebrew font names have a space before their עברית sample.
+
 ## [0.34.1] - 2026-10-06
 
 ### Changed

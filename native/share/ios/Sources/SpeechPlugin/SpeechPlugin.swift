@@ -51,7 +51,10 @@ public class SpeechPlugin: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDeleg
 
     @objc func voices(_ call: CAPPluginCall) {
         let list = AVSpeechSynthesisVoice.speechVoices().map { v -> [String: Any] in
-            ["id": v.identifier, "name": v.name, "lang": v.language, "online": false]
+            var quality = v.quality == .enhanced ? 400 : 300
+            if #available(iOS 16.0, *), v.quality == .premium { quality = 500 }
+            let gender = v.gender == .female ? "female" : v.gender == .male ? "male" : ""
+            return ["id": v.identifier, "name": v.name, "lang": v.language, "online": false, "quality": quality, "gender": gender]
         }
         call.resolve(["voices": list])
     }

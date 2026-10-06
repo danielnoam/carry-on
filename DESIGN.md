@@ -395,8 +395,10 @@ and the page shows above it.
   the bottom): an accent pill, 44 px, speaker icon and label. The block
   being read has `--preview` behind it
   with a `--s-1` spread and `--r-sm` corners. In Aa, under the theme:
-  "Read aloud", Voice (a dropdown of the page language's voices, the
-  phone's default first), Speed (0.75× to 2×) and a footnote.
+  "Read aloud", Voice (a field drop-down like the font pickers, 0.34.2:
+  the phone's default first, then the page language's voices under a
+  head per country, best first, coded names as Voice 1, 2… with tags
+  such as female, natural, online), Speed and a footnote.
 - **Pressed (Now, 0.26.0):** no tap flash and no focus ring after a
   tap, only for a keyboard (`:focus-visible`). Buttons, chips and tiles
   scale to 0.97 on the control spring with `--press` over their fill;

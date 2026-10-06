@@ -18,7 +18,7 @@ import org.json.JSONArray;
  * Read aloud (src/aloud.js, 0.27.0) with the phone's own voices, offline.
  * The reading itself is SpeechService, which goes on with the screen off:
  *
- *   voices()                     { voices: [{ id, name, lang, online }] }
+ *   voices()                     { voices: [{ id, name, lang, online, quality }] }
  *   play({ items, start, lang, voice, rate, title, subtitle, key })
  *   pause() resume() stop() seek({ index }) skip({ by }) rate({ rate })
  *   state()                      { key, index, state }
@@ -72,6 +72,7 @@ public class SpeechPlugin extends Plugin {
                     o.put("name", v.getName());
                     o.put("lang", v.getLocale().toLanguageTag());
                     o.put("online", v.isNetworkConnectionRequired());
+                    o.put("quality", v.getQuality());
                     list.put(o);
                 }
             } catch (Exception e) {
