@@ -1,7 +1,7 @@
 // Waypage: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "1.0.0";
+  const APP_VERSION = "1.1.0";
   window.Waypage.version = APP_VERSION;
 
   const C = window.Waypage;
@@ -331,8 +331,13 @@
     if (!on && r.wake) { r.wake(); r.wake = null; }
     runChanged();
   }
+  // Stop on sync's run (1.1.0): sync hands the same pages over again at
+  // its next run, so they'd start again seconds later. Stopped, they wait
+  // until Waypage is next opened.
+  let linksStopped = false;
   function stopRun(r) {
     if (!r) return;
+    if (r.sync) linksStopped = true;
     r.stopped = true;
     r.paused = false;
     if (r.wake) { r.wake(); r.wake = null; }
@@ -342,10 +347,34 @@
   function endRun(r) {
     if (!r) return;
     runs.delete(r);
+    oneEach();
     r.done = true;
     r.at = Date.now();
     if (r.saved || failedOf(r).length) finish({ key: "r:" + r.id, run: r });
     renderDownloads();
+  }
+
+  // Two clips of one address (a chapter saved by a run while sync was
+  // bringing it in, before 1.1.0) become one: the one saved last, with the
+  // other's tags, favourite, collection and reading, as sync does. Run at
+  // launch and when a run ends. Files of your own have no address.
+  async function oneEach() {
+    const web = state.pages.filter((p) => p.url && !p.file);
+    const gone = {};
+    const kept = new Map(C.sync.oneCopyEach(web, gone, Date.now(), sameUrl).map((p) => [p.id, p]));
+    const ids = Object.keys(gone);
+    if (!ids.length) return 0;
+    state.pages = state.pages.filter((p) => !gone[p.id]).map((p) => {
+      const k = kept.get(p.id);
+      if (!k || k === p) return p;
+      for (const key of Object.keys(p)) if (!(key in k)) delete p[key];
+      return Object.assign(p, k);
+    });
+    await C.store.writeIndex(state.pages);
+    for (const id of ids) await C.store.removePage(id).catch(() => {});
+    renderLibrary();
+    if (state.folder) renderFolder();
+    return ids.length;
   }
 
   // Downloads keeps the last 30 finished, for this session.
@@ -980,18 +1009,22 @@
     return going.sort((a, b) => (b.readAt || 0) - (a.readAt || 0))[0] || null;
   }
 
-  // Folders, the one touched last first.
+  // Folders, the one read last first, then the newest made. Pages landing
+  // in one don't move it (1.1.0).
   function foldersByUse() {
-    const last = (name) => Math.max(...folderPages(name).map((p) => Math.max(p.readAt || 0, p.savedAt || 0)));
+    const last = (name) => { const list = folderPages(name);
+      return Math.max(...list.map((p) => p.readAt || 0), Math.min(...list.map((p) => p.savedAt || 0))); };
     return allFolders().map((n) => [n, last(n)]).sort((a, b) => b[1] - a[1]).map(([n]) => n);
   }
 
-  // A collection as one item among pages, for the library's order: its
-  // newest page, the one read last, its length and its site.
+  // A collection as one item among pages, for the library's order: when
+  // it was made (its first page), the page read last, its length and its
+  // site. Made, not its newest page: pages downloading into collections
+  // reshuffled them with every one that landed (1.1.0).
   function asItem(name) {
     const list = folderPages(name);
     return { folder: name, title: name, site: list[0].site,
-      savedAt: Math.max(...list.map((p) => p.savedAt || 0)),
+      savedAt: Math.min(...list.map((p) => p.savedAt || 0)),
       readAt: Math.max(...list.map((p) => p.readAt || 0)),
       minutes: list.reduce((n, p) => n + (p.minutes || 0), 0) };
   }
@@ -1024,6 +1057,9 @@
   // page it matches, collections' pages too; a search lists only what it
   // found.
   let firstRender = true;
+  // Android's version, from the Files plugin (0.33.0): what the storage
+  // places and the empty library's way back (1.1.0) offer.
+  let androidSdk = 0;
   function renderLibrary() {
     const root = $("library");
     const old = new Map([...root.querySelectorAll(":scope > [data-key]")].map((n) => [n.dataset.key, n]));
@@ -1145,7 +1181,12 @@
           ? "Share a page to Waypage from your browser, or paste its link below. It stays readable with no connection, with a link back to the original."
           : "Paste a Wikipedia link below, or bring the clips you saved on your phone: back up there, then open the backup here."),
         el("button", { class: "btn-quiet empty-open", type: "button", onclick: () => pickFile() }, "Open a file"),
-        C.platform.native ? null : el("button", { class: "btn-quiet empty-open", type: "button", onclick: () => openSettings(false, "storage") }, "Open a backup")));
+        // After a reinstall Android hides what the last install kept in
+        // Documents/Waypage until it's picked again (1.1.0).
+        C.platform.android && C.platform.files.canPickFolder && C.store.place.kind === "app" && androidSdk >= 30
+          ? el("button", { class: "btn-quiet empty-open", type: "button", onclick: () => changePlace("folder", "Documents/Waypage") }, "Get back your library from Documents") : null,
+        C.platform.native ? null : el("button", { class: "btn-quiet empty-open", type: "button", onclick: () => openSettings(false, "storage") }, "Open a backup")),
+      [androidSdk, C.store.place.kind].join("|"));
     }
     root.replaceChildren(...nodes);
     // A card or two arriving springs in; a whole new list (Collections or
@@ -1183,6 +1224,11 @@
 
   const sameUrl = (a, b) => a && b && a.split("#")[0].replace(/\/$/, "") === b.split("#")[0].replace(/\/$/, "");
   const savedAs = (url) => state.pages.find((p) => sameUrl(p.url, url) || sameUrl(p.requested, url));
+  // Being saved now, or waiting to be: a page sync is bringing in from its
+  // link counts, under either of its addresses (1.1.0). Missing those let
+  // Save new chapters save again what sync was already fetching.
+  const savingAs = (url) => state.saving.some((s) => !s.error && (sameUrl(s.url, url)
+    || (s.synced && (sameUrl(s.synced.url, url) || sameUrl(s.synced.requested, url)))));
   const newJob = (url, folder) => ({ key: url, url, site: C.save.siteName(url), done: 0, total: null, error: null, folder: folder || null });
 
   async function savePage(url, folder, how) {
@@ -1218,7 +1264,7 @@
     const name = folder ? folderName(folder) : null;
     const places = skipSaved && name ? placesBetween(all, name) : new Map();
     const urls = skipSaved ? all.filter((u) => !savedAs(u)) : all;
-    const jobs = urls.filter((u) => !state.saving.some((s) => !s.error && sameUrl(s.url, u))).map((u) => ({ ...newJob(u, name), tags, mode, kind, source: name ? source : undefined }));
+    const jobs = urls.filter((u) => !savingAs(u)).map((u) => ({ ...newJob(u, name), tags, mode, kind, source: name ? source : undefined }));
     state.saving = state.saving.filter((s) => !(s.error && jobs.some((j) => sameUrl(j.url, s.url))));
     const fresh = jobs.filter((j) => !savedAs(j.url));
     fresh.forEach((j) => { if (places.has(j.url)) j.folderAt = places.get(j.url); });
@@ -1438,6 +1484,7 @@
     const shown = show(p, html);
     pushScreen($("readerView"));
     await shown;
+    if (p.link) C.files.drawNear($("readerFrame"));
     $("readerFrame").focus();
   }
 
@@ -1464,6 +1511,7 @@
       onSelect: showReadHere,
       pages: readingPrefs().layout === "pages",
       top: () => $("readerView").querySelector(".reader-bar").offsetHeight,
+      bottom: () => $("readFoot").offsetHeight,
     }).then(() => { $("readerContents").hidden = C.reader.headings().length < 2; });
   }
 
@@ -1494,6 +1542,7 @@
   let lastY = 0, readerY = 0;
   function readerScrolled(at, y) {
     readerY = y;
+    if (state.open && state.open.link) C.files.drawNear($("readerFrame"));
     if (readHere && !readHere.hidden) showReadHere(C.reader.selectionSpot());
     $("readProgress").firstElementChild.style.transform = "scaleX(" + at + ")";
     if (!$("readerView").classList.contains("bar-away") || aloud.state !== "stopped") readerFoot(at);
@@ -1591,6 +1640,7 @@
     popScreen($("readerView")).then(() => {
       if (state.open) return;
       C.reader.close();
+      C.files.closeHeld();
       renderLibrary();
       if (state.folder) renderFolder();
     });
@@ -3507,6 +3557,116 @@
     if (state.section) renderSection();
   }
 
+  // ---- A watched folder (1.1.0) ----
+  // A folder picked once (say Books) that Waypage looks in each time it
+  // opens, comes back, or is pulled down: a file it hasn't seen becomes a
+  // clip reading from where it is, with no question, in a collection named
+  // after its own folder when it's in one; a clip whose file left the
+  // folder leaves the library. Clips from it carry `watched` (the folder).
+  // This device's own, like any clip that reads from a file: never synced.
+  // Android only for now; iOS needs a security-scoped bookmark (TODO.md).
+  const WATCH_KEY = "waypage.watch";
+  const WATCH_EXTS = /\.(epub|pdf|cbz|md|markdown|txt|html?|xhtml)$/i;
+  let watching = null;
+  const watched = () => { const w = load(WATCH_KEY, null); return w && w.tree ? w : null; };
+  function watchSoon(ms = 1500) {
+    if (!C.platform.files.canWatch || !watched()) return;
+    clearTimeout(watchSoon.t);
+    watchSoon.t = setTimeout(() => lookInFolder(), ms);
+  }
+  async function lookInFolder(said) {
+    const w = watched();
+    if (!w || !C.platform.files.canWatch) return null;
+    if (watching) return watching;
+    watching = (async () => {
+      const got = await C.platform.files.scan(w.tree);
+      // A folder that can't be read (a memory card out, the permission
+      // taken back) takes nothing away: its clips wait for it.
+      if (!got.ok) {
+        w.lost = true; store(WATCH_KEY, w);
+        if (said) toast("Waypage can't open " + w.name + " any more. Pick it again in Settings, Storage.");
+        return { added: 0, gone: 0, lost: true };
+      }
+      if (w.lost) { delete w.lost; store(WATCH_KEY, w); }
+      const there = got.files.filter((f) => WATCH_EXTS.test(f.name));
+      const refs = new Set(there.map((f) => f.ref));
+      const gone = state.pages.filter((p) => p.watched === w.tree && !refs.has(p.link));
+      if (gone.length) {
+        for (const p of gone) await C.store.removePage(p.id);
+        state.pages = state.pages.filter((p) => !gone.includes(p));
+        await C.store.writeIndex(state.pages);
+        if (state.folder) renderFolder();
+      }
+      const known = new Set(state.pages.filter((p) => p.link).map((p) => p.link));
+      const fresh = there.filter((f) => !known.has(f.ref)).sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true, sensitivity: "base" }));
+      let added = 0;
+      if (fresh.length && said !== false) toast(fresh.length === 1 ? "Adding " + fresh[0].name + " from " + w.name + "…" : "Adding " + fresh.length + " files from " + w.name + "…");
+      for (const f of fresh) {
+        try {
+          const file = await C.platform.files.blob(f.ref, f.size);
+          const kind = await C.files.kindOf(file);
+          if (!C.files.KINDS[kind]) continue;
+          const meta = await C.files.bring(file, kind, { link: f.ref, has: (name, size) => hasFile(name, size, f.ref) });
+          if (meta.already) continue;
+          meta.watched = w.tree;
+          meta.file.path = f.path.slice(0, 500);
+          const dir = f.path.split("/").slice(-2, -1)[0];
+          if (dir) { meta.folder = folderName(dir); meta.folderAt = Date.now(); }
+          state.pages.unshift(meta);
+          await C.store.writeIndex(state.pages);
+          added++;
+        } catch (e) {
+          if (!(e instanceof C.files.FileError)) console.error(e);
+        }
+      }
+      if (added) { await loadThumbs(); C.store.keepStored(); }
+      if (added || gone.length) { renderLibrary(); updateWidgets(); }
+      if (added && said !== false) toast("Added " + (added === 1 ? "1 file" : added + " files") + " from " + w.name);
+      else if (said && !gone.length) toast("Nothing new in " + w.name + ".");
+      return { added, gone: gone.length };
+    })();
+    try { return await watching; } finally { watching = null; if (state.section === "storage") renderSection(); }
+  }
+  function watchGroup() {
+    if (!C.platform.files.canWatch) return null;
+    const w = watched();
+    const n = w ? state.pages.filter((p) => p.watched === w.tree).length : 0;
+    const rows = w
+      ? [el("div", { class: "row" }, el("span", { class: "row-label" }, "Folder"), el("span", { class: "row-value" }, w.name)),
+        el("button", { class: "row", type: "button", ...(watching ? { disabled: "" } : {}), onclick: () => lookInFolder(true) },
+          el("span", { class: "row-label accent" }, watching ? "Looking…" : "Look now")),
+        el("button", { class: "row", type: "button", onclick: pickWatched }, el("span", { class: "row-label accent" }, "Pick another folder")),
+        el("button", { class: "row", type: "button", onclick: stopWatching }, el("span", { class: "row-label warn" }, "Stop watching"))]
+      : [el("button", { class: "row", type: "button", onclick: pickWatched }, el("span", { class: "row-label accent" }, "Watch a folder"))];
+    return el("section", { class: "settings-section", id: "watchSection" },
+      el("h2", { class: "overline" }, "Watched folder"),
+      el("div", { class: "group" }, ...rows),
+      el("p", { class: "footnote" }, w
+        ? (w.lost ? "Waypage can't open this folder any more. Pick it again to carry on. " : (n === 1 ? "1 file" : n + " files") + " from it. ")
+          + "Waypage looks in it each time it opens. Its folders become collections, and a file you delete there leaves Waypage too."
+        : "Pick a folder, like Books, and Waypage adds what's in it each time it opens. Each file is read from where it is, so it doesn't sync."));
+  }
+  async function pickWatched() {
+    let got = null;
+    try { got = await C.platform.files.pickFolder(); } catch (e) { got = null; }
+    if (!got) return;
+    const was = watched();
+    // Clips from the folder before stay, as files read from where they are.
+    if (was && was.tree !== got.ref) for (const p of state.pages) if (p.watched === was.tree) delete p.watched;
+    store(WATCH_KEY, { tree: got.ref, name: got.name });
+    if (state.section === "storage") renderSection();
+    await lookInFolder(true);
+  }
+  async function stopWatching() {
+    const w = watched();
+    if (!w) return;
+    for (const p of state.pages) if (p.watched === w.tree) delete p.watched;
+    await C.store.writeIndex(state.pages);
+    localStorage.removeItem(WATCH_KEY);
+    if (state.section === "storage") renderSection();
+    toast("Stopped watching " + w.name + ". Its files stay in your library.");
+  }
+
   function backupGroup() {
     const input = el("input", { type: "file", class: "visually-hidden", tabindex: "-1", "aria-hidden": "true" });
     const open = el("button", { class: "row", type: "button", onclick: () => (C.platform.files.canLink ? pickFile() : input.click()) },
@@ -3583,8 +3743,12 @@
   // like a run, each into its place in the library. In a browser only
   // Wikipedia can be fetched, so the rest wait for the app.
   async function saveFromLinks(list) {
+    if (linksStopped) return;
+    // One already saved here under the same address is left to sync, which
+    // keeps one copy of each (sync.js, oneCopyEach).
     const jobs = list.filter((m) => m.url && (C.platform.native || C.save.wikipediaPage(m.url))
-      && !state.pages.some((p) => p.id === m.id) && !state.saving.some((s) => s.synced && s.synced.id === m.id))
+      && !state.pages.some((p) => p.id === m.id) && !state.saving.some((s) => s.synced && s.synced.id === m.id)
+      && !savedAs(m.url) && !(m.requested && savedAs(m.requested)) && !savingAs(m.url))
       .map((m) => ({ ...newJob(m.url, null), key: "sync:" + m.id, synced: m, mode: m.mode, kind: m.comic ? "comic" : "article", waiting: true }));
     if (!jobs.length) return;
     const run = jobs.length > 1 ? Object.assign(startRun(null, jobs[0].site, jobs.length), { label: "From sync", sync: true, paused: C.sync.paused }) : null;
@@ -4269,7 +4433,7 @@
         // it isn't saved is new, wherever it sits.
         const found = await C.save.findChapters(source);
         const all = found.links.slice(0, 5000);
-        count = all.filter((u) => !savedAs(u)).length;
+        count = all.filter((u) => !savedAs(u) && !savingAs(u)).length;
         setNewFor(name, { at: Date.now(), count, all });
         await updateCover(name, found.cover || "");
       } else {
@@ -4306,7 +4470,7 @@
   function freshCount(name) {
     const entry = newFor(name);
     if (!entry || !entry.count) return 0;
-    if (entry.all) return entry.all.filter((u) => !savedAs(u)).length;
+    if (entry.all) return entry.all.filter((u) => !savedAs(u) && !savingAs(u)).length;
     const list = folderPages(name);
     const last = list[list.length - 1];
     if (!last || !last.next || savedAs(last.next)) return 0;
@@ -5216,7 +5380,8 @@
       // A pull also looks for a newer Waypage (0.34.0); the bar says so.
       const app = checkForNewerApp().catch(() => {});
       if (state.place === "feeds") { Promise.all([checkNow(picked || null), app]).finally(done); return; }
-      pullChapters(app).finally(done);
+      // And in the library, in the watched folder (1.1.0).
+      Promise.all([pullChapters(app), lookInFolder(false)]).finally(done);
     }, { passive: true });
   }
 
@@ -5532,10 +5697,9 @@
   // Documents folder, or a folder you pick. Choosing another moves
   // everything there. Android only: on iOS the app's own storage already
   // shows in the Files app.
-  let androidSdk = 0;
   let moving = null;
   if (C.platform.android && C.platform.plugin("Files") && C.platform.plugin("Files").where) {
-    C.platform.plugin("Files").where().then((w) => { androidSdk = (w && w.sdk) || 0; }).catch(() => {});
+    C.platform.plugin("Files").where().then((w) => { androidSdk = (w && w.sdk) || 0; if (!state.pages.length) renderLibrary(); }).catch(() => {});
   }
   function placeGroup() {
     if (C.platform.ios) {
@@ -5549,7 +5713,7 @@
       { value: "app", label: "Inside Waypage", note: "Recommended. Private to the app, and the quickest. Uninstalling Waypage deletes it." },
     ];
     if (androidSdk >= 30 || place.kind === "documents") {
-      options.push({ value: "documents", label: "Documents/Waypage", note: "You can see it in the Files app, and it stays if you uninstall Waypage. After reinstalling, pick it as your folder to get it back." });
+      options.push({ value: "documents", label: "Documents/Waypage", note: "You can see it in the Files app, and it stays if you uninstall Waypage. After reinstalling, the empty library offers to get it back." });
     }
     options.push({ value: "folder", label: place.kind === "folder" ? place.name || "A folder you picked" : "A folder you pick",
       note: place.kind === "folder" ? "Pick this again to choose another folder." : "Any folder on the phone or a memory card. Saving there is a little slower." });
@@ -5562,13 +5726,13 @@
     if (again && place.kind === "folder") again.addEventListener("click", () => changePlace("folder"));
     return group;
   }
-  async function changePlace(kind) {
+  async function changePlace(kind, initial) {
     if (moving) return;
     const now = C.store.place;
     let next = { kind };
     if (kind === "folder") {
       let got = null;
-      try { got = await C.platform.files.pickFolder(); } catch (e) { got = null; }
+      try { got = await C.platform.files.pickFolder(initial); } catch (e) { got = null; }
       if (!got) { renderSection(); return; }
       if (now.kind === "folder" && now.tree === got.ref) { renderSection(); return; }
       next = { kind, tree: got.ref, name: got.name };
@@ -5582,7 +5746,7 @@
       await loadThumbs();
       renderLibrary();
       moving = null;
-      toast("Your library is in " + C.store.placeName(next) + " now.");
+      toast(initial && joined.length ? "Your library is back: " + countLine(joined.length) + "." : "Your library is in " + C.store.placeName(next) + " now.");
     } catch (e) {
       console.error(e);
       moving = null;
@@ -5678,7 +5842,7 @@
     saving: { title: "Saving", build: () => [choiceGroup(SETTINGS[1])],
       value: () => SETTINGS[1].options.find((o) => o.value === SETTINGS[1].get()).label },
     sync: { title: "Sync", build: syncSections, value: () => (C.sync.on ? (C.sync.last.error ? "Stopped" : "On") : "Off") },
-    storage: { title: "Storage and backup", build: () => [storageGroup(), placeGroup(), browserStorageGroup(), backupGroup()], value: () => formatSize(totalBytes()) },
+    storage: { title: "Storage and backup", build: () => [storageGroup(), placeGroup(), watchGroup(), browserStorageGroup(), backupGroup()], value: () => formatSize(totalBytes()) },
     updates: { title: "About", build: () => [updatesGroup(), aboutGroup()], value: () => (updateOut() ? upd.latest + " is out" : APP_VERSION) },
   };
 
@@ -5954,6 +6118,7 @@
   paintPlace();
   Promise.all([C.platform.ready, C.store.ready]).then(() => Promise.all([C.store.readIndex(), loadThumbs()])).then(([pages]) => {
     state.pages = Array.isArray(pages) ? pages : [];
+    setTimeout(() => oneEach().then((n) => { if (n) toast("Removed " + (n === 1 ? "a clip that was" : n + " clips that were") + " saved twice."); }), 1200);
     if (history.state && history.state.view) history.replaceState(null, "");
     paintPlace();
     noteVersion();
@@ -5977,11 +6142,13 @@
     setTimeout(healPictures, 4000);
     addEventListener("hashchange", takeSetupLink);
     setTimeout(() => syncNow(), 2000);
+    watchSoon(2500);
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) { if (positionTimer) savePositions(); updateWidgets(); if (syncTimer) syncNow(); return; }
       takeFeedNews();
       takeWidget();
       syncSoon(1000);
+      watchSoon(800);
     });
   });
   addEventListener("online", () => { dailyCheck(false); checkFeeds(false); syncSoon(1000); fetchPictures(); });

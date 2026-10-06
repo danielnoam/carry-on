@@ -23,20 +23,43 @@
   const BOOT = String.raw`
 const post = (m, t) => parent.postMessage(m, "*", t || []);
 let busy = false;
+// A PDF kept open to draw its pages as they're reached (1.1.0).
+let held = null, queue = Promise.resolve();
 addEventListener("message", async (e) => {
   const job = e.data;
-  if (!job || job.kind !== "read" || busy) return;
+  if (!job) return;
+  if (job.kind === "open" || job.kind === "draw") {
+    queue = queue.then(async () => {
+      try {
+        if (job.kind === "open") {
+          held = await load(job);
+          const sizes = [];
+          for (let n = 1; n <= Math.min(held.numPages, 2000); n++) {
+            const v = (await held.getPage(n)).getViewport({ scale: 1 });
+            sizes.push([Math.round(v.width), Math.round(v.height)]);
+          }
+          post({ id: job.id, pages: held.numPages, sizes });
+        } else {
+          if (!held) throw new Error("No PDF open");
+          const bytes = await drawOne(held, job.n, job.width);
+          post({ id: job.id, n: job.n, bytes: bytes.buffer }, [bytes.buffer]);
+        }
+      } catch (err) { post({ id: job.id, error: String((err && err.message) || err) }); }
+    });
+    return;
+  }
+  if (job.kind !== "read" || busy) return;
   busy = true;
   try { post(await read(job)); }
   catch (err) { post({ error: String((err && err.message) || err) }); }
   busy = false;
 });
 
-async function read(job) {
+async function load(job) {
   const url = (text, type) => URL.createObjectURL(new Blob([text], { type }));
   const lib = await import(url(job.lib, "text/javascript"));
   lib.GlobalWorkerOptions.workerSrc = url(job.worker, "text/javascript");
-  const doc = await lib.getDocument({
+  return lib.getDocument({
     data: job.bytes,
     isEvalSupported: false,
     disableAutoFetch: true,
@@ -47,6 +70,28 @@ async function read(job) {
     cMapUrl: null,
     verbosity: 0,
   }).promise;
+}
+
+// One page drawn about "width" pixels wide, as JPEG bytes.
+async function drawOne(doc, n, width) {
+  const page = await doc.getPage(n);
+  const first = page.getViewport({ scale: 1 });
+  const scale = Math.min(2, Math.max(0.3, (width || 1000) / first.width));
+  const view = page.getViewport({ scale });
+  const canvas = new OffscreenCanvas(Math.round(view.width), Math.round(view.height));
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // "print" draws in one go: the screen's way waits on animation
+  // frames, which a frame kept out of sight never gets.
+  await page.render({ canvasContext: ctx, viewport: view, intent: "print" }).promise;
+  const blob = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.78 });
+  page.cleanup();
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+async function read(job) {
+  const doc = await load(job);
   const count = Math.min(doc.numPages, job.maxPages || 2000);
   const meta = await doc.getMetadata().catch(() => null);
   const info = (meta && meta.info) || {};
@@ -72,22 +117,19 @@ async function read(job) {
     return out;
   }
   out.images = [];
+  // A scan kept in its file (1.1.0) draws only its first page, for the
+  // card, and gives every page's size, so the reader can keep a place
+  // for each until it's drawn.
+  if (job.sizes) {
+    out.sizes = [];
+    for (let n = 1; n <= count; n++) {
+      const v = (await doc.getPage(n)).getViewport({ scale: 1 });
+      out.sizes.push([Math.round(v.width), Math.round(v.height)]);
+    }
+  }
   const many = Math.min(count, job.maxDraw || 400);
   for (let n = 1; n <= many; n++) {
-    const page = await doc.getPage(n);
-    const first = page.getViewport({ scale: 1 });
-    const scale = Math.min(2, Math.max(0.3, (job.width || 1000) / first.width));
-    const view = page.getViewport({ scale });
-    const canvas = new OffscreenCanvas(Math.round(view.width), Math.round(view.height));
-    const ctx = canvas.getContext("2d");
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    // "print" draws in one go: the screen's way waits on animation
-    // frames, which a frame kept out of sight never gets.
-    await page.render({ canvasContext: ctx, viewport: view, intent: "print" }).promise;
-    const blob = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.78 });
-    out.images.push(new Uint8Array(await blob.arrayBuffer()));
-    page.cleanup();
+    out.images.push(await drawOne(doc, n, job.width));
     post({ progress: n, of: many, stage: "pages" });
   }
   return out;
@@ -189,7 +231,7 @@ post({ ready: true });
   // { title, byline, pages, blocks } or { title, byline, pages, images }.
   // `draw` skips the words and draws the pages, for a scan read from its
   // file each time it's opened.
-  async function read(bytes, onProgress, { draw = false } = {}) {
+  async function read(bytes, onProgress, { draw = false, sizes = false, maxDraw = 0 } = {}) {
     const { lib, worker } = await sources();
     const frame = document.createElement("iframe");
     frame.setAttribute("sandbox", "allow-scripts");
@@ -210,7 +252,7 @@ post({ ready: true });
         function onMessage(e) {
           if (e.source !== frame.contentWindow) return;
           const m = e.data || {};
-          if (m.ready) { frame.contentWindow.postMessage({ kind: "read", draw, lib, worker, bytes: copy.buffer }, "*", [copy.buffer]); return; }
+          if (m.ready) { frame.contentWindow.postMessage({ kind: "read", draw, sizes, maxDraw, lib, worker, bytes: copy.buffer }, "*", [copy.buffer]); return; }
           if (m.progress) { if (onProgress) onProgress(m.progress, m.of, m.stage); return; }
           if (m.error) { done(null, new Error(m.error)); return; }
           done(m);
@@ -223,5 +265,57 @@ post({ ready: true });
     }
   }
 
-  C.pdf = { read, BOOT, CSP };
+  // A PDF kept open in its own sandbox, to draw pages one at a time as
+  // the reader reaches them (1.1.0). Resolves to { pages, sizes, draw(n,
+  // width) → JPEG bytes, close() }.
+  async function open(bytes) {
+    const { lib, worker } = await sources();
+    const frame = document.createElement("iframe");
+    frame.setAttribute("sandbox", "allow-scripts");
+    frame.setAttribute("aria-hidden", "true");
+    frame.style.cssText = "position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;border:0;left:-9999px";
+    frame.srcdoc = '<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="' + CSP + '">'
+      + "<script type=\"module\">" + BOOT + "<\/script>";
+    const waiting = new Map();
+    let ids = 0, closed = false;
+    let ready;
+    const isReady = new Promise((go) => { ready = go; });
+    function onMessage(e) {
+      if (e.source !== frame.contentWindow) return;
+      const m = e.data || {};
+      if (m.ready) { ready(); return; }
+      const w = waiting.get(m.id);
+      if (!w) return;
+      waiting.delete(m.id);
+      if (m.error) w.reject(new Error(m.error)); else w.resolve(m);
+    }
+    const ask = (job, transfer) => new Promise((resolve, reject) => {
+      if (closed) { reject(new Error("closed")); return; }
+      const id = ++ids;
+      waiting.set(id, { resolve, reject });
+      frame.contentWindow.postMessage({ ...job, id }, "*", transfer || []);
+    });
+    const close = () => {
+      if (closed) return;
+      closed = true;
+      removeEventListener("message", onMessage);
+      frame.remove();
+      for (const w of waiting.values()) w.reject(new Error("closed"));
+      waiting.clear();
+    };
+    addEventListener("message", onMessage);
+    document.body.append(frame);
+    try {
+      await isReady;
+      const copy = bytes.slice(0);
+      const got = await ask({ kind: "open", lib, worker, bytes: copy.buffer }, [copy.buffer]);
+      return {
+        pages: got.pages, sizes: got.sizes || [],
+        draw: async (n, width) => new Uint8Array((await ask({ kind: "draw", n, width })).bytes),
+        close,
+      };
+    } catch (e) { close(); throw e; }
+  }
+
+  C.pdf = { read, open, BOOT, CSP };
 })();

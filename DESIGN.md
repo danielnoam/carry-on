@@ -266,6 +266,15 @@ and the page shows above it.
   Reduced motion: it turns without easing.
 - **Storage and backup (Now):** the total in the title size, the page
   count, "Pages by size" (tap one to read it), then Backup.
+- **Watched folder (Now, 1.1.0, Android):** in Storage, after where
+  your library is. Off: one accent row "Watch a folder" and a footnote
+  saying what it does. On: a Folder row with its name on the right,
+  accent rows "Look now" (reads "Looking…" while it looks) and "Pick
+  another folder", and a warn-coloured "Stop watching"; the footnote
+  counts its files and says folders become collections and deleted files
+  leave. What comes in is said in a toast. The empty library on Android
+  also offers a quiet "Get back your library from Documents" after a
+  reinstall.
 - **In a browser (Now, 0.27.12):** the words say "in this browser"
   where the app says "on this phone". Storage adds "This browser": Space
   used ("14 KB of 872 MB") and an accent row "Keep pages from being

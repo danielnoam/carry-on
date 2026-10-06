@@ -24,6 +24,17 @@ asks from Daniel.
 
 ---
 
+## Next: a speed pass (Daniel, 6 Oct 2026)
+
+The whole app feels slow, worse while downloads and sync run: opening
+the library and closing the sidebar lag. A pass over what runs on every
+change: renderLibrary rebuilding and comparing every card, writeIndex
+writing the whole library.json after each saved page, loadThumbs and
+updateWidgets after each one, sync's merge and JSON.stringify of the
+whole library every few seconds, and pictures fetched one page at a time
+on the main thread. Measure first (a big library, a run of 100 chapters
+with sync on), then batch and defer what doesn't need to be immediate.
+
 ## Naming (Daniel, 5 Oct 2026)
 
 Library · Clips (web saves) · Files (imports) · Collections · Feeds ·
@@ -54,30 +65,12 @@ native code.
   Waypage, Documents/Waypage, or a folder you pick; moving between them
   (NOTES.md, 0.33.0).
 
-### Still open on files
+### Still open on files and where Waypage keeps them
 
-- **A watched folder (Daniel, 6 Oct 2026, next release):** pick a folder
-  (say Books) in Settings; each time Waypage opens or the library is
-  refreshed it looks there and brings in any file it hasn't seen, without
-  asking copy-or-outside each time. Android reuses the folder access
-  0.33.0's "a folder you pick" already has; iOS needs the bookmark in
-  the iOS release.
-- **A PDF's own pages:** a scanned PDF is drawn once at about 1000 px and
-  kept as pictures, or, read from where it is, every page is drawn again
-  each time it's opened, which is slow for a long one. Drawing as you
-  reach them, and keeping where you are by page, would suit a long one
-  better.
-- **Sync of a big file's clip:** over 20 MB of pictures a copy keeps them
-  on the device it was opened on. GitHub's contents API takes up to
-  100 MB a file (reads over 1 MB need the blob API), so the cap could go
-  up once it's clear how slow a 100 MB page is to write.
+1.1.0 shipped the watched folder, long PDFs drawn as you reach them,
+sync of a file's pictures up to 100 MB, and the way back to a library in
+Documents/Waypage after a reinstall.
 
-### Still open on where Waypage keeps its files (0.33.0 shipped it)
-
-- **A cleaner reinstall for Documents/Waypage:** Android won't let a
-  reinstalled app read the files its last install made there, so the
-  setting says to pick that folder with the third option. Spotting a
-  library left there at first start would save the reader the trip.
 - **Moving a big library is file by file over the bridge:** fine for
   hundreds of megabytes; a native copy would be quicker for gigabytes.
 

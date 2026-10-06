@@ -3,6 +3,49 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Room under the page (1.1.0).** The line along the bottom (section,
+  minutes left, the read-aloud player) floats over the reader like the
+  top bar, so the page's end sat under it, Next card and all. reader.js
+  now sets --co-bottom on the page from that line's height when the page
+  opens, as it sets --co-top. Not again when the read-aloud player shows:
+  that would change the page's length under the voice.
+- **A collection's place is when it was made (1.1.0).** Under Newest
+  saved a collection sorted by its newest clip, so every chapter landing
+  moved it to the front and a download into several collections shuffled
+  them. It's now its first clip's savedAt; the sidebar and the collection
+  picker go by the one read last, then the newest made.
+- **Saved twice (1.1.0).** Sync's links-only pages wait in state.saving
+  under their synced entry (`s.synced`), not under `s.url` alone, and a
+  chapter list names a chapter by the address it was asked for
+  (`requested`). Save new chapters only checked `s.url`, so it queued
+  chapters sync was already fetching. `savingAs()` checks both, and
+  oneEach() (sync's oneCopyEach on the local library) folds any pair of
+  one address into one at launch and when a run ends. Stop on sync's run
+  sets `linksStopped` for the session: sync hands the same pages back at
+  its next run, so stopping them any other way lasted seconds.
+- **A watched folder (1.1.0).** Android only: FilesPlugin.folderScan walks
+  the tree (8 deep, 5000 files, hidden ones left out) on its own thread.
+  Each file's document URI under the tree is its `link`, readable through
+  the tree's one persisted permission, so a hundred books cost one of
+  Android's 128. Clips from it carry `watched` (the tree). A scan that
+  can't read the folder (`ok` false) removes nothing, so a memory card
+  out doesn't empty the library. Stop watching keeps the clips as plain
+  linked files. No copy-or-outside question: a watched folder is read
+  where it is by definition.
+- **Long PDFs (1.1.0).** A linked scan used to be drawn whole on every
+  open. pdf.js now keeps a document open in its sandbox (C.pdf.open) and
+  draws one page per message; files.drawNear draws what's within 1.5
+  screens and lets go of what's more than 6 away. Each slot has the
+  page's width and height and a blank SVG of that size until drawn, so
+  the page's length and the saved position don't move. Bringing a linked
+  scan in draws only page 1 (for the card) and records every page's size.
+- **Packs (1.1.0).** A file's clip's pictures went up inside its page as
+  data: until 1.1.0, capped at 20 MB so the page stayed far from GitHub's
+  100 MB a file. They now go beside it in pack files of up to 16 MB, the
+  page naming each picture as sync:<pack>:<offset>:<length>:<type>, and
+  library.json keeping each pack's sha for updates and deletes. One write
+  a pack keeps a 300-page comic inside GitHub's limit on writes a minute,
+  which one file a picture would break. The cap is 100 MB.
 - **Carry-on became Waypage (1.0.0).** Everything named carryon,
   Carry-on or CarryOn was renamed: the app ID (io.github.danielnoam.waypage),
   the Java packages and widget resources, the local plugin

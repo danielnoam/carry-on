@@ -6,7 +6,7 @@ html { -webkit-text-size-adjust: 100%; scroll-padding-top: var(--co-top, 0px); -
 body {
   margin: 0 auto;
   max-width: var(--reader-measure, var(--measure));
-  padding: calc(var(--co-top, 0px) + var(--s-5)) var(--reader-pad, 20px) var(--s-7);
+  padding: calc(var(--co-top, 0px) + var(--s-5)) var(--reader-pad, 20px) calc(var(--co-bottom, 0px) + var(--s-7));
   background: var(--bg);
   color: var(--ink);
   font: 400 var(--reader-fs, var(--fs-body))/var(--reader-lh, var(--lh-body)) var(--reader-font, var(--serif));
