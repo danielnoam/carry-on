@@ -31,6 +31,19 @@ asks from Daniel.
   owns that its clips can't carry, still wants collections in a file of
   their own first.
 
+## Read aloud settings (Daniel, 6 Oct 2026)
+
+- **Read footnotes:** a checkbox in Read aloud's settings. Off: the
+  footnote marks ([1], [a]) and the notes themselves are skipped. On:
+  each note is read where its mark is, or at the end of its paragraph.
+  Today reader.js drops bracketed `<sup>` marks for speech
+  (`readable()`, around line 234) and reads any notes list at the
+  bottom as ordinary text.
+- **Skip headers and footers:** a checkbox. On: running heads, page
+  numbers, captions and the clip's own header and credit line aren't
+  read, just the body. Matters most for PDFs, whose page heads 0.32.0
+  already drops, and for sites whose layout leaves a footer behind.
+
 ## Rename to Waypage (Daniel, 5 Oct 2026)
 
 The app becomes **Waypage**, store title "Waypage: Offline Reader": a page
