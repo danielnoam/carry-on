@@ -223,10 +223,15 @@ and the page shows above it.
 - **Contents sheet (Now):** the page's h2s, h3s indented, as rows in a
   group; the part being read in the accent with a 3 px accent rule on its
   start edge. A tap jumps there, just under the bar.
-- **Aa sheet (Now):** rises from the bottom on the sheet spring, the one
-  soft shadow, no scrim. Rows: text size (A, five dots, A), spacing and
-  font as segmented controls, theme as four swatches. Tapping the page or
-  back closes it.
+- **Reader settings sheet (the gear, 0.34.0; "Aa sheet" below means
+  this):** rises from the bottom on the sheet spring, the one soft
+  shadow, no scrim. A segmented control on top picks one part: Layout
+  (show as Scroll | Pages, margins), Text (font and Hebrew font as
+  drop-downs with each name in its face, size, spacing, theme swatches,
+  Reset text) or Read aloud (voice, a speed slider 0.5×–3× with its value
+  under the label, then Read footnotes and Skip headers and footers as
+  switches with a grey line each). The parts share one grid cell, so the
+  sheet keeps one height. Tapping the page or back closes it.
 - **Page sheet (Now):** ⋯ opens it in the Aa sheet's place, in groups
   in the order they're used. Share, Export and Original as three tiles (72 px,
   accent icon over the label). "This page": tags as round chips (accent

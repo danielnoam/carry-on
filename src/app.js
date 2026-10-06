@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.33.0";
+  const APP_VERSION = "0.34.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -886,6 +886,7 @@
       const at = o.options.find((x) => !x.head && x.value === value) || (o.placeholder ? { label: o.placeholder } : o.options[0]);
       const empty = !!o.placeholder && at.label === o.placeholder;
       face.textContent = at.label;
+      face.style.cssText = at.style || "";
       face.classList.toggle("unset", empty);
       btn.setAttribute("aria-label", empty ? o.label : o.label + ": " + at.label);
     };
@@ -908,7 +909,7 @@
         if (x.value === value) check.innerHTML = CHECK;
         return el("button", { class: "dropdown-item", type: "button", role: "option", "aria-selected": String(x.value === value),
           onclick: () => { const changed = x.value !== value; value = x.value; show(); close(true); if (changed) o.onpick(x.value); } },
-          el("span", { class: "dropdown-text", dir: "auto" }, x.label), check);
+          el("span", { class: "dropdown-text", dir: "auto", style: x.style || null }, x.label, x.sample || null), check);
       });
       const items = nodes.filter((x) => x.tagName === "BUTTON");
       menu = el("div", { class: "dropdown-menu", role: "listbox", "aria-label": o.label }, ...nodes);
@@ -1586,7 +1587,10 @@
 
   const speech = C.platform.speech;
   const aloud = { key: "", map: [], state: "stopped", index: -1, arrived: false };
-  const RATES = [0.75, 1, 1.25, 1.5, 2];
+  // Speed is a slider since 0.34.0, from half to three times.
+  const RATE_MIN = 0.5, RATE_MAX = 3;
+  const FOOTNOTES_KEY = "carryon.aloudFootnotes";
+  const EDGES_KEY = "carryon.aloudSkipEdges";
   const PIECE = 600;
 
   // `parts` is [{ text, block }]; a block can be in two parts when the
@@ -1627,7 +1631,7 @@
   async function startAloud(from, spot) {
     const p = state.open;
     if (!p) return;
-    const texts = C.reader.readable();
+    const texts = C.reader.readable({ footnotes: !!load(FOOTNOTES_KEY, false), edges: !!load(EDGES_KEY, false) });
     if (!texts.length) { toast("There's no text in this clip to read aloud."); return; }
     const block = spot ? spot.block : from == null ? C.reader.firstShown() : from;
     const parts = [];
@@ -1778,14 +1782,32 @@
           if (aloud.state !== "stopped" && state.open && aloud.key === state.open.id) startAloud(blockAt(aloud.index));
         } }));
     });
+    const rate = clamp(Number(load(RATE_KEY, 1)) || 1, RATE_MIN, RATE_MAX);
+    const shown = el("span", { class: "rc-value" }, rateText(rate));
+    const speed = el("input", { class: "range", type: "range", min: RATE_MIN, max: RATE_MAX, step: 0.1, value: rate, "aria-label": "Speed",
+      "aria-valuetext": rateText(rate),
+      oninput: (e) => { const v = Number(e.target.value); shown.textContent = rateText(v); e.target.setAttribute("aria-valuetext", rateText(v)); },
+      // Applied when the thumb is let go: a phone's voice restarts its sentence on each change.
+      onchange: (e) => { const v = Number(e.target.value); store(RATE_KEY, v); if (aloud.state !== "stopped") speech.rate(v); } });
+    speed.value = rate;
+    const check = (key, text, note) => {
+      const input = el("input", { class: "switch", type: "checkbox", role: "switch", checked: !!load(key, false),
+        onchange: () => {
+          store(key, input.checked);
+          if (aloud.state !== "stopped" && state.open && aloud.key === state.open.id) startAloud(blockAt(aloud.index));
+        } });
+      return el("label", { class: "rc-row switch-row" },
+        el("span", { class: "choice-text" }, el("span", { class: "rc-label" }, text), el("span", { class: "choice-note" }, note)), input);
+    };
     return el("div", { class: "aloud-controls" },
-      el("h2", { class: "overline" }, "Read aloud"),
       voiceRow,
-      el("div", { class: "rc-row stack" }, el("span", { class: "rc-label" }, "Speed"),
-        seg("aloud-rate", "Speed", RATES.map((r) => ({ value: String(r), label: r + "×" })), String(load(RATE_KEY, 1)),
-          (v) => { store(RATE_KEY, Number(v)); if (aloud.state !== "stopped") speech.rate(Number(v)); })),
+      el("div", { class: "rc-row" }, el("span", { class: "rc-label" }, "Speed", shown),
+        el("div", { class: "stepper" }, speed)),
+      check(FOOTNOTES_KEY, "Read footnotes", "The notes at the end, as part of the clip."),
+      check(EDGES_KEY, "Skip headers and footers", "Just the body: no title, captions or page heads."),
       note);
   }
+  const rateText = (v) => (Math.round(v * 10) / 10) + "×";
 
   // The same controls in the Aa sheet and in Settings. A change is applied
   // at once and every copy on screen follows it in place, so focus stays put.
@@ -1812,30 +1834,38 @@
     const row = (text, control, key) => el("div", { class: "rc-row" }, label(text, key), control);
     const stack = (text, control) => el("div", { class: "rc-row stack" }, label(text), control);
     const nudge = (d) => setReading({ size: clamp(readingPrefs().size + d, SIZE_MIN, SIZE_MAX) });
-    const box = el("div", { class: "reading-controls" },
-      row("Layout", seg(id + "-layout", "Layout", [
+    const part = (name, title, ...rows) => el("div", { class: "rc-part", "data-part": name },
+      el("h2", { class: "overline" }, title), ...rows);
+    // Fonts are drop-downs (0.34.0), each name set in its own face.
+    const fontPick = (pref, label, options) => {
+      const d = dropdown({ label, cls: "field-pick font-pick", options, value: r[pref], onpick: (v) => setReading({ [pref]: v }) });
+      d.dataset.pref = pref;
+      return d;
+    };
+    const layout = part("layout", "Layout",
+      row("Show as", seg(id + "-layout", "Show as", [
         { value: "scroll", label: "Scroll" }, { value: "pages", label: "Pages" },
       ], r.layout, (v) => setReading({ layout: v }))),
+      row("Margins", seg(id + "-margins", "Margins", [
+        { value: "narrow", label: "Narrow" }, { value: "normal", label: "Normal" }, { value: "wide", label: "Wide" },
+      ], r.margins, (v) => setReading({ margins: v }))));
+    const text = part("text", "Text",
+      row("Font", fontPick("font", "Font",
+        FONTS.map((f) => ({ value: f.value, label: f.label, style: "font-family: " + f.family + ", var(--sans)" })))),
+      row("Hebrew", fontPick("hebrew", "Hebrew font",
+        HEBREW.map((f) => ({ value: f.value, label: f.label,
+          sample: f.family ? el("span", { class: "seg-sample", lang: "he", dir: "rtl", style: "font-family: " + f.family, "aria-hidden": "true" }, " עברית") : null })))),
       row("Text size", el("div", { class: "stepper" },
         el("button", { class: "step-btn small", type: "button", "data-step": "-1", "aria-label": "Smaller text", onclick: () => nudge(-1) }, "A"),
         slider("Text size", SIZE_MIN, SIZE_MAX, 1, (v) => setReading({ size: v })),
         el("button", { class: "step-btn large", type: "button", "data-step": "1", "aria-label": "Larger text", onclick: () => nudge(1) }, "A")), "size"),
       row("Spacing", el("div", { class: "stepper" },
         slider("Line spacing", SPACING_MIN, SPACING_MAX, 0.05, (v) => setReading({ spacing: v }))), "spacing"),
-      row("Margins", seg(id + "-margins", "Margins", [
-        { value: "narrow", label: "Narrow" }, { value: "normal", label: "Normal" }, { value: "wide", label: "Wide" },
-      ], r.margins, (v) => setReading({ margins: v }))),
-      stack("Font", seg(id + "-font", "Font",
-        FONTS.map((f) => ({ value: f.value, label: f.label, style: "font-family: " + f.family + ", var(--sans)" })),
-        r.font, (v) => setReading({ font: v }), "scroll fonts")),
-      stack("Hebrew", seg(id + "-hebrew", "Hebrew font",
-        HEBREW.map((f) => ({ value: f.value, label: f.label,
-          sample: f.family ? el("span", { class: "seg-sample", lang: "he", dir: "rtl", style: "font-family: " + f.family, "aria-hidden": "true" }, "עברית") : null })),
-        r.hebrew, (v) => setReading({ hebrew: v }), "scroll hebrew")),
       withTheme ? stack("Theme", seg(id + "-theme", "Theme",
         [{ value: "system", label: "Auto", swatch: autoSwatch(), auto: true }, ...themeOptions(THEMES)],
         state.theme, (v) => { setTheme(v); syncThemeInputs(); }, "themes scroll")) : null,
-      el("button", { class: "btn-quiet reset", type: "button", onclick: () => setReading({ ...READING_DEFAULT, layout: readingPrefs().layout }) }, "Reset text"));
+      el("button", { class: "btn-quiet reset", type: "button", onclick: () => setReading({ ...READING_DEFAULT, layout: readingPrefs().layout, margins: readingPrefs().margins }) }, "Reset text"));
+    const box = el("div", { class: "reading-controls" }, layout, text);
     syncReadingControls(box);
     requestAnimationFrame(() => box.querySelectorAll(".seg.scroll").forEach(showPicked));
     return box;
@@ -1858,11 +1888,12 @@
     box.querySelector('[data-value="spacing"]').textContent = r.spacing.toFixed(2);
     box.querySelector('[data-step="-1"]').disabled = r.size <= SIZE_MIN;
     box.querySelector('[data-step="1"]').disabled = r.size >= SIZE_MAX;
-    for (const k of ["layout", "margins", "font", "hebrew"]) {
+    for (const k of ["layout", "margins"]) {
       box.querySelectorAll('input[name$="-' + k + '"]').forEach((i) => { i.checked = i.value === r[k]; });
     }
+    box.querySelectorAll(".font-pick").forEach((d) => d.set(r[d.dataset.pref]));
     // Reset text leaves the layout as it is.
-    const dflt = Object.keys(READING_DEFAULT).every((k) => k === "layout" || r[k] === READING_DEFAULT[k]);
+    const dflt = Object.keys(READING_DEFAULT).every((k) => k === "layout" || k === "margins" || r[k] === READING_DEFAULT[k]);
     box.querySelector(".reset").disabled = dflt;
   }
 
@@ -1871,16 +1902,39 @@
     document.querySelectorAll('input[name$="-theme"], input[name="' + THEME_KEY + '"]').forEach((i) => { i.checked = i.value === state.theme; });
   }
 
+  // The reader's settings (0.34.0): Layout, Text and Read aloud, one at a
+  // time behind tabs, the last one opened coming back.
+  const SHEET_TAB_KEY = "carryon.sheetTab";
+  function readerSettings() {
+    const box = readingControls(true);
+    const parts = [...box.querySelectorAll(".rc-part")];
+    if (speech.available) {
+      const a = aloudControls();
+      a.classList.add("rc-part");
+      a.dataset.part = "aloud";
+      a.prepend(el("h2", { class: "overline" }, "Read aloud"));
+      box.append(a);
+      parts.push(a);
+    }
+    const names = { layout: "Layout", text: "Text", aloud: "Read aloud" };
+    let tab = load(SHEET_TAB_KEY, "text");
+    if (!parts.some((x) => x.dataset.part === tab)) tab = "text";
+    const show = (v) => {
+      tab = v;
+      store(SHEET_TAB_KEY, v);
+      for (const x of parts) x.hidden = x.dataset.part !== v;
+    };
+    const tabs = seg("sheet-tab", "Settings", parts.map((x) => ({ value: x.dataset.part, label: names[x.dataset.part] })), tab, show, "sheet-tabs");
+    show(tab);
+    return el("div", { class: "reader-settings" }, tabs, box);
+  }
+
   // ---- The reader's sheets ----
   // "reading" (Aa) and "page" (tags, delete) share one sheet. Each is a
   // history entry of its own, so Android's back closes it before the page.
 
   const SHEETS = {
-    reading: { button: "readerAa", label: "Text and theme", build: () => {
-      const box = readingControls(true);
-      if (speech.available) box.insertBefore(aloudControls(), box.querySelector(".reset"));
-      return box;
-    } },
+    reading: { button: "readerAa", label: "Reader settings", build: readerSettings },
     page: { button: "readerMore", label: "This clip", build: () => state.open.preview ? previewSheet(state.open) : pageSheet(state.open, "reader") },
     contents: { button: "readerContents", label: "Contents", build: contentsList },
   };
@@ -5094,9 +5148,20 @@
       hint.classList.add("busy");
       const picked = state.feed && feeds.find((f) => f.url === state.feed);
       const done = () => { hint.classList.remove("busy"); set(0, true); };
-      if (state.place === "feeds") { checkNow(picked || null).finally(done); return; }
-      checkChapters().finally(done);
+      // A pull also looks for a newer Carry-on (0.34.0); the bar says so.
+      const app = checkForNewerApp().catch(() => {});
+      if (state.place === "feeds") { Promise.all([checkNow(picked || null), app]).finally(done); return; }
+      pullChapters(app).finally(done);
     }, { passive: true });
+  }
+
+  async function pullChapters(app) {
+    if (navigator.onLine && !allFolders().some((n) => isSeries(folderPages(n)))) {
+      await app;
+      toast(updateOut() ? "Carry-on " + upd.latest + " is out." : "Nothing new.");
+      return;
+    }
+    await Promise.all([checkChapters(), app]);
   }
 
   async function checkChapters() {
@@ -5313,7 +5378,7 @@
       el("div", { class: "group" },
         el("p", { class: "reading-sample" }, "The page is the product. Everything else gets out of its way."),
         readingControls(false)),
-      el("p", { class: "footnote" }, "The same as Aa while you read."));
+      el("p", { class: "footnote" }, "The same as the reader's settings, behind the gear while you read."));
   }
 
   function libraryGroup() {
