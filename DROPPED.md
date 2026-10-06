@@ -21,3 +21,7 @@ stops being true.
   other people for a GitHub token is a non-starter. v1 is per device with
   export and import. *Revived 2 Oct 2026:* Daniel wants it for his own
   devices; it's in TODO.md under Sync, with the image question open.
+- **Exporting a clip that reads from a file (Daniel, 6 Oct 2026).** Its
+  pictures stay in the original file, so an export would need them pulled
+  back out; the original is already on the device and can be shared as
+  it is. Export stays hidden on those clips.
