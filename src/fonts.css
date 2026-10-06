@@ -1,4 +1,4 @@
-/* Carry-on: the bundled fonts, shared by the app (styles.css) and the
+/* Waypage: the bundled fonts, shared by the app (styles.css) and the
    reader's sandboxed page (reader.css). Latin subsets, and Hebrew-only
    subsets of the Hebrew faces, so a Hebrew page takes its letters from
    the Hebrew face after the chosen one; other scripts fall back to the

@@ -1,7 +1,7 @@
 {
-  "name": "carry-on",
+  "name": "waypage",
   "private": true,
-  "description": "Carry-on's native builds. The web app itself has no build step and doesn't depend on anything here.",
+  "description": "Waypage's native builds. The web app itself has no build step and doesn't depend on anything here.",
   "scripts": {
     "build:www": "node tools/build-www.js",
     "android:sync": "node tools/build-www.js && npx cap sync android",
@@ -18,6 +18,6 @@
     "@capacitor/ios": "8.5.2",
     "@capacitor/share": "8.0.2",
     "@capawesome-team/capacitor-file-opener": "8.0.5",
-    "carryon-share": "file:native/share"
+    "waypage-share": "file:native/share"
   }
 }

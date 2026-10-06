@@ -1,4 +1,4 @@
-# Carry-on design language
+# Waypage design language
 
 A quiet reading app: the page is the product and the chrome gets out of
 its way. Apple's Human Interface Guidelines are the rulebook (minimal
@@ -7,6 +7,12 @@ and never blocks input. Every rule here is **Now** (in the code) or
 **Target** (agreed, not built yet). The design canvas the values came
 from: https://claude.ai/artifact/5zi1VCs3WcLSTLJCw7iasC, with its
 artboards copied into `design/`.
+
+**The icon (1.0.0):** "Open road", an open book in Paper and `--line`
+whose gutter is a road (a darker blue, Paper dashes) running to a yellow
+sun, on an `--accent` blue tile. `icon.svg` is the source; icons/ and
+assets/ are rendered from it. On Android the glyph sits inside the
+adaptive icon's middle 66%.
 
 ## 1. Color (Now, `src/styles.css`)
 
@@ -175,8 +181,8 @@ and the page shows above it.
   meta size, 600, spaced a little (0.31.0), and its site line names the
   kind.
 - **Where your library is (0.33.0):** a radio group in Storage and
-  backup, under the sizes: "Inside Carry-on" (marked Recommended in its
-  note), "Documents/Carry-on", "A folder you pick" (its name once
+  backup, under the sizes: "Inside Waypage" (marked Recommended in its
+  note), "Documents/Waypage", "A folder you pick" (its name once
   picked). Each note says what it costs. While moving, the footnote is
   the progress ("Moving, 12 of 80 files…") and the radios are disabled.
 - **Opening a file (0.32.0, every kind since 0.32.2):** a file asks first, as a
@@ -250,7 +256,7 @@ and the page shows above it.
 - **Settings (Now):** a menu of three groups: Appearance and Saving (the
   current choice on the right), Storage and backup (the total), Updates
   and About (the version). Each row ends with a chevron and pushes its
-  own screen. A new version adds an accent-bordered "Carry-on 0.20.0 is
+  own screen. A new version adds an accent-bordered "Waypage 0.20.0 is
   out" card with View above the groups. At 900 px and wider the menu
   stays on the left (360 px) and the section fills the rest.
 - **Storage by collection (Now):** under "By collection", one row a collection,
@@ -265,7 +271,7 @@ and the page shows above it.
   used ("14 KB of 872 MB") and an accent row "Keep pages from being
   cleared" (or "Kept" once the browser agrees), with a footnote that
   clearing site data deletes the pages. About starts with an accent row
-  "Install Carry-on" while the browser offers it, or on an iPhone a
+  "Install Waypage" while the browser offers it, or on an iPhone a
   footnote: "tap Share, then Add to Home Screen". The empty library says
   what a browser can do, with a quiet "Open a backup" that goes to
   Storage.
@@ -454,10 +460,10 @@ and the page shows above it.
   ring like every control's; the whole row is the target. Reduced motion: the knob
   moves without sliding.
 - **Updates (Now):** a Settings screen: "This version", a status row
-  (spinner while checking or downloading; "Carry-on 0.12.0 is out" in the
+  (spinner while checking or downloading; "Waypage 0.12.0 is out" in the
   accent with Update / 42% / Install, or Get it on iOS), what's in it as
   the release's headed lists, Check for updates, and What's new. The
-  library's bar says "Carry-on 0.12.0 is out" with View, or "Updated to
+  library's bar says "Waypage 0.12.0 is out" with View, or "Updated to
   0.11.0" with What's new, and an × to put it away.
 - **What's new (Now):** a pushed screen; each version a serif heading
   with its date, "You have this" by the installed one, then its Added /
@@ -486,7 +492,7 @@ and the page shows above it.
   start of the library's bar opens a 300 px panel (at most 85 % of the
   screen) from the start edge over `--scrim`, sliding on the sheet spring
   (reduced motion: a fade), in its own history entry, so Back and Escape
-  close it. "Carry-on" in the serif, then Library (its page count, muted)
+  close it. "Waypage" in the serif, then Library (its page count, muted)
   with the three collections touched last under it (a 24 × 32 cover,
   new chapters in `--accent`), a hairline, then Feeds (a pill in
   `--accent` with what's new since Feeds was last open) with the three
@@ -531,7 +537,7 @@ and the page shows above it.
   a post reads the saved copy, or shows the post in the reader without
   saving it (0.28.1), whose ⋯ offers Save and Browser.
 - **Add a feed (Now, 0.28.0):** the library's sheet: a 48 px field ("A
-  site's address is enough: Carry-on finds its feed."), Find its feed,
+  site's address is enough: Waypage finds its feed."), Find its feed,
   then the found feed as a card (mark, name, "About 2 posts a day · last
   one 2 h ago"), New posts as a segmented Show them / Save them with a
   note naming the collection, and Follow. Errors replace the help line in
@@ -562,12 +568,12 @@ and the page shows above it.
   its value On, Off or Stopped. Off: "Sync with GitHub" and a section
   lead, then one group of three numbered steps, each number a 24 px
   `--accent` ring: 1 "Make a free GitHub account" (github.com/signup),
-  2 "Make a token for Carry-on" (GitHub's form filled in), both rows
+  2 "Make a token for Waypage" (GitHub's form filled in), both rows
   with ↗; 3 "Paste it here" holding the 48 px field and a full-width
   Connect, errors under them in `--warn`. Then "Already syncing on
   another device?" with "Scan its setup code" where the app has the
   scanner, and a footnote. On: a group with the account
-  (dan/carryon-data) over "Synced 2 min ago" (or the error in `--warn`),
+  (dan/waypage-data) over "Synced 2 min ago" (or the error in `--warn`),
   Sync now in `--accent`, Stop syncing in `--warn`; then "Add another
   device": the setup code, 200 px, black on `--code-paper` (white in
   every theme, since scanners need it), over "Copy setup link", and a
@@ -579,7 +585,7 @@ and the page shows above it.
   after Finished; empty: "No favourites yet. Hold a page and tap
   Favourite." The Favourites widget is Keep reading's card with
   "Favourites" over up to four rows (title in serif on one line, "site ·
-  6 min left"), each row at least 44 dp; empty: "Hold a page in Carry-on
+  6 min left"), each row at least 44 dp; empty: "Hold a page in Waypage
   and tap Favourite, and it shows here." Favourite collections come
   first (0.35.0), "Collection · 2 of 9 read" under the name.
 - **Collection widget (0.35.0, Android):** the Favourites card with the

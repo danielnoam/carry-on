@@ -2,6 +2,19 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.0.0] - 2026-10-06
+
+### Changed
+- Carry-on is now Waypage, with a new icon: an open book whose middle is
+  a road. It's a new app, so it starts empty: send your library from
+  Carry-on (Settings, Updates, "Send your library to Waypage"), or turn
+  sync on with the same GitHub account. Then you can remove Carry-on.
+- Sync keeps your library in a repo called waypage-data. Your
+  carryon-data repo is renamed to it when you connect, with everything in
+  it.
+- The web version moved to danielnoam.github.io/waypage, and keeps the
+  library and settings it had.
+
 ## [0.36.0] - 2026-10-06
 
 ### Added

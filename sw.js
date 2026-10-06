@@ -1,4 +1,4 @@
-// Carry-on service worker, for the web copy: makes it installable and
+// Waypage service worker, for the web copy: makes it installable and
 // usable offline. The app has none; its files are already on the phone.
 //
 // Stale-while-revalidate for this app's own files, as LifeLog's sw.js: a
@@ -7,7 +7,7 @@
 // release's changed files new URLs. Third-party requests are never touched.
 //
 // ASSETS is also exactly what tools/build-www.js copies into the app.
-const CACHE = "carryon-v73";
+const CACHE = "waypage-v1";
 const ASSETS = [
   "./", "./index.html",
   "./src/fonts.css", "./src/styles.css", "./src/reader.css",

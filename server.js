@@ -1,4 +1,4 @@
-// Tiny zero-dependency static file server for Carry-on.
+// Tiny zero-dependency static file server for Waypage.
 // Run with `node server.js` (or double-click start.cmd) then open http://localhost:5173
 const http = require("http");
 const fs = require("fs");
@@ -41,5 +41,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`\n  Carry-on running →  http://localhost:${PORT}\n`);
+  console.log(`\n  Waypage running →  http://localhost:${PORT}\n`);
 });

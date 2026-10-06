@@ -24,69 +24,23 @@ asks from Daniel.
 
 ---
 
-## Rename to Waypage (Daniel, 5 Oct 2026)
+## After the rename (Waypage 1.0.0, 6 Oct 2026)
 
-The app becomes **Waypage**, store title "Waypage: Offline Reader": a page
-for the way, keeping Carry-on's sense of reading on the go without tying
-the name to planes. Offprint was dropped: "Offprint: Web to PDF & EPUB"
-is already on the App Store. Web searches found no reading app called
-Waypage; waypage.com is a landing-page builder, so the domain is
-taken and the store listing should lean on "Offline Reader". Before this
-release, search Waypage in the Play Store and the App Store by hand.
+Carry-on became Waypage in 1.0.0: new app ID, repo danielnoam/waypage,
+Waypage.apk and .ipa, waypage.* keys, waypage-data for sync, the Open
+road icon (NOTES.md has what kept its old name and why). Left to do:
 
-**Everything is renamed (Daniel, 5 Oct 2026),** not only what's shown.
-This replaces the earlier "display name only" plan. Daniel gave the go
-on 6 Oct 2026, with a new icon too; the keystore he swaps later (Waypage
-can keep the current key until then, since its app ID is new anyway).
-
-What gets the new name, and what each one breaks:
-
-- **App ID** `io.github.danielnoam.carryon` → `io.github.danielnoam.waypage`
-  (capacitor.config.json, the Java packages in native/, widgets, share
-  target, notification channels). Android and iOS treat a new ID as a
-  different app: it installs beside Carry-on, starts with an empty
-  library, and Carry-on's updater can't install over it. The library has
-  to be carried across (sync, or a backup file).
-- **Signing key alias** `carryon` → `waypage`, with secrets Daniel adds.
-  Harmless only because the app ID changes too: an existing install can
-  never take an update signed with a different key.
-- **iOS bundle ID and name:** a new app in AltStore/SideStore as well.
-- **GitHub repo** danielnoam/carry-on → danielnoam/waypage. GitHub
-  redirects the API and release downloads, so installed copies' updater
-  keeps working, as long as no new repo takes the old name. GitHub Pages
-  does not redirect: the web copy moves from /carry-on/ to /waypage/, and
-  setup links and QR codes made before point at the old address.
-- **The APK** `CarryOn.apk` → `Waypage.apk` (and the IPA). Installed
-  Carry-on looks for `CarryOn.apk`; after the bridge release it looks for
-  Waypage instead.
-- **Storage keys** `carryon.*` → `waypage.*`, and the IndexedDB name. The
-  app starts empty anyway (new ID), but the web copy at /waypage/ shares
-  danielnoam.github.io's storage with /carry-on/: it copies the old keys
-  over once, then uses only the new ones.
-- **The sync repo** `carryon-data` → `waypage-data`. Waypage looks for
-  waypage-data, then carryon-data, and renames it (GitHub redirects the
-  old name for Carry-on copies still syncing).
-- **Text:** every "Carry-on" in the app, the User-Agent and Wikipedia
-  `Api-User-Agent`, manifest.json, `<title>`, release titles, README,
-  DESIGN.md, CLAUDE.md, NOTES.md, the skills, the store title "Waypage:
-  Offline Reader".
-- **The Claude project** and its memory, renamed by Daniel in the app.
-
-A safe order:
-
-1. **Done in 0.36.0: bridge release, the last Carry-on.** Its updater learns the new
-   repo, the `Waypage.apk` name and the new app ID. When Waypage is out it
-   says so: "Carry-on is now Waypage. Install it, then bring your
-   library", and makes a backup file (or relies on sync when it's on).
-2. **Rename the repo** to danielnoam/waypage; check that the old API and
-   release URLs redirect and that the web copy is up at /waypage/.
-3. **Waypage 1.0:** new app ID, key alias, bundle ID, file names, storage
-   keys with the web copy's one-time copy, sync repo lookup, all text.
-   Releases publish `Waypage.apk` and the IPA.
-4. **On Daniel's phones:** install Waypage beside Carry-on, bring the
-   library over by sync or backup, check pictures, positions and feeds,
-   then uninstall Carry-on.
-5. **Store listings** and the Claude project name last, once it all runs.
+- **Daniel's phones:** install Waypage beside Carry-on (0.36.0 offers
+  it), bring the library over by sync or "Send your library to
+  Waypage", check pictures, positions and feeds, then remove Carry-on.
+  Re-add the home screen widgets.
+- **The signing key (Daniel, later):** a new keystore under an alias of
+  his choice, set as ANDROID_KEYSTORE_B64 and ANDROID_KEYSTORE_PASSWORD,
+  and the alias in tools/sign-apk.sh. Do it before installing Waypage on
+  more devices: each install only takes updates signed with the key it
+  was installed with.
+- **Store listings and this Claude project's name,** last, once it runs.
+  Search Waypage in the Play Store and the App Store by hand first.
 
 ## Naming (Daniel, 5 Oct 2026)
 
@@ -95,7 +49,7 @@ Tags. 0.30.7 renamed "pages" to "clips" in everything shown; storage
 keys, file paths and sync keep "page". The files release names imported
 documents Files. With Waypage, the set stays.
 
-## Files: your own files, and where Carry-on keeps everything (Daniel, 6 Oct 2026)
+## Files: your own files, and where Waypage keeps everything (Daniel, 6 Oct 2026)
 
 Decided: PDFs through pdf.js, locked down; three places for files, the
 app's private storage the default and recommended. "Files" is the name
@@ -115,7 +69,7 @@ native code.
 - **0.32.1, 0.32.2:** PDFs really read from where they are; every kind of
   file asks.
 - **0.33.0:** where your library is, in Settings under Storage: inside
-  Carry-on, Documents/Carry-on, or a folder you pick; moving between them
+  Waypage, Documents/Waypage, or a folder you pick; moving between them
   (NOTES.md, 0.33.0).
 
 ### Still open on files
@@ -139,11 +93,11 @@ native code.
   100 MB a file (reads over 1 MB need the blob API), so the cap could go
   up once it's clear how slow a 100 MB page is to write.
 
-### Still open on where Carry-on keeps its files (0.33.0 shipped it)
+### Still open on where Waypage keeps its files (0.33.0 shipped it)
 
 - **iOS: a folder you pick,** kept as a security-scoped bookmark. 0.33.0
   only shows the app's own storage in the Files app (On My iPhone).
-- **A cleaner reinstall for Documents/Carry-on:** Android won't let a
+- **A cleaner reinstall for Documents/Waypage:** Android won't let a
   reinstalled app read the files its last install made there, so the
   setting says to pick that folder with the third option. Spotting a
   library left there at first start would save the reader the trip.
@@ -159,7 +113,7 @@ AltStore or SideStore gets 3 app IDs and re-signs every 7 days. Decide
 on the program first; this release comes after.
 
 - **Share extension,** with Safari's JavaScript preprocessing file, which
-  is also iOS's only route to script-built pages. Puts Carry-on in the
+  is also iOS's only route to script-built pages. Puts Waypage in the
   share sheet, as Android has since 0.3.0.
 - **Widgets (WidgetKit):** Keep reading, Feeds and Favourites, as on
   Android since 0.29.0 and 0.29.2.

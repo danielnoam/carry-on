@@ -20,68 +20,68 @@
     </queries>
     <application>
         <service
-            android:name="io.github.danielnoam.carryon.share.SpeechService"
+            android:name="io.github.danielnoam.waypage.share.SpeechService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
         <service
-            android:name="io.github.danielnoam.carryon.share.DownloadService"
+            android:name="io.github.danielnoam.waypage.share.DownloadService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
         <service
-            android:name="io.github.danielnoam.carryon.share.FeedCheckJob"
+            android:name="io.github.danielnoam.waypage.share.FeedCheckJob"
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />
         <!-- Home screen widgets (0.29.0). -->
         <receiver
-            android:name="io.github.danielnoam.carryon.share.ReadingWidget"
+            android:name="io.github.danielnoam.waypage.share.ReadingWidget"
             android:exported="false"
-            android:label="@string/carryon_w_reading">
+            android:label="@string/waypage_w_reading">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/carryon_widget_reading_info" />
+                android:resource="@xml/waypage_widget_reading_info" />
         </receiver>
         <receiver
-            android:name="io.github.danielnoam.carryon.share.FeedsWidget"
+            android:name="io.github.danielnoam.waypage.share.FeedsWidget"
             android:exported="false"
-            android:label="@string/carryon_w_feeds">
+            android:label="@string/waypage_w_feeds">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/carryon_widget_feeds_info" />
+                android:resource="@xml/waypage_widget_feeds_info" />
         </receiver>
         <receiver
-            android:name="io.github.danielnoam.carryon.share.FavouritesWidget"
+            android:name="io.github.danielnoam.waypage.share.FavouritesWidget"
             android:exported="false"
-            android:label="@string/carryon_w_favourites">
+            android:label="@string/waypage_w_favourites">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/carryon_widget_favourites_info" />
+                android:resource="@xml/waypage_widget_favourites_info" />
         </receiver>
         <!-- One collection (0.35.0), picked when the widget is placed. -->
         <receiver
-            android:name="io.github.danielnoam.carryon.share.CollectionWidget"
+            android:name="io.github.danielnoam.waypage.share.CollectionWidget"
             android:exported="false"
-            android:label="@string/carryon_w_collection">
+            android:label="@string/waypage_w_collection">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/carryon_widget_collection_info" />
+                android:resource="@xml/waypage_widget_collection_info" />
         </receiver>
         <activity
-            android:name="io.github.danielnoam.carryon.share.CollectionPickActivity"
+            android:name="io.github.danielnoam.waypage.share.CollectionPickActivity"
             android:exported="true"
             android:excludeFromRecents="true"
-            android:theme="@style/CarryOnPick">
+            android:theme="@style/WaypagePick">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>

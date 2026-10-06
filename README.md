@@ -1,4 +1,4 @@
-# Carry-on
+# Waypage
 
 Save a web page to your phone and read it with no connection: on a plane,
 in a tunnel, anywhere. Text is kept whole, images keep a small preview
@@ -22,9 +22,9 @@ Sharing to the app from other apps is next (see TODO.md).
 - **Android:** `.github/workflows/android.yml` builds an APK on every push
   and publishes a release `app-v<version>` when `APP_VERSION` is new and
   the signing secrets are set (`ANDROID_KEYSTORE_B64`,
-  `ANDROID_KEYSTORE_PASSWORD`, key alias `carryon`). Without them it still
+  `ANDROID_KEYSTORE_PASSWORD`, key alias `carryon`, kept from before the rename). Without them it still
   builds a test APK but publishes nothing.
-- **iOS:** `.github/workflows/ios.yml` builds an unsigned `CarryOn.ipa`
+- **iOS:** `.github/workflows/ios.yml` builds an unsigned `Waypage.ipa`
   on a Mac runner and attaches it to the same release. Install it with
   AltStore or SideStore; shipping to other people needs Apple's developer
   programme.

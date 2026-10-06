@@ -3,9 +3,9 @@
 // are the Markdown and plain-text rules.
 const assert = require("assert");
 
-global.window = { CarryOn: { platform: {} } };
+global.window = { Waypage: { platform: {} } };
 require("../src/files.js");
-const F = window.CarryOn.files;
+const F = window.Waypage.files;
 
 let passed = 0;
 function test(name, fn) {

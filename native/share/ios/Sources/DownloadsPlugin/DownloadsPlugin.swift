@@ -21,7 +21,7 @@ public class DownloadsPlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func update(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
             if self.task == .invalid {
-                self.task = UIApplication.shared.beginBackgroundTask(withName: "Carry-on downloads") { self.end() }
+                self.task = UIApplication.shared.beginBackgroundTask(withName: "Waypage downloads") { self.end() }
             }
             call.resolve()
         }

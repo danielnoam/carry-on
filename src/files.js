@@ -1,4 +1,4 @@
-// Carry-on: your own files (0.31.0, rebuilt in 0.32.0). An EPUB, a
+// Waypage: your own files (0.31.0, rebuilt in 0.32.0). An EPUB, a
 // Markdown or text file, an HTML page, a CBZ comic or a PDF opened from
 // the phone becomes a clip: its words rebuilt through save.cleanSaved's
 // allowlist (a file is as untrusted as a web page) and read in the same
@@ -13,7 +13,7 @@
 // (0.32.2): for a note or a page the words are kept either way, and the
 // choice is where it lives, Clips or Files, and whether it syncs.
 (function () {
-  const C = window.CarryOn;
+  const C = window.Waypage;
   const S = () => C.store;
   const B = () => C.backup;
 
@@ -43,7 +43,7 @@
       add(bytes, at) {
         const type = B().imageType(bytes);
         if (!MIME_EXT[type]) return null;
-        const token = "data:" + type + ";base64," + btoa("carryon-" + waiting.size);
+        const token = "data:" + type + ";base64," + btoa("waypage-" + waiting.size);
         waiting.set(token, { bytes, type, at });
         return token;
       },
@@ -52,7 +52,7 @@
   }
 
   // What a file is, from its name and first bytes: one of KINDS, "backup"
-  // (a Carry-on backup zip), "clip" (a clip sent as a file), "pdf", "zip"
+  // (a Waypage backup zip), "clip" (a clip sent as a file), "pdf", "zip"
   // (any other zip, or a broken one), or null.
   async function kindOf(file) {
     const head = new Uint8Array(await file.slice(0, 1024).arrayBuffer());
@@ -68,7 +68,7 @@
     }
     if (ext === "html" || /^\s*<(!doctype|html|head|body|meta)/i.test(decode(head))) {
       const text = await file.text();
-      return /<meta\s+name="carry-on-page"/i.test(text) ? "clip" : "html";
+      return /<meta\s+name="(waypage|carry-on)-page"/i.test(text) ? "clip" : "html";
     }
     if (ext === "md" || ext === "txt") return ext;
     if (/^text\//.test(file.type || "")) return "txt";
@@ -109,7 +109,7 @@
     const spine = [...opf.getElementsByTagNameNS("*", "itemref")]
       .map((r) => manifest.get(r.getAttribute("idref")))
       .filter((it) => it && /html/.test(it.type) && entries.has(it.path));
-    if (!spine.length) throw new FileError("This EPUB has no chapters Carry-on can read.");
+    if (!spine.length) throw new FileError("This EPUB has no chapters Waypage can read.");
     const chapterOf = new Map(spine.map((it, i) => [it.path, i]));
     const pics = pictures();
     const picAt = new Map();
@@ -320,7 +320,7 @@
       got = await C.pdf.read(bytes, (done, total, stage) => onProgress && onProgress(done, total, stage === "pages" ? "pictures" : "words"));
     } catch (e) {
       throw new FileError(/password|encrypt/i.test(String(e.message)) ? "This PDF is locked with a password."
-        : "Carry-on couldn't read this PDF. It may be damaged.");
+        : "Waypage couldn't read this PDF. It may be damaged.");
     }
     const root = out.createElement("div");
     root.className = "co-body";
@@ -360,13 +360,13 @@
     try {
       blob = await C.platform.files.blob(meta.link, meta.file.size);
     } catch (e) {
-      throw new FileError("Carry-on can't find " + meta.file.name + " any more. It may have been moved or deleted.");
+      throw new FileError("Waypage can't find " + meta.file.name + " any more. It may have been moved or deleted.");
     }
     for (const url of lastUrls) URL.revokeObjectURL(url);
     lastUrls = [];
     if (meta.file.kind === "pdf") return fillPdf(doc, slots, blob, meta);
     const entries = await B().zipEntries(blob).catch(() => null);
-    if (!entries) throw new FileError("Carry-on can't read " + meta.file.name + " any more.");
+    if (!entries) throw new FileError("Waypage can't read " + meta.file.name + " any more.");
     for (const img of slots) {
       const e = entries.get(img.getAttribute("data-in"));
       if (!e) { img.className = "co-missing"; continue; }
@@ -388,7 +388,7 @@
     try {
       got = await C.pdf.read(new Uint8Array(await blob.arrayBuffer()), null, { draw: true });
     } catch (e) {
-      throw new FileError("Carry-on can't read " + meta.file.name + " any more.");
+      throw new FileError("Waypage can't read " + meta.file.name + " any more.");
     }
     const images = got.images || [];
     for (const img of slots) {
@@ -478,7 +478,7 @@
         else p.img.remove();
         if (onProgress) onProgress(i + 1, got.panels.length, "pictures");
       }
-      if (!pics.n) throw new FileError("There are no pictures in this comic Carry-on can show.");
+      if (!pics.n) throw new FileError("There are no pictures in this comic Waypage can show.");
       return { root: got.root, title: got.title };
     }
     let got;
@@ -522,7 +522,7 @@
   // it; its pictures then stay in the file. Resolves to the clip's index
   // entry, or { already } when `has(name, size)` says it's here.
   async function bring(file, kind, { has, onProgress, link = null } = {}) {
-    if (!KINDS[kind]) throw new FileError("Carry-on can't open this kind of file.");
+    if (!KINDS[kind]) throw new FileError("Waypage can't open this kind of file.");
     if (has && has(file.name, file.size)) return { already: true };
     const id = C.save.newId();
     const out = document.implementation.createHTMLDocument("");
@@ -534,7 +534,7 @@
     } catch (e) {
       await S().removePage(id);
       if (!(e instanceof FileError)) console.error(e);
-      throw e instanceof FileError ? e : new FileError("Carry-on couldn't read this " + KINDS[kind] + " file. It may be damaged.");
+      throw e instanceof FileError ? e : new FileError("Waypage couldn't read this " + KINDS[kind] + " file. It may be damaged.");
     }
     const { root } = got;
     const words = root.textContent;

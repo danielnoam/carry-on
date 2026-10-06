@@ -19,7 +19,7 @@ function test(name, fn) {
   catch (e) { console.error("  FAIL - " + name); console.error("    " + e.message); process.exitCode = 1; }
 }
 
-const out = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "carryon-www-")), "www");
+const out = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "waypage-www-")), "www");
 build(out);
 
 test("every file index.html loads is in the bundle", () => {
@@ -77,7 +77,7 @@ test("versionCode goes up with every version", () => {
 
 test("the manifest gains the updater's permission and the share target, once", () => {
   const xml = '<?xml version="1.0" encoding="utf-8"?>\n<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n' +
-    '    <application android:label="Carry-on">\n' +
+    '    <application android:label="Waypage">\n' +
     '        <activity\n            android:name=".MainActivity"\n            android:launchMode="singleTask"\n            android:exported="true">\n' +
     '            <intent-filter>\n                <action android:name="android.intent.action.MAIN" />\n            </intent-filter>\n' +
     '        </activity>\n    </application>\n</manifest>\n';
@@ -92,12 +92,12 @@ test("the manifest gains the updater's permission and the share target, once", (
 
 test("the share target plugin is a local Capacitor plugin the app depends on", () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
-  assert.strictEqual(pkg.devDependencies["carryon-share"], "file:native/share");
+  assert.strictEqual(pkg.devDependencies["waypage-share"], "file:native/share");
   const plugin = JSON.parse(fs.readFileSync(path.join(ROOT, "native", "share", "package.json"), "utf8"));
   assert.strictEqual(plugin.capacitor.android.src, "android");
-  const java = fs.readFileSync(path.join(ROOT, "native", "share", "android", "src", "main", "java", "io", "github", "danielnoam", "carryon", "share", "ShareTargetPlugin.java"), "utf8");
+  const java = fs.readFileSync(path.join(ROOT, "native", "share", "android", "src", "main", "java", "io", "github", "danielnoam", "waypage", "share", "ShareTargetPlugin.java"), "utf8");
   assert.ok(/@CapacitorPlugin\(name = "ShareTarget"\)/.test(java));
-  const files = fs.readFileSync(path.join(ROOT, "native", "share", "android", "src", "main", "java", "io", "github", "danielnoam", "carryon", "share", "FilesPlugin.java"), "utf8");
+  const files = fs.readFileSync(path.join(ROOT, "native", "share", "android", "src", "main", "java", "io", "github", "danielnoam", "waypage", "share", "FilesPlugin.java"), "utf8");
   assert.ok(/@CapacitorPlugin\(name = "Files"\)/.test(files));
   // The lasting permission is the whole point of the system's picker.
   assert.ok(/takePersistableUriPermission/.test(files));
@@ -113,9 +113,9 @@ test("android.yml patches the manifest and the updater's plugin is installed", (
 test("the updater downloads the asset the workflow publishes", () => {
   const yml = fs.readFileSync(path.join(ROOT, ".github", "workflows", "android.yml"), "utf8");
   const platform = fs.readFileSync(path.join(ROOT, "src", "platform.js"), "utf8");
-  assert.ok(/gh release create "app-v\$V" CarryOn\.apk/.test(yml));
+  assert.ok(/gh release create "app-v\$V" Waypage\.apk/.test(yml));
   assert.ok(platform.includes('"/releases/download/app-v" + version + "/" + file'));
-  assert.ok(platform.includes('file = "CarryOn.apk"'));
+  assert.ok(platform.includes('file = "Waypage.apk"'));
 });
 
 console.log("\n" + passed + " passed");

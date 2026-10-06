@@ -1,11 +1,11 @@
-// Carry-on: shows a saved page. The page's HTML is untrusted (CLAUDE.md),
+// Waypage: shows a saved page. The page's HTML is untrusted (CLAUDE.md),
 // so it goes into an iframe sandboxed without allow-scripts, under its own
 // CSP, never into the app's document: a script there could reach the
 // Capacitor plugins. allow-same-origin stays, which without allow-scripts
 // only lets this file reach in to theme it and handle taps; nothing inside
 // can run.
 (function () {
-  const C = window.CarryOn;
+  const C = window.Waypage;
 
   const CSP = "default-src 'none'; img-src 'self' https: data: blob:; style-src 'self'; font-src 'self'; base-uri 'self'; form-action 'none'";
   const TOKENS = ["bg", "surface", "ink", "muted", "accent", "line", "preview", "video", "on-video", "scrim",

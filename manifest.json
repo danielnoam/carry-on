@@ -1,6 +1,6 @@
 {
-  "name": "Carry-on",
-  "short_name": "Carry-on",
+  "name": "Waypage",
+  "short_name": "Waypage",
   "description": "Save web pages and read them offline.",
   "start_url": "./",
   "scope": "./",

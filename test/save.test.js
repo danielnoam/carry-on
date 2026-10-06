@@ -5,12 +5,12 @@ const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
 
-global.window = { CarryOn: { platform: {} } };
+global.window = { Waypage: { platform: {} } };
 global.addEventListener = () => {};
 require("../src/save.js");
 require("../src/reader.js");
-const S = window.CarryOn.save;
-const R = window.CarryOn.reader;
+const S = window.Waypage.save;
+const R = window.Waypage.reader;
 
 let passed = 0;
 function test(name, fn) {

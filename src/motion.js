@@ -1,4 +1,4 @@
-// Carry-on: motion (DESIGN.md §4). Springs, sampled into CSS linear()
+// Waypage: motion (DESIGN.md §4). Springs, sampled into CSS linear()
 // curves since there's no animation library: stiffness 400, damping 32 for
 // screens, sheets and cards; 600 and 40 for small controls. Under
 // prefers-reduced-motion every one of them becomes a 120 ms fade. Nothing
@@ -134,6 +134,6 @@
   root.setProperty("--spring-control-ms", SPRINGS.control.ms + "ms");
   root.setProperty("--fade-in", FADE_IN);
 
-  window.CarryOn = window.CarryOn || {};
-  window.CarryOn.motion = { timing, pushIn, popOut, rise, sink, slideIn, slideOut, slideBack, pageOut, pageIn, zoomIn, zoomOut, arrive, leave, through, reduced, FADE_IN };
+  window.Waypage = window.Waypage || {};
+  window.Waypage.motion = { timing, pushIn, popOut, rise, sink, slideIn, slideOut, slideBack, pageOut, pageIn, zoomIn, zoomOut, arrive, leave, through, reduced, FADE_IN };
 })();

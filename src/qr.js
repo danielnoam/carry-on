@@ -1,8 +1,8 @@
 // A small QR code encoder for sync's setup link, from LifeLog's src/qr.js.
 // Byte mode, error correction L, versions 1 to 9. It runs here so the token
 // in the link never goes to a QR service.
-// window.CarryOn.qr.svg(text, {size}) gives an <svg> string, or null when the
-// text is too long; window.CarryOn.qr.fits(text) says which.
+// window.Waypage.qr.svg(text, {size}) gives an <svg> string, or null when the
+// text is too long; window.Waypage.qr.fits(text) says which.
 (function () {
   "use strict";
 
@@ -253,6 +253,6 @@
       '" shape-rendering="crispEdges"><rect width="' + dim + '" height="' + dim + '" fill="#ffffff"/><path d="' + d + '" fill="#000000"/></svg>';
   }
 
-  window.CarryOn = window.CarryOn || {};
-  window.CarryOn.qr = { svg, fits: (t) => chooseVersion(utf8(t).length) !== null };
+  window.Waypage = window.Waypage || {};
+  window.Waypage.qr = { svg, fits: (t) => chooseVersion(utf8(t).length) !== null };
 })();

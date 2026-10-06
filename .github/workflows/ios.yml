@@ -3,7 +3,7 @@
 # LifeLog's ios.yml, without its widgets.
 #
 # There's no Apple developer account behind it yet, so it can't be signed for
-# real: what it makes is an ad-hoc-signed CarryOn.ipa, which AltStore or
+# real: what it makes is an ad-hoc-signed Waypage.ipa, which AltStore or
 # SideStore sign with your own Apple ID when they install it (and re-sign
 # every 7 days). With an account, this is where signing and a TestFlight
 # upload go. A private repo's macOS minutes count 10x against the free
@@ -53,7 +53,7 @@ jobs:
       - name: Icon and splash
         run: >-
           npx --yes @capacitor/assets@3 generate --ios
-          --iconBackgroundColor '#F7F4EE' --iconBackgroundColorDark '#F7F4EE'
+          --iconBackgroundColor '#2F5D8A' --iconBackgroundColorDark '#2F5D8A'
           --splashBackgroundColor '#F7F4EE' --splashBackgroundColorDark '#F7F4EE'
 
       - name: Version
@@ -82,13 +82,13 @@ jobs:
           cp -R ios/App/build/Build/Products/Release-iphoneos/App.app Payload/
           [ ! -d Payload/App.app/Frameworks ] || find Payload/App.app/Frameworks -maxdepth 1 -name "*.framework" -exec codesign --force --sign - {} \;
           codesign --force --sign - Payload/App.app
-          zip -qry CarryOn.ipa Payload
-          ls -lh CarryOn.ipa
+          zip -qry Waypage.ipa Payload
+          ls -lh Waypage.ipa
 
       - uses: actions/upload-artifact@v4
         with:
-          name: CarryOn-${{ steps.v.outputs.version }}-ios-unsigned
-          path: CarryOn.ipa
+          name: Waypage-${{ steps.v.outputs.version }}-ios-unsigned
+          path: Waypage.ipa
 
       # The Android workflow creates the release; this waits for it rather than
       # racing it, since whichever created it first would leave the other's
@@ -104,7 +104,7 @@ jobs:
         run: |
           for i in $(seq 1 40); do
             if gh release view "app-v$V" >/dev/null 2>&1; then
-              gh release upload "app-v$V" CarryOn.ipa --clobber
+              gh release upload "app-v$V" Waypage.ipa --clobber
               exit 0
             fi
             sleep 30

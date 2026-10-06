@@ -1,4 +1,4 @@
-# Carry-on
+# Waypage
 
 An offline reader: save a web page (a Wikipedia article, a news story) to
 the phone, read it with no connection, on a plane, with a link back to the
@@ -17,7 +17,9 @@ borrows its stack, build workflows and native-fetch trick from.
 
 ## Decisions already made (2026-10-02)
 
-- **Name:** Carry-on. Store title "Carry-on: Offline Reader".
+- **Name:** Waypage (was Carry-on until 1.0.0, 6 Oct 2026). Store title
+  "Waypage: Offline Reader". The repo was danielnoam/carry-on; GitHub
+  redirects the old name. The signing key keeps its alias `carryon`.
 - **No server for the phone app.** Pages and images are fetched on the
   device with CapacitorHttp and `Filesystem.downloadFile`, which CORS
   doesn't apply to (LifeLog does the same since its 0.215.0). A server is

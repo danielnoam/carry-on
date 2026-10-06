@@ -1,12 +1,10 @@
-// Carry-on: the shell. Version, theme, the library, saving, the reader and
+// Waypage: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.36.0";
-  // Carry-on's new name (0.36.0), whose releases the updater learns to spot.
-  const NEW_APP = "Waypage";
-  window.CarryOn.version = APP_VERSION;
+  const APP_VERSION = "1.0.0";
+  window.Waypage.version = APP_VERSION;
 
-  const C = window.CarryOn;
+  const C = window.Waypage;
   const M = C.motion;
   // Each theme is a token set in src/styles.css; "system" (Auto) picks
   // the light or dark one chosen for it from the phone's setting.
@@ -22,26 +20,26 @@
     { value: "solarized-dark", label: "Solarized Dark", short: "Solarized", dark: true },
   ];
   const themeOf = (v) => THEMES.find((t) => t.value === v);
-  const THEME_KEY = "carryon.theme";
-  const AUTO_KEY = "carryon.themeAuto";
-  const IMAGES_KEY = "carryon.images";
-  const READING_KEY = "carryon.reading";
-  const FILTER_KEY = "carryon.filter";
-  const SEEN_KEY = "carryon.seenVersion";
-  const SORT_KEY = "carryon.sort";
-  const CONTINUE_KEY = "carryon.continue";
-  const LAYOUT_KEY = "carryon.layout";
+  const THEME_KEY = "waypage.theme";
+  const AUTO_KEY = "waypage.themeAuto";
+  const IMAGES_KEY = "waypage.images";
+  const READING_KEY = "waypage.reading";
+  const FILTER_KEY = "waypage.filter";
+  const SEEN_KEY = "waypage.seenVersion";
+  const SORT_KEY = "waypage.sort";
+  const CONTINUE_KEY = "waypage.continue";
+  const LAYOUT_KEY = "waypage.layout";
   // The library's three looks (0.28.0); Settings, Appearance picks one.
   const LAYOUTS = [
     { value: "shelf", label: "Shelf", note: "Collections as a row of covers, clips listed under them" },
     { value: "list", label: "One list", note: "Collections and clips together, grouped by date or site" },
     { value: "grid", label: "Grid", note: "Covers three across, clips as picture cards" },
   ];
-  const NEW_KEY = "carryon.newChapters";
-  const DAILY_KEY = "carryon.checkDaily";
-  const EXPORT_KEY = "carryon.exportKind";
-  const RATE_KEY = "carryon.aloudRate";
-  const VOICE_KEY = "carryon.aloudVoice";
+  const NEW_KEY = "waypage.newChapters";
+  const DAILY_KEY = "waypage.checkDaily";
+  const EXPORT_KEY = "waypage.exportKind";
+  const RATE_KEY = "waypage.aloudRate";
+  const VOICE_KEY = "waypage.aloudVoice";
 
   const $ = (id) => document.getElementById(id);
   const libTools = $("libTools");
@@ -1144,7 +1142,7 @@
       keep("empty", () => el("div", { class: "empty wide" },
         el("h2", { class: "empty-title" }, "Clips you take with you"),
         el("p", { class: "empty-text" }, C.platform.native
-          ? "Share a page to Carry-on from your browser, or paste its link below. It stays readable with no connection, with a link back to the original."
+          ? "Share a page to Waypage from your browser, or paste its link below. It stays readable with no connection, with a link back to the original."
           : "Paste a Wikipedia link below, or bring the clips you saved on your phone: back up there, then open the backup here."),
         el("button", { class: "btn-quiet empty-open", type: "button", onclick: () => pickFile() }, "Open a file"),
         C.platform.native ? null : el("button", { class: "btn-quiet empty-open", type: "button", onclick: () => openSettings(false, "storage") }, "Open a backup")));
@@ -1608,8 +1606,8 @@
   const aloud = { key: "", map: [], state: "stopped", index: -1, arrived: false };
   // Speed is a slider since 0.34.0, from half to three times.
   const RATE_MIN = 0.5, RATE_MAX = 3;
-  const FOOTNOTES_KEY = "carryon.aloudFootnotes";
-  const EDGES_KEY = "carryon.aloudSkipEdges";
+  const FOOTNOTES_KEY = "waypage.aloudFootnotes";
+  const EDGES_KEY = "waypage.aloudSkipEdges";
   const PIECE = 600;
 
   // `parts` is [{ text, block }]; a block can be in two parts when the
@@ -1948,7 +1946,7 @@
 
   // The reader's settings (0.34.0): Layout, Text and Read aloud, one at a
   // time behind tabs, the last one opened coming back.
-  const SHEET_TAB_KEY = "carryon.sheetTab";
+  const SHEET_TAB_KEY = "waypage.sheetTab";
   function readerSettings() {
     const box = readingControls(true);
     const parts = [...box.querySelectorAll(".rc-part")];
@@ -3249,7 +3247,7 @@
   // for working out why a site saves badly.
   const EXPORTS = [
     { value: "pdf", label: "PDF", note: "Opens the print screen, where Save as PDF is a printer." },
-    { value: "html", label: "HTML", note: "One file with its pictures. Opens in any browser, and back in Carry-on.", mime: "text/html" },
+    { value: "html", label: "HTML", note: "One file with its pictures. Opens in any browser, and back in Waypage.", mime: "text/html" },
     { value: "epub", label: "EPUB", note: "For an e-reader, Apple Books or Send to Kindle.", mime: "application/epub+zip" },
     { value: "md", label: "Markdown", note: "The text for a notes app. Pictures link to the site.", mime: "text/markdown" },
     { value: "source", label: "Page source", note: "The site's own page, fetched again. Send it when a site saves badly.", mime: "text/html" },
@@ -3343,7 +3341,7 @@
     btn.disabled = false;
   }
 
-  async function backUp(btn, idle = "Back up the library") {
+  async function backUp(btn) {
     if (!state.pages.length && !feeds.length) { toast("There's nothing to back up yet."); return; }
     btn.disabled = true;
     const label = btn.querySelector(".row-label");
@@ -3357,7 +3355,7 @@
       toast("Couldn't write the backup. Free some space and try again.");
     }
     btn.disabled = false;
-    label.textContent = idle;
+    label.textContent = "Back up the library";
   }
 
   // A backup (a zip) or one page's file, picked from the phone.
@@ -3426,7 +3424,7 @@
           el("span", { class: "choice-text" }, el("span", { class: "choice-label" + (a.can ? " accent" : "") }, "Read from where it is"),
             el("span", { class: "choice-note" }, a.can
               ? "Lives in Files and costs almost nothing here. It needs the file to stay where it is, and doesn't sync."
-              : "Carry-on wasn't given lasting access to this file. Open it with Open a file to read it from where it is.")))));
+              : "Waypage wasn't given lasting access to this file. Open it with Open a file to read it from where it is.")))));
   }
   // A file dropped on the window, on a computer.
   addEventListener("dragover", (e) => { if (e.dataTransfer && [...e.dataTransfer.types].includes("Files")) e.preventDefault(); });
@@ -3477,9 +3475,9 @@
         const what = [n ? countLine(n) : "", followed ? (followed === 1 ? "1 feed" : followed + " feeds") : ""].filter(Boolean).join(" and ");
         toast((what ? "Restored " + what : "Nothing new to restore") + (res.kept ? ". " + res.kept + " already here" + (res.kept === 1 ? " was" : " were") + " kept." : "."));
       } else if (kind === "zip") {
-        toast("This zip isn't a Carry-on backup, an EPUB or a comic, so it can't be opened here.");
+        toast("This zip isn't a Waypage backup, an EPUB or a comic, so it can't be opened here.");
       } else if (!kind) {
-        toast("Carry-on opens " + FILE_KINDS_LINE + ", and its own backups.");
+        toast("Waypage opens " + FILE_KINDS_LINE + ", and its own backups.");
       } else {
         if (!btn) toast("Opening " + file.name + "…");
         const meta = kind === "clip" ? await C.backup.importPage(await file.text(), (url) => !!savedAs(url))
@@ -3500,7 +3498,7 @@
       }
       renderLibrary();
     } catch (e) {
-      const told = e instanceof C.files.FileError || /Carry-on|empty/.test(e.message);
+      const told = e instanceof C.files.FileError || /Waypage|empty/.test(e.message);
       if (!told) console.error(e);
       toast(told ? e.message : "Couldn't open that file. Try again.");
     }
@@ -3610,7 +3608,7 @@
   }
   // Before 0.30.2 a new page's pictures never downloaded on Android (see
   // platform.js, folderFor). Those pages fetch them once, when online.
-  const HEALED_KEY = "carryon.picturesHealed";
+  const HEALED_KEY = "waypage.picturesHealed";
   function healPictures() {
     if (!C.platform.native || !navigator.onLine || load(HEALED_KEY, false)) return;
     store(HEALED_KEY, true);
@@ -3678,13 +3676,13 @@
       el("p", { class: "section-lead" }, "Keeps your clips, tags, collections, favourites and where you are the same on every device, through a private repo on your GitHub. Each device gets the pictures itself."),
       el("div", { class: "group" },
         outRow("https://github.com/signup", "1", "Make a free GitHub account", "Skip this if you have one."),
-        outRow(C.sync.KEY_URL, "2", "Make a token for Carry-on", "GitHub fills it in. Under Repository access pick All repositories, then Generate token, and copy it."),
+        outRow(C.sync.KEY_URL, "2", "Make a token for Waypage", "GitHub fills it in. Under Repository access pick All repositories, then Generate token, and copy it."),
         el("div", { class: "row sync-step sync-paste" },
           el("span", { class: "step-num", "aria-hidden": "true" }, "3"),
           el("div", { class: "choice-text" },
             el("span", { class: "choice-label" }, "Paste it here"),
             input, go, note))),
-      el("p", { class: "footnote" }, "The token stays on this device and goes only to GitHub. Carry-on makes a private repo called carryon-data for your library."));
+      el("p", { class: "footnote" }, "The token stays on this device and goes only to GitHub. Waypage makes a private repo called waypage-data for your library."));
   }
   function syncJoin() {
     const scan = C.platform.canScan ? el("button", { class: "row", type: "button", onclick: scanSync },
@@ -3699,7 +3697,7 @@
     try { text = await C.platform.scanQr(() => toast("Getting the scanner ready…")); }
     catch (e) { toast("Couldn't scan. Paste the setup link in step 3 instead."); return; }
     if (!text) return;
-    if (!C.sync.tokenIn(text)) { toast("That isn't a Carry-on setup code. Show the one in Settings, Sync on a synced device."); return; }
+    if (!C.sync.tokenIn(text)) { toast("That isn't a Waypage setup code. Show the one in Settings, Sync on a synced device."); return; }
     const err = await connectSync(text);
     if (err) toast(err);
   }
@@ -3752,7 +3750,7 @@
           el("span", { class: "row-label accent" }, paused ? "Resume syncing" : "Pause syncing"))),
       el("p", { class: "footnote" }, paused
         ? "Nothing syncs until you resume. What synced before stays."
-        : "Syncs when Carry-on opens, after a change, and every few minutes while it's open. Pausing stops at the next clip and picks up where it left off."));
+        : "Syncs when Waypage opens, after a change, and every few minutes while it's open. Pausing stops at the next clip and picks up where it left off."));
   }
   // Pause stops a sync at the next page and starts none until Resume;
   // pages saving from their links and pictures wait too (0.30.4).
@@ -3808,7 +3806,7 @@
       el("div", { class: "group" },
         qr,
         el("button", { class: "row", type: "button", onclick: copy }, el("span", { class: "row-label accent" }, "Copy setup link"))),
-      el("p", { class: "footnote" }, "In Carry-on on the other device, go to Settings, Sync and scan this code, or paste the link there. A camera opens it in the web copy instead."),
+      el("p", { class: "footnote" }, "In Waypage on the other device, go to Settings, Sync and scan this code, or paste the link there. A camera opens it in the web copy instead."),
       el("p", { class: "footnote warn" }, "The code and link hold your token. Only use them on your own devices."));
   }
 
@@ -4040,7 +4038,7 @@
       { value: "previews", label: "Previews" }, { value: "full", label: "Full" }, { value: "links", label: "Links" },
     ], mode, (v) => { mode = v; }) : null;
     const asPage = from ? el("section", { class: "settings-section batch-from" },
-      el("p", { class: "meta" }, "Carry-on read this page as a list of chapters."),
+      el("p", { class: "meta" }, "Waypage read this page as a list of chapters."),
       el("button", { class: "btn-quiet batch-as-page", type: "button", onclick: () => { history.back(); savePage(from, null, { asPage: true }); } },
         "Save it as one clip instead")) : null;
     // A file of your own comes in from here too (0.31.0).
@@ -4505,10 +4503,10 @@
   // its feed's window. Feeds are kept in localStorage as [{ url, title,
   // link, icon, mode: "show" | "save", images, folder, days, addedAt,
   // checkedAt, error, items: [{ id, url, title, date, foundAt, tried }] }].
-  const FEEDS_KEY = "carryon.feeds";
-  const PLACE_KEY = "carryon.place";
-  const FEEDS_SEEN_KEY = "carryon.feedsSeen";
-  const FEEDS_ASKED_KEY = "carryon.feedsAsked";
+  const FEEDS_KEY = "waypage.feeds";
+  const PLACE_KEY = "waypage.place";
+  const FEEDS_SEEN_KEY = "waypage.feedsSeen";
+  const FEEDS_ASKED_KEY = "waypage.feedsAsked";
   const FEED_EVERY = 3 * 36e5;
   const FEED_KEEP = 100;
   const FEED_DAYS = [{ value: "3", label: "3 days" }, { value: "7", label: "A week" }, { value: "30", label: "A month" }];
@@ -4845,7 +4843,7 @@
         el("h2", { class: "empty-title" }, "Follow the sites you read"),
         el("p", { class: "empty-text" }, C.platform.native
           ? "Add a site and its new posts wait here for you to save, or save themselves."
-          : "Add a site and its new posts wait here. Most sites only let Carry-on on your phone read their feed."),
+          : "Add a site and its new posts wait here. Most sites only let Waypage on your phone read their feed."),
         el("button", { class: "btn-primary", type: "button", onclick: () => openMenu("addFeed") }, "Add a feed")));
       root.replaceChildren(...nodes);
       return;
@@ -5015,7 +5013,7 @@
     const inFeeds = state.place === "feeds";
     const latest = (f) => Math.max(0, ...f.items.map(postAt));
     fill($("sidebar"),
-      el("p", { class: "side-title" }, "Carry-on"),
+      el("p", { class: "side-title" }, "Waypage"),
       item(feedIcon("library"), "Library", !inFeeds && state.part !== "files", count(state.pages.length, "side-count"), () => goPlace("library")),
       ...[...foldersByUse().filter(folderFav), ...foldersByUse().filter((f) => !folderFav(f))].slice(0, SIDE_MAX).map((name) =>
         item(sideCover(name), name, false, count(freshCount(name)), () => openFromSide(name), "side-sub")),
@@ -5215,7 +5213,7 @@
       hint.classList.add("busy");
       const picked = state.feed && feeds.find((f) => f.url === state.feed);
       const done = () => { hint.classList.remove("busy"); set(0, true); };
-      // A pull also looks for a newer Carry-on (0.34.0); the bar says so.
+      // A pull also looks for a newer Waypage (0.34.0); the bar says so.
       const app = checkForNewerApp().catch(() => {});
       if (state.place === "feeds") { Promise.all([checkNow(picked || null), app]).finally(done); return; }
       pullChapters(app).finally(done);
@@ -5225,7 +5223,7 @@
   async function pullChapters(app) {
     if (navigator.onLine && !allFolders().some((n) => isSeries(folderPages(n)))) {
       await app;
-      toast(updateOut() ? (upd.moved ? "Carry-on is now " + NEW_APP + "." : "Carry-on " + upd.latest + " is out.") : "Nothing new.");
+      toast(updateOut() ? "Waypage " + upd.latest + " is out." : "Nothing new.");
       return;
     }
     await Promise.all([checkChapters(), app]);
@@ -5248,7 +5246,7 @@
     let found = null, mode = "show";
     const input = el("input", { class: "feed-input", type: "url", inputmode: "url", placeholder: "A site or its feed", "aria-label": "A site or its feed",
       autocomplete: "off", autocapitalize: "off", spellcheck: "false", enterkeyhint: "go" });
-    const help = el("p", { class: "footnote" }, "A site's address is enough: Carry-on finds its feed.");
+    const help = el("p", { class: "footnote" }, "A site's address is enough: Waypage finds its feed.");
     const card = el("div", { class: "found-feed" });
     const note = el("p", { class: "footnote" });
     const modeBox = el("div", { class: "feed-mode" },
@@ -5268,7 +5266,7 @@
       modeBox.hidden = true;
       go.textContent = "Find its feed";
       help.className = "footnote";
-      help.textContent = "A site's address is enough: Carry-on finds its feed.";
+      help.textContent = "A site's address is enough: Waypage finds its feed.";
     };
     reset();
     const find = async () => {
@@ -5543,15 +5541,15 @@
     if (C.platform.ios) {
       return el("section", { class: "settings-section" },
         el("h2", { class: "overline" }, "Where your library is"),
-        el("p", { class: "footnote" }, "In the Files app, under On My iPhone, then Carry-on. Each clip is a folder there."));
+        el("p", { class: "footnote" }, "In the Files app, under On My iPhone, then Waypage. Each clip is a folder there."));
     }
     if (!C.platform.native || !C.platform.files.canPickFolder) return null;
     const place = C.store.place;
     const options = [
-      { value: "app", label: "Inside Carry-on", note: "Recommended. Private to the app, and the quickest. Uninstalling Carry-on deletes it." },
+      { value: "app", label: "Inside Waypage", note: "Recommended. Private to the app, and the quickest. Uninstalling Waypage deletes it." },
     ];
     if (androidSdk >= 30 || place.kind === "documents") {
-      options.push({ value: "documents", label: "Documents/Carry-on", note: "You can see it in the Files app, and it stays if you uninstall Carry-on. After reinstalling, pick it as your folder to get it back." });
+      options.push({ value: "documents", label: "Documents/Waypage", note: "You can see it in the Files app, and it stays if you uninstall Waypage. After reinstalling, pick it as your folder to get it back." });
     }
     options.push({ value: "folder", label: place.kind === "folder" ? place.name || "A folder you picked" : "A folder you pick",
       note: place.kind === "folder" ? "Pick this again to choose another folder." : "Any folder on the phone or a memory card. Saving there is a little slower." });
@@ -5597,7 +5595,7 @@
 
   function aboutGroup() {
     const list = el("div", { class: "group" });
-    const releases = C.platform.releasesUrl() || "https://github.com/danielnoam/carry-on/releases/latest";
+    const releases = C.platform.releasesUrl() || "https://github.com/danielnoam/waypage/releases/latest";
     list.append(el("a", { class: "row", href: releases, target: "_blank", rel: "noopener" },
       el("span", { class: "row-label accent" }, "Releases and source"),
       el("span", { class: "row-value", "aria-hidden": "true" }, "↗")));
@@ -5606,14 +5604,14 @@
     if (!C.platform.native && !installed && installPrompt) {
       list.prepend(el("button", { class: "row install-row", type: "button", onclick: installApp },
         el("span", { class: "choice-text" },
-          el("span", { class: "choice-label accent" }, "Install Carry-on"),
+          el("span", { class: "choice-label accent" }, "Install Waypage"),
           el("span", { class: "choice-note" }, "Opens in its own window and works with no connection"))));
     }
     return el("section", { class: "settings-section" },
       list,
       !C.platform.native && !installed && !installPrompt && ios
-        ? el("p", { class: "footnote install-hint" }, "To install Carry-on, tap Share, then Add to Home Screen.") : null,
-      el("p", { class: "footnote" }, "Clips stay " + ON_HERE + ". Carry-on collects nothing."));
+        ? el("p", { class: "footnote install-hint" }, "To install Waypage, tap Share, then Add to Home Screen.") : null,
+      el("p", { class: "footnote" }, "Clips stay " + ON_HERE + ". Waypage collects nothing."));
   }
 
   // The browser's own install offer (Chrome, Edge, Android), kept for the
@@ -5627,7 +5625,7 @@
   addEventListener("appinstalled", () => {
     installPrompt = null;
     if (state.section === "updates") renderSection();
-    toast("Installed. Carry-on is with your other apps.");
+    toast("Installed. Waypage is with your other apps.");
   });
   async function installApp() {
     if (!installPrompt) return;
@@ -5653,7 +5651,7 @@
           el("span", { class: "choice-note" }, "This browser won't clear your clips to make space.")))
         : el("button", { class: "row keep-row", type: "button", onclick: async () => {
           const ok = await C.store.keepStored();
-          toast(ok ? "This browser will keep your clips." : "This browser didn't agree. Installing Carry-on usually helps.");
+          toast(ok ? "This browser will keep your clips." : "This browser didn't agree. Installing Waypage usually helps.");
           draw(await C.store.storageInfo());
         } }, el("span", { class: "choice-text" },
           el("span", { class: "choice-label accent" }, "Keep clips from being cleared"),
@@ -5699,7 +5697,7 @@
       el("div", { class: "settings-menu" },
         out ? el("div", { class: "group update-card" },
           el("div", { class: "row update-row out" },
-            el("span", { class: "row-label accent" }, upd.moved ? "Carry-on is now " + NEW_APP : "Carry-on " + upd.latest + " is out"),
+            el("span", { class: "row-label accent" }, "Waypage " + upd.latest + " is out"),
             el("button", { class: "btn-small", type: "button", onclick: () => openSection("updates") }, "View"))) : null,
         el("div", { class: "group" }, row("appearance"), row("saving")),
         el("div", { class: "group" }, row("storage"), row("sync")),
@@ -5915,7 +5913,7 @@
   // link, sometimes "Title https://…". Saved straight away.
   // 0.31.0 kept the file beside the clip it made; 0.32.0 doesn't, so the
   // copies it left are given back. Once, quietly.
-  const TIDIED_KEY = "carryon.tidiedFiles";
+  const TIDIED_KEY = "waypage.tidiedFiles";
   async function tidyOldFiles() {
     if (!C.platform.native || load(TIDIED_KEY, false)) return;
     store(TIDIED_KEY, true);
@@ -5932,7 +5930,7 @@
     if (!share) return;
     let got;
     try { got = await share.take(); } catch (e) { return; }
-    // A file opened with Carry-on, or shared to it (0.31.0): copied into
+    // A file opened with Waypage, or shared to it (0.31.0): copied into
     // the app's cache by the plugin, read back through the WebView.
     if (got && got.file) {
       await toLibrary();
@@ -6004,9 +6002,7 @@
   }
 
   // phase: idle, checking, current, failed, available, downloading, ready.
-  // `moved` (0.36.0): the release is Waypage, Carry-on's new name, a new app
-  // that installs beside this one and takes the library from a backup.
-  const upd = { phase: "idle", latest: null, notes: "", pct: 0, apk: null, error: "", moved: false };
+  const upd = { phase: "idle", latest: null, notes: "", pct: 0, apk: null, error: "" };
 
   function setUpd(change) {
     Object.assign(upd, change);
@@ -6027,9 +6023,8 @@
       if (res.status !== 200) throw new Error("HTTP " + res.status);
       const release = JSON.parse(res.text);
       const latest = String(release.tag_name || "").replace(/^app-v/, "");
-      const moved = (release.assets || []).some((a) => a && /^Waypage\.(apk|ipa)$/.test(a.name));
       if (/^\d+\.\d+\.\d+$/.test(latest) && isNewerVersion(latest, APP_VERSION)) {
-        setUpd({ phase: upd.latest === latest && upd.apk ? "ready" : "available", latest, notes: String(release.body || ""), moved });
+        setUpd({ phase: upd.latest === latest && upd.apk ? "ready" : "available", latest, notes: String(release.body || "") });
       } else setUpd({ phase: "current" });
     } catch (e) {
       setUpd({ phase: "failed", error: "Couldn't check. Try again when you're online." });
@@ -6046,14 +6041,14 @@
     setUpd({ phase: "downloading", pct: 0 });
     let apk;
     try {
-      apk = await C.platform.downloadUpdate(upd.latest, (f) => setUpd({ pct: Math.round(f * 100) }), upd.moved ? NEW_APP + ".apk" : "CarryOn.apk");
+      apk = await C.platform.downloadUpdate(upd.latest, (f) => setUpd({ pct: Math.round(f * 100) }));
     } catch (e) {
       setUpd({ phase: "available", error: "The download didn't finish. Try again." });
       return;
     }
     if (!apk) {
       setUpd({ phase: "available" });
-      C.platform.openOutside(C.platform.apkUrl(upd.moved ? NEW_APP + ".apk" : "CarryOn.apk"));
+      C.platform.openOutside(C.platform.apkUrl());
       return;
     }
     setUpd({ phase: "ready", apk, error: "" });
@@ -6081,7 +6076,7 @@
       return;
     }
     $("updateText").textContent = out
-      ? (upd.phase === "downloading" ? "Downloading " + appName() + " " + upd.latest + " · " + upd.pct + "%" : upd.moved ? "Carry-on is now " + NEW_APP : upd.phase === "ready" ? "Carry-on " + upd.latest + " is ready to install" : "Carry-on " + upd.latest + " is out")
+      ? (upd.phase === "downloading" ? "Downloading " + upd.latest + " · " + upd.pct + "%" : upd.phase === "ready" ? "Waypage " + upd.latest + " is ready to install" : "Waypage " + upd.latest + " is out")
       : "Updated to " + APP_VERSION;
     const btn = $("updateBtn");
     btn.textContent = out ? "View" : "What's new";
@@ -6109,15 +6104,14 @@
 
   // Updates and About in one (0.30.2): the version is the button that
   // checks for a newer one, then What's new.
-  function appName() { return upd.moved ? NEW_APP : "Carry-on"; }
   function updatesGroup() {
     const list = el("div", { class: "group" });
     if (C.platform.native) {
       const out = ["available", "downloading", "ready"].includes(upd.phase);
       const status = {
         idle: "Tap to check for updates", checking: "Checking…", current: "You have the latest version",
-        failed: upd.error, available: upd.moved ? "Carry-on is now " + NEW_APP + ". Get it here." : "Carry-on " + upd.latest + " is out",
-        downloading: "Downloading " + appName() + " " + upd.latest + " · " + upd.pct + "%", ready: appName() + " " + upd.latest + " is ready to install",
+        failed: upd.error, available: "Waypage " + upd.latest + " is out",
+        downloading: "Downloading " + upd.latest + " · " + upd.pct + "%", ready: "Waypage " + upd.latest + " is ready to install",
       }[upd.phase];
       const busy = upd.phase === "checking" || upd.phase === "downloading";
       const version = el("button", { class: "row update-row" + (out ? " out" : ""), type: "button", onclick: () => (out ? startUpdate() : checkForNewerApp()) },
@@ -6125,24 +6119,16 @@
         el("span", { class: "choice-text" },
           el("span", { class: "row-label" }, "Version " + APP_VERSION),
           el("span", { class: "choice-note" + (out ? " accent" : upd.phase === "failed" ? " warn" : ""), role: "status" }, status)),
-        out ? el("span", { class: "btn-small", "aria-hidden": "true" }, upd.phase === "downloading" ? upd.pct + "%" : C.platform.ios ? "Get it" : upd.phase === "ready" ? "Install" : upd.moved ? "Get it" : "Update") : null);
+        out ? el("span", { class: "btn-small", "aria-hidden": "true" }, upd.phase === "downloading" ? upd.pct + "%" : C.platform.ios ? "Get it" : upd.phase === "ready" ? "Install" : "Update") : null);
       version.disabled = busy;
       list.append(version);
       if (out && upd.error) list.append(el("div", { class: "row" }, el("span", { class: "row-label warn" }, upd.error)));
-      // Carry-on's last job (0.36.0): its library, sent to Waypage as a backup.
-      if (out && upd.moved) {
-        const send = el("button", { class: "row", type: "button", onclick: (e) => backUp(e.currentTarget, "Send your library to " + NEW_APP) },
-          el("span", { class: "row-label accent" }, "Send your library to " + NEW_APP));
-        list.append(send);
-      }
     } else {
       list.append(el("div", { class: "row" }, el("span", { class: "row-label" }, "Version"), el("span", { class: "row-value" }, APP_VERSION)));
     }
     list.append(el("button", { class: "row", type: "button", onclick: () => openNews() },
       el("span", { class: "row-label accent" }, "What's new"), el("span", { class: "row-value", "aria-hidden": "true" }, "›")));
-    const moved = C.platform.native && upd.moved && ["available", "downloading", "ready"].includes(upd.phase);
-    return el("section", { class: "settings-section", id: "updatesSection" }, list,
-      moved ? el("p", { class: "footnote" }, NEW_APP + " is a new app, so it starts empty and Carry-on stays until you remove it. Get " + NEW_APP + ", then send your library and pick " + NEW_APP + " in the share sheet. With sync on, turning it on in " + NEW_APP + " brings the library over instead.") : null);
+    return el("section", { class: "settings-section", id: "updatesSection" }, list);
   }
 
   // ---- What's new ----

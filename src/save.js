@@ -1,4 +1,4 @@
-// Carry-on: turning a link into a saved page (docs/PROPOSAL.md,
+// Waypage: turning a link into a saved page (docs/PROPOSAL.md,
 // "Architecture"). Fetch, pick the article (the Wikipedia adapter or
 // Readability), clean it down to an allowlist, then download image previews
 // and video thumbnails next to it.
@@ -7,7 +7,7 @@
 // no scripts and load nothing; what comes out is rebuilt element by element
 // from the allowlist, so nothing the page carried survives unless named here.
 (function () {
-  const C = window.CarryOn;
+  const C = window.Waypage;
 
   const PREVIEW_WIDTH = 480;
   // Wikimedia serves (and caches) thumbnails at fixed steps; other widths
@@ -922,7 +922,7 @@
       if (/time(d)?\s?out/i.test((e && e.message) || "")) throw new SaveError("The site didn't answer. Try again, or later on a better connection.");
       throw new SaveError(C.platform.canFetchPages
         ? "Couldn't reach this page. Check the link, or try again when you're online."
-        : "This browser can't reach that site directly. Save it in Carry-on on your phone, then bring it here with a backup.");
+        : "This browser can't reach that site directly. Save it in Waypage on your phone, then bring it here with a backup.");
     }
     if (res.status === 429) throw new SaveError("The site asked to slow down. Try again in a few minutes.");
     if (res.status === 404 || res.status === 410) throw new SaveError("That page doesn't exist any more. Check the link.");
@@ -955,7 +955,7 @@
 
   async function fromWikipedia(page) {
     const api = "https://" + page.host + "/api/rest_v1/page/html/" + encodeURIComponent(page.title) + "?redirect=true";
-    const res = await get(api, { Accept: "text/html; charset=utf-8", "Api-User-Agent": "Carry-on (https://github.com/danielnoam/carry-on)" });
+    const res = await get(api, { Accept: "text/html; charset=utf-8", "Api-User-Agent": "Waypage (https://github.com/danielnoam/waypage)" });
     const url = "https://" + page.host + "/wiki/" + encodeURIComponent(page.title).replace(/%2F/g, "/");
     const doc = parse(res.text, url);
     doc.querySelectorAll(".navbox, .vertical-navbox, .sistersitebox, .metadata, .ambox, .noprint, .mw-empty-elt, [role=navigation], .portalbox, .side-box, .hatnote")
@@ -1004,7 +1004,7 @@
       try {
         const res = await get("https://" + host + "/w/api.php?action=query&format=json&formatversion=2&prop=imageinfo&iiprop=extmetadata" +
           "&iiextmetadatafilter=Artist%7CLicenseShortName&origin=*&titles=" + encodeURIComponent(titles.join("|")),
-        { "Api-User-Agent": "Carry-on (https://github.com/danielnoam/carry-on)" });
+        { "Api-User-Agent": "Waypage (https://github.com/danielnoam/waypage)" });
         data = JSON.parse(res.text).query;
       } catch (e) { return; }
       const renamed = new Map(((data && data.normalized) || []).map((n) => [n.to, n.from]));
@@ -1061,7 +1061,7 @@
       if (own && own.prev !== undefined) prev = own.prev;
       return panels ? { doc, docTitle, headline: (own && own.title) || headline, next, prev, panels, series: (own && own.series) || "", byline: (own && own.byline) || "" } : null;
     }
-    if (typeof window.Readability !== "function") throw new SaveError("The reader part of the app didn't load. Restart Carry-on.");
+    if (typeof window.Readability !== "function") throw new SaveError("The reader part of the app didn't load. Restart Waypage.");
     const article = new window.Readability(doc, { charThreshold: 500, keepClasses: false }).parse();
     if (!article || (article.textContent || "").trim().length < MIN_TEXT) return null;
     if (own && own.next !== undefined) next = own.next;
@@ -1093,13 +1093,13 @@
         got = readArticle(drawn.text, finalUrl, comic, siteRule(finalUrl), asPage);
       }
     }
-    if (got && got.check) throw new SaveError("The site asked for a browser check, so Carry-on can't save it yet.");
+    if (got && got.check) throw new SaveError("The site asked for a browser check, so Waypage can't save it yet.");
     if (got && got.contents) throw new ContentsPage(got.contents);
-    if (!got && comic) throw new SaveError("Carry-on couldn't find the pictures on this page.");
+    if (!got && comic) throw new SaveError("Waypage couldn't find the pictures on this page.");
     if (!got) {
       throw new SaveError(C.platform.canRender
-        ? "Carry-on couldn't find the article on this page, even after letting it draw itself."
-        : "This page builds itself with JavaScript, which Carry-on can't save yet.");
+        ? "Waypage couldn't find the article on this page, even after letting it draw itself."
+        : "This page builds itself with JavaScript, which Waypage can't save yet.");
     }
     if (got.panels) {
       const { doc, docTitle, headline, next, prev, panels, series, byline } = got;
@@ -1292,7 +1292,7 @@
 
   // A saved page coming back in (an exported file, 0.18.0): the article
   // part of its body, rebuilt from the same allowlist plus the few classes
-  // and attributes Carry-on itself writes. Images keep only a data: picture
+  // and attributes Waypage itself writes. Images keep only a data: picture
   // or an https link; anything else a hand-edited file carries is dropped.
   // Resolves to { root, images } with the data: pictures to write out.
   const CO_CLASS = /^co-(body|comic|video|play|video-title|video-note|credit|missing)$/;
