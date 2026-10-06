@@ -56,7 +56,7 @@ async function read(job) {
   // the page, lines into paragraphs by the gap between them.
   const pages = [];
   let words = 0;
-  for (let n = 1; n <= count; n++) {
+  for (let n = 1; n <= (job.draw ? 0 : count); n++) {
     const page = await doc.getPage(n);
     const content = await page.getTextContent();
     const lines = linesOf(content.items);
@@ -67,7 +67,7 @@ async function read(job) {
   }
   // About 40 letters a page is a scan with a stray label on it, not a
   // document with words in it.
-  if (words / count >= 40) {
+  if (!job.draw && words / count >= 40) {
     out.blocks = blocksOf(pages);
     return out;
   }
@@ -82,7 +82,9 @@ async function read(job) {
     const ctx = canvas.getContext("2d");
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    await page.render({ canvasContext: ctx, viewport: view }).promise;
+    // "print" draws in one go: the screen's way waits on animation
+    // frames, which a frame kept out of sight never gets.
+    await page.render({ canvasContext: ctx, viewport: view, intent: "print" }).promise;
     const blob = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.78 });
     out.images.push(new Uint8Array(await blob.arrayBuffer()));
     page.cleanup();
@@ -185,7 +187,9 @@ post({ ready: true });
   // Runs one PDF through the sandbox. `bytes` is the file; onProgress is
   // told ({ done, total, stage }) as pages are read. Resolves to
   // { title, byline, pages, blocks } or { title, byline, pages, images }.
-  async function read(bytes, onProgress) {
+  // `draw` skips the words and draws the pages, for a scan read from its
+  // file each time it's opened.
+  async function read(bytes, onProgress, { draw = false } = {}) {
     const { lib, worker } = await sources();
     const frame = document.createElement("iframe");
     frame.setAttribute("sandbox", "allow-scripts");
@@ -206,7 +210,7 @@ post({ ready: true });
         function onMessage(e) {
           if (e.source !== frame.contentWindow) return;
           const m = e.data || {};
-          if (m.ready) { frame.contentWindow.postMessage({ kind: "read", lib, worker, bytes: copy.buffer }, "*", [copy.buffer]); return; }
+          if (m.ready) { frame.contentWindow.postMessage({ kind: "read", draw, lib, worker, bytes: copy.buffer }, "*", [copy.buffer]); return; }
           if (m.progress) { if (onProgress) onProgress(m.progress, m.of, m.stage); return; }
           if (m.error) { done(null, new Error(m.error)); return; }
           done(m);

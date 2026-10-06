@@ -19,7 +19,7 @@
 
   const KINDS = { epub: "EPUB", md: "Markdown", txt: "Text", html: "HTML", cbz: "Comic", pdf: "PDF" };
   // Kinds whose pictures can be left in the file and read as they're needed.
-  const LINKABLE = new Set(["epub", "cbz"]);
+  const LINKABLE = new Set(["epub", "cbz", "pdf"]);
   const EXTS = { epub: "epub", md: "md", markdown: "md", txt: "txt", text: "txt", html: "html", htm: "html", xhtml: "html", cbz: "cbz" };
   const PICTURE = /\.(jpe?g|png|gif|webp)$/i;
   const MIME_EXT = { "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp" };
@@ -328,7 +328,7 @@
         const img = out.createElement("img");
         img.setAttribute("alt", "");
         root.append(img);
-        await pics.put(img, b, "image/jpeg");
+        await pics.put(img, b, "image/jpeg", false, "page:" + (i + 1));
         if (onProgress) onProgress(i + 1, got.images.length, "pictures");
       }
       if (!pics.n) throw new FileError("There's nothing to read in this PDF.");
@@ -362,6 +362,7 @@
     }
     for (const url of lastUrls) URL.revokeObjectURL(url);
     lastUrls = [];
+    if (meta.file.kind === "pdf") return fillPdf(doc, slots, blob, meta);
     const entries = await B().zipEntries(blob).catch(() => null);
     if (!entries) throw new FileError("Carry-on can't read " + meta.file.name + " any more.");
     for (const img of slots) {
@@ -374,6 +375,27 @@
         img.setAttribute("src", url);
         img.removeAttribute("data-in");
       } catch (err) { img.className = "co-missing"; }
+    }
+    return "<!doctype html>\n" + doc.documentElement.outerHTML;
+  }
+
+  // A scan read from its PDF: its pages drawn again, each into its slot.
+  // A PDF with words keeps those words in the clip and has no slots.
+  async function fillPdf(doc, slots, blob, meta) {
+    let got;
+    try {
+      got = await C.pdf.read(new Uint8Array(await blob.arrayBuffer()), null, { draw: true });
+    } catch (e) {
+      throw new FileError("Carry-on can't read " + meta.file.name + " any more.");
+    }
+    const images = got.images || [];
+    for (const img of slots) {
+      const b = images[Number(String(img.getAttribute("data-in")).replace(/^page:/, "")) - 1];
+      if (!b) { img.className = "co-missing"; continue; }
+      const url = URL.createObjectURL(new Blob([b], { type: "image/jpeg" }));
+      lastUrls.push(url);
+      img.setAttribute("src", url);
+      img.removeAttribute("data-in");
     }
     return "<!doctype html>\n" + doc.documentElement.outerHTML;
   }
@@ -495,7 +517,7 @@
 
   // Whether reading from the file instead of copying would save anything:
   // only where the pictures are most of the file.
-  const canLink = (kind) => LINKABLE.has(kind) || kind === "pdf";
+  const canLink = (kind) => LINKABLE.has(kind);
 
   // Makes a clip of `file`, `kind` from kindOf. `link` is the lasting
   // permission on the file (platform.files) when the clip is to read from
@@ -507,8 +529,6 @@
     const id = C.save.newId();
     const out = document.implementation.createHTMLDocument("");
     const ext = kind === "epub" || kind === "cbz" || !EXTS[extOf(file.name)] ? kind : extOf(file.name);
-    // A PDF is read once into words or pages; there's nothing left in the
-    // file to come back for, so it's never a clip that reads from one.
     const pics = picturesOut(id, link && LINKABLE.has(kind));
     let got;
     try {

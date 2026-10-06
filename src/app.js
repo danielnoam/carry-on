@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.32.0";
+  const APP_VERSION = "0.32.1";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -3373,7 +3373,6 @@
         const meta = kind === "clip" ? await C.backup.importPage(await file.text(), (url) => !!savedAs(url))
           : await C.files.bring(file, kind, { has: (name, size) => hasFile(name, size, link), link,
             onProgress: (done, total, what) => say(what === "words" ? "Reading, page " + done + " of " + total : "Pictures, " + done + " of " + total) });
-        if (link && meta.file && !meta.link) toast("This one is kept as a copy: there's nothing left in the file to come back for.");
         if (meta.already) {
           toast("Already in your library");
           const had = open && kind !== "clip" && fileLike(file.name, file.size, link);

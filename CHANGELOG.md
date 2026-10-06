@@ -2,6 +2,16 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.32.1] - 2026-10-06
+
+### Fixed
+- Choosing "Read from where it is" for a PDF made a copy anyway, so the PDF
+  landed in Clips and deleting it said it would leave the phone. It now
+  reads from the file and lives in Files like a comic or a book does. A
+  scanned PDF draws its pages from the file each time you open it.
+- A scanned PDF (one with no words in it) stopped on its first page while
+  opening. It now comes in.
+
 ## [0.32.0] - 2026-10-06
 
 ### Added
