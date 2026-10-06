@@ -97,6 +97,10 @@ test("the share target plugin is a local Capacitor plugin the app depends on", (
   assert.strictEqual(plugin.capacitor.android.src, "android");
   const java = fs.readFileSync(path.join(ROOT, "native", "share", "android", "src", "main", "java", "io", "github", "danielnoam", "carryon", "share", "ShareTargetPlugin.java"), "utf8");
   assert.ok(/@CapacitorPlugin\(name = "ShareTarget"\)/.test(java));
+  const files = fs.readFileSync(path.join(ROOT, "native", "share", "android", "src", "main", "java", "io", "github", "danielnoam", "carryon", "share", "FilesPlugin.java"), "utf8");
+  assert.ok(/@CapacitorPlugin\(name = "Files"\)/.test(files));
+  // The lasting permission is the whole point of the system's picker.
+  assert.ok(/takePersistableUriPermission/.test(files));
 });
 
 test("android.yml patches the manifest and the updater's plugin is installed", () => {

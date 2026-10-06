@@ -27,11 +27,11 @@
   // Fields that come with the page's text, so the copy saved last wins
   // them all together.
   const CONTENT = ["url", "title", "site", "byline", "licence", "savedAt", "minutes", "lang", "dir", "mode", "images",
-    "comic", "next", "prev", "requested", "series", "source"];
+    "comic", "next", "prev", "requested", "series", "source", "file"];
   // Every field an index entry can carry through a backup or sync
   // (backup.cleanMeta); anything else on a page stays on its device.
   const SYNCED = new Set(["id", "url", "title", "site", "byline", "licence", "savedAt", "minutes", "lang", "dir", "mode", "images",
-    "at", "finished", "readAt", "comic", "next", "prev", "requested", "tags", "folder", "folderAt", "source", "series", "fav", "favAt", "folderFav", "folderFavAt"]);
+    "at", "finished", "readAt", "comic", "next", "prev", "requested", "tags", "folder", "folderAt", "source", "series", "fav", "favAt", "folderFav", "folderFavAt", "file"]);
   // Where the reader is, which goes with whichever device read last.
   const READING = ["at", "finished", "readAt"];
 
@@ -284,14 +284,29 @@
 
   // ---- A page's text going up and coming down ----
 
+  // A clip made from a file of your own has no links to fetch its
+  // pictures from again, so they go up inside its page, as long as they
+  // come to less than this (0.32.0). A bigger one keeps its pictures on
+  // the device it was opened on.
+  const FILE_PICTURES = 20 * 1024 * 1024;
+
   // The page's HTML with its pictures marked missing: the other device
-  // gets them from the site itself.
-  function outgoing(html) {
+  // gets them from the site itself. A file's clip takes its pictures with
+  // it instead, when they're small enough.
+  async function outgoing(html, entry) {
     const doc = new DOMParser().parseFromString(html, "text/html");
+    const carry = !!(entry && entry.file) && (entry.imageBytes || 0) <= FILE_PICTURES;
     for (const img of doc.querySelectorAll("img[src]")) {
       // A local picture, or one a browser keeps inside the page.
       const src = img.getAttribute("src");
       if (!LOCAL.test(src) && !(/^data:/.test(src) && (img.hasAttribute("data-full") || img.hasAttribute("data-thumb")))) continue;
+      if (carry && LOCAL.test(src)) {
+        try {
+          const bytes = await C.store.readBytes(entry.id, src);
+          img.setAttribute("src", "data:" + (C.backup.imageType(bytes) || "image/jpeg") + ";base64," + C.store.toBase64(bytes));
+          continue;
+        } catch (e) { /* gone: missing, like any other */ }
+      }
       img.removeAttribute("src");
       img.className = "co-missing";
     }
@@ -302,10 +317,28 @@
   // A page from GitHub, ready to keep: pictures as links where this device
   // keeps none (a browser, or a page saved as Links), else left missing for
   // the downloads after. Resolves to { html, missing }.
-  function incoming(html, entry) {
+  async function incoming(html, entry) {
     const doc = new DOMParser().parseFromString(html, "text/html");
     const asLinks = !C.platform.native || entry.mode === "links";
     let missing = 0;
+    // A file's clip brought its pictures with it; on a phone they go back
+    // into files beside the page, so the page itself stays small.
+    if (entry.file && C.platform.native) {
+      let n = 0, bytes = 0;
+      for (const img of doc.querySelectorAll('img[src^="data:image/"]')) {
+        const src = img.getAttribute("src");
+        const [head, b64] = src.split(",");
+        const ext = (head.match(/image\/(\w+)/) || [])[1].replace("jpeg", "jpg");
+        try {
+          const bin = Uint8Array.from(atob(b64.replace(/\s+/g, "")), (c) => c.charCodeAt(0));
+          const rel = "images/" + n++ + "." + ext;
+          await C.store.writeBytes(entry.id, rel, bin);
+          img.setAttribute("src", rel);
+          bytes += bin.length;
+        } catch (e) { img.removeAttribute("src"); img.className = "co-missing"; }
+      }
+      if (n) entry.imageBytes = bytes;
+    }
     for (const img of doc.querySelectorAll("img.co-missing")) {
       const url = img.getAttribute("data-preview") || img.getAttribute("data-full") || img.getAttribute("data-thumb") || "";
       if (asLinks && /^https?:/.test(url)) { img.setAttribute("src", url); img.removeAttribute("class"); }
@@ -380,13 +413,14 @@
         if (!html) continue;
         const was = merged.files[p.id] || (remoteDoc && remoteDoc.files && remoteDoc.files[p.id]);
         let sha;
-        try { sha = await write("pages/" + p.id + ".html", outgoing(html), was && was.sha, "Page: " + p.title.slice(0, 60)); }
+        const body = await outgoing(html, mine.get(p.id));
+        try { sha = await write("pages/" + p.id + ".html", body, was && was.sha, "Page: " + p.title.slice(0, 60)); }
         catch (e) {
           if (e.status !== 409 && e.status !== 422) throw e;
           // There already, under a sha this device didn't know.
           const now = await call(contents("pages/" + p.id + ".html") + "?ref=" + encodeURIComponent(cfg.branch), { headers: headers() });
           if (!now.ok) throw await fail(now);
-          sha = await write("pages/" + p.id + ".html", outgoing(html), (await now.json()).sha, "Page: " + p.title.slice(0, 60));
+          sha = await write("pages/" + p.id + ".html", body, (await now.json()).sha, "Page: " + p.title.slice(0, 60));
         }
         merged.files[p.id] = uploaded[p.id] = { at: p.savedAt, sha };
         up++;
@@ -438,9 +472,10 @@
       let html = null;
       try { html = await readText("pages/" + m.id + ".html"); } catch (e) { html = null; }
       if (!html) { if (!have) stillWaiting.push(m.id); continue; }
-      const got = incoming(html, m);
       if (have) await C.store.removePage(m.id);
+      const got = await incoming(html, m);
       const meta = { ...m, missing: got.missing };
+      if (m.file && m.imageBytes != null) meta.imageBytes = m.imageBytes;
       meta.bytes = await C.store.writePage(m.id, got.html, meta);
       decided.set(m.id, meta);
       if (got.missing) downloads.push(meta);

@@ -475,6 +475,134 @@
     }
   }
 
+  // ---- Files of your own, kept where they are (0.32.0) ----
+  // A file the WebView's own picker hands over is readable once; a file
+  // Carry-on can still open next week needs the system's picker, which
+  // grants a lasting permission. `ref` is what that permission is held by:
+  // a content:// address in the app, a stored handle in a browser (Chrome
+  // and Edge on a computer; Firefox and Safari have no such picker).
+  const FILE_MIMES = ["application/epub+zip", "text/markdown", "text/x-markdown", "text/plain", "text/html",
+    "application/pdf", "application/vnd.comicbook+zip", "application/x-cbz", "application/zip"];
+  const FILE_EXTS = [".epub", ".md", ".markdown", ".txt", ".html", ".htm", ".pdf", ".cbz"];
+  const PIECE = 4 << 20;
+
+  // A browser's handles live in IndexedDB; the entry keeps the key.
+  function handles() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open("carryon-files", 1);
+      req.onupgradeneeded = () => req.result.createObjectStore("handles");
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function handleDo(mode, fn) {
+    const db = await handles();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction("handles", mode);
+      const req = fn(tx.objectStore("handles"));
+      tx.oncomplete = () => { db.close(); resolve(req && req.result); };
+      tx.onerror = () => { db.close(); reject(tx.error); };
+    });
+  }
+  const webPicker = () => !native && typeof window.showOpenFilePicker === "function";
+
+  // The file behind a handle, asking for permission again if the browser
+  // dropped it. null when it's gone or permission was refused.
+  async function handleFile(ref) {
+    try {
+      const h = await handleDo("readonly", (s) => s.get(ref));
+      if (!h) return null;
+      if (h.queryPermission) {
+        let state = await h.queryPermission({ mode: "read" });
+        if (state === "prompt") state = await h.requestPermission({ mode: "read" });
+        if (state !== "granted") return null;
+      }
+      return await h.getFile();
+    } catch (e) { return null; }
+  }
+
+  const files = {
+    // Whether this device can keep reading a file after the app closes.
+    get canLink() { return !!plugin("Files") || webPicker(); },
+    get canPickFolder() { return !!plugin("Files"); },
+    async pick() {
+      const F = plugin("Files");
+      if (F) {
+        const got = await F.pick({ mimes: FILE_MIMES });
+        return got && got.uri ? { ref: got.uri, name: got.name || "file", size: got.size || 0, mime: got.mime || "" } : null;
+      }
+      if (!webPicker()) return null;
+      let handle;
+      try {
+        [handle] = await window.showOpenFilePicker({ multiple: false,
+          types: [{ description: "Books, notes and comics", accept: { "*/*": FILE_EXTS } }] });
+      } catch (e) { return null; }
+      if (!handle) return null;
+      const file = await handle.getFile();
+      const ref = "h" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      await handleDo("readwrite", (s) => s.put(handle, ref));
+      return { ref, name: file.name, size: file.size, mime: file.type || "" };
+    },
+    async pickFolder() {
+      const F = plugin("Files");
+      if (!F) return null;
+      const got = await F.pickFolder();
+      return got && got.uri ? { ref: got.uri, name: got.name || "Folder" } : null;
+    },
+    // Whether the file is still where it was, and how big it is now.
+    async info(ref) {
+      const F = plugin("Files");
+      if (F) {
+        try { const got = await F.info({ uri: ref }); return { ok: !!got.ok, name: got.name || "", size: got.size || 0 }; }
+        catch (e) { return { ok: false, name: "", size: 0 }; }
+      }
+      const file = await handleFile(ref);
+      return file ? { ok: true, name: file.name, size: file.size } : { ok: false, name: "", size: 0 };
+    },
+    // The file as something the zip reader can slice: a real Blob in a
+    // browser, and in the app a stand-in that reads each stretch over the
+    // bridge. Throws when the file has moved or been deleted.
+    async blob(ref, size) {
+      const F = plugin("Files");
+      if (!F) {
+        const file = await handleFile(ref);
+        if (!file) throw new Error("gone");
+        return file;
+      }
+      const info = await F.info({ uri: ref });
+      if (!info || !info.ok) throw new Error("gone");
+      const whole = info.size || size || 0;
+      const read = async (from, to) => {
+        const out = new Uint8Array(Math.max(0, Math.min(to, whole) - from));
+        let at = 0;
+        while (at < out.length) {
+          const want = Math.min(PIECE, out.length - at);
+          const { data } = await F.read({ uri: ref, offset: from + at, length: want });
+          const bin = atob(data || "");
+          for (let i = 0; i < bin.length; i++) out[at + i] = bin.charCodeAt(i);
+          if (!bin.length) break;
+          at += bin.length;
+        }
+        return at === out.length ? out : out.slice(0, at);
+      };
+      // Enough of a File for the zip reader and files.js to work with.
+      const part = (from, to) => ({
+        name: info.name || "file",
+        type: "",
+        get size() { return Math.max(0, Math.min(to, whole) - from); },
+        slice: (a = 0, b) => part(from + a, b == null ? to : from + b),
+        arrayBuffer: async () => (await read(from, to)).buffer,
+        text: async () => new TextDecoder().decode(await read(from, to)),
+      });
+      return part(0, whole);
+    },
+    release(ref) {
+      const F = plugin("Files");
+      if (F) return F.release({ uri: ref }).catch(() => {});
+      return handleDo("readwrite", (s) => s.delete(ref)).catch(() => {});
+    },
+  };
+
   window.CarryOn = window.CarryOn || {};
   window.CarryOn.platform = {
     native,
@@ -514,6 +642,7 @@
     // The web copy the app was built from: inside the app this page is at
     // https://localhost, which another device can't open.
     webUrl() { return (build && build.webUrl) || null; },
+    files,
     get canScan() { return !!scanner(); },
     scanQr,
   };

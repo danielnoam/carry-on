@@ -151,7 +151,7 @@
       try { await FS().rmdir({ path: "pages/" + id, directory: DIR, recursive: true }); } catch (e) { /* already gone */ }
       return;
     }
-    try { await idbDo("readwrite", (s) => { s.delete(id + ":text"); s.delete(id + ":thumb"); s.delete(id + ":original"); return s.delete(id); }); } catch (e) { /* already gone */ }
+    try { await idbDo("readwrite", (s) => { s.delete(id + ":text"); s.delete(id + ":thumb"); return s.delete(id); }); } catch (e) { /* already gone */ }
   }
 
   // The page's words as plain text (text.txt), for searching the library.
@@ -288,44 +288,6 @@
     await FS().writeFile({ path: "pages/" + id + "/" + rel, data: toBase64(bytes), directory: DIR, recursive: true });
   }
 
-  // ---- A file of your own (0.31.0) ----
-  // The file someone opened, kept as it came beside the clip made from it
-  // (original.epub, original.cbz). Written a megabyte at a time, so a
-  // big comic never crosses the bridge whole. In a browser it is a Blob
-  // in IndexedDB.
-  const PIECE = 1 << 20;
-  async function writeOriginal(id, ext, blob, onProgress) {
-    if (!FS()) { await idbDo("readwrite", (s) => s.put(blob, id + ":original")); return blob.size; }
-    const path = "pages/" + id + "/original." + ext;
-    await FS().writeFile({ path, data: "", directory: DIR, recursive: true });
-    for (let at = 0; at < blob.size; at += PIECE) {
-      const bytes = new Uint8Array(await blob.slice(at, at + PIECE).arrayBuffer());
-      await FS().appendFile({ path, data: toBase64(bytes), directory: DIR });
-      if (onProgress) onProgress(Math.min(blob.size, at + PIECE), blob.size);
-    }
-    return blob.size;
-  }
-  async function readOriginal(id, ext) {
-    if (!FS()) {
-      const b = await idbDo("readonly", (s) => s.get(id + ":original"));
-      if (!(b instanceof Blob)) throw new Error("missing original");
-      return b;
-    }
-    const r = await fetch(pageDirUrl(id) + "original." + ext);
-    if (!r.ok) throw new Error("missing original");
-    return r.blob();
-  }
-  // The original copied into the cache under its own name, for the share
-  // sheet, which can't reach the app's data directory.
-  async function originalForShare(id, ext, name) {
-    const to = "files/" + name.replace(/[\\/:*?"<>|]+/g, "_");
-    await FS().copy({ from: "pages/" + id + "/original." + ext, directory: DIR, to, toDirectory: "CACHE" }).catch(async () => {
-      await FS().mkdir({ path: "files", directory: "CACHE", recursive: true }).catch(() => {});
-      await FS().copy({ from: "pages/" + id + "/original." + ext, directory: DIR, to, toDirectory: "CACHE" });
-    });
-    return (await FS().getUri({ path: to, directory: "CACHE" })).uri;
-  }
-
   // A file in the app's cache written a piece at a time, so a backup of
   // hundreds of megabytes never sits in memory or crosses the bridge whole.
   async function cacheFile(name) {
@@ -348,5 +310,5 @@
   }
 
   window.CarryOn.store = { ready, readIndex, writeIndex, writeIndexOnly, set onIndex(f) { onIndex = f; }, writeThumb, readThumbs, storageInfo, keepStored, writePage, readPage, removePage, writeText, readText, download, removeFile, sizeOf, shrink, pageDirUrl, bytesOf,
-    listFiles, listSized, readBytes, writeBytes, cacheFile, toBase64, writeOriginal, readOriginal, originalForShare };
+    listFiles, listSized, readBytes, writeBytes, cacheFile, toBase64 };
 })();

@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.31.0";
+  const APP_VERSION = "0.32.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -1076,9 +1076,11 @@
       if (part) back();
       // Files of your own (0.31.0) are a part of their own after Clips,
       // unless a search or filter lists everything together.
+      // Files are the clips that read from a file of your own; a copy is
+      // a clip like any other (0.32.0).
       const apart = !ts.length && state.filter === "all";
-      const mine = apart ? loose.filter((p) => p.file) : [];
-      const clips = apart ? loose.filter((p) => !p.file) : loose;
+      const mine = apart ? loose.filter((p) => p.link) : [];
+      const clips = apart ? loose.filter((p) => !p.link) : loose;
       if (folders.length && (!part || part === "collections")) {
         const names = sorted(folders.map(asItem)).map((x) => x.folder);
         const label = "Collections · " + names.length;
@@ -1405,10 +1407,15 @@
   async function openPage(id, fromHistory) {
     const p = state.pages.find((x) => x.id === id);
     if (!p || (!fromHistory && opening === id)) return;
-    let html;
+    let html, trouble = null;
     opening = id;
-    try { html = await C.store.readPage(id); } catch (e) { html = null; } finally { opening = null; }
-    if (!html) { toast("This clip's file is missing. Delete it and save it again."); return; }
+    try {
+      html = p.link ? await C.files.openLinked(p) : await C.store.readPage(id);
+    } catch (e) {
+      html = null;
+      trouble = e instanceof C.files.FileError ? e.message : null;
+    } finally { opening = null; }
+    if (!html) { toast(trouble || "This clip's file is missing. Delete it and save it again."); return; }
     if (!fromHistory) history.pushState(readerState(p), "");
     const shown = show(p, html);
     pushScreen($("readerView"));
@@ -2693,7 +2700,7 @@
     const list = folderPages(name);
     if (withPages && !confirm("Delete “" + name + "” and its " + countLine(list.length) + " from " + HERE + "?" + alsoSynced())) return;
     for (const p of list) {
-      if (withPages) await C.store.removePage(p.id);
+      if (withPages) { if (p.link) C.platform.files.release(p.link); await C.store.removePage(p.id); }
       else { delete p.folder; delete p.folderAt; delete p.folderFav; delete p.folderFavAt; }
     }
     if (withPages) state.pages = state.pages.filter((p) => !list.includes(p));
@@ -2778,10 +2785,9 @@
           el("p", { class: "meta" }, [p.site, p.folder, readingLine(p), formatSize(p.bytes || 0)].filter(Boolean).join(" · "))),
         el("div", { class: "tile-row" },
           inReader ? null : tileButton("open", "Open", () => back().then(() => openPage(p.id))),
-          // A file of your own shares the file itself, and has no page to
-          // go back to or to export (0.31.0).
-          tileButton("share", "Share", () => (p.file ? shareOriginal(p) : shareLink(p))),
-          p.file ? null : tileButton("send", "Export", () => { exporting = true; draw(); }),
+          // A clip made from a file has no address to share or go back to.
+          p.file ? null : tileButton("share", "Share", () => shareLink(p)),
+          p.link ? null : tileButton("send", "Export", () => { exporting = true; draw(); }),
           p.file ? null : tileButton("original", "Original", () => C.platform.openOutside(p.url)),
           favTile(p, draw)),
         el("h3", { class: "overline" }, "This clip"),
@@ -2841,7 +2847,8 @@
   // With sync on, a deletion reaches every device.
   const alsoSynced = () => (C.sync.on ? " With sync on, it goes from your other devices too." : "");
   async function deletePage(p, where) {
-    if (!confirm("Delete “" + p.title + "” from " + HERE + "?" + alsoSynced())) return;
+    if (!confirm("Delete “" + p.title + "” from " + HERE + "?" + (p.link ? " The file itself stays where it is." : alsoSynced()))) return;
+    if (p.link) C.platform.files.release(p.link);
     await C.store.removePage(p.id);
     state.pages = state.pages.filter((x) => x.id !== p.id);
     await C.store.writeIndex(state.pages);
@@ -2948,7 +2955,7 @@
   async function deletePicked() {
     const list = picked();
     if (!list.length || !confirm("Delete " + countLine(list.length) + " from " + HERE + "?" + alsoSynced())) return;
-    for (const p of list) await C.store.removePage(p.id);
+    for (const p of list) { if (p.link) C.platform.files.release(p.link); await C.store.removePage(p.id); }
     state.pages = state.pages.filter((p) => !list.includes(p));
     await C.store.writeIndex(state.pages);
     await back(andFolder(1));
@@ -2966,6 +2973,7 @@
     tags: { label: "Tags", build: tagsSheet },
     folder: { label: "Collection", build: folderSheet },
     saved: { label: "What's saved", build: savedSheet },
+    file: { label: "Opening a file", build: fileSheet },
     remove: { label: "Remove collection", build: removeSheet },
     addFeed: { label: "Add a feed", build: addFeedSheet },
     feed: { label: "Feed", build: feedSheet },
@@ -2995,6 +3003,11 @@
 
   function closeMenu() {
     if (!state.menu) return;
+    // The file question put away without an answer: nothing is opened.
+    if (state.menu.kind === "file" && askingFile && !askingFile.answered) {
+      askingFile.answered = true;
+      askingFile.done(null);
+    }
     state.menu = null;
     const was = menuUnder;
     menuUnder = [];
@@ -3130,18 +3143,6 @@
     } catch (e) { toast("Couldn't share the link. Try again."); }
   }
 
-  // A file of your own handed on as it came (0.31.0): the share sheet in
-  // the app, a download in a browser.
-  async function shareOriginal(p) {
-    try {
-      if (C.platform.native) {
-        const uri = await C.store.originalForShare(p.id, p.file.ext, p.file.name);
-        if (await C.platform.shareFile(uri, p.file.name)) return;
-      }
-      C.platform.download(p.file.name, await C.store.readOriginal(p.id, p.file.ext));
-    } catch (e) { toast("Couldn't find this file's original. Delete it and open the file again."); }
-  }
-
   // ---- Export (0.25.2) ----
   // A page as a file of the kind picked, saved where the person picks or
   // handed to the share sheet. PDF goes through the print screen, where
@@ -3265,8 +3266,24 @@
   // (0.31.0): a backup is restored, a clip sent as a file comes back, and
   // a book, a note, a page or a comic becomes a clip of its own. `open`
   // opens it once it's in.
-  const FILE_ACCEPT = ".epub,.md,.markdown,.txt,.html,.htm,.cbz,application/epub+zip,text/markdown,text/plain,text/html";
-  function pickFile(first) {
+  const FILE_ACCEPT = ".epub,.md,.markdown,.txt,.html,.htm,.cbz,.pdf,application/epub+zip,application/pdf,text/markdown,text/plain,text/html";
+  // The system's picker where there is one (it also grants a lasting
+  // permission, for a clip that reads from the file); the browser's own
+  // otherwise.
+  async function pickFile(first) {
+    if (C.platform.files.canLink) {
+      let got = null;
+      try { got = await C.platform.files.pick(); } catch (e) { got = null; }
+      if (!got) return;
+      if (first) await first();
+      let file;
+      try { file = await C.platform.files.blob(got.ref, got.size); } catch (e) {
+        toast("Couldn't read that file. Try opening it again.");
+        return;
+      }
+      openFile(file, null, true, got.ref);
+      return;
+    }
     // Kept in the page while the picker is up, so it isn't collected.
     document.querySelectorAll(".file-pick").forEach((n) => n.remove());
     const input = el("input", { type: "file", accept: FILE_ACCEPT, class: "file-pick visually-hidden", tabindex: "-1", "aria-hidden": "true" });
@@ -3280,6 +3297,34 @@
     });
     input.click();
   }
+
+  // Keep a copy, or read from the file where it is? Asked only where it
+  // changes anything: a comic, a book or a PDF, whose pictures are most
+  // of the file. Resolves to true to link, false to copy, null to stop.
+  let askingFile = null;
+  function askKeep(file, kind) {
+    return new Promise((done) => {
+      askingFile = { file, kind, done, answered: false };
+      openMenu("file");
+    });
+  }
+  function fileSheet() {
+    const a = askingFile;
+    if (!a) return el("div");
+    const answer = (v) => { if (a.answered) return; a.answered = true; a.done(v); back(); };
+    const big = formatSize(a.file.size || 0);
+    return el("div", { class: "page-controls" },
+      el("div", { class: "menu-head" },
+        el("p", { class: "menu-title", dir: "auto" }, a.file.name),
+        el("p", { class: "meta" }, [C.files.KINDS[a.kind], big].filter(Boolean).join(" · "))),
+      el("div", { class: "group" },
+        el("button", { class: "row", type: "button", onclick: () => answer(false) },
+          el("span", { class: "choice-text" }, el("span", { class: "choice-label accent" }, "Keep a copy"),
+            el("span", { class: "choice-note" }, "A clip like any other: it syncs, and it stays when the file goes. About " + big + " " + ON_HERE + "."))),
+        el("button", { class: "row", type: "button", onclick: () => answer(true) },
+          el("span", { class: "choice-text" }, el("span", { class: "choice-label accent" }, "Read from where it is"),
+            el("span", { class: "choice-note" }, "Costs almost nothing here, and lives in Files. It needs the file to stay where it is, and doesn't sync.")))));
+  }
   // A file dropped on the window, on a computer.
   addEventListener("dragover", (e) => { if (e.dataTransfer && [...e.dataTransfer.types].includes("Files")) e.preventDefault(); });
   addEventListener("drop", async (e) => {
@@ -3288,9 +3333,12 @@
     e.preventDefault();
     for (const f of files) await openFile(f, null, files.length === 1);
   });
-  const hasFile = (name, size) => state.pages.some((p) => p.file && p.file.name === name && p.file.size === size);
-  const FILE_KINDS_LINE = "EPUB, Markdown, text, HTML and CBZ comic files";
-  async function openFile(file, btn, open) {
+  // The same file again is already here, unless it's being brought in the
+  // other way this time (a copy of one read from where it is, or back).
+  const hasFile = (name, size, link) => state.pages.some((p) => p.file && p.file.name === name && p.file.size === size && !p.link === !link);
+  const fileLike = (name, size, link) => state.pages.find((p) => p.file && p.file.name === name && p.file.size === size && !p.link === !link);
+  const FILE_KINDS_LINE = "EPUB, PDF, Markdown, text, HTML and CBZ comic files";
+  async function openFile(file, btn, open, ref) {
     if (!file) return;
     const label = btn ? btn.querySelector(".row-label") : null;
     const say = (t) => { if (label) label.textContent = t; };
@@ -3298,6 +3346,13 @@
     say("Opening…");
     try {
       const kind = await C.files.kindOf(file);
+      let link = null;
+      if (ref && C.files.canLink(kind)) {
+        const asked = await askKeep(file, kind);
+        if (asked == null) { if (btn) { btn.disabled = false; say("Restore or open a file"); } return; }
+        link = asked ? ref : null;
+      }
+      if (ref && !link) C.platform.files.release(ref);
       if (kind === "backup") {
         const res = await C.backup.restoreLibrary(file, state.pages, sameUrl, (done, total) => say("Restoring, " + done + " of " + total));
         state.pages = res.pages;
@@ -3309,8 +3364,6 @@
         const n = res.added + res.replaced;
         const what = [n ? countLine(n) : "", followed ? (followed === 1 ? "1 feed" : followed + " feeds") : ""].filter(Boolean).join(" and ");
         toast((what ? "Restored " + what : "Nothing new to restore") + (res.kept ? ". " + res.kept + " already here" + (res.kept === 1 ? " was" : " were") + " kept." : "."));
-      } else if (kind === "pdf") {
-        toast("PDFs open in Carry-on in the next update. For now it opens " + FILE_KINDS_LINE + ".");
       } else if (kind === "zip") {
         toast("This zip isn't a Carry-on backup, an EPUB or a comic, so it can't be opened here.");
       } else if (!kind) {
@@ -3318,11 +3371,12 @@
       } else {
         if (!btn) toast("Opening " + file.name + "…");
         const meta = kind === "clip" ? await C.backup.importPage(await file.text(), (url) => !!savedAs(url))
-          : await C.files.bring(file, kind, { has: hasFile,
-            onProgress: (done, total, what) => say(what === "file" ? "Keeping the file…" : "Pictures, " + done + " of " + total) });
+          : await C.files.bring(file, kind, { has: (name, size) => hasFile(name, size, link), link,
+            onProgress: (done, total, what) => say(what === "words" ? "Reading, page " + done + " of " + total : "Pictures, " + done + " of " + total) });
+        if (link && meta.file && !meta.link) toast("This one is kept as a copy: there's nothing left in the file to come back for.");
         if (meta.already) {
           toast("Already in your library");
-          const had = open && kind !== "clip" && state.pages.find((p) => p.file && p.file.name === file.name && p.file.size === file.size);
+          const had = open && kind !== "clip" && fileLike(file.name, file.size, link);
           if (had) openPage(had.id);
         } else {
           state.pages.unshift(meta);
@@ -3378,9 +3432,10 @@
     let res = null;
     try {
       res = await C.sync.run({
-        // Files of your own stay on this device for now (0.31.0): sync
-        // neither sees them nor takes them away.
-        getPages: () => state.pages.filter((p) => !p.file),
+        // A clip that reads from a file on this device can't be read from
+        // another one, so it stays here (0.32.0). A copy syncs like any
+        // other clip, with its pictures inside it.
+        getPages: () => state.pages.filter((p) => !p.link),
         // The same objects are kept and updated in place: the open page,
         // an open menu and the position timer hold on to them.
         setPages: async (list) => {
@@ -3390,7 +3445,7 @@
             if (!o || o === n) return n;
             for (const k of Object.keys(o)) if (!(k in n)) delete o[k];
             return Object.assign(o, n);
-          }).concat(state.pages.filter((p) => p.file)).sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+          }).concat(state.pages.filter((p) => p.link)).sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
           await C.store.writeIndexOnly(state.pages);
           texts.clear();
           await loadThumbs();
@@ -4832,7 +4887,7 @@
       ...[...foldersByUse().filter(folderFav), ...foldersByUse().filter((f) => !folderFav(f))].slice(0, SIDE_MAX).map((name) =>
         item(sideCover(name), name, false, count(freshCount(name)), () => openFromSide(name), "side-sub")),
       // Files of your own (0.31.0), their part of the library.
-      state.pages.some((p) => p.file) ? item(fileMark(), "Files", !inFeeds && state.part === "files", null, () => back().then(() => {
+      state.pages.some((p) => p.link) ? item(fileMark(), "Files", !inFeeds && state.part === "files", null, () => back().then(() => {
         if (state.place !== "library") { state.place = "library"; store(PLACE_KEY, "library"); paintPlace(); }
         if (state.part !== "files") openPart("files");
       }), "side-sub") : null,
@@ -5649,6 +5704,20 @@
   // ---- Shared from another app (Android) ----
   // native/share hands over what Chrome's share sheet sent: usually the
   // link, sometimes "Title https://…". Saved straight away.
+  // 0.31.0 kept the file beside the clip it made; 0.32.0 doesn't, so the
+  // copies it left are given back. Once, quietly.
+  const TIDIED_KEY = "carryon.tidiedFiles";
+  async function tidyOldFiles() {
+    if (!C.platform.native || load(TIDIED_KEY, false)) return;
+    store(TIDIED_KEY, true);
+    let freed = 0;
+    for (const p of state.pages.filter((x) => x.file && x.file.ext && !x.link)) {
+      const went = await C.store.removeFile(p.id, "original." + p.file.ext).catch(() => 0);
+      if (went) { freed += went; p.bytes = Math.max(0, (p.bytes || 0) - went); }
+    }
+    if (freed) await C.store.writeIndex(state.pages);
+  }
+
   async function saveShared() {
     const share = C.platform.plugin("ShareTarget");
     if (!share) return;
@@ -5681,6 +5750,7 @@
     if (history.state && history.state.view) history.replaceState(null, "");
     paintPlace();
     noteVersion();
+    tidyOldFiles();
     const share = C.platform.plugin("ShareTarget");
     if (share && share.addListener) share.addListener("shared", saveShared);
     saveShared();
