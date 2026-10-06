@@ -114,7 +114,8 @@ test("the updater downloads the asset the workflow publishes", () => {
   const yml = fs.readFileSync(path.join(ROOT, ".github", "workflows", "android.yml"), "utf8");
   const platform = fs.readFileSync(path.join(ROOT, "src", "platform.js"), "utf8");
   assert.ok(/gh release create "app-v\$V" CarryOn\.apk/.test(yml));
-  assert.ok(platform.includes('"/releases/download/app-v" + version + "/CarryOn.apk"'));
+  assert.ok(platform.includes('"/releases/download/app-v" + version + "/" + file'));
+  assert.ok(platform.includes('file = "CarryOn.apk"'));
 });
 
 console.log("\n" + passed + " passed");

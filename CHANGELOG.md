@@ -2,6 +2,14 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.36.0] - 2026-10-06
+
+### Added
+- Getting ready for Carry-on's new name, Waypage. When Waypage comes out,
+  Updates says so and gets it for you. Waypage is a new app beside this
+  one, so Updates also offers "Send your library to Waypage": a backup
+  you hand to Waypage from the share sheet.
+
 ## [0.35.0] - 2026-10-06
 
 ### Added

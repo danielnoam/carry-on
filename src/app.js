@@ -1,7 +1,9 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.35.0";
+  const APP_VERSION = "0.36.0";
+  // Carry-on's new name (0.36.0), whose releases the updater learns to spot.
+  const NEW_APP = "Waypage";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -3341,7 +3343,7 @@
     btn.disabled = false;
   }
 
-  async function backUp(btn) {
+  async function backUp(btn, idle = "Back up the library") {
     if (!state.pages.length && !feeds.length) { toast("There's nothing to back up yet."); return; }
     btn.disabled = true;
     const label = btn.querySelector(".row-label");
@@ -3355,7 +3357,7 @@
       toast("Couldn't write the backup. Free some space and try again.");
     }
     btn.disabled = false;
-    label.textContent = "Back up the library";
+    label.textContent = idle;
   }
 
   // A backup (a zip) or one page's file, picked from the phone.
@@ -5223,7 +5225,7 @@
   async function pullChapters(app) {
     if (navigator.onLine && !allFolders().some((n) => isSeries(folderPages(n)))) {
       await app;
-      toast(updateOut() ? "Carry-on " + upd.latest + " is out." : "Nothing new.");
+      toast(updateOut() ? (upd.moved ? "Carry-on is now " + NEW_APP + "." : "Carry-on " + upd.latest + " is out.") : "Nothing new.");
       return;
     }
     await Promise.all([checkChapters(), app]);
@@ -5697,7 +5699,7 @@
       el("div", { class: "settings-menu" },
         out ? el("div", { class: "group update-card" },
           el("div", { class: "row update-row out" },
-            el("span", { class: "row-label accent" }, "Carry-on " + upd.latest + " is out"),
+            el("span", { class: "row-label accent" }, upd.moved ? "Carry-on is now " + NEW_APP : "Carry-on " + upd.latest + " is out"),
             el("button", { class: "btn-small", type: "button", onclick: () => openSection("updates") }, "View"))) : null,
         el("div", { class: "group" }, row("appearance"), row("saving")),
         el("div", { class: "group" }, row("storage"), row("sync")),
@@ -6002,7 +6004,9 @@
   }
 
   // phase: idle, checking, current, failed, available, downloading, ready.
-  const upd = { phase: "idle", latest: null, notes: "", pct: 0, apk: null, error: "" };
+  // `moved` (0.36.0): the release is Waypage, Carry-on's new name, a new app
+  // that installs beside this one and takes the library from a backup.
+  const upd = { phase: "idle", latest: null, notes: "", pct: 0, apk: null, error: "", moved: false };
 
   function setUpd(change) {
     Object.assign(upd, change);
@@ -6023,8 +6027,9 @@
       if (res.status !== 200) throw new Error("HTTP " + res.status);
       const release = JSON.parse(res.text);
       const latest = String(release.tag_name || "").replace(/^app-v/, "");
+      const moved = (release.assets || []).some((a) => a && /^Waypage\.(apk|ipa)$/.test(a.name));
       if (/^\d+\.\d+\.\d+$/.test(latest) && isNewerVersion(latest, APP_VERSION)) {
-        setUpd({ phase: upd.latest === latest && upd.apk ? "ready" : "available", latest, notes: String(release.body || "") });
+        setUpd({ phase: upd.latest === latest && upd.apk ? "ready" : "available", latest, notes: String(release.body || ""), moved });
       } else setUpd({ phase: "current" });
     } catch (e) {
       setUpd({ phase: "failed", error: "Couldn't check. Try again when you're online." });
@@ -6041,14 +6046,14 @@
     setUpd({ phase: "downloading", pct: 0 });
     let apk;
     try {
-      apk = await C.platform.downloadUpdate(upd.latest, (f) => setUpd({ pct: Math.round(f * 100) }));
+      apk = await C.platform.downloadUpdate(upd.latest, (f) => setUpd({ pct: Math.round(f * 100) }), upd.moved ? NEW_APP + ".apk" : "CarryOn.apk");
     } catch (e) {
       setUpd({ phase: "available", error: "The download didn't finish. Try again." });
       return;
     }
     if (!apk) {
       setUpd({ phase: "available" });
-      C.platform.openOutside(C.platform.apkUrl());
+      C.platform.openOutside(C.platform.apkUrl(upd.moved ? NEW_APP + ".apk" : "CarryOn.apk"));
       return;
     }
     setUpd({ phase: "ready", apk, error: "" });
@@ -6076,7 +6081,7 @@
       return;
     }
     $("updateText").textContent = out
-      ? (upd.phase === "downloading" ? "Downloading " + upd.latest + " · " + upd.pct + "%" : upd.phase === "ready" ? "Carry-on " + upd.latest + " is ready to install" : "Carry-on " + upd.latest + " is out")
+      ? (upd.phase === "downloading" ? "Downloading " + appName() + " " + upd.latest + " · " + upd.pct + "%" : upd.moved ? "Carry-on is now " + NEW_APP : upd.phase === "ready" ? "Carry-on " + upd.latest + " is ready to install" : "Carry-on " + upd.latest + " is out")
       : "Updated to " + APP_VERSION;
     const btn = $("updateBtn");
     btn.textContent = out ? "View" : "What's new";
@@ -6104,14 +6109,15 @@
 
   // Updates and About in one (0.30.2): the version is the button that
   // checks for a newer one, then What's new.
+  function appName() { return upd.moved ? NEW_APP : "Carry-on"; }
   function updatesGroup() {
     const list = el("div", { class: "group" });
     if (C.platform.native) {
       const out = ["available", "downloading", "ready"].includes(upd.phase);
       const status = {
         idle: "Tap to check for updates", checking: "Checking…", current: "You have the latest version",
-        failed: upd.error, available: "Carry-on " + upd.latest + " is out",
-        downloading: "Downloading " + upd.latest + " · " + upd.pct + "%", ready: "Carry-on " + upd.latest + " is ready to install",
+        failed: upd.error, available: upd.moved ? "Carry-on is now " + NEW_APP + ". Get it here." : "Carry-on " + upd.latest + " is out",
+        downloading: "Downloading " + appName() + " " + upd.latest + " · " + upd.pct + "%", ready: appName() + " " + upd.latest + " is ready to install",
       }[upd.phase];
       const busy = upd.phase === "checking" || upd.phase === "downloading";
       const version = el("button", { class: "row update-row" + (out ? " out" : ""), type: "button", onclick: () => (out ? startUpdate() : checkForNewerApp()) },
@@ -6119,16 +6125,24 @@
         el("span", { class: "choice-text" },
           el("span", { class: "row-label" }, "Version " + APP_VERSION),
           el("span", { class: "choice-note" + (out ? " accent" : upd.phase === "failed" ? " warn" : ""), role: "status" }, status)),
-        out ? el("span", { class: "btn-small", "aria-hidden": "true" }, upd.phase === "downloading" ? upd.pct + "%" : C.platform.ios ? "Get it" : upd.phase === "ready" ? "Install" : "Update") : null);
+        out ? el("span", { class: "btn-small", "aria-hidden": "true" }, upd.phase === "downloading" ? upd.pct + "%" : C.platform.ios ? "Get it" : upd.phase === "ready" ? "Install" : upd.moved ? "Get it" : "Update") : null);
       version.disabled = busy;
       list.append(version);
       if (out && upd.error) list.append(el("div", { class: "row" }, el("span", { class: "row-label warn" }, upd.error)));
+      // Carry-on's last job (0.36.0): its library, sent to Waypage as a backup.
+      if (out && upd.moved) {
+        const send = el("button", { class: "row", type: "button", onclick: (e) => backUp(e.currentTarget, "Send your library to " + NEW_APP) },
+          el("span", { class: "row-label accent" }, "Send your library to " + NEW_APP));
+        list.append(send);
+      }
     } else {
       list.append(el("div", { class: "row" }, el("span", { class: "row-label" }, "Version"), el("span", { class: "row-value" }, APP_VERSION)));
     }
     list.append(el("button", { class: "row", type: "button", onclick: () => openNews() },
       el("span", { class: "row-label accent" }, "What's new"), el("span", { class: "row-value", "aria-hidden": "true" }, "›")));
-    return el("section", { class: "settings-section", id: "updatesSection" }, list);
+    const moved = C.platform.native && upd.moved && ["available", "downloading", "ready"].includes(upd.phase);
+    return el("section", { class: "settings-section", id: "updatesSection" }, list,
+      moved ? el("p", { class: "footnote" }, NEW_APP + " is a new app, so it starts empty and Carry-on stays until you remove it. Get " + NEW_APP + ", then send your library and pick " + NEW_APP + " in the share sheet. With sync on, turning it on in " + NEW_APP + " brings the library over instead.") : null);
   }
 
   // ---- What's new ----

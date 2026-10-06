@@ -35,8 +35,9 @@ taken and the store listing should lean on "Offline Reader". Before this
 release, search Waypage in the Play Store and the App Store by hand.
 
 **Everything is renamed (Daniel, 5 Oct 2026),** not only what's shown.
-This replaces the earlier "display name only" plan. Nothing here has
-started; it waits for Daniel's go.
+This replaces the earlier "display name only" plan. Daniel gave the go
+on 6 Oct 2026, with a new icon too; the keystore he swaps later (Waypage
+can keep the current key until then, since its app ID is new anyway).
 
 What gets the new name, and what each one breaks:
 
@@ -73,7 +74,7 @@ What gets the new name, and what each one breaks:
 
 A safe order:
 
-1. **Bridge release, the last Carry-on.** Its updater learns the new
+1. **Done in 0.36.0: bridge release, the last Carry-on.** Its updater learns the new
    repo, the `Waypage.apk` name and the new app ID. When Waypage is out it
    says so: "Carry-on is now Waypage. Install it, then bring your
    library", and makes a backup file (or relies on sync when it's on).
