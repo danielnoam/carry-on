@@ -3,6 +3,17 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **A PDF read from where it is, and drawn for print (0.32.1).** 0.32.0
+  asked "copy or read from where it is" for a PDF and then copied anyway,
+  on the reasoning that once its words are out there's nothing to come
+  back for. That broke the promise of the question: the PDF landed in
+  Clips, synced, and its delete said it would leave the phone. Now a PDF
+  with words keeps those words (they're what search and read aloud need,
+  and they're small) and the link; a scan keeps slots (`page:N`) and
+  draws its pages from the file each time it's opened. Pages are drawn
+  with pdf.js's `intent: "print"`: the screen intent waits on
+  requestAnimationFrame, which Chromium never runs in a frame kept out of
+  sight, so in 0.32.0 a scanned PDF hung on its first page.
 - **pdf.js in a frame with no origin (0.32.0).** A PDF is read by
   Mozilla's pdf.js (vendored, Apache 2.0, like Readability), but never in
   the app's own page: a script in a PDF could otherwise reach the

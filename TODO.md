@@ -131,7 +131,8 @@ native code.
   tile is hidden on those clips for now; filling the slots first would
   let it work.
 - **A PDF's own pages:** a scanned PDF is drawn once at about 1000 px and
-  kept as pictures. Drawing as you reach them, and keeping where you are
+  kept as pictures, or, read from where it is, every page is drawn again
+  each time it's opened, which is slow for a long one. Drawing as you reach them, and keeping where you are
   by page, would suit a long one better.
 - **Sync of a big file's clip:** over 20 MB of pictures a copy keeps them
   on the device it was opened on. GitHub's contents API takes up to
