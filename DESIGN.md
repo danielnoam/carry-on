@@ -103,18 +103,26 @@ and the page shows above it.
   until then.
 - Nothing animates text the reader is reading.
 - `prefers-reduced-motion: reduce`: springs become a 120 ms opacity fade.
-- Only `transform` and `opacity` move, so the GPU runs every animation;
-  anything costly an animation causes (focus, `inert`, redraws) runs after
-  its first frame (0.30.4).
-- Screens come in from 18% to the right as they fade in (opaque by 40%
-  of the way, sheet spring) and leave the same way (control spring),
-  Material's shared axis (0.30.5). A page or collection opened from its
-  card in the library scales from 0.86 around the card's centre as it
-  fades in (opaque by 45%), and on Back scales to 0.9 and fades into it.
-- Collections and Pages opening alone in the library are a view
-  transition: the collections' row, its heading, the Pages heading and
-  the cards on screen are named, so they move to their new places on the
-  sheet spring and everything else crossfades (0.30.6).
+- Only `transform` and `opacity` move, so the GPU runs every animation.
+  Focus can follow an animation's first frame; `inert` on the library
+  (which restyles every card) waits until the spring has all but landed,
+  300 ms (0.30.8).
+- Movement springs; opacity never does (0.30.8). A spring is most of the
+  way there in its first fifth, so a fade on it reads as a cut. Fades run
+  beside the movement on their own clock: fading in 200–240 ms on
+  `cubic-bezier(0.2, 0, 0.2, 1)` (`--fade-in`), fading out 160–220 ms
+  on `cubic-bezier(0.4, 0, 1, 1)`.
+- Screens come in from 72 px (or 18% of a narrow window) to the right as
+  they fade in, and leave the same way, Material's shared axis. A clip or
+  collection opened from its card grows out of the card to fill the
+  window as it fades in, and on Back shrinks into the card, fading once
+  it is nearly there (0.30.3, back in 0.30.8 after a 0.86 scale-up from
+  the card's centre in 0.30.5 read worse).
+- Collections or Clips opening alone, and back, fade through: the
+  library fades out in 90 ms, the new part is drawn while nothing shows,
+  then fades in as it grows from 0.96 (0.30.8). The view transition
+  before it (0.30.6) held the screen still while it took its pictures and
+  laid out every frame on the main thread.
 - The sidebar follows a drag to the left; past a third of its width or
   a flick it closes from there, short of that it springs back (0.30.5).
 - The reader's page turn: the page read lifts 6% and fades (control
@@ -163,8 +171,9 @@ and the page shows above it.
   With no picture, the thumbnail is `--preview` with the site's icon
   centred at 32 px (`--s-6`), or the site's first letter in the serif,
   heading size, `--muted` (0.27.6).
-- **Reader bars (0.30.5):** top and bottom on `--reader-bar`, a shade
-  darker than `--bar`, checked for AA with ink, muted and accent. The
+- **Reader bars:** top and bottom on `--bar`, the same as the strip under
+  the status bar (a darker `--reader-bar` in 0.30.5 was taken back in
+  0.30.8), checked for AA with ink, muted and accent. The
   bottom bar's time or pages left sits `--gutter` + `--s-2` in from the
   edge, centred in a bar at least `--s-7` tall.
 - **Collection tile (Now):** its story page's cover when it's linked to

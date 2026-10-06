@@ -2,6 +2,20 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.30.8] - 2026-10-06
+
+### Changed
+- Fades in the app now really fade: they run on their own gentle timing
+  beside the movement, where before they were over in a few frames.
+- A clip or collection grows out of the card you tapped again, as it did
+  before 0.30.5, and shrinks back into it on Back.
+- Tapping Collections or Clips in the library responds at once: the
+  library fades out and back in with the new view, instead of freezing
+  for a moment and then stuttering.
+- The sidebar and menus no longer catch on their first frames.
+- The reader's top and bottom bars are back to their earlier colour,
+  which matches the strip under the status bar.
+
 ## [0.30.7] - 2026-10-05
 
 ### Changed
