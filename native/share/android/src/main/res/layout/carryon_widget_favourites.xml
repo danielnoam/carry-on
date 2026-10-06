@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Favourites (0.29.2): the four pages favourited last. -->
+<!-- Favourites (0.29.2): the four pages favourited last. Also one
+     collection's next clips (0.35.0), its name in w_head. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/w_root"
     android:layout_width="match_parent"
@@ -8,8 +9,11 @@
     android:orientation="vertical"
     android:padding="@dimen/carryon_w_pad">
     <TextView
+        android:id="@+id/w_head"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="1"
         android:text="@string/carryon_w_favourites"
         android:textColor="@color/carryon_w_muted"
         android:textSize="12sp"

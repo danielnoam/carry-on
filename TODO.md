@@ -24,13 +24,6 @@ asks from Daniel.
 
 ---
 
-## Next: a widget for one collection
-
-- Favourite collections shipped in 0.30.9 as a mark on their clips
-  (NOTES.md). A widget for one collection, or anything else a collection
-  owns that its clips can't carry, still wants collections in a file of
-  their own first.
-
 ## Rename to Waypage (Daniel, 5 Oct 2026)
 
 The app becomes **Waypage**, store title "Waypage: Offline Reader": a page

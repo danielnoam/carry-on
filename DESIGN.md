@@ -580,7 +580,15 @@ and the page shows above it.
   Favourite." The Favourites widget is Keep reading's card with
   "Favourites" over up to four rows (title in serif on one line, "site ·
   6 min left"), each row at least 44 dp; empty: "Hold a page in Carry-on
-  and tap Favourite, and it shows here."
+  and tap Favourite, and it shows here." Favourite collections come
+  first (0.35.0), "Collection · 2 of 9 read" under the name.
+- **Collection widget (0.35.0, Android):** the Favourites card with the
+  collection's name and "2 of 9 read" as its head, over its next four
+  clips to read. Placing it opens a dialog in the widget's colours,
+  "Show which collection?", one 48 dp row per collection (name in serif,
+  how much is read under it). A widget whose collection is gone says
+  "This collection is gone. Tap to pick another." and a tap opens the
+  dialog again.
 - **New posts notification (Now, 0.28.4, Android):** the Feeds icon,
   "3 new posts from The Slow Times" and "Tap to see them in Feeds.", or
   "5 new posts" and "From The Slow Times, Kitchen Table and 1 more."

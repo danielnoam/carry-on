@@ -2,6 +2,18 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.35.0] - 2026-10-06
+
+### Added
+- A Collection widget on Android: pick a collection when you place it,
+  and it shows the next clips to read in it. Tap a clip to read it, or
+  the widget to open the collection. It follows the collection when you
+  rename it.
+
+### Changed
+- The Favourites widget shows your favourite collections too, first,
+  then your favourite clips.
+
 ## [0.34.2] - 2026-10-06
 
 ### Changed

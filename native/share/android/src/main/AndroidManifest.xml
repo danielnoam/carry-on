@@ -65,5 +65,26 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/carryon_widget_favourites_info" />
         </receiver>
+        <!-- One collection (0.35.0), picked when the widget is placed. -->
+        <receiver
+            android:name="io.github.danielnoam.carryon.share.CollectionWidget"
+            android:exported="false"
+            android:label="@string/carryon_w_collection">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/carryon_widget_collection_info" />
+        </receiver>
+        <activity
+            android:name="io.github.danielnoam.carryon.share.CollectionPickActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:theme="@style/CarryOnPick">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
     </application>
 </manifest>

@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.34.2";
+  const APP_VERSION = "0.35.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -2846,6 +2846,7 @@
     await C.store.writeIndex(state.pages);
     renderLibrary();
     if (state.folder) renderFolder();
+    updateWidgets();
     toast(on ? name + " is a favourite" : name + " is no longer a favourite");
   }
   async function setFavourite(list, on) {
@@ -4483,12 +4484,14 @@
     const clash = allFolders().find((n) => sameTag(n, name) && !sameTag(n, old));
     if (clash) { toast("There's already a collection called " + clash + "."); return false; }
     for (const p of folderPages(old)) p.folder = name;
+    C.platform.widgets.renamed(old, name);
     const entry = newFor(old);
     if (entry && !sameTag(old, name)) { setNewFor(name, entry); setNewFor(old, null); }
     await C.store.writeIndex(state.pages);
     state.folder = name;
     history.replaceState({ view: "folder", folder: name }, "");
     renderLibrary();
+    updateWidgets();
     return true;
   }
 
@@ -4650,8 +4653,10 @@
   // ---- Home screen widgets (0.29.0, Android) ----
   // Keep reading shows the page read last that isn't finished (or the
   // last one at all); Feeds the three newest posts not saved yet;
-  // Favourites (0.29.2) the four favourited last. Handed
-  // over whenever the app goes to the background, and after changes.
+  // Favourites (0.29.2) the favourite collections, then the clips
+  // favourited last (0.35.0), four in all; each collection widget (0.35.0)
+  // its collection's next clips to read. Handed over whenever the app
+  // goes to the background, and after changes.
   let widgetTimer = null;
   function updateWidgets() {
     clearTimeout(widgetTimer);
@@ -4665,13 +4670,26 @@
         reading: p ? { id: p.id, title: p.title, at: p.at || 0,
           meta: [p.site, (p.at || 0) >= 0.995 ? "Finished" : Math.max(1, Math.ceil((p.minutes || 1) * (1 - (p.at || 0)))) + " min left"].filter(Boolean).join(" · ") } : null,
         feeds: { following: feeds.length > 0, fresh: freshPosts(), posts },
-        favourites: state.pages.filter((x) => x.fav).sort((a, b) => (b.favAt || 0) - (a.favAt || 0)).slice(0, 4)
-          .map((x) => ({ id: x.id, title: x.title, meta: [x.site, readingLine(x)].filter(Boolean).join(" · ") })),
+        favourites: [
+          ...allFolders().filter(folderFav).map((name) => ({ name, at: Math.max(...folderPages(name).map((x) => x.folderFavAt || 0)) }))
+            .sort((a, b) => b.at - a.at).map(({ name }) => ({ kind: "collection", name, title: name, meta: "Collection · " + readCount(folderPages(name)) })),
+          ...state.pages.filter((x) => x.fav).sort((a, b) => (b.favAt || 0) - (a.favAt || 0))
+            .map((x) => ({ id: x.id, title: x.title, meta: clipMeta(x) })),
+        ].slice(0, 4),
+        collections: allFolders().sort((a, b) => a.localeCompare(b)).map((name) => {
+          const list = folderPages(name);
+          const i = list.findIndex((x) => !x.finished);
+          const from = i < 0 ? Math.max(0, list.length - 4) : i;
+          return { name, meta: readCount(list), clips: list.slice(from, from + 4).map((x) => ({ id: x.id, title: x.title, meta: clipMeta(x) })) };
+        }),
       });
     }, 800);
   }
 
-  // A widget's tap: the page to keep reading, a post, or Feeds.
+  const clipMeta = (x) => [x.site, readingLine(x)].filter(Boolean).join(" · ");
+  const readCount = (list) => { const done = list.filter((x) => x.finished).length; return done === list.length ? "All read" : done + " of " + list.length + " read"; };
+
+  // A widget's tap: the page to keep reading, a post, Feeds or a collection.
   async function takeWidget() {
     const got = await C.platform.widgets.take();
     if (!got || !got.kind) return;
@@ -4687,6 +4705,11 @@
     }
     if (got.kind === "feeds" || got.kind === "library") await goPlace(got.kind);
     if (got.kind === "favourites") { await goPlace("library"); setFilter("favourites"); }
+    if (got.kind === "collection" && got.name) {
+      await goPlace("library");
+      const name = allFolders().find((n) => sameTag(n, got.name));
+      if (name) openFolder(name);
+    }
   }
 
   // Posts found with the app closed: those feeds are read again now, and
