@@ -174,6 +174,11 @@ and the page shows above it.
   with no picture shows its kind instead ("EPUB", "PDF") in the sans at
   meta size, 600, spaced a little (0.31.0), and its site line names the
   kind.
+- **Where your library is (0.33.0):** a radio group in Storage and
+  backup, under the sizes: "Inside Carry-on" (marked Recommended in its
+  note), "Documents/Carry-on", "A folder you pick" (its name once
+  picked). Each note says what it costs. While moving, the footnote is
+  the progress ("Moving, 12 of 80 files…") and the radios are disabled.
 - **Opening a file (0.32.0, every kind since 0.32.2):** a file asks first, as a
   sheet of two rows, each a bold accent label over a line of grey saying
   what it costs: "Keep a copy" first, since it's the one that syncs and

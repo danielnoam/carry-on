@@ -9,7 +9,9 @@
 // and the "audio" background mode, so Read aloud (0.27.0) goes on with the
 // screen locked, and NSCameraUsageDescription for scanning sync's setup
 // code (0.30.1): on iOS the scanner plugin opens the camera itself, and iOS
-// closes an app that does that without saying why.
+// closes an app that does that without saying why. UIFileSharingEnabled
+// and LSSupportsOpeningDocumentsInPlace (0.33.0) show the app's Documents
+// folder, where the library already is, in the Files app as "Carry-on".
 // The oldest iOS goes from the template's 15.0 to 15.5, in the project and
 // the Podfile alike: Google's ML Kit, which the scanner is built on, needs
 // 15.5, and pod install refuses a project asking for less than a pod.
@@ -26,6 +28,8 @@ const PLIST = [
   ["ITSAppUsesNonExemptEncryption", "<false/>"],
   ["UIBackgroundModes", "<array>\n\t\t<string>audio</string>\n\t</array>"],
   ["NSCameraUsageDescription", "<string>Carry-on uses the camera to read the sync setup code from your other device.</string>"],
+  ["UIFileSharingEnabled", "<true/>"],
+  ["LSSupportsOpeningDocumentsInPlace", "<true/>"],
 ];
 const MIN_IOS = "15.5";
 

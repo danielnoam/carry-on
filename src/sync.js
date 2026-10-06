@@ -383,6 +383,9 @@
   }
 
   async function once(getPages, setPages, sameUrl, onProgress, getFeeds, setFeeds, getSeen, setSeen) {
+    // A library Carry-on can't reach reads as empty; sent as it is, that
+    // would look like every clip deleted (0.33.0).
+    if (C.store.problem) throw new Error(C.store.problem);
     const before = getPages().map((p) => ({ ...p }));
     const feedsBefore = getFeeds ? getFeeds().map(feedShare) : null;
     const snapshot = new Map(before.map((p) => [p.id, JSON.stringify(p)]));

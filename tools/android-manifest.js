@@ -45,7 +45,7 @@ const ENTRIES = [
       '                <action android:name="android.intent.action.VIEW" />\n' +
       '                <action android:name="android.intent.action.SEND" />\n' +
       '                <category android:name="android.intent.category.DEFAULT" />\n' +
-      ["application/epub+zip", "text/markdown", "text/x-markdown", "text/plain", "text/html",
+      ["application/epub+zip", "application/pdf", "text/markdown", "text/x-markdown", "text/plain", "text/html",
         "application/vnd.comicbook+zip", "application/x-cbz", "application/zip"]
         .map((t) => '                <data android:mimeType="' + t + '" />\n').join("") +
       '            </intent-filter>',

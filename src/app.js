@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.32.2";
+  const APP_VERSION = "0.33.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -5398,6 +5398,71 @@
 
   const remeasured = () => { if (state.section === "storage") renderSection(); };
 
+  // Where the library lives (0.33.0): the app's own storage, the phone's
+  // Documents folder, or a folder you pick. Choosing another moves
+  // everything there. Android only: on iOS the app's own storage already
+  // shows in the Files app.
+  let androidSdk = 0;
+  let moving = null;
+  if (C.platform.android && C.platform.plugin("Files") && C.platform.plugin("Files").where) {
+    C.platform.plugin("Files").where().then((w) => { androidSdk = (w && w.sdk) || 0; }).catch(() => {});
+  }
+  function placeGroup() {
+    if (C.platform.ios) {
+      return el("section", { class: "settings-section" },
+        el("h2", { class: "overline" }, "Where your library is"),
+        el("p", { class: "footnote" }, "In the Files app, under On My iPhone, then Carry-on. Each clip is a folder there."));
+    }
+    if (!C.platform.native || !C.platform.files.canPickFolder) return null;
+    const place = C.store.place;
+    const options = [
+      { value: "app", label: "Inside Carry-on", note: "Recommended. Private to the app, and the quickest. Uninstalling Carry-on deletes it." },
+    ];
+    if (androidSdk >= 30 || place.kind === "documents") {
+      options.push({ value: "documents", label: "Documents/Carry-on", note: "You can see it in the Files app, and it stays if you uninstall Carry-on. After reinstalling, pick it as your folder to get it back." });
+    }
+    options.push({ value: "folder", label: place.kind === "folder" ? place.name || "A folder you picked" : "A folder you pick",
+      note: place.kind === "folder" ? "Pick this again to choose another folder." : "Any folder on the phone or a memory card. Saving there is a little slower." });
+    const group = choiceGroup({ key: "storage-place", label: "Where your library is", get: () => place.kind, options,
+      set: (v) => changePlace(v),
+      footnote: moving ? moving : "Changing it moves every clip there. A library already in the new place is added to yours." });
+    if (moving) group.querySelectorAll("input").forEach((i) => { i.disabled = true; });
+    // The picked folder can be picked again, which a radio that's already on doesn't report.
+    const again = group.querySelector('input[value="folder"]');
+    if (again && place.kind === "folder") again.addEventListener("click", () => changePlace("folder"));
+    return group;
+  }
+  async function changePlace(kind) {
+    if (moving) return;
+    const now = C.store.place;
+    let next = { kind };
+    if (kind === "folder") {
+      let got = null;
+      try { got = await C.platform.files.pickFolder(); } catch (e) { got = null; }
+      if (!got) { renderSection(); return; }
+      if (now.kind === "folder" && now.tree === got.ref) { renderSection(); return; }
+      next = { kind, tree: got.ref, name: got.name };
+    } else if (kind === now.kind) return;
+    const say = (t) => { moving = t; if (state.section === "storage") renderSection(); };
+    say("Moving your library…");
+    try {
+      const joined = await C.store.moveTo(next, (done, total) => say(total ? "Moving, " + done + " of " + total + " files…" : "Moving your library…"));
+      state.pages = joined;
+      texts.clear();
+      await loadThumbs();
+      renderLibrary();
+      moving = null;
+      toast("Your library is in " + C.store.placeName(next) + " now.");
+    } catch (e) {
+      console.error(e);
+      moving = null;
+      if (next.kind === "folder") C.platform.files.release(next.tree);
+      toast("Couldn't move your library, so it stayed where it was. " + (e && /space|ENOSPC/i.test(e.message) ? "Free some space and try again." : "Try again."));
+    }
+    if (state.section === "storage") renderSection();
+    if (state.settings) renderSettings();
+  }
+
   function aboutGroup() {
     const list = el("div", { class: "group" });
     const releases = C.platform.releasesUrl() || "https://github.com/danielnoam/carry-on/releases/latest";
@@ -5483,7 +5548,7 @@
     saving: { title: "Saving", build: () => [choiceGroup(SETTINGS[1])],
       value: () => SETTINGS[1].options.find((o) => o.value === SETTINGS[1].get()).label },
     sync: { title: "Sync", build: syncSections, value: () => (C.sync.on ? (C.sync.last.error ? "Stopped" : "On") : "Off") },
-    storage: { title: "Storage and backup", build: () => [storageGroup(), browserStorageGroup(), backupGroup()], value: () => formatSize(totalBytes()) },
+    storage: { title: "Storage and backup", build: () => [storageGroup(), placeGroup(), browserStorageGroup(), backupGroup()], value: () => formatSize(totalBytes()) },
     updates: { title: "About", build: () => [updatesGroup(), aboutGroup()], value: () => (updateOut() ? upd.latest + " is out" : APP_VERSION) },
   };
 
@@ -5762,6 +5827,7 @@
     if (history.state && history.state.view) history.replaceState(null, "");
     paintPlace();
     noteVersion();
+    if (C.store.problem) setTimeout(() => toast(C.store.problem), 800);
     tidyOldFiles();
     const share = C.platform.plugin("ShareTarget");
     if (share && share.addListener) share.addListener("shared", saveShared);

@@ -2,6 +2,17 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.33.0] - 2026-10-06
+
+### Added
+- Choose where your library is, in Settings under Storage and backup:
+  inside Carry-on (the default), Documents/Carry-on, which you can see in
+  the Files app and which stays if you uninstall, or any folder you pick,
+  a memory card too. Changing it moves every clip there; a library
+  already in that folder is added to yours.
+- On iPhone, your library shows in the Files app, under On My iPhone.
+- PDFs can be opened with Carry-on from other apps on Android.
+
 ## [0.32.2] - 2026-10-06
 
 ### Changed

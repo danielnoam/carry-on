@@ -1,12 +1,20 @@
 package io.github.danielnoam.carryon.share;
 
 import android.app.Activity;
+import android.content.ContentResolver;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Build;
+import android.provider.DocumentsContract;
 import android.provider.OpenableColumns;
 import android.util.Base64;
+import android.webkit.MimeTypeMap;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
+import android.webkit.WebView;
 import androidx.activity.result.ActivityResult;
+import com.getcapacitor.BridgeWebViewClient;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -14,9 +22,16 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Files of your own, read where they are (src/files.js, 0.32.0). Android's
@@ -31,9 +46,262 @@ import java.util.List;
  *
  * The permission is taken as persistable, so it survives a restart. Android
  * keeps about 128 of them per app, so a file Carry-on forgets is released.
+ *
+ * A picked folder can also be where the library lives (0.33.0, store.js).
+ * Paths are relative to the folder, "/"-separated; folders on the way are
+ * made as needed:
+ *
+ *   where()                         { sdk }
+ *   serve({ tree })                 the WebView reads the folder at
+ *                                   /_carryon_folder_/<path>; tree null stops
+ *   folderWrite({ tree, path, data, encoding })   utf8, or base64 bytes
+ *   folderRead({ tree, path })      { data } as utf8
+ *   folderStat({ tree, path })      { exists, size }
+ *   folderList({ tree, path })      { files: [{ name, type, size }] }
+ *   folderDelete({ tree, path })    a file, or a folder and all in it
+ *   folderMoveIn({ tree, path, from })  a file:// in the app moved in
  */
 @CapacitorPlugin(name = "Files")
 public class FilesPlugin extends Plugin {
+
+    static final String ROUTE = "/_carryon_folder_/";
+    private static volatile Uri served;
+    // Paths already found, so a page with fifty pictures doesn't walk the
+    // folder fifty times. Cleared for whatever is deleted.
+    private static final Map<String, Uri> found = new ConcurrentHashMap<>();
+
+    @Override
+    public void load() {
+        bridge.setWebViewClient(new BridgeWebViewClient(bridge) {
+            @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                String path = request.getUrl().getPath();
+                Uri tree = served;
+                if (tree != null && path != null && path.startsWith(ROUTE)) return fromFolder(tree, path.substring(ROUTE.length()));
+                return super.shouldInterceptRequest(view, request);
+            }
+        });
+    }
+
+    private WebResourceResponse fromFolder(Uri tree, String rel) {
+        Map<String, String> headers = new HashMap<>();
+        headers.put("Cache-Control", "no-cache");
+        try {
+            Uri doc = find(tree, rel, false);
+            if (doc == null) throw new java.io.FileNotFoundException(rel);
+            InputStream in = getContext().getContentResolver().openInputStream(doc);
+            String ext = MimeTypeMap.getFileExtensionFromUrl(rel.replace(" ", "_")).toLowerCase();
+            String mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext);
+            if ("html".equals(ext)) mime = "text/html";
+            if ("json".equals(ext)) mime = "application/json";
+            return new WebResourceResponse(mime == null ? "application/octet-stream" : mime, null, 200, "OK", headers, in);
+        } catch (Exception e) {
+            return new WebResourceResponse("text/plain", "utf-8", 404, "Not Found", headers,
+                new java.io.ByteArrayInputStream(new byte[0]));
+        }
+    }
+
+    @PluginMethod
+    public void where(PluginCall call) {
+        JSObject out = new JSObject();
+        out.put("sdk", Build.VERSION.SDK_INT);
+        call.resolve(out);
+    }
+
+    @PluginMethod
+    public void serve(PluginCall call) {
+        String t = call.getString("tree");
+        served = t == null || t.isEmpty() ? null : Uri.parse(t);
+        found.clear();
+        call.resolve(new JSObject());
+    }
+
+    @PluginMethod
+    public void folderWrite(PluginCall call) {
+        Uri tree = treeOf(call);
+        String path = call.getString("path");
+        String data = call.getString("data", "");
+        boolean utf8 = "utf8".equals(call.getString("encoding"));
+        if (tree == null || path == null) return;
+        try {
+            byte[] bytes = utf8 ? data.getBytes(StandardCharsets.UTF_8) : Base64.decode(data, Base64.DEFAULT);
+            Uri doc = find(tree, path, true);
+            try (OutputStream out = getContext().getContentResolver().openOutputStream(doc, "wt")) {
+                if (out == null) throw new java.io.IOException("can't write");
+                out.write(bytes);
+            }
+            call.resolve(new JSObject());
+        } catch (Exception e) {
+            call.reject("Couldn't write " + path, e);
+        }
+    }
+
+    @PluginMethod
+    public void folderMoveIn(PluginCall call) {
+        Uri tree = treeOf(call);
+        String path = call.getString("path");
+        String from = call.getString("from");
+        if (tree == null || path == null || from == null) return;
+        File src = new File(Uri.parse(from).getPath() == null ? from : Uri.parse(from).getPath());
+        try {
+            Uri doc = find(tree, path, true);
+            try (InputStream in = new FileInputStream(src);
+                 OutputStream out = getContext().getContentResolver().openOutputStream(doc, "wt")) {
+                if (out == null) throw new java.io.IOException("can't write");
+                byte[] buf = new byte[1 << 16];
+                int n;
+                while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+            }
+            JSObject res = new JSObject();
+            res.put("size", src.length());
+            src.delete();
+            call.resolve(res);
+        } catch (Exception e) {
+            call.reject("Couldn't keep " + path, e);
+        }
+    }
+
+    @PluginMethod
+    public void folderRead(PluginCall call) {
+        Uri tree = treeOf(call);
+        String path = call.getString("path");
+        if (tree == null || path == null) return;
+        try {
+            Uri doc = find(tree, path, false);
+            if (doc == null) throw new java.io.FileNotFoundException(path);
+            try (InputStream in = getContext().getContentResolver().openInputStream(doc)) {
+                if (in == null) throw new java.io.IOException("can't read");
+                java.io.ByteArrayOutputStream all = new java.io.ByteArrayOutputStream();
+                byte[] buf = new byte[1 << 16];
+                int n;
+                while ((n = in.read(buf)) > 0) all.write(buf, 0, n);
+                JSObject out = new JSObject();
+                out.put("data", new String(all.toByteArray(), StandardCharsets.UTF_8));
+                call.resolve(out);
+            }
+        } catch (Exception e) {
+            call.reject("Couldn't read " + path, e);
+        }
+    }
+
+    @PluginMethod
+    public void folderStat(PluginCall call) {
+        Uri tree = treeOf(call);
+        String path = call.getString("path");
+        if (tree == null || path == null) return;
+        JSObject out = new JSObject();
+        Uri doc = find(tree, path, false);
+        out.put("exists", doc != null);
+        out.put("size", doc == null ? 0 : sizeOf(doc));
+        call.resolve(out);
+    }
+
+    @PluginMethod
+    public void folderList(PluginCall call) {
+        Uri tree = treeOf(call);
+        String path = call.getString("path", "");
+        if (tree == null) return;
+        Uri dir = path.isEmpty() ? root(tree) : find(tree, path, false);
+        JSArray files = new JSArray();
+        if (dir != null) {
+            for (String[] c : children(tree, dir)) {
+                JSObject f = new JSObject();
+                f.put("name", c[1]);
+                f.put("type", DocumentsContract.Document.MIME_TYPE_DIR.equals(c[2]) ? "directory" : "file");
+                f.put("size", c[3] == null ? 0 : Long.parseLong(c[3]));
+                files.put(f);
+            }
+        }
+        JSObject out = new JSObject();
+        out.put("files", files);
+        call.resolve(out);
+    }
+
+    @PluginMethod
+    public void folderDelete(PluginCall call) {
+        Uri tree = treeOf(call);
+        String path = call.getString("path");
+        if (tree == null || path == null) return;
+        Uri doc = find(tree, path, false);
+        try {
+            if (doc != null) DocumentsContract.deleteDocument(getContext().getContentResolver(), doc);
+        } catch (Exception e) {
+            // Gone already, or the provider won't; either way it's not there for us.
+        }
+        String key = tree + "|" + path;
+        for (String k : found.keySet()) if (k.equals(key) || k.startsWith(key + "/")) found.remove(k);
+        call.resolve(new JSObject());
+    }
+
+    private Uri treeOf(PluginCall call) {
+        String t = call.getString("tree");
+        if (t == null) { call.reject("No folder"); return null; }
+        return Uri.parse(t);
+    }
+
+    private Uri root(Uri tree) {
+        return DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree));
+    }
+
+    // { id, name, mime, size } of each thing in a folder.
+    private List<String[]> children(Uri tree, Uri dir) {
+        List<String[]> out = new ArrayList<>();
+        Uri list = DocumentsContract.buildChildDocumentsUriUsingTree(tree, DocumentsContract.getDocumentId(dir));
+        try (Cursor c = getContext().getContentResolver().query(list, new String[] {
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            DocumentsContract.Document.COLUMN_MIME_TYPE, DocumentsContract.Document.COLUMN_SIZE }, null, null, null)) {
+            while (c != null && c.moveToNext()) out.add(new String[] { c.getString(0), c.getString(1), c.getString(2), c.isNull(3) ? null : c.getString(3) });
+        } catch (Exception e) {
+            // An empty or unreadable folder lists as nothing.
+        }
+        return out;
+    }
+
+    private long sizeOf(Uri doc) {
+        try (Cursor c = getContext().getContentResolver().query(doc, new String[] { DocumentsContract.Document.COLUMN_SIZE }, null, null, null)) {
+            if (c != null && c.moveToFirst() && !c.isNull(0)) return c.getLong(0);
+        } catch (Exception e) {
+            return 0;
+        }
+        return 0;
+    }
+
+    // The document at `rel` in the folder, step by step from the top; with
+    // `make`, the folders on the way and the file itself are made. null when
+    // it isn't there.
+    private Uri find(Uri tree, String rel, boolean make) {
+        String clean = rel.replaceAll("^/+|/+$", "");
+        String key = tree + "|" + clean;
+        Uri known = found.get(key);
+        if (known != null) return known;
+        ContentResolver cr = getContext().getContentResolver();
+        String[] parts = clean.split("/");
+        Uri at = root(tree);
+        String walked = "";
+        for (int i = 0; i < parts.length; i++) {
+            String name = Uri.decode(parts[i]);
+            walked = walked.isEmpty() ? parts[i] : walked + "/" + parts[i];
+            Uri next = found.get(tree + "|" + walked);
+            if (next == null) {
+                for (String[] c : children(tree, at)) {
+                    if (name.equals(c[1])) { next = DocumentsContract.buildDocumentUriUsingTree(tree, c[0]); break; }
+                }
+            }
+            if (next == null) {
+                if (!make) return null;
+                boolean last = i == parts.length - 1;
+                try {
+                    next = DocumentsContract.createDocument(cr, at, last ? "application/octet-stream" : DocumentsContract.Document.MIME_TYPE_DIR, name);
+                } catch (Exception e) {
+                    next = null;
+                }
+                if (next == null) return null;
+            }
+            found.put(tree + "|" + walked, next);
+            at = next;
+        }
+        return at;
+    }
 
     @PluginMethod
     public void pick(PluginCall call) {
