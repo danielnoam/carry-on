@@ -2,6 +2,32 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.1.0] - 2026-10-06
+
+### Added
+- Watch a folder (Android): pick one, like Books, in Settings, Storage.
+  Each time Waypage opens, comes back or is pulled down, it adds what's
+  new in it, read from where it is. Its folders become collections, and a
+  file you delete there leaves Waypage too.
+- After reinstalling, an empty library offers to get back the one you
+  kept in Documents/Waypage.
+
+### Changed
+- Collections keep their place while chapters download into them. They
+  used to jump to the front with every chapter that landed.
+- Long scanned PDFs read from their file open at once: each page is drawn
+  as you reach it, instead of all of them every time.
+- A file's clip with up to 100 MB of pictures syncs them (20 MB before).
+
+### Fixed
+- Chapters saved twice when you saved new chapters while sync was still
+  bringing them in. Clips already saved twice are cleaned up when
+  Waypage opens, keeping where you were.
+- Stop on sync's downloads now stops them until Waypage is next opened;
+  before, they started again a few seconds later.
+- The line along the bottom of the reader no longer covers the Next
+  chapter card at the end of a page.
+
 ## [1.0.0] - 2026-10-06
 
 ### Changed

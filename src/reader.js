@@ -14,7 +14,7 @@
     "reader-fs", "reader-lh", "reader-font", "reader-pad", "reader-measure"];
   const NEAR = 2;
 
-  let frame = null, doc = null, scrollTimer = null, scrollFrame = 0, topSpace = null;
+  let frame = null, doc = null, scrollTimer = null, scrollFrame = 0, topSpace = null, bottomSpace = null;
   // Pages (0.29.0): the text in columns a screen wide, turned instead of
   // scrolled. `paged` is the reader's choice; a comic chapter always
   // scrolls.
@@ -373,9 +373,12 @@
   // shouldn't put the bars away.
   const following = () => Date.now() < followUntil;
 
-  // Room at the top of the page for the reader bar, which floats over it.
+  // Room at the top of the page for the reader bar, which floats over it,
+  // and at the bottom for the line under it (1.1.0), so the end of a page
+  // (its Next card) clears it.
   function applyTop() {
     if (doc && topSpace) doc.documentElement.style.setProperty("--co-top", topSpace() + "px");
+    if (doc && bottomSpace) doc.documentElement.style.setProperty("--co-bottom", bottomSpace() + "px");
     if (isPaged()) relayout();
   }
 
@@ -485,7 +488,7 @@
   // `next` ({ over, title, go }) adds a link to the next page at the end;
   // `top` () gives the height the bar covers; onImage(info) opens a tapped
   // image.
-  function open(iframe, html, meta, { at = 0, onPosition, onScroll, next, top, onImage: image, onTap: tap, onSelect, pages: asPages } = {}) {
+  function open(iframe, html, meta, { at = 0, onPosition, onScroll, next, top, onImage: image, onTap: tap, onSelect, pages: asPages, bottom } = {}) {
     frame = iframe;
     turning = null;
     paged = !!asPages;
@@ -496,6 +499,7 @@
     onTap = tap || null;
     heads = [];
     topSpace = top || null;
+    bottomSpace = bottom || null;
     savedFull = meta.mode === "full";
     doc = null;
     nextLink = null;
@@ -571,6 +575,7 @@
     frame = null;
     doc = null;
     topSpace = null;
+    bottomSpace = null;
     onImage = null;
     onTap = null;
     heads = [];

@@ -317,14 +317,29 @@
     const bytes = new Uint8Array(await file.arrayBuffer());
     let got;
     try {
-      got = await C.pdf.read(bytes, (done, total, stage) => onProgress && onProgress(done, total, stage === "pages" ? "pictures" : "words"));
+      got = await C.pdf.read(bytes, (done, total, stage) => onProgress && onProgress(done, total, stage === "pages" ? "pictures" : "words"),
+        pics.link ? { sizes: true, maxDraw: 1 } : {});
     } catch (e) {
       throw new FileError(/password|encrypt/i.test(String(e.message)) ? "This PDF is locked with a password."
         : "Waypage couldn't read this PDF. It may be damaged.");
     }
     const root = out.createElement("div");
     root.className = "co-body";
-    if (got.images) {
+    if (got.images && got.sizes) {
+      // A scan kept in its file: a slot the size of each page, drawn when
+      // it's reached; only the first is drawn now, for the card.
+      root.classList.add("co-comic");
+      for (const [i, [w, h]] of got.sizes.entries()) {
+        const img = out.createElement("img");
+        img.setAttribute("alt", "");
+        img.setAttribute("width", w);
+        img.setAttribute("height", h);
+        root.append(img);
+        if (i === 0 && got.images[0]) await pics.put(img, got.images[0], "image/jpeg", false, "page:1");
+        else { img.setAttribute("data-in", "page:" + (i + 1)); pics.n++; }
+      }
+      if (!pics.n) throw new FileError("There's nothing to read in this PDF.");
+    } else if (got.images) {
       root.classList.add("co-comic");
       for (const [i, b] of got.images.entries()) {
         const img = out.createElement("img");
@@ -352,6 +367,7 @@
   // The clip's page with its pictures filled in from the file it reads
   // from. Throws FileError when the file has moved or been deleted.
   async function openLinked(meta) {
+    closeHeld();
     const html = await S().readPage(meta.id);
     const doc = new DOMParser().parseFromString(html, "text/html");
     const slots = [...doc.querySelectorAll("img[data-in]")];
@@ -381,25 +397,75 @@
     return "<!doctype html>\n" + doc.documentElement.outerHTML;
   }
 
-  // A scan read from its PDF: its pages drawn again, each into its slot.
-  // A PDF with words keeps those words in the clip and has no slots.
+  // A scan read from its PDF (1.1.0): the PDF is kept open and each page
+  // drawn as the reader comes near it (drawNear), so a long one opens at
+  // once. Until then a page is a blank of its own size, so the place you
+  // were is where you left it. A PDF with words keeps those words in the
+  // clip and has no slots.
+  let held = null;
+  const blank = (w, h) => "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '"/>');
   async function fillPdf(doc, slots, blob, meta) {
-    let got;
+    closeHeld();
+    let pdf;
     try {
-      got = await C.pdf.read(new Uint8Array(await blob.arrayBuffer()), null, { draw: true });
+      pdf = await C.pdf.open(new Uint8Array(await blob.arrayBuffer()));
     } catch (e) {
       throw new FileError("Waypage can't read " + meta.file.name + " any more.");
     }
-    const images = got.images || [];
+    held = { pdf, urls: new Map(), busy: false };
     for (const img of slots) {
-      const b = images[Number(String(img.getAttribute("data-in")).replace(/^page:/, "")) - 1];
-      if (!b) { img.className = "co-missing"; continue; }
-      const url = URL.createObjectURL(new Blob([b], { type: "image/jpeg" }));
-      lastUrls.push(url);
-      img.setAttribute("src", url);
+      const n = Number(String(img.getAttribute("data-in")).replace(/^page:/, ""));
+      const size = pdf.sizes[n - 1];
+      if (!size) { img.className = "co-missing"; continue; }
+      const w = Number(img.getAttribute("width")) || size[0], h = Number(img.getAttribute("height")) || size[1];
+      img.setAttribute("width", w);
+      img.setAttribute("height", h);
+      img.setAttribute("src", blank(w, h));
+      img.setAttribute("data-page", n);
       img.removeAttribute("data-in");
     }
     return "<!doctype html>\n" + doc.documentElement.outerHTML;
+  }
+  function closeHeld() {
+    if (!held) return;
+    held.pdf.close();
+    for (const url of held.urls.values()) URL.revokeObjectURL(url);
+    held = null;
+  }
+  // Draws the pages within a screen and a half of what the reader `frame`
+  // shows, nearest first, and lets go of those more than six screens away.
+  async function drawNear(frame) {
+    const h = held;
+    const win = frame && frame.contentWindow;
+    if (!h || h.busy || !win || !win.document) return;
+    h.busy = true;
+    try {
+      for (;;) {
+        if (held !== h) return;
+        const tall = win.innerHeight || 800;
+        const width = Math.min(1600, Math.round((win.innerWidth || 400) * (win.devicePixelRatio || 1)));
+        const pages = [...win.document.querySelectorAll("img[data-page]")];
+        let next = null, best = Infinity;
+        for (const img of pages) {
+          const r = img.getBoundingClientRect();
+          const away = r.bottom < 0 ? -r.bottom : r.top > tall ? r.top - tall : 0;
+          const n = img.getAttribute("data-page");
+          if (h.urls.has(n) && away > tall * 6) {
+            URL.revokeObjectURL(h.urls.get(n));
+            h.urls.delete(n);
+            img.setAttribute("src", blank(img.getAttribute("width"), img.getAttribute("height")));
+          } else if (!h.urls.has(n) && away <= tall * 1.5 && away < best) { next = img; best = away; }
+        }
+        if (!next) return;
+        const n = next.getAttribute("data-page");
+        let bytes;
+        try { bytes = await h.pdf.draw(Number(n), width); } catch (e) { return; }
+        if (held !== h) return;
+        const url = URL.createObjectURL(new Blob([bytes], { type: "image/jpeg" }));
+        h.urls.set(n, url);
+        next.setAttribute("src", url);
+      }
+    } finally { h.busy = false; }
   }
 
   // ---- Bringing one in ----
@@ -408,7 +474,7 @@
   // the page as data: addresses in a browser. The first becomes the card's
   // picture unless it's told which is the cover.
   function picturesOut(id, link) {
-    const res = { bytes: 0, thumb: null, n: 0 };
+    const res = { bytes: 0, thumb: null, n: 0, link: !!link };
     // Writes one picture, or leaves a slot for it when the clip reads from
     // the file. The card's own picture is always written, so the library
     // needs nothing but itself.
@@ -562,5 +628,5 @@
     return meta;
   }
 
-  C.files = { KINDS, LINKABLE, canLink, kindOf, bring, openLinked, markdown, plain, FileError };
+  C.files = { KINDS, LINKABLE, canLink, kindOf, bring, openLinked, drawNear, closeHeld, markdown, plain, FileError };
 })();

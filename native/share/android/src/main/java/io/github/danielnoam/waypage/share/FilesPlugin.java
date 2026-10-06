@@ -39,7 +39,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * what the WebView's <input type="file"> hands over is readable once.
  *
  *   pick({ mimes })         the picker; { uri, name, size, mime } or { }
- *   pickFolder()            the folder picker; { uri, name } or { }
+ *   pickFolder({ initial })  the folder picker, opening at `initial` under
+ *                           the phone's storage when given ("Documents/Waypage");
+ *                           { uri, name } or { }
  *   info({ uri })           { ok, name, size }; ok false once it's gone
  *   read({ uri, offset, length })   { data } as base64, for that stretch
  *   release({ uri })        gives the lasting permission back
@@ -60,6 +62,13 @@ import java.util.concurrent.ConcurrentHashMap;
  *   folderList({ tree, path })      { files: [{ name, type, size }] }
  *   folderDelete({ tree, path })    a file, or a folder and all in it
  *   folderMoveIn({ tree, path, from })  a file:// in the app moved in
+ *
+ * A watched folder (1.1.0, app.js) is read, never written:
+ *
+ *   folderScan({ tree })    { ok, files: [{ uri, path, name, size }] }, every
+ *                           file in it and its folders; ok false when the
+ *                           folder itself can't be read (gone, or the
+ *                           permission was taken back)
  */
 @CapacitorPlugin(name = "Files")
 public class FilesPlugin extends Plugin {
@@ -233,6 +242,58 @@ public class FilesPlugin extends Plugin {
         call.resolve(new JSObject());
     }
 
+    @PluginMethod
+    public void folderScan(PluginCall call) {
+        Uri tree = treeOf(call);
+        if (tree == null) return;
+        new Thread(() -> {
+            JSObject out = new JSObject();
+            JSArray files = new JSArray();
+            boolean ok;
+            try {
+                Uri top = root(tree);
+                ok = readable(tree, top);
+                if (ok) walk(tree, top, "", files, 0);
+            } catch (Exception e) {
+                ok = false;
+            }
+            out.put("ok", ok);
+            out.put("files", files);
+            call.resolve(out);
+        }).start();
+    }
+
+    // Whether a folder answers at all: an empty one does, a gone one doesn't.
+    private boolean readable(Uri tree, Uri dir) {
+        Uri list = DocumentsContract.buildChildDocumentsUriUsingTree(tree, DocumentsContract.getDocumentId(dir));
+        try (Cursor c = getContext().getContentResolver().query(list, new String[] { DocumentsContract.Document.COLUMN_DOCUMENT_ID }, null, null, null)) {
+            return c != null;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    // Hidden files and folders are left out, and it stops at 8 folders deep
+    // and 5000 files, so a folder picked by mistake (the whole phone) ends.
+    private void walk(Uri tree, Uri dir, String at, JSArray out, int depth) {
+        for (String[] c : children(tree, dir)) {
+            if (out.length() >= 5000) return;
+            if (c[1] == null || c[1].startsWith(".")) continue;
+            String path = at.isEmpty() ? c[1] : at + "/" + c[1];
+            Uri doc = DocumentsContract.buildDocumentUriUsingTree(tree, c[0]);
+            if (DocumentsContract.Document.MIME_TYPE_DIR.equals(c[2])) {
+                if (depth < 8) walk(tree, doc, path, out, depth + 1);
+                continue;
+            }
+            JSObject f = new JSObject();
+            f.put("uri", doc.toString());
+            f.put("path", path);
+            f.put("name", c[1]);
+            f.put("size", c[3] == null ? 0 : Long.parseLong(c[3]));
+            out.put(f);
+        }
+    }
+
     private Uri treeOf(PluginCall call) {
         String t = call.getString("tree");
         if (t == null) { call.reject("No folder"); return null; }
@@ -323,6 +384,11 @@ public class FilesPlugin extends Plugin {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
             | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        String initial = call.getString("initial");
+        if (initial != null && !initial.isEmpty() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI,
+                DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "primary:" + initial));
+        }
         startActivityForResult(call, intent, "pickedFolder");
     }
 

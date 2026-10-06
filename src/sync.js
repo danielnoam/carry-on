@@ -212,18 +212,34 @@
     if (!b64) return null;
     return { data: JSON.parse(b64decode(b64)), sha: j.sha };
   }
+  async function readBytes(path) {
+    const r = await call(contents(path) + "?ref=" + encodeURIComponent(cfg.branch), { headers: headers({ Accept: "application/vnd.github.raw" }) });
+    if (!r.ok) throw await fail(r);
+    return new Uint8Array(await r.arrayBuffer());
+  }
   async function readText(path) {
     const r = await call(contents(path) + "?ref=" + encodeURIComponent(cfg.branch), { headers: headers({ Accept: "application/vnd.github.raw" }) });
     if (r.status === 404) return null;
     if (!r.ok) throw await fail(r);
     return r.text();
   }
-  async function write(path, text, sha, message) {
-    const body = { message, content: b64encode(text), branch: cfg.branch };
+  async function write(path, text, sha, message, bytes) {
+    const body = { message, content: bytes ? C.store.toBase64(bytes) : b64encode(text), branch: cfg.branch };
     if (sha) body.sha = sha;
     const r = await call(contents(path), { method: "PUT", headers: headers({ "Content-Type": "application/json" }), body: JSON.stringify(body) });
     if (!r.ok) throw await fail(r);
     return (await r.json()).content.sha;
+  }
+  // Writes a file whether or not this device knew its sha: one already
+  // there under another is asked for and written again.
+  async function put(path, text, sha, message, bytes) {
+    try { return await write(path, text, sha, message, bytes); }
+    catch (e) {
+      if (e.status !== 409 && e.status !== 422) throw e;
+      const now = await call(contents(path) + "?ref=" + encodeURIComponent(cfg.branch), { headers: headers({ Accept: "application/vnd.github.object+json" }) });
+      if (!now.ok) throw await fail(now);
+      return write(path, text, (await now.json()).sha, message, bytes);
+    }
   }
   async function remove(path, sha) {
     const r = await call(contents(path), { method: "DELETE", headers: headers({ "Content-Type": "application/json" }),
@@ -287,33 +303,48 @@
   // ---- A page's text going up and coming down ----
 
   // A clip made from a file of your own has no links to fetch its
-  // pictures from again, so they go up inside its page, as long as they
-  // come to less than this (0.32.0). A bigger one keeps its pictures on
-  // the device it was opened on.
-  const FILE_PICTURES = 20 * 1024 * 1024;
+  // pictures from again, so they go up with it, as long as they come to
+  // less than this (0.32.0; 20 MB until 1.1.0). Since 1.1.0 they go in
+  // packs beside the page (pages/<id>/pack-N), each under PACK, the page
+  // naming each picture's pack, place and length: one write per pack, not
+  // per picture (GitHub limits how many writes a minute), and nothing near
+  // its 100 MB a file. Pages from before carry them inside as data:.
+  const FILE_PICTURES = 100 * 1024 * 1024;
+  const PACK = 16 * 1024 * 1024;
+  const PACKED = /^sync:(\d+):(\d+):(\d+):([a-z]+\/[a-z+.-]+)$/;
 
   // The page's HTML with its pictures marked missing: the other device
   // gets them from the site itself. A file's clip takes its pictures with
   // it instead, when they're small enough.
+  // The page as it goes up, and the packs of a file's clip's pictures:
+  // { html, packs: [Uint8Array] }.
   async function outgoing(html, entry) {
     const doc = new DOMParser().parseFromString(html, "text/html");
     const carry = !!(entry && entry.file) && (entry.imageBytes || 0) <= FILE_PICTURES;
+    const packs = [];
+    let pack = [], size = 0;
+    const close = () => { if (!pack.length) return; const all = new Uint8Array(size); let at = 0; for (const b of pack) { all.set(b, at); at += b.length; } packs.push(all); pack = []; size = 0; };
     for (const img of doc.querySelectorAll("img[src]")) {
       // A local picture, or one a browser keeps inside the page.
       const src = img.getAttribute("src");
-      if (!LOCAL.test(src) && !(/^data:/.test(src) && (img.hasAttribute("data-full") || img.hasAttribute("data-thumb")))) continue;
-      if (carry && LOCAL.test(src)) {
+      const inside = /^data:image\//.test(src);
+      if (!LOCAL.test(src) && !(inside && (carry || img.hasAttribute("data-full") || img.hasAttribute("data-thumb")))) continue;
+      if (carry && (LOCAL.test(src) || inside)) {
         try {
-          const bytes = await C.store.readBytes(entry.id, src);
-          img.setAttribute("src", "data:" + (C.backup.imageType(bytes) || "image/jpeg") + ";base64," + C.store.toBase64(bytes));
+          const bytes = inside ? Uint8Array.from(atob(src.split(",")[1].replace(/\s+/g, "")), (c) => c.charCodeAt(0)) : await C.store.readBytes(entry.id, src);
+          if (size && size + bytes.length > PACK) close();
+          img.setAttribute("src", "sync:" + packs.length + ":" + size + ":" + bytes.length + ":" + (C.backup.imageType(bytes) || "image/jpeg"));
+          pack.push(bytes);
+          size += bytes.length;
           continue;
         } catch (e) { /* gone: missing, like any other */ }
       }
       img.removeAttribute("src");
       img.className = "co-missing";
     }
+    close();
     for (const v of doc.querySelectorAll("video[poster]")) if (LOCAL.test(v.getAttribute("poster"))) v.removeAttribute("poster");
-    return "<!doctype html>\n" + doc.documentElement.outerHTML;
+    return { html: "<!doctype html>\n" + doc.documentElement.outerHTML, packs };
   }
 
   // A page from GitHub, ready to keep: pictures as links where this device
@@ -323,8 +354,34 @@
     const doc = new DOMParser().parseFromString(html, "text/html");
     const asLinks = !C.platform.native || entry.mode === "links";
     let missing = 0;
-    // A file's clip brought its pictures with it; on a phone they go back
-    // into files beside the page, so the page itself stays small.
+    // Packed pictures (1.1.0) come down a pack at a time: into files
+    // beside the page on a phone, into the page itself in a browser.
+    const packed = [...doc.querySelectorAll('img[src^="sync:"]')];
+    if (packed.length) {
+      const got = new Map();
+      let n = 0, bytes = 0;
+      for (const img of packed) {
+        const m = img.getAttribute("src").match(PACKED);
+        let b = null;
+        if (m) {
+          const k = Number(m[1]);
+          if (!got.has(k)) got.set(k, await readBytes("pages/" + entry.id + "/pack-" + k).catch(() => null));
+          const all = got.get(k);
+          if (all && Number(m[2]) + Number(m[3]) <= all.length) b = all.subarray(Number(m[2]), Number(m[2]) + Number(m[3]));
+        }
+        if (!b) { img.removeAttribute("src"); img.className = "co-missing"; continue; }
+        if (C.platform.native) {
+          const rel = "images/" + n++ + "." + (m[4].split("/")[1] || "jpg").replace("jpeg", "jpg").replace(/\+.*/, "");
+          await C.store.writeBytes(entry.id, rel, b);
+          img.setAttribute("src", rel);
+        } else img.setAttribute("src", "data:" + m[4] + ";base64," + C.store.toBase64(b));
+        bytes += b.length;
+      }
+      entry.imageBytes = bytes;
+    }
+    // A file's clip from before 1.1.0 brought its pictures inside the
+    // page; on a phone they go back into files beside it, so the page
+    // itself stays small.
     if (entry.file && C.platform.native) {
       let n = 0, bytes = 0;
       for (const img of doc.querySelectorAll('img[src^="data:image/"]')) {
@@ -438,22 +495,25 @@
         try { html = await C.store.readPage(p.id); } catch (e) { html = null; }
         if (!html) continue;
         const was = merged.files[p.id] || (remoteDoc && remoteDoc.files && remoteDoc.files[p.id]);
-        let sha;
-        const body = await outgoing(html, mine.get(p.id));
-        try { sha = await write("pages/" + p.id + ".html", body, was && was.sha, "Page: " + p.title.slice(0, 60)); }
-        catch (e) {
-          if (e.status !== 409 && e.status !== 422) throw e;
-          // There already, under a sha this device didn't know.
-          const now = await call(contents("pages/" + p.id + ".html") + "?ref=" + encodeURIComponent(cfg.branch), { headers: headers() });
-          if (!now.ok) throw await fail(now);
-          sha = await write("pages/" + p.id + ".html", body, (await now.json()).sha, "Page: " + p.title.slice(0, 60));
+        const { html: body, packs } = await outgoing(html, mine.get(p.id));
+        // The packs first, so a page never names one that isn't there.
+        const packShas = [];
+        for (const [k, b] of packs.entries()) {
+          halt();
+          packShas.push(await put("pages/" + p.id + "/pack-" + k, null, was && was.packs && was.packs[k], "Pictures: " + p.title.slice(0, 50), b));
         }
+        const sha = await put("pages/" + p.id + ".html", body, was && was.sha, "Page: " + p.title.slice(0, 60));
+        for (const [k, s] of ((was && was.packs) || []).entries()) if (k >= packs.length) await remove("pages/" + p.id + "/pack-" + k, s).catch(() => {});
         merged.files[p.id] = uploaded[p.id] = { at: p.savedAt, sha };
+        if (packShas.length) merged.files[p.id].packs = packShas;
         up++;
       }
       // Text of deleted pages goes too.
       const gone = Object.entries((remoteDoc && remoteDoc.files) || {}).filter(([id]) => merged.deleted[id]);
-      for (const [id, f] of gone) await remove("pages/" + id + ".html", f.sha).catch(() => {});
+      for (const [id, f] of gone) {
+        await remove("pages/" + id + ".html", f.sha).catch(() => {});
+        for (const [k, s] of (f.packs || []).entries()) await remove("pages/" + id + "/pack-" + k, s).catch(() => {});
+      }
       if (remote && same(merged, remoteDoc)) break;
       halt();
       try {
@@ -556,7 +616,11 @@
     }
     const deleted = {}, files = {};
     for (const [id, at] of Object.entries(doc.deleted || {})) if (typeof at === "number") deleted[id] = at;
-    for (const [id, f] of Object.entries(doc.files || {})) if (f && typeof f.at === "number" && typeof f.sha === "string") files[id] = { at: f.at, sha: f.sha };
+    for (const [id, f] of Object.entries(doc.files || {})) {
+      if (!f || typeof f.at !== "number" || typeof f.sha !== "string") continue;
+      files[id] = { at: f.at, sha: f.sha };
+      if (Array.isArray(f.packs) && f.packs.every((s) => typeof s === "string")) files[id].packs = f.packs.slice(0, 64);
+    }
     const out = { format: 1, pages, deleted, files };
     if (Array.isArray(doc.feeds)) {
       out.feeds = doc.feeds.map((f) => C.backup.cleanFeed(f)).filter(Boolean).map(feedShare);
@@ -568,7 +632,7 @@
   }
 
   C.sync = {
-    merge, mergeTags, mergeFeeds, outgoing, incoming, connect, disconnect, run, SyncError, KEY_URL, tokenIn, setupLink,
+    merge, mergeTags, mergeFeeds, oneCopyEach, outgoing, incoming, connect, disconnect, run, SyncError, KEY_URL, tokenIn, setupLink,
     get on() { return !!cfg; },
     get account() { return cfg ? cfg.owner + "/" + cfg.repo : ""; },
     get running() { return !!running; },

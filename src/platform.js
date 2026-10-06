@@ -547,6 +547,8 @@
     // Whether this device can keep reading a file after the app closes.
     get canLink() { return !!plugin("Files") || webPicker(); },
     get canPickFolder() { return !!plugin("Files"); },
+    // Whether a folder can be watched for files (1.1.0): the app on Android.
+    get canWatch() { return !!plugin("Files") && os === "android"; },
     async pick() {
       const F = plugin("Files");
       if (F) {
@@ -570,11 +572,23 @@
       await handleDo("readwrite", (s) => s.put(handle, ref));
       return { ref, name: file.name, size: file.size, mime: file.type || "" };
     },
-    async pickFolder() {
+    // `initial` is where the picker opens, under the phone's storage
+    // (Android 8 and later): "Documents/Waypage".
+    async pickFolder(initial) {
       const F = plugin("Files");
       if (!F) return null;
-      const got = await F.pickFolder();
+      const got = await F.pickFolder(initial ? { initial } : {});
       return got && got.uri ? { ref: got.uri, name: got.name || "Folder" } : null;
+    },
+    // Every file in a picked folder and its folders: { ok, files: [{ ref,
+    // path, name, size }] }, ok false when the folder can't be read.
+    async scan(tree) {
+      const F = plugin("Files");
+      if (!F || !F.folderScan) return { ok: false, files: [] };
+      try {
+        const got = await F.folderScan({ tree });
+        return { ok: !!got.ok, files: (got.files || []).map((f) => ({ ref: f.uri, path: f.path || f.name, name: f.name, size: f.size || 0 })) };
+      } catch (e) { return { ok: false, files: [] }; }
     },
     // Whether the file is still where it was, and how big it is now.
     async info(ref) {
