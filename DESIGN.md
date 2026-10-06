@@ -226,9 +226,9 @@ and the page shows above it.
 - **Reader settings sheet (the gear, 0.34.0; "Aa sheet" below means
   this):** rises from the bottom on the sheet spring, the one soft
   shadow, no scrim. A segmented control on top picks one part: Layout
-  (show as Scroll | Pages, margins), Text (font and Hebrew font as
-  drop-downs with each name in its face, size, spacing, theme swatches,
-  Reset text) or Read aloud (voice, a speed slider 0.5×–3× with its value
+  (show as Scroll | Pages, margins, theme swatches; 0.34.1), Text (font
+  and Hebrew font as drop-downs with each name in its face, size,
+  spacing, Reset text) or Read aloud (voice, a speed slider 0.5×–3× with its value
   under the label, then Read footnotes and Skip headers and footers as
   switches with a grey line each). The parts share one grid cell, so the
   sheet keeps one height. Tapping the page or back closes it.

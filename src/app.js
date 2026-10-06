@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.34.0";
+  const APP_VERSION = "0.34.1";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -902,6 +902,24 @@
       M.leave(m).then(() => m.remove());
       if (focus) btn.focus();
     }
+    // In a sheet or other scrolling box (0.34.1), a menu fits inside it:
+    // it opens upward when there's more room above and scrolls in itself,
+    // so the box under it doesn't scroll and stay moved. On the page, a
+    // menu opened low on the screen scrolls the page up instead.
+    function fit(m) {
+      let box = null;
+      for (let p = wrap.parentElement; p && p !== document.body; p = p.parentElement) {
+        if (/auto|scroll/.test(getComputedStyle(p).overflowY)) { box = p.getBoundingClientRect(); break; }
+      }
+      if (!box) { m.scrollIntoView({ block: "nearest" }); return false; }
+      const b = btn.getBoundingClientRect(), gap = 8, need = m.scrollHeight;
+      const below = Math.min(box.bottom, innerHeight) - b.bottom - gap;
+      const above = b.top - Math.max(box.top, 0) - gap;
+      const up = need > below && above > below;
+      m.classList.toggle("up", up);
+      if (need > (up ? above : below)) m.style.maxHeight = Math.max(up ? above : below, 132) + "px";
+      return up;
+    }
     function open() {
       const nodes = o.options.map((x) => {
         if (x.head) return el("div", { class: "dropdown-head", role: "presentation" }, x.head);
@@ -922,9 +940,8 @@
       });
       wrap.append(menu);
       btn.setAttribute("aria-expanded", "true");
-      M.arrive(menu, -6);
-      // A menu opened low on the screen scrolls up into view.
-      menu.scrollIntoView({ block: "nearest" });
+      const up = fit(menu);
+      M.arrive(menu, up ? 6 : -6);
       document.addEventListener("pointerdown", outside, true);
       (items.find((b) => b.getAttribute("aria-selected") === "true") || items[0]).focus({ preventScroll: true });
     }
@@ -1848,7 +1865,10 @@
       ], r.layout, (v) => setReading({ layout: v }))),
       row("Margins", seg(id + "-margins", "Margins", [
         { value: "narrow", label: "Narrow" }, { value: "normal", label: "Normal" }, { value: "wide", label: "Wide" },
-      ], r.margins, (v) => setReading({ margins: v }))));
+      ], r.margins, (v) => setReading({ margins: v }))),
+      withTheme ? stack("Theme", seg(id + "-theme", "Theme",
+        [{ value: "system", label: "Auto", swatch: autoSwatch(), auto: true }, ...themeOptions(THEMES)],
+        state.theme, (v) => { setTheme(v); syncThemeInputs(); }, "themes scroll")) : null);
     const text = part("text", "Text",
       row("Font", fontPick("font", "Font",
         FONTS.map((f) => ({ value: f.value, label: f.label, style: "font-family: " + f.family + ", var(--sans)" })))),
@@ -1861,9 +1881,6 @@
         el("button", { class: "step-btn large", type: "button", "data-step": "1", "aria-label": "Larger text", onclick: () => nudge(1) }, "A")), "size"),
       row("Spacing", el("div", { class: "stepper" },
         slider("Line spacing", SPACING_MIN, SPACING_MAX, 0.05, (v) => setReading({ spacing: v }))), "spacing"),
-      withTheme ? stack("Theme", seg(id + "-theme", "Theme",
-        [{ value: "system", label: "Auto", swatch: autoSwatch(), auto: true }, ...themeOptions(THEMES)],
-        state.theme, (v) => { setTheme(v); syncThemeInputs(); }, "themes scroll")) : null,
       el("button", { class: "btn-quiet reset", type: "button", onclick: () => setReading({ ...READING_DEFAULT, layout: readingPrefs().layout, margins: readingPrefs().margins }) }, "Reset text"));
     const box = el("div", { class: "reading-controls" }, layout, text);
     syncReadingControls(box);
