@@ -54,7 +54,7 @@ jobs:
       - name: Icon and splash
         run: >-
           npx --yes @capacitor/assets@3 generate --android
-          --iconBackgroundColor '#F7F4EE' --iconBackgroundColorDark '#F7F4EE'
+          --iconBackgroundColor '#2F5D8A' --iconBackgroundColorDark '#2F5D8A'
           --splashBackgroundColor '#F7F4EE' --splashBackgroundColorDark '#F7F4EE'
 
       - name: Stamp the version
@@ -81,8 +81,8 @@ jobs:
           # Both branches non-empty: `cond && '' || 'x'` is always 'x' in an
           # Actions expression, because '' is falsy — which labelled the first
           # properly signed build "-unsigned-key".
-          name: CarryOn-${{ steps.v.outputs.version }}${{ steps.sign.outputs.signed == 'true' && '-release-key' || '-throwaway-key' }}
-          path: CarryOn.apk
+          name: Waypage-${{ steps.v.outputs.version }}${{ steps.sign.outputs.signed == 'true' && '-release-key' || '-throwaway-key' }}
+          path: Waypage.apk
 
       # Only from main, only with the real key, and only once per version:
       # each APK has to install over the last.
@@ -99,8 +99,8 @@ jobs:
           {
             echo
             echo "---"
-            echo "**Installing:** open this page on your phone, tap **CarryOn.apk**, and allow your browser to install apps the first time it asks. Updates install over the top and keep your data."
+            echo "**Installing:** open this page on your phone, tap **Waypage.apk**, and allow your browser to install apps the first time it asks. Updates install over the top and keep your data."
             echo
-            echo "**iPhone:** **CarryOn.ipa** is added here a few minutes later. It's unsigned: install it with AltStore or SideStore, which sign it with your own Apple ID."
+            echo "**iPhone:** **Waypage.ipa** is added here a few minutes later. It's unsigned: install it with AltStore or SideStore, which sign it with your own Apple ID."
           } >> notes.md
-          gh release create "app-v$V" CarryOn.apk --title "Carry-on $V" --notes-file notes.md
+          gh release create "app-v$V" Waypage.apk --title "Waypage $V" --notes-file notes.md

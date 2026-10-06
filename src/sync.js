@@ -1,4 +1,4 @@
-// Carry-on: the library kept in step between devices through a private
+// Waypage: the library kept in step between devices through a private
 // GitHub repo (0.30.0), the way LifeLog syncs (its src/storage.js).
 //
 // The repo holds library.json, every page's index entry with tags,
@@ -12,12 +12,13 @@
 // library both saw (the base), field by field, so neither writes over the
 // other; a stale write (409) is merged again and retried, never forced.
 (function () {
-  const C = window.CarryOn;
+  const C = window.Waypage;
   const API = "https://api.github.com";
-  const CFG_KEY = "carryon.sync";        // { owner, repo, branch, token, sha, at, links, paused }
-  const BASE_KEY = "carryon.syncBase";   // the library.json last written or read
-  const WAIT_KEY = "carryon.syncWaiting"; // ids whose text hasn't come down yet
-  const REPO = "carryon-data";
+  const CFG_KEY = "waypage.sync";        // { owner, repo, branch, token, sha, at, links, paused }
+  const BASE_KEY = "waypage.syncBase";   // the library.json last written or read
+  const WAIT_KEY = "waypage.syncWaiting"; // ids whose text hasn't come down yet
+  const REPO = "waypage-data";
+  const OLD_REPO = "carryon-data"; // Carry-on's name for it, before 1.0.0
   const LOCAL = /^images\//;
   const KEEP_DELETED = 90 * 24 * 3600 * 1000;
 
@@ -182,7 +183,7 @@
     let msg = "";
     try { msg = (await r.json()).message || ""; } catch (e) { /* none */ }
     const e = new SyncError(r.status === 401 ? "GitHub didn't accept the token. Make a new one and connect again."
-      : (r.status === 403 || r.status === 429) && /rate limit/i.test(msg) ? "GitHub asked Carry-on to slow down. Sync tries again in a few minutes."
+      : (r.status === 403 || r.status === 429) && /rate limit/i.test(msg) ? "GitHub asked Waypage to slow down. Sync tries again in a few minutes."
       : r.status === 403 || r.status === 404 ? "The token can't reach the " + REPO + " repo. Give it Contents: Read and write on that repo."
       : r.status >= 500 ? "GitHub isn't answering right now. Sync tries again later."
       : "GitHub said: " + (msg || r.status));
@@ -237,8 +238,8 @@
   // expires (sync shouldn't stop in a month), allowed to make the repo
   // (Administration) and write it (Contents). Which repos it reaches can't
   // be filled in, so the steps say to pick All repositories.
-  const KEY_URL = "https://github.com/settings/personal-access-tokens/new?name=Carry-on+sync" +
-    "&description=Keeps+Carry-on%27s+library+in+step+through+a+private+repo+called+" + REPO +
+  const KEY_URL = "https://github.com/settings/personal-access-tokens/new?name=Waypage+sync" +
+    "&description=Keeps+Waypage%27s+library+in+step+through+a+private+repo+called+" + REPO +
     "&expires_in=none&contents=write&administration=write";
   // Another device joins from a link to the web copy with the token after
   // the # (which a browser never sends to the server), as LifeLog's setup
@@ -257,19 +258,20 @@
       const me = await call(API + "/user", { headers: headers() });
       if (!me.ok) throw await fail(me);
       cfg.owner = (await me.json()).login;
-      const repo = await call(API + "/repos/" + cfg.owner + "/" + REPO, { headers: headers() });
-      if (repo.ok) cfg.branch = (await repo.json()).default_branch || "main";
+      let repo = await call(API + "/repos/" + cfg.owner + "/" + REPO, { headers: headers() });
+      if (repo.status === 404) repo = await adoptOld();
+      if (repo.ok) { const j = await repo.json(); cfg.branch = j.default_branch || "main"; cfg.repo = j.name || cfg.repo; }
       else if (repo.status === 404) {
         const made = await call(API + "/user/repos", { method: "POST", headers: headers({ "Content-Type": "application/json" }),
-          body: JSON.stringify({ name: REPO, private: true, auto_init: true, description: "Carry-on's library" }) });
-        if (!made.ok) throw new SyncError("Carry-on couldn't make its " + REPO + " repo. Make the token again with All repositories picked under Repository access, then connect.");
+          body: JSON.stringify({ name: REPO, private: true, auto_init: true, description: "Waypage's library" }) });
+        if (!made.ok) throw new SyncError("Waypage couldn't make its " + REPO + " repo. Make the token again with All repositories picked under Repository access, then connect.");
         cfg.branch = (await made.json()).default_branch || "main";
       } else throw await fail(repo);
       if (was && was.links) cfg.links = true;
       keep(CFG_KEY, cfg);
       keep(BASE_KEY, null);
       keep(WAIT_KEY, null);
-      return cfg.owner + "/" + REPO;
+      return cfg.owner + "/" + cfg.repo;
     } catch (e) {
       cfg = was;
       throw e;
@@ -360,12 +362,33 @@
   // { up, down, removed, downloads, fromLinks } with `downloads` the pages
   // whose pictures this device fetches next and `fromLinks` the pages it
   // saves itself from their links; throws SyncError.
+  // Carry-on's carryon-data becomes waypage-data (1.0.0): renamed when the
+  // token may (it has Administration: write since it could make the repo),
+  // used as it is when not. Resolves to the repo's response, or the 404.
+  async function adoptOld() {
+    const old = await call(API + "/repos/" + cfg.owner + "/" + OLD_REPO, { headers: headers() });
+    if (!old.ok) return old;
+    const moved = await call(API + "/repos/" + cfg.owner + "/" + OLD_REPO, { method: "PATCH",
+      headers: headers({ "Content-Type": "application/json" }), body: JSON.stringify({ name: REPO, description: "Waypage's library" }) });
+    if (moved.ok) cfg.repo = REPO;
+    else cfg.repo = OLD_REPO;
+    return moved.ok ? moved : old;
+  }
+  // A copy set up under Carry-on still names carryon-data: once a phone has
+  // renamed it, GitHub answers the old name with the new one.
+  async function settle() {
+    if (!cfg || cfg.repo === REPO) return;
+    const r = await call(API + "/repos/" + cfg.owner + "/" + cfg.repo, { headers: headers() });
+    if (r.ok) { const name = (await r.json()).name; if (name && name !== cfg.repo) { cfg.repo = name; keep(CFG_KEY, cfg); } }
+  }
+
   function run({ getPages, setPages, getFeeds, setFeeds, getSeen, setSeen, sameUrl, onProgress }) {
     if (!cfg || cfg.paused) return Promise.resolve(null);
     if (running) return running;
     const told = (p) => { progress = p; if (onProgress) onProgress(p); };
     running = (async () => {
       try {
+        await settle().catch(() => {});
         const res = await once(getPages, setPages, sameUrl || ((a, b) => a === b), told, getFeeds, setFeeds, getSeen, setSeen);
         last = { at: Date.now(), error: "" };
         cfg.at = last.at;
@@ -383,7 +406,7 @@
   }
 
   async function once(getPages, setPages, sameUrl, onProgress, getFeeds, setFeeds, getSeen, setSeen) {
-    // A library Carry-on can't reach reads as empty; sent as it is, that
+    // A library Waypage can't reach reads as empty; sent as it is, that
     // would look like every clip deleted (0.33.0).
     if (C.store.problem) throw new Error(C.store.problem);
     const before = getPages().map((p) => ({ ...p }));
@@ -400,7 +423,7 @@
     let merged, remote;
     for (let tries = 0; ; tries++) {
       remote = await readJson("library.json");
-      if (remote && (!remote.data || !Array.isArray(remote.data.pages))) throw new SyncError("The library.json on GitHub isn't Carry-on's. Move it away and sync again.");
+      if (remote && (!remote.data || !Array.isArray(remote.data.pages))) throw new SyncError("The library.json on GitHub isn't Waypage's. Move it away and sync again.");
       const remoteDoc = remote && clean(remote.data);
       merged = merge(load(BASE_KEY, null), { pages: view, waiting, feeds: feedsBefore, feedsSeen: getSeen ? getSeen() : 0 }, remoteDoc, Date.now(), sameUrl);
       for (const [id, f] of Object.entries(uploaded)) if (merged.pages.some((p) => p.id === id && p.savedAt === f.at)) merged.files[id] = f;
@@ -521,7 +544,7 @@
     return { up, down, removed: gone.length, downloads, fromLinks };
   }
 
-  // A library file from GitHub, down to what Carry-on writes.
+  // A library file from GitHub, down to what Waypage writes.
   function clean(doc) {
     const pages = [];
     for (const raw of doc.pages) {

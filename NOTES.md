@@ -3,6 +3,30 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Carry-on became Waypage (1.0.0).** Everything named carryon,
+  Carry-on or CarryOn was renamed: the app ID (io.github.danielnoam.waypage),
+  the Java packages and widget resources, the local plugin
+  (waypage-share, WaypageShare.podspec), the JS namespace
+  (window.Waypage), localStorage keys (waypage.*), the service worker's
+  cache, widget links (waypage-widget://), the folder route
+  (/_waypage_folder_/), Documents/Waypage, backups (waypage-backup-…zip,
+  waypage.json inside) and clip files (meta waypage-page), the
+  User-Agent, the release files and the repo. What kept the old name, on
+  purpose: the signing key's alias `carryon` (Daniel swaps the key
+  later; a new app ID can use any key), the browser's IndexedDB names
+  `carryon` and `carryon-files` (the web copy moved to /waypage/ on the
+  same origin, so its library stays put without copying), and the readers
+  of old files (a carry-on-page clip file and a Carry-on backup still
+  open). The web copy copies its carryon.* settings to waypage.* once.
+  Sync looks for waypage-data, then renames carryon-data to it (the token
+  has Administration: write because it could create the repo), or uses
+  carryon-data as it is when it may not; a copy still set up for
+  carryon-data asks GitHub, which answers with the new name. The icon is
+  the Open road Daniel picked: drawn as SVG (icon.svg) and
+  rendered to icons/ and assets/ by a one-off script; assets/ is new, and
+  is where @capacitor/assets finds Android's adaptive layers (the glyph
+  inside the middle 66%) and the splash. The bridge code from 0.36.0 is
+  gone again: Waypage's own updater only looks for Waypage.apk.
 - **The bridge to Waypage (0.36.0).** Waypage gets a new app ID, so it's
   a new app: it installs beside Carry-on, can't install over it, and
   starts with nothing. This release teaches Carry-on's updater to spot a

@@ -1,4 +1,4 @@
-// Carry-on: where this copy of the app is running, a browser or the
+// Waypage: where this copy of the app is running, a browser or the
 // Android/iOS app built from these same files, and the few things that
 // differ between them. Adapted from LifeLog's src/platform.js (0.227.0).
 //
@@ -16,6 +16,20 @@
   const plugin = (name) => (native && cap.Plugins && cap.Plugins[name]) || null;
 
   if (native) document.documentElement.classList.add("native");
+
+  // Carry-on became Waypage (1.0.0). The web copy at /waypage/ shares its
+  // origin, and so its storage, with the old /carry-on/: its settings are
+  // copied to their new names once, before anything reads them. The app is
+  // a new install and has nothing to copy.
+  try {
+    if (!native && localStorage.getItem("waypage.renamed") === null) {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith("carryon.") && localStorage.getItem("waypage." + k.slice(8)) === null) localStorage.setItem("waypage." + k.slice(8), localStorage.getItem(k));
+      }
+      localStorage.setItem("waypage.renamed", "1");
+    }
+  } catch (e) { /* storage blocked: nothing to copy */ }
 
   let build = null;
   const ready = native
@@ -60,7 +74,7 @@
   // sites (ynet among them) never answer a request that doesn't look like a
   // browser, and Wikipedia's rule is only that the app is named.
   const USER_AGENT = (navigator.userAgent ? navigator.userAgent + " " : "") +
-    "Carry-on (offline reader; https://github.com/danielnoam/carry-on)";
+    "Waypage (offline reader; https://github.com/danielnoam/waypage)";
 
   // Native requests have no deadline of their own, so a site that holds the
   // connection open would leave "Saving" up for good.
@@ -409,16 +423,16 @@
   // ---- updating the app in place (0.2.0, from LifeLog's 0.179.0) ----
   // Downloads the release's APK into the app's cache, reporting progress, and
   // hands it to Android's installer: no browser tab, no Downloads folder.
-  // Android asks once whether Carry-on may install apps, then to install.
-  // Signed with the same key (alias carryon), it installs over the top and
+  // Android asks once whether Waypage may install apps, then to install.
+  // Signed with the same key (alias waypage), it installs over the top and
   // keeps every saved page. The download names the tag, not `latest`, so a
   // release published mid-download can't swap the file. Resolves to the
   // file's uri so a dismissed installer can be reopened without downloading
   // again; null where there's no in-app installer (iOS, a browser).
   const APK_MIME = "application/vnd.android.package-archive";
   const repo = () => (build && build.repo) || null;
-  // `file` is the release's APK: Waypage.apk once Carry-on is Waypage (0.36.0).
-  async function downloadUpdate(version, onProgress, file = "CarryOn.apk") {
+  // `file` is the release's APK: Waypage.apk once Waypage is Waypage (0.36.0).
+  async function downloadUpdate(version, onProgress, file = "Waypage.apk") {
     const FS = plugin("Filesystem");
     if (os !== "android" || !FS || !plugin("FileOpener") || !repo()) return null;
     const url = "https://github.com/" + repo() + "/releases/download/app-v" + version + "/" + file;
@@ -444,7 +458,7 @@
       const { files } = await FS.readdir({ path: "", directory: "CACHE" });
       for (const f of files || []) {
         const name = typeof f === "string" ? f : f.name;
-        const m = /^CarryOn-(\d+\.\d+\.\d+)\.apk$/.exec(name || "");
+        const m = /^Waypage-(\d+\.\d+\.\d+)\.apk$/.exec(name || "");
         if (m && !isNewer(m[1], currentVersion)) await FS.deleteFile({ path: name, directory: "CACHE" });
       }
     } catch (e) { /* nothing to tidy */ }
@@ -452,7 +466,7 @@
 
   // Reading a QR code (0.30.1, sync's setup code), with
   // @capacitor-mlkit/barcode-scanning as LifeLog does. On Android that's
-  // Google's scanner, run by Play services, so Carry-on asks for no camera
+  // Google's scanner, run by Play services, so Waypage asks for no camera
   // permission; it's fetched at install (tools/android-manifest.js) and
   // fetched here if it isn't there yet. On iOS the plugin opens the camera
   // itself. Resolves to the text read, or null when backed out of.
@@ -485,7 +499,7 @@
 
   // ---- Files of your own, kept where they are (0.32.0) ----
   // A file the WebView's own picker hands over is readable once; a file
-  // Carry-on can still open next week needs the system's picker, which
+  // Waypage can still open next week needs the system's picker, which
   // grants a lasting permission. `ref` is what that permission is held by:
   // a content:// address in the app, a stored handle in a browser (Chrome
   // and Edge on a computer; Firefox and Safari have no such picker).
@@ -616,8 +630,8 @@
     },
   };
 
-  window.CarryOn = window.CarryOn || {};
-  window.CarryOn.platform = {
+  window.Waypage = window.Waypage || {};
+  window.Waypage.platform = {
     native,
     os,
     ios: os === "ios",
@@ -651,7 +665,7 @@
     openInstaller,
     clearOldUpdates,
     releasesUrl() { return repo() ? "https://github.com/" + repo() + "/releases/latest" : null; },
-    apkUrl(file = "CarryOn.apk") { return repo() ? "https://github.com/" + repo() + "/releases/latest/download/" + file : null; },
+    apkUrl(file = "Waypage.apk") { return repo() ? "https://github.com/" + repo() + "/releases/latest/download/" + file : null; },
     // The web copy the app was built from: inside the app this page is at
     // https://localhost, which another device can't open.
     webUrl() { return (build && build.webUrl) || null; },

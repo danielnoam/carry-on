@@ -2,10 +2,10 @@
 // the library at once, against the last library both saw.
 const assert = require("assert");
 
-global.window = { CarryOn: { platform: {} } };
+global.window = { Waypage: { platform: {} } };
 global.localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
 require("../src/sync.js");
-const S = window.CarryOn.sync;
+const S = window.Waypage.sync;
 
 let passed = 0;
 function test(name, fn) {

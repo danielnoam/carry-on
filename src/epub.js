@@ -1,4 +1,4 @@
-// Carry-on: pages as an EPUB 3 book (0.20.0), for e-readers and Send to
+// Waypage: pages as an EPUB 3 book (0.20.0), for e-readers and Send to
 // Kindle. One XHTML chapter per page, rebuilt from the same allowlist the
 // saved page came through, with its saved pictures and its licence line.
 // Written from the EPUB 3.3 spec; the layout choices (mimetype first and
@@ -6,7 +6,7 @@
 // WebToEpub learned in practice (NOTES.md, 0.20.0). Packed by backup.js's
 // zip writer.
 (function () {
-  const C = window.CarryOn;
+  const C = window.Waypage;
   const S = () => C.store;
   const XHTML = "http://www.w3.org/1999/xhtml";
   const XML_NS = "http://www.w3.org/XML/1998/namespace";
@@ -319,7 +319,7 @@
       (creator ? "<dc:creator>" + esc(clean(creator)) + "</dc:creator>\n" : "") +
       pages.map((p) => "<dc:source>" + esc(p.url) + "</dc:source>\n").join("") +
       (wiki ? "<dc:rights>Text from Wikipedia, CC BY-SA 4.0, by Wikipedia contributors.</dc:rights>\n" : "") +
-      "<dc:contributor>Carry-on</dc:contributor>\n" +
+      "<dc:contributor>Waypage</dc:contributor>\n" +
       '<meta property="dcterms:modified">' + modified + "</meta>\n" +
       (coverAt >= 0 ? '<meta name="cover" content="i' + (coverAt + 1) + '"/>\n' : "") +
       "</metadata>\n<manifest>\n" + manifest.join("\n") + "\n</manifest>\n" +

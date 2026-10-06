@@ -1,4 +1,4 @@
-// Carry-on's share target, as a local Capacitor plugin so android/ can
+// Waypage's share target, as a local Capacitor plugin so android/ can
 // stay generated. Modelled on @capacitor/app-launcher's own build file.
 ext {
     junitVersion = project.hasProperty('junitVersion') ? rootProject.ext.junitVersion : '4.13.2'
@@ -23,7 +23,7 @@ buildscript {
 apply plugin: 'com.android.library'
 
 android {
-    namespace = "io.github.danielnoam.carryon.share"
+    namespace = "io.github.danielnoam.waypage.share"
     compileSdk = project.hasProperty('compileSdkVersion') ? rootProject.ext.compileSdkVersion : 36
     defaultConfig {
         minSdkVersion project.hasProperty('minSdkVersion') ? rootProject.ext.minSdkVersion : 24

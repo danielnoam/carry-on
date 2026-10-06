@@ -1,4 +1,4 @@
-// Carry-on: PDFs (0.32.0). A PDF is read by pdf.js, but never in the app's
+// Waypage: PDFs (0.32.0). A PDF is read by pdf.js, but never in the app's
 // own page: a script there could reach the Capacitor plugins and every
 // saved clip. So pdf.js runs in an iframe with `sandbox="allow-scripts"`
 // and no `allow-same-origin`, which gives it an opaque origin of its own,
@@ -12,7 +12,7 @@
 // were. A PDF with no words in it (a scan, a comic) comes back as its
 // pages drawn as pictures instead.
 (function () {
-  const C = window.CarryOn;
+  const C = window.Waypage;
   const LIB = "src/vendor/pdf.min.mjs";
   const WORKER = "src/vendor/pdf.worker.min.mjs";
   const CSP = "default-src 'none'; script-src 'unsafe-inline' blob:; worker-src blob:; " +

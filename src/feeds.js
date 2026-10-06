@@ -1,11 +1,11 @@
-// Carry-on: following a site's feed (0.28.0). RSS 2.0, RSS 1.0, Atom and
+// Waypage: following a site's feed (0.28.0). RSS 2.0, RSS 1.0, Atom and
 // JSON Feed are read into one shape; a site's address is enough, since its
 // feed is found from the page's <link rel="alternate"> or the usual paths.
 //
 // Like a saved page, a feed is only ever parsed (DOMParser's XML documents
 // run nothing); its titles and summaries are kept as plain text.
 (function () {
-  const C = window.CarryOn;
+  const C = window.Waypage;
   const ACCEPT = "application/rss+xml, application/atom+xml, application/feed+json, application/xml;q=0.9, text/xml;q=0.9, */*;q=0.8";
   const GUESSES = ["/feed", "/rss", "/feed.xml", "/rss.xml", "/atom.xml", "/index.xml", "/feed/", "/rss/"];
   const MAX_ITEMS = 50;
@@ -164,7 +164,7 @@
     } catch (e) {
       throw new FeedError(C.platform.canFetchPages
         ? "Couldn't reach " + siteOf(url) + ". Check the address, or try again when you're online."
-        : "This browser can't reach " + siteOf(url) + ". Follow the feed in Carry-on on your phone.");
+        : "This browser can't reach " + siteOf(url) + ". Follow the feed in Waypage on your phone.");
     }
     if (res.status === 429) throw new FeedError(siteOf(url) + " asked to slow down. Try again later.");
     if (res.status >= 400) throw new FeedError(siteOf(url) + " answered with an error (" + res.status + ").");

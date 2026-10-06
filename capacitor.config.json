@@ -1,6 +1,6 @@
 {
-  "appId": "io.github.danielnoam.carryon",
-  "appName": "Carry-on",
+  "appId": "io.github.danielnoam.waypage",
+  "appName": "Waypage",
   "webDir": "www",
   "backgroundColor": "#F7F4EE",
   "android": {

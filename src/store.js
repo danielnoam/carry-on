@@ -1,11 +1,11 @@
-// Carry-on: where saved pages live. One directory per page, `pages/<id>/`
+// Waypage: where saved pages live. One directory per page, `pages/<id>/`
 // with page.html, meta.json and images/, plus library.json listing them
 // (docs/PROPOSAL.md, "Store and read").
 //
 // Where that is, in the app (0.33.0): the app's own storage (the default),
-// Documents/Carry-on on the phone (Android 11 and later), or a folder you
+// Documents/Waypage on the phone (Android 11 and later), or a folder you
 // picked, which Android lets the app reach only through its folder access
-// (the Files plugin; the WebView reads it at /_carryon_folder_/). Every
+// (the Files plugin; the WebView reads it at /_waypage_folder_/). Every
 // read and write below goes through `cur`, so that's the only difference.
 //
 // In a browser there is no directory: page.html, the index and a page's
@@ -13,11 +13,11 @@
 // 0.27.12), and a saved page's pictures are inside its HTML as data:
 // URLs. Pages saved in the browser keep images as links.
 (function () {
-  const P = window.CarryOn.platform;
+  const P = window.Waypage.platform;
   const FS = () => P.plugin("Filesystem");
   const F = () => P.plugin("Files");
-  const INDEX_KEY = "carryon.library";
-  const PLACE_KEY = "carryon.storagePlace";
+  const INDEX_KEY = "waypage.library";
+  const PLACE_KEY = "waypage.storagePlace";
 
   const bytesOf = (text) => new Blob([text]).size;
 
@@ -55,11 +55,11 @@
           const { uri } = await FS().getUri({ path: tmp, directory: "CACHE" });
           return (await F().folderMoveIn({ tree, path, from: uri })).size || 0;
         },
-        base: async () => location.origin + "/_carryon_folder_/",
+        base: async () => location.origin + "/_waypage_folder_/",
       };
     }
     const directory = place.kind === "documents" ? "DOCUMENTS" : "DATA";
-    const pre = place.kind === "documents" ? "Carry-on/" : "";
+    const pre = place.kind === "documents" ? "Waypage/" : "";
     return {
       place, directory, pre,
       write: (path, data, utf8) => FS().writeFile({ path: pre + path, data, directory, recursive: true, ...(utf8 ? { encoding: "utf8" } : {}) }),
@@ -102,12 +102,12 @@
     problem = null;
     if (place.kind !== "app") {
       try { await cur.stat("library.json"); }
-      catch (e) { problem = "Carry-on can't reach " + placeName(place) + ". Pick it again in Settings, under Storage."; }
+      catch (e) { problem = "Waypage can't reach " + placeName(place) + ". Pick it again in Settings, under Storage."; }
     }
   })();
 
   function placeName(place) {
-    if (place.kind === "documents") return "Documents/Carry-on";
+    if (place.kind === "documents") return "Documents/Waypage";
     if (place.kind === "folder") return place.name || "the folder you picked";
     return "the app's own storage";
   }
@@ -116,6 +116,9 @@
   let gate = Promise.resolve();
   const B = async () => { await ready; await gate; return cur; };
 
+  // The browser's library keeps Carry-on's database name (1.0.0): the web
+  // copy moved from /carry-on/ to /waypage/ on the same origin, so the
+  // library it already has stays where it is.
   function idb() {
     return new Promise((resolve, reject) => {
       const req = indexedDB.open("carryon", 1);
@@ -457,7 +460,7 @@
     }
   }
 
-  window.CarryOn.store = { ready,
+  window.Waypage.store = { ready,
     get place() { return cur ? cur.place : savedPlace(); }, placeName, get problem() { return problem; }, moveTo, readIndex, writeIndex, writeIndexOnly, set onIndex(f) { onIndex = f; }, writeThumb, readThumbs, storageInfo, keepStored, writePage, readPage, removePage, writeText, readText, download, removeFile, sizeOf, shrink, pageDirUrl, bytesOf,
     listFiles, listSized, readBytes, writeBytes, cacheFile, toBase64 };
 })();

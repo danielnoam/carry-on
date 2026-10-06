@@ -1,13 +1,13 @@
-// Carry-on: pages leaving the app and coming back (0.18.0). One page as a
+// Waypage: pages leaving the app and coming back (0.18.0). One page as a
 // self-contained HTML file, and the whole library as one zip: library.json
 // plus every page directory, stored without compression (pictures are
 // already compressed), written and read by the small zip code below.
 //
 // Anything read back is untrusted: index entries keep only the fields
-// Carry-on writes, file names only the shapes it makes, and an imported
+// Waypage writes, file names only the shapes it makes, and an imported
 // page's HTML goes through save.cleanSaved.
 (function () {
-  const C = window.CarryOn;
+  const C = window.Waypage;
   const S = () => C.store;
 
   // ---- The index entry ----
@@ -57,7 +57,7 @@
     return out;
   }
 
-  // A followed feed from a file, down to the fields Carry-on keeps. null
+  // A followed feed from a file, down to the fields Waypage keeps. null
   // when it has no address to read.
   function cleanFeed(f) {
     if (!f || typeof f !== "object" || !httpUrl(f.url)) return null;
@@ -193,11 +193,11 @@
   // cache, for the share sheet) or { blob } in a browser.
   async function exportLibrary(pages, onProgress, feeds) {
     const native = C.platform.native;
-    const name = "carry-on-backup-" + today() + ".zip";
+    const name = "waypage-backup-" + today() + ".zip";
     const file = native ? await S().cacheFile(name) : null;
     const parts = [];
     const zip = zipWriter(native ? (b) => file.append(b) : (b) => { parts.push(b); });
-    await zip.add("carry-on.json", utf8(JSON.stringify({ format: 1, app: C.version, made: Date.now(), pages: pages.length, feeds: (feeds || []).length })));
+    await zip.add("waypage.json", utf8(JSON.stringify({ format: 1, app: C.version, made: Date.now(), pages: pages.length, feeds: (feeds || []).length })));
     await zip.add("library.json", utf8(JSON.stringify(pages)));
     if (feeds && feeds.length) await zip.add("feeds.json", utf8(JSON.stringify(feeds)));
     let done = 0;
@@ -227,11 +227,11 @@
   // and `feeds` the backup's followed feeds, cleaned.
   async function restoreLibrary(blob, current, same, onProgress) {
     let entries;
-    try { entries = await zipEntries(blob); } catch (e) { throw new Error("This file isn't a Carry-on backup."); }
+    try { entries = await zipEntries(blob); } catch (e) { throw new Error("This file isn't a Waypage backup."); }
     const indexEntry = entries.get("library.json");
     let list;
     try { list = JSON.parse(new TextDecoder().decode(await zipRead(blob, indexEntry))); } catch (e) { list = null; }
-    if (!indexEntry || !Array.isArray(list)) throw new Error("This file isn't a Carry-on backup.");
+    if (!indexEntry || !Array.isArray(list)) throw new Error("This file isn't a Waypage backup.");
     const pages = [...current];
     const taken = new Set(pages.map((p) => p.id));
     let added = 0, replaced = 0, kept = 0, done = 0;
@@ -325,7 +325,7 @@
     const keep = { ...p };
     delete keep.id; delete keep.thumb; delete keep.bytes;
     const m = doc.createElement("meta");
-    m.name = "carry-on-page";
+    m.name = "waypage-page";
     m.content = JSON.stringify(keep);
     doc.head.prepend(m);
     const charset = doc.createElement("meta");
@@ -485,12 +485,12 @@
   // throws an Error whose message says what's wrong with the file.
   async function importPage(html, has) {
     const doc = new DOMParser().parseFromString(html, "text/html");
-    const tag = doc.querySelector('meta[name="carry-on-page"]');
+    const tag = doc.querySelector('meta[name="waypage-page"], meta[name="carry-on-page"]');
     let raw = null;
     try { raw = tag && JSON.parse(tag.getAttribute("content")); } catch (e) { raw = null; }
     const id = C.save.newId();
     const meta = cleanMeta(raw, id);
-    if (!meta) throw new Error("This file wasn't sent from Carry-on, so it can't be opened here.");
+    if (!meta) throw new Error("This file wasn't sent from Waypage, so it can't be opened here.");
     if (has && has(meta.url)) return { already: meta.url };
     const out = document.implementation.createHTMLDocument("");
     const { root, images } = C.save.cleanSaved(doc.body, out);

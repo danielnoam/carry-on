@@ -1,4 +1,4 @@
-// Adds what Carry-on needs to the generated AndroidManifest.xml. From
+// Adds what Waypage needs to the generated AndroidManifest.xml. From
 // LifeLog's tools/android-manifest.js, without its storage entries.
 //
 //   node tools/android-manifest.js
@@ -7,22 +7,22 @@
 //   Android refuses to install an APK that an app hands it. Play restricts
 //   this permission; a sideloaded app is exactly what it's for. The user still
 //   approves each install on Android's own screen, and once, in Settings,
-//   whether Carry-on may install apps at all.
+//   whether Waypage may install apps at all.
 //
 // - An intent filter on MainActivity for text shared from another app
-//   (0.3.0): it's what puts Carry-on in Chrome's share sheet. A share
+//   (0.3.0): it's what puts Waypage in Chrome's share sheet. A share
 //   arrives as ACTION_SEND with the link in EXTRA_TEXT, which
 //   native/share's ShareTarget plugin hands to the page.
 //
 // - An intent filter for files (0.31.0): "Open with" (ACTION_VIEW) and
 //   a file shared from another app (ACTION_SEND with EXTRA_STREAM), for
-//   the kinds Carry-on opens. The ShareTarget plugin copies the file into
+//   the kinds Waypage opens. The ShareTarget plugin copies the file into
 //   the app's cache for the page to read.
 //
 // - The ML Kit meta-data that has Play services fetch its barcode scanner
 //   when the app is installed (0.30.1, sync's setup code), so the first
 //   scan doesn't wait for it. The scanner is Google's own screen, which is
-//   why Carry-on needs no camera permission.
+//   why Waypage needs no camera permission.
 //
 // Idempotent, and fails loudly if a tag it needs can't be found.
 const fs = require("fs");
@@ -76,6 +76,6 @@ if (require.main === module) {
   const before = fs.readFileSync(file, "utf8");
   fs.writeFileSync(file, patch(before));
   const n = ENTRIES.length;
-  console.log("android: manifest " + (before === patch(before) ? "already has" : "gained") + " " + n + " Carry-on entr" + (n === 1 ? "y" : "ies"));
+  console.log("android: manifest " + (before === patch(before) ? "already has" : "gained") + " " + n + " Waypage entr" + (n === 1 ? "y" : "ies"));
 }
 module.exports = { patch, ENTRIES };
