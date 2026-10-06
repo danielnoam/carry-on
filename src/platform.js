@@ -417,11 +417,12 @@
   // again; null where there's no in-app installer (iOS, a browser).
   const APK_MIME = "application/vnd.android.package-archive";
   const repo = () => (build && build.repo) || null;
-  async function downloadUpdate(version, onProgress) {
+  // `file` is the release's APK: Waypage.apk once Carry-on is Waypage (0.36.0).
+  async function downloadUpdate(version, onProgress, file = "CarryOn.apk") {
     const FS = plugin("Filesystem");
     if (os !== "android" || !FS || !plugin("FileOpener") || !repo()) return null;
-    const url = "https://github.com/" + repo() + "/releases/download/app-v" + version + "/CarryOn.apk";
-    const path = "CarryOn-" + version + ".apk";
+    const url = "https://github.com/" + repo() + "/releases/download/app-v" + version + "/" + file;
+    const path = file.replace(/\.apk$/, "") + "-" + version + ".apk";
     const listener = await FS.addListener("progress", (p) => {
       if (onProgress && p && p.contentLength > 0) onProgress(Math.min(1, p.bytes / p.contentLength));
     });
@@ -650,7 +651,7 @@
     openInstaller,
     clearOldUpdates,
     releasesUrl() { return repo() ? "https://github.com/" + repo() + "/releases/latest" : null; },
-    apkUrl() { return repo() ? "https://github.com/" + repo() + "/releases/latest/download/CarryOn.apk" : null; },
+    apkUrl(file = "CarryOn.apk") { return repo() ? "https://github.com/" + repo() + "/releases/latest/download/" + file : null; },
     // The web copy the app was built from: inside the app this page is at
     // https://localhost, which another device can't open.
     webUrl() { return (build && build.webUrl) || null; },

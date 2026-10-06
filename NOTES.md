@@ -3,6 +3,20 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **The bridge to Waypage (0.36.0).** Waypage gets a new app ID, so it's
+  a new app: it installs beside Carry-on, can't install over it, and
+  starts with nothing. This release teaches Carry-on's updater to spot a
+  release whose assets are Waypage.apk or Waypage.ipa (`upd.moved`); it
+  then says "Carry-on is now Waypage", downloads Waypage.apk instead of
+  CarryOn.apk and opens the installer, and adds "Send your library to
+  Waypage", the usual backup handed to the share sheet. Waypage opens a
+  backup sent to it (application/zip is in its Open with list since
+  0.31.0) and restores it. With sync on, turning sync on in Waypage
+  brings the library instead. The updater reads `build.repo`, which
+  stays danielnoam/carry-on here; GitHub redirects it once the repo is
+  renamed. Only a Carry-on with this release knows about Waypage: older
+  ones would look for CarryOn.apk in a Waypage release and fail, so the
+  bridge has to be on the phone before Waypage 1.0 is published.
 - **A widget for one collection (0.35.0).** TODO had it waiting on a
   file of collections, but the widget doesn't need one: each widget keeps
   its collection's name in the widgets' preferences
