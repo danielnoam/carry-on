@@ -62,10 +62,6 @@ native code.
   asking copy-or-outside each time. Android reuses the folder access
   0.33.0's "a folder you pick" already has; iOS needs the bookmark in
   the iOS release.
-- **Exporting a clip that reads from a file:** its pictures are slots, so
-  an EPUB or HTML export of one would come out without them. The Export
-  tile is hidden on those clips for now; filling the slots first would
-  let it work.
 - **A PDF's own pages:** a scanned PDF is drawn once at about 1000 px and
   kept as pictures, or, read from where it is, every page is drawn again
   each time it's opened, which is slow for a long one. Drawing as you
