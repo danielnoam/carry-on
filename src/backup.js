@@ -41,6 +41,7 @@
     if (tags.length) out.tags = [...new Set(tags)].slice(0, 50);
     const folder = text(m.folder, 32).replace(/\s+/g, " ").trim();
     if (folder) { out.folder = folder; out.folderAt = num(m.folderAt) || out.savedAt; }
+    if (folder && m.folderFav === true) { out.folderFav = true; out.folderFavAt = num(m.folderFavAt) || out.savedAt; }
     if (folder && httpUrl(m.source)) out.source = httpUrl(m.source);
     if (text(m.series, 200)) out.series = text(m.series, 200);
     return out;

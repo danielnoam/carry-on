@@ -31,7 +31,7 @@
   // Every field an index entry can carry through a backup or sync
   // (backup.cleanMeta); anything else on a page stays on its device.
   const SYNCED = new Set(["id", "url", "title", "site", "byline", "licence", "savedAt", "minutes", "lang", "dir", "mode", "images",
-    "at", "finished", "readAt", "comic", "next", "prev", "requested", "tags", "folder", "folderAt", "source", "series", "fav", "favAt"]);
+    "at", "finished", "readAt", "comic", "next", "prev", "requested", "tags", "folder", "folderAt", "source", "series", "fav", "favAt", "folderFav", "folderFavAt"]);
   // Where the reader is, which goes with whichever device read last.
   const READING = ["at", "finished", "readAt"];
 
@@ -71,6 +71,7 @@
     for (const k of Object.keys(out)) if (out[k] === undefined || (k === "tags" && !out[k].length)) delete out[k];
     // A favourite's time goes with the mark.
     if (!out.fav) delete out.favAt;
+    if (!out.folderFav) delete out.folderFavAt;
     return out;
   }
 
@@ -86,7 +87,10 @@
       if (tags.length) win.tags = tags;
       if (lose.fav && !win.fav) { win.fav = true; win.favAt = lose.favAt; }
       if ((lose.readAt || 0) > (win.readAt || 0)) for (const k of READING) { if (lose[k] === undefined) delete win[k]; else win[k] = lose[k]; }
-      if (!win.folder && lose.folder) { win.folder = lose.folder; win.folderAt = lose.folderAt; }
+      if (!win.folder && lose.folder) {
+        win.folder = lose.folder; win.folderAt = lose.folderAt;
+        if (lose.folderFav) { win.folderFav = true; win.folderFavAt = lose.folderFavAt; }
+      }
       kept[i] = win;
       deleted[lose.id] = now;
     }
