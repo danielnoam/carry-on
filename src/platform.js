@@ -537,7 +537,12 @@
         [handle] = await window.showOpenFilePicker({ multiple: false,
           types: [{ description: "Books, notes and comics", accept: { "*/*": FILE_EXTS } }] });
       } catch (e) { return null; }
-      if (!handle) return null;
+      return handle ? files.adopt(handle) : null;
+    },
+    // A handle got some other way (a file dropped on the window) kept like
+    // a picked one. null when it isn't a file.
+    async adopt(handle) {
+      if (!handle || handle.kind !== "file") return null;
       const file = await handle.getFile();
       const ref = "h" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
       await handleDo("readwrite", (s) => s.put(handle, ref));

@@ -174,11 +174,13 @@ and the page shows above it.
   with no picture shows its kind instead ("EPUB", "PDF") in the sans at
   meta size, 600, spaced a little (0.31.0), and its site line names the
   kind.
-- **Opening a file (0.32.0):** a comic, a book or a PDF asks first, as a
+- **Opening a file (0.32.0, every kind since 0.32.2):** a file asks first, as a
   sheet of two rows, each a bold accent label over a line of grey saying
   what it costs: "Keep a copy" first, since it's the one that syncs and
   outlives the file, then "Read from where it is". Putting the sheet away
-  opens nothing.
+  opens nothing. A file that came without lasting access (a synthetic
+  drop, an app that won't share one) still shows the second row, disabled
+  and muted, with what to do instead.
 - **Reader bars:** top and bottom on `--bar`, the same as the strip under
   the status bar (a darker `--reader-bar` in 0.30.5 was taken back in
   0.30.8), checked for AA with ink, muted and accent. The
