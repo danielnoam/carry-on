@@ -159,16 +159,14 @@ on the program first; this release comes after.
   camera prompt), Read aloud with the screen locked, and the updater's
   "Get it" link.
 
-## Next: sync, what's left after 0.30.1
+## Sync: done for now (Daniel, 6 Oct 2026)
 
 0.30.0 syncs the library and each page's text; pictures sync as each
-page's mode and every device fetches its own (Daniel, 5 Oct 2026), so
-the planned 0.31.0 (images through the Git Data API) is not needed.
-0.30.1 added feeds, the step-by-step setup and the setup code.
-
-- **Try it on Daniel's two phones:** save on one and read on the other;
-  delete on one and confirm it stays gone; tag on both offline, then
-  sync.
+page's mode and every device fetches its own. 0.30.1 added feeds, 0.30.9
+favourite collections and 0.30.10 when Feeds was last looked at. Kept
+per device on purpose: settings (theme, reading type, layout, read aloud,
+the images default) and the new-chapter checks, which leave out chapters
+sync brings in. No sync with the app closed (Daniel: not needed).
 
 ---
 

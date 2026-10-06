@@ -2,6 +2,12 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.30.10] - 2026-10-06
+
+### Changed
+- Sync keeps what's new in Feeds the same on every device: posts you've
+  looked at on one aren't counted as new on another.
+
 ## [0.30.9] - 2026-10-06
 
 ### Added

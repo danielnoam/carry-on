@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.30.9";
+  const APP_VERSION = "0.30.10";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -3326,6 +3326,8 @@
         },
         getFeeds: () => feeds,
         setFeeds: syncedFeeds,
+        getSeen: () => load(FEEDS_SEEN_KEY, 0),
+        setSeen: (at) => { store(FEEDS_SEEN_KEY, at); if (state.side) renderSide(); },
         sameUrl,
         onProgress: () => { if (state.section === "sync") renderSection(); paintDownloads(); },
       });
@@ -4563,7 +4565,9 @@
     const root = $("feeds");
     const picked = state.feed && feeds.find((f) => f.url === state.feed);
     if (state.feed && !picked) state.feed = null;
-    if (document.visibilityState !== "hidden") store(FEEDS_SEEN_KEY, Date.now());
+    // Looking at Feeds clears what's new; only a change goes to sync, so
+    // an open river doesn't write to GitHub every few minutes.
+    if (document.visibilityState !== "hidden" && freshPosts()) { store(FEEDS_SEEN_KEY, Date.now()); syncSoon(); }
     const active = document.activeElement && root.contains(document.activeElement)
       ? [document.activeElement.closest("[data-key]"), document.activeElement.className] : null;
     const chipsAt = root.querySelector(".feed-chips");

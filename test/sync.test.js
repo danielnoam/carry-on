@@ -137,4 +137,17 @@ test("a device that doesn't send feeds leaves them as they are", () => {
   assert.deepStrictEqual(m.feedsGone, remote.feedsGone);
 });
 
+test("Feeds looked at on either device clears what's new on both, the latest look wins", () => {
+  const m = S.merge(null, lib([], { feedsSeen: NOW - 50 }), lib([], { feedsSeen: NOW - 10 }), NOW);
+  assert.strictEqual(m.feedsSeen, NOW - 10);
+  const n = S.merge(null, lib([], { feedsSeen: NOW - 5 }), lib([], {}), NOW);
+  assert.strictEqual(n.feedsSeen, NOW - 5);
+  assert.ok(!("feedsSeen" in S.merge(null, lib([]), null, NOW)));
+});
+test("the same look on both is not a change, so nothing is written", () => {
+  const remote = lib([], { feedsSeen: NOW - 10 });
+  const m = S.merge(remote, lib([], { feedsSeen: NOW - 10 }), remote, NOW);
+  assert.strictEqual(m.feedsSeen, remote.feedsSeen);
+});
+
 console.log("\n" + passed + " passed");
