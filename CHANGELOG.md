@@ -2,6 +2,17 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.34.1] - 2026-10-06
+
+### Changed
+- In the reader's settings, the theme moved from Text to Layout, next to
+  scroll or pages and the margins.
+
+### Fixed
+- Opening a drop-down in a sheet, like the font picker, no longer scrolls
+  the sheet and leaves it moved. The list fits where it opens, upward if
+  there's more room above, and scrolls inside itself.
+
 ## [0.34.0] - 2026-10-06
 
 ### Changed

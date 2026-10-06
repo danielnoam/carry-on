@@ -3,6 +3,16 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Drop-downs fit their box (0.34.1).** A menu hangs below its button,
+  absolutely placed; in the reader settings sheet that ran past the
+  sheet's scrolling body, and `scrollIntoView` scrolled the body to show
+  it, pushing the tabs out of sight until you scrolled back. Now, when
+  the drop-down sits in a scrolling box, the menu measures the room above
+  and below, opens toward the bigger side and caps its height to fit
+  (132px at least). On the page itself it still scrolls the page.
+- **Theme under Layout (0.34.1).** Daniel's call: a theme is how the page
+  looks, like margins and scroll or pages, not part of the type. It also
+  evens out the tabs; Layout had two rows and Text five.
 - **The reader's settings in three parts (0.34.0).** Daniel asked for a
   gear instead of Aa and Layout, Text and Read aloud kept apart. In the
   sheet they're tabs (a segmented control), and all three share one grid
