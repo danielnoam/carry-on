@@ -278,7 +278,12 @@
       const W = plugin("Widgets");
       if (W) W.update(data).catch(() => {});
     },
-    // { kind: "page" | "post" | "feeds" | "library", id, url }, or {}.
+    // A collection widget follows its collection's new name (0.35.0).
+    renamed(from, to) {
+      const W = plugin("Widgets");
+      if (W) W.renamed({ from, to }).catch(() => {});
+    },
+    // { kind: "page" | "post" | "feeds" | "library" | "favourites" | "collection", id, url, name }, or {}.
     async take() {
       const W = plugin("Widgets");
       if (W) { try { return await W.take(); } catch (e) { /* none */ } }

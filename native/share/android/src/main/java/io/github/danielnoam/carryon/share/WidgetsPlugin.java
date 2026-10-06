@@ -13,7 +13,8 @@ import com.getcapacitor.annotation.CapacitorPlugin;
  *
  *   update({ reading: { id, title, meta, at } | null,
  *            feeds: { following, fresh, posts: [{ title, site, url }] } })
- *   take()    { kind: "page" | "post" | "feeds" | "library" | "favourites", id, url } once,
+ *   renamed({ from, to })   a collection widget follows a renamed collection
+ *   take()    { kind: "page" | "post" | "feeds" | "library" | "favourites" | "collection", id, url, name } once,
  *             what a widget's tap asked to open, or {}
  *
  * and an "open" event when a tap brings the running app back.
@@ -42,6 +43,7 @@ public class WidgetsPlugin extends Plugin {
         out.put("kind", kind);
         if (kind.equals("page") && u.getLastPathSegment() != null) out.put("id", u.getLastPathSegment());
         if (kind.equals("post")) out.put("url", u.getQueryParameter("url"));
+        if (kind.equals("collection")) out.put("name", u.getQueryParameter("name"));
         pending = out;
         intent.setAction(Intent.ACTION_MAIN);
         intent.setData(null);
@@ -51,6 +53,16 @@ public class WidgetsPlugin extends Plugin {
     @PluginMethod
     public void update(PluginCall call) {
         Widgets.save(getContext(), call.getData().toString());
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void renamed(PluginCall call) {
+        String from = call.getString("from", ""), to = call.getString("to", "");
+        if (!from.isEmpty() && !to.isEmpty()) {
+            Widgets.rename(getContext(), from, to);
+            Widgets.refresh(getContext());
+        }
         call.resolve();
     }
 

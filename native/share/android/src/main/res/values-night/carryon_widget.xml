@@ -6,4 +6,5 @@
     <color name="carryon_w_muted">#9AA1AB</color>
     <color name="carryon_w_accent">#8DB4E2</color>
     <color name="carryon_w_line">#252B33</color>
+    <style name="CarryOnPick" parent="@android:style/Theme.DeviceDefault.Dialog.NoActionBar" />
 </resources>

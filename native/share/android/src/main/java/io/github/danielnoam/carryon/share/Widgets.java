@@ -19,7 +19,8 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
- * Home screen widgets (0.29.0): Keep reading and Feeds. The app writes
+ * Home screen widgets (0.29.0): Keep reading, Feeds, Favourites and one
+ * collection. The app writes
  * what they show (WidgetsPlugin.update) and they only draw it; a tap opens
  * the app with an OPEN intent that names what to show, which the plugin
  * hands to the page.
@@ -55,6 +56,7 @@ final class Widgets {
         if (feeds.length > 0) m.updateAppWidget(feeds, feeds(ctx));
         int[] favs = m.getAppWidgetIds(new ComponentName(ctx, FavouritesWidget.class));
         if (favs.length > 0) m.updateAppWidget(favs, favourites(ctx));
+        for (int id : m.getAppWidgetIds(new ComponentName(ctx, CollectionWidget.class))) m.updateAppWidget(id, collection(ctx, id));
     }
 
     // `what` goes in the intent's address so each tap is its own
@@ -136,7 +138,94 @@ final class Widgets {
             v.setViewVisibility(FAVS[i], View.VISIBLE);
             v.setTextViewText(FAV_TITLES[i], p.optString("title", ""));
             v.setTextViewText(FAV_METAS[i], p.optString("meta", ""));
-            v.setOnClickPendingIntent(FAVS[i], open(ctx, 31 + i, Uri.parse("carryon-widget://page/" + Uri.encode(p.optString("id", "")))));
+            Uri what = p.optString("kind", "").equals("collection")
+                ? collectionUri(p.optString("name", ""))
+                : Uri.parse("carryon-widget://page/" + Uri.encode(p.optString("id", "")));
+            v.setOnClickPendingIntent(FAVS[i], open(ctx, 31 + i, what));
+        }
+        return v;
+    }
+
+    // ---- One collection (0.35.0) ----
+    // Each widget keeps the name of the collection picked for it
+    // (CollectionPickActivity) under "collection.<id>"; the app hands over
+    // every collection's next clips, and a rename in the app moves the name.
+
+    private static Uri collectionUri(String name) {
+        return Uri.parse("carryon-widget://collection").buildUpon().appendQueryParameter("name", name).build();
+    }
+
+    private static SharedPreferences prefs(Context ctx) {
+        return ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+    }
+
+    static String picked(Context ctx, int id) {
+        return prefs(ctx).getString("collection." + id, "");
+    }
+
+    static void pick(Context ctx, int id, String name) {
+        prefs(ctx).edit().putString("collection." + id, name).apply();
+        AppWidgetManager.getInstance(ctx).updateAppWidget(id, collection(ctx, id));
+    }
+
+    static void forget(Context ctx, int[] ids) {
+        SharedPreferences.Editor e = prefs(ctx).edit();
+        for (int id : ids) e.remove("collection." + id);
+        e.apply();
+    }
+
+    static void rename(Context ctx, String from, String to) {
+        SharedPreferences.Editor e = prefs(ctx).edit();
+        for (Map.Entry<String, ?> it : prefs(ctx).getAll().entrySet()) {
+            if (it.getKey().startsWith("collection.") && from.equalsIgnoreCase(String.valueOf(it.getValue()))) e.putString(it.getKey(), to);
+        }
+        e.apply();
+    }
+
+    // The collections the app last handed over, by name.
+    static JSONArray collections(Context ctx) {
+        JSONArray all = data(ctx).optJSONArray("collections");
+        return all != null ? all : new JSONArray();
+    }
+
+    private static JSONObject find(Context ctx, String name) {
+        JSONArray all = collections(ctx);
+        for (int i = 0; i < all.length(); i++) {
+            JSONObject c = all.optJSONObject(i);
+            if (c != null && name.equalsIgnoreCase(c.optString("name", ""))) return c;
+        }
+        return null;
+    }
+
+    static RemoteViews collection(Context ctx, int id) {
+        RemoteViews v = new RemoteViews(ctx.getPackageName(), R.layout.carryon_widget_favourites);
+        String name = picked(ctx, id);
+        JSONObject c = name.isEmpty() ? null : find(ctx, name);
+        for (int row : FAVS) v.setViewVisibility(row, View.GONE);
+        v.setViewVisibility(R.id.w_empty, View.VISIBLE);
+        if (c == null) {
+            v.setTextViewText(R.id.w_head, name.isEmpty() ? "Collection" : name);
+            v.setTextViewText(R.id.w_empty, name.isEmpty() ? "Tap to pick a collection." : "This collection is gone. Tap to pick another.");
+            Intent i = new Intent(ctx, CollectionPickActivity.class);
+            i.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id);
+            i.setData(Uri.parse("carryon-widget://pick/" + id));
+            v.setOnClickPendingIntent(R.id.w_root, PendingIntent.getActivity(ctx, 1000 + id, i, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT));
+            return v;
+        }
+        name = c.optString("name", name);
+        v.setTextViewText(R.id.w_head, name + " · " + c.optString("meta", ""));
+        v.setOnClickPendingIntent(R.id.w_root, open(ctx, 1000 + id, collectionUri(name)));
+        JSONArray clips = c.optJSONArray("clips");
+        int n = clips == null ? 0 : Math.min(clips.length(), FAVS.length);
+        v.setViewVisibility(R.id.w_empty, n == 0 ? View.VISIBLE : View.GONE);
+        v.setTextViewText(R.id.w_empty, "Nothing in it yet.");
+        for (int i = 0; i < n; i++) {
+            JSONObject p = clips.optJSONObject(i);
+            if (p == null) continue;
+            v.setViewVisibility(FAVS[i], View.VISIBLE);
+            v.setTextViewText(FAV_TITLES[i], p.optString("title", ""));
+            v.setTextViewText(FAV_METAS[i], p.optString("meta", ""));
+            v.setOnClickPendingIntent(FAVS[i], open(ctx, 100000 + id * 4 + i, Uri.parse("carryon-widget://page/" + Uri.encode(p.optString("id", "")))));
         }
         return v;
     }

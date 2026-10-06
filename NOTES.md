@@ -3,6 +3,18 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **A widget for one collection (0.35.0).** TODO had it waiting on a
+  file of collections, but the widget doesn't need one: each widget keeps
+  its collection's name in the widgets' preferences
+  (`collection.<widget id>`), picked in CollectionPickActivity (the
+  widget's `android:configure`, reconfigurable), and the app hands over
+  every collection with its next four clips (from the first unfinished,
+  or the last four when all are read). A rename in the app calls
+  `Widgets.renamed`, which moves the name; a rename synced in from
+  another device doesn't, and that widget asks to be picked again. It
+  draws with the Favourites layout, its head given the collection's name.
+  Favourites puts favourite collections first, newest marked first, as
+  the library's Favourites does, then clips, four rows in all.
 - **Telling voices apart (0.34.2).** Google's engine names voices like
   `en-us-x-iol-local` and lists most of them twice, `-local` and
   `-network`, so Daniel saw a long run of "Voice 1… Voice 20". Now the
