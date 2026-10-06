@@ -101,36 +101,53 @@ Tags. 0.30.7 renamed "pages" to "clips" in everything shown; storage
 keys, file paths and sync keep "page". The files release names imported
 documents Files. With Waypage, the set stays.
 
-## Your files, where you want them, and a reader for any file (Daniel, 5 Oct 2026)
+## Files: your own files, and where Carry-on keeps everything (Daniel, 6 Oct 2026)
 
-Not reorganising the library (that's fine as it is). Two things:
+Decided: PDFs through pdf.js, locked down; three places for files, the
+app's private storage the default and recommended. "Files" is the name
+for what you bring in (Naming). Order: what you open first, since it can
+be tried in the browser; the folder setting after, since it is mostly
+native code.
 
-- **Choose where Carry-on keeps its files** (Settings): pages, pictures,
-  collections, everything it saves, in a folder you pick on the phone,
-  so you can see and copy them.
-  - iOS: the app's folder shows in Files under On My iPhone (LifeLog's
-    UIFileSharingEnabled), which is most of it.
-  - Android: the app's own storage is private. A public folder
-    (Documents/Carry-on, as LifeLog's phone backup) is visible to Files
-    and a PC; a folder you pick anywhere goes through Android's folder
-    picker, whose files the reader can't load directly, so they'd be read
-    through a native plugin. Moving an existing library there is a copy,
-    with a check before the old one goes.
-- **Open outside files as they are,** in readers of Carry-on's own, never
-  converted: the original file is kept and is what's read. Each gets the
-  library's marks: where you are, tags, collections, favourites, sync.
-  - **EPUB:** its chapters' XHTML and its own CSS, shown in the same
-    sandboxed reader (no scripts), with its table of contents, scroll or
-    pages.
-  - **PDF:** needs a renderer. pdf.js is the usual one, but it is a
-    dependency (CLAUDE.md says none) and runs scripts, so it can't live in
-    the sandboxed reader. The other way is the phone's own renderer
-    (Android PdfRenderer, iOS PDFKit) drawing each page as you reach it.
-    Decide which.
-  - **Markdown, text, HTML:** shown as they are (Markdown drawn as
-    formatting, HTML sandboxed like a saved page).
-  - **Images and comic archives (CBZ)** in the comics reader.
-  - From the share sheet, Files, or a drop on the desktop.
+### 0.31: open your own files
+
+- **Bringing one in:** "Open a file" under Save, Android's Open with and
+  Share for these types, a drop on the desktop. The original file is
+  kept as it is (pages/<id>/original.<ext>) and is what's read; it gets
+  the library's marks: where you are, tags, collections, favourites.
+  The library gets a Files part beside Collections and Clips.
+- **EPUB:** its chapters' XHTML and its own CSS, cleaned through the same
+  allowlist as a saved page, in the sandboxed reader (no scripts), with
+  its table of contents, scroll or pages.
+- **Markdown, text, HTML:** Markdown drawn as formatting, text as text,
+  HTML cleaned and sandboxed like a saved page.
+- **Images and comic archives (CBZ):** in the comics reader.
+- **PDF:** pdf.js, vendored (one release, its licence beside it, like
+  Readability), run in its own frame with `sandbox="allow-scripts"` and
+  no `allow-same-origin`, so it has no origin and can't reach the app or
+  Capacitor's plugins; a strict CSP, `isEvalSupported: false`, scripts in
+  PDFs off. The app hands it the bytes by postMessage and gets back pages
+  and text. The text layer gives search, read aloud and where you are.
+  Pages drawn as you reach them, so a big PDF doesn't fill memory.
+- **Sync:** a file goes up like a clip's text. GitHub's contents API
+  takes up to 100 MB a file, but reads over 1 MB need the blob API:
+  check, and decide a size above which a file stays on its device.
+
+### 0.32: where Carry-on keeps its files (Settings)
+
+- **The app's storage (default, recommended):** as now. Fastest; on iOS
+  it already shows in Files under On My iPhone.
+- **Documents/Carry-on (Android):** seen from Files and a PC. Catch, said
+  in the setting: after a reinstall Android won't let the app read the
+  files it made there before, so the library is brought back from a
+  backup or sync, or the folder picked again with the third option.
+- **A folder you pick:** anywhere, an SD card too, through Android's
+  folder picker (a persisted permission). Pages and pictures load through
+  a small native plugin, a little slower. iOS: a folder in Files, kept as
+  a security-scoped bookmark.
+- **Moving:** copies everything with progress, checks every file, and
+  only then removes the old copy; stopping half way leaves the old one in
+  use.
 
 ## The iOS release (Daniel, 5 Oct 2026)
 
