@@ -543,7 +543,6 @@ html.native .reader-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top
 .field-pick .dropdown-face { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: start; }
 .field-pick .dropdown-face.unset { color: var(--muted); }
 .field-pick .dropdown-menu { left: 0; right: 0; max-height: 50vh; overflow-y: auto; }
-.voice-pick .dropdown-menu { max-height: 50vh; overflow-y: auto; max-width: min(320px, calc(100vw - 2 * var(--gutter))); }
 .aloud-player .icon-btn { border-radius: var(--r-full); }
 .aloud-play { background: var(--accent); color: var(--accent-ink); }
 .aloud-play .aloud-play-icon, .aloud-play.paused .aloud-pause-icon { display: none; }
@@ -748,6 +747,7 @@ html.native .reader::before {
 .seg.scroll.themes .seg-face { min-width: 72px; }
 .seg.fonts .seg-face { font-size: var(--fs-label); }
 .seg-sample { font-size: var(--fs-label); color: var(--ink); }
+.dropdown-text .seg-sample { margin-left: var(--s-2); }
 .rc-row.stack { flex-direction: column; align-items: stretch; gap: var(--s-2); }
 .rc-row.stack .rc-label { width: auto; }
 .rc-value { display: block; color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }

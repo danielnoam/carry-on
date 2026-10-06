@@ -3,6 +3,20 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Telling voices apart (0.34.2).** Google's engine names voices like
+  `en-us-x-iol-local` and lists most of them twice, `-local` and
+  `-network`, so Daniel saw a long run of "Voice 1… Voice 20". Now the
+  plugins also send quality (Android `Voice.getQuality()`, iOS
+  enhanced/premium) and, on iOS, gender (Android has no field for it).
+  Voices are grouped under a head per country, offline and better ones
+  first, numbered within their country, and tagged natural (quality 400
+  and up), female or male, online. The `-network` twin of a voice that
+  is on the phone is dropped, unless it's the one already picked; it's
+  the same voice and needs a connection, which a reader for planes
+  rarely has. `en-US-language` is the engine's default for that country
+  and shows as "Standard". The Hebrew samples' gap is `margin-left`, not
+  `margin-inline-start`: the sample is `dir="rtl"`, so its start is its
+  right side.
 - **Drop-downs fit their box (0.34.1).** A menu hangs below its button,
   absolutely placed; in the reader settings sheet that ran past the
   sheet's scrolling body, and `scrollIntoView` scrolled the body to show

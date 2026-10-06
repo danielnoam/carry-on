@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.34.1";
+  const APP_VERSION = "0.34.2";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -1768,6 +1768,37 @@
   $("aloudPrev").addEventListener("click", () => moveAloud(-1));
   $("aloudNext").addEventListener("click", () => moveAloud(1));
 
+  // Voices told apart (0.34.2): grouped by country, the best first, coded
+  // names ("en-us-x-iol-local") shown as Voice 1, 2… with what sets each
+  // apart. Google lists most voices twice, on the phone and online; the
+  // online twin is left out unless it's the only one or already picked.
+  function voiceOptions(list, saved) {
+    const coded = (v) => /-x-|#|^[a-z]{2,3}[-_]/i.test(v.name);
+    const twin = (v) => { const m = /^(.+-x-[a-z0-9]+)-(local|network)$/i.exec(v.name); return m ? m[1].toLowerCase() : ""; };
+    const local = new Set(list.filter((v) => !v.online && twin(v)).map(twin));
+    const kept = list.filter((v) => !(v.online && local.has(twin(v)) && v.id !== saved));
+    const region = (v) => { try { return new Intl.Locale(v.lang.replace("_", "-")).region || ""; } catch (e) { return ""; } };
+    const named = (code) => {
+      for (const l of [navigator.language, "en"]) { try { return new Intl.DisplayNames([l], { type: "region" }).of(code); } catch (e) { /* next */ } }
+      return code;
+    };
+    const groups = new Map();
+    for (const v of kept) { const k = region(v); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(v); }
+    const order = [...groups.keys()].sort((a, b) => groups.get(b).length - groups.get(a).length || a.localeCompare(b));
+    const out = [];
+    for (const k of order) {
+      const vs = groups.get(k).sort((a, b) => (a.online - b.online) || ((b.quality || 0) - (a.quality || 0)) || coded(a) - coded(b));
+      if (order.length > 1) out.push({ head: k ? named(k) : "Other" });
+      let n = 0;
+      for (const v of vs) {
+        const name = /-language$/i.test(v.name) ? "Standard" : coded(v) ? "Voice " + ++n : v.name;
+        const tags = [v.gender, (v.quality || 0) >= 400 ? "natural" : "", v.online ? "online" : ""].filter(Boolean);
+        out.push({ value: v.id, label: [name, ...tags].join(" · ") });
+      }
+    }
+    return out;
+  }
+
   // In the Aa sheet: the voice for this page's language and the speed.
   function aloudControls() {
     const p = state.open;
@@ -1782,15 +1813,9 @@
         note.textContent = "No " + name + " voice on this phone. Add one in its text-to-speech settings, then come back.";
         return;
       }
-      const label = (v, n) => {
-        let region = v.lang;
-        try { region = new Intl.DisplayNames([navigator.language || "en"], { type: "language" }).of(v.lang.replace("_", "-")); } catch (e) { /* as is */ }
-        const plain = /-x-|#|^[a-z]{2,3}[-_]/i.test(v.name) ? "Voice " + n : v.name;
-        return plain + " · " + region + (v.online ? " · online" : "");
-      };
-      const options = [{ value: "", label: "Phone's default" }, ...mine.map((v, i) => ({ value: v.id, label: label(v, i + 1) }))];
       const saved = voiceFor(p);
-      voiceRow.lastChild.replaceWith(dropdown({ label: "Voice", cls: "voice-pick", options,
+      const options = [{ value: "", label: "Phone's default" }, ...voiceOptions(mine, saved)];
+      voiceRow.lastChild.replaceWith(dropdown({ label: "Voice", cls: "field-pick font-pick voice-pick", options,
         value: options.some((o) => o.value === saved) ? saved : "",
         onpick: (v) => {
           const all = load(VOICE_KEY, {});
@@ -1874,7 +1899,7 @@
         FONTS.map((f) => ({ value: f.value, label: f.label, style: "font-family: " + f.family + ", var(--sans)" })))),
       row("Hebrew", fontPick("hebrew", "Hebrew font",
         HEBREW.map((f) => ({ value: f.value, label: f.label,
-          sample: f.family ? el("span", { class: "seg-sample", lang: "he", dir: "rtl", style: "font-family: " + f.family, "aria-hidden": "true" }, " עברית") : null })))),
+          sample: f.family ? el("span", { class: "seg-sample", lang: "he", dir: "rtl", style: "font-family: " + f.family, "aria-hidden": "true" }, "עברית") : null })))),
       row("Text size", el("div", { class: "stepper" },
         el("button", { class: "step-btn small", type: "button", "data-step": "-1", "aria-label": "Smaller text", onclick: () => nudge(-1) }, "A"),
         slider("Text size", SIZE_MIN, SIZE_MAX, 1, (v) => setReading({ size: v })),
