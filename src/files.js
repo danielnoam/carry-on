@@ -1,15 +1,25 @@
-// Carry-on: your own files (0.31.0). An EPUB, a Markdown or text file, an
-// HTML page or a CBZ comic opened from the phone becomes a clip like a
-// saved page: its words rebuilt through save.cleanSaved's allowlist (a
-// file is as untrusted as a web page), its pictures written beside it, and
-// the file itself kept as it came (original.<ext>), for sharing it on and
-// for the storage-place setting to come (TODO.md, "Files").
+// Carry-on: your own files (0.31.0, rebuilt in 0.32.0). An EPUB, a
+// Markdown or text file, an HTML page, a CBZ comic or a PDF opened from
+// the phone becomes a clip: its words rebuilt through save.cleanSaved's
+// allowlist (a file is as untrusted as a web page) and read in the same
+// sandboxed reader.
+//
+// Two ways in (0.32.0). **A copy** is a clip like any other: its pictures
+// are written beside it and the file itself isn't kept. **Reading from
+// where it is** keeps no pictures either: each one is a slot (data-in,
+// naming its place in the file) filled from the file when the clip is
+// opened, so a 400 MB comic costs a thumbnail. That needs a lasting
+// permission on the file (platform.files), and it only saves anything
+// where the pictures are the file, so Carry-on asks for a comic, an EPUB
+// or a PDF and copies anything else without asking.
 (function () {
   const C = window.CarryOn;
   const S = () => C.store;
   const B = () => C.backup;
 
-  const KINDS = { epub: "EPUB", md: "Markdown", txt: "Text", html: "HTML", cbz: "Comic" };
+  const KINDS = { epub: "EPUB", md: "Markdown", txt: "Text", html: "HTML", cbz: "Comic", pdf: "PDF" };
+  // Kinds whose pictures can be left in the file and read as they're needed.
+  const LINKABLE = new Set(["epub", "cbz"]);
   const EXTS = { epub: "epub", md: "md", markdown: "md", txt: "txt", text: "txt", html: "html", htm: "html", xhtml: "html", cbz: "cbz" };
   const PICTURE = /\.(jpe?g|png|gif|webp)$/i;
   const MIME_EXT = { "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp" };
@@ -23,15 +33,16 @@
 
   // A picture waits for the page behind a stand-in data: address that
   // cleanSaved lets through, and is written out once the page is clean,
-  // so a book's pictures are never held as base64 text.
+  // so a book's pictures are never held as base64 text. `at` is where it
+  // sits in the file, for a clip that reads from the file.
   function pictures() {
     const waiting = new Map();
     return {
-      add(bytes) {
+      add(bytes, at) {
         const type = B().imageType(bytes);
         if (!MIME_EXT[type]) return null;
         const token = "data:" + type + ";base64," + btoa("carryon-" + waiting.size);
-        waiting.set(token, { bytes, type });
+        waiting.set(token, { bytes, type, at });
         return token;
       },
       get: (token) => waiting.get(token),
@@ -103,7 +114,7 @@
     const picture = async (path) => {
       if (!picAt.has(path)) {
         let token = null;
-        try { if (entries.has(path)) token = pics.add(await read(path)); } catch (e) { token = null; }
+        try { if (entries.has(path)) token = pics.add(await read(path), path); } catch (e) { token = null; }
         picAt.set(path, token);
       }
       return picAt.get(path);
@@ -291,9 +302,80 @@
       const img = out.createElement("img");
       img.setAttribute("alt", "");
       root.append(img);
-      return { img, read: () => B().zipRead(file, entries.get(n)) };
+      return { img, at: n, read: () => B().zipRead(file, entries.get(n)) };
     });
     return { root, panels, title: title || baseName(name) };
+  }
+
+  // ---- PDF ----
+
+  // A PDF through the sandbox (pdf.js in src/pdf.js): its words as
+  // paragraphs, or its pages as pictures when it holds no words (a scan).
+  async function fromPdf(file, out, onProgress, pics) {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let got;
+    try {
+      got = await C.pdf.read(bytes, (done, total, stage) => onProgress && onProgress(done, total, stage === "pages" ? "pictures" : "words"));
+    } catch (e) {
+      throw new FileError(/password|encrypt/i.test(String(e.message)) ? "This PDF is locked with a password."
+        : "Carry-on couldn't read this PDF. It may be damaged.");
+    }
+    const root = out.createElement("div");
+    root.className = "co-body";
+    if (got.images) {
+      root.classList.add("co-comic");
+      for (const [i, b] of got.images.entries()) {
+        const img = out.createElement("img");
+        img.setAttribute("alt", "");
+        root.append(img);
+        await pics.put(img, b, "image/jpeg");
+        if (onProgress) onProgress(i + 1, got.images.length, "pictures");
+      }
+      if (!pics.n) throw new FileError("There's nothing to read in this PDF.");
+    } else {
+      for (const b of got.blocks || []) {
+        if (b.t === "page") continue;
+        const el = out.createElement(b.t === "h" ? "h2" : "p");
+        el.textContent = b.s;
+        root.append(el);
+      }
+      if (!root.textContent.trim()) throw new FileError("There's nothing to read in this PDF.");
+    }
+    return { root, title: got.title || baseName(file.name), byline: got.byline, scan: !!got.images };
+  }
+
+  // ---- Reading a clip that lives in its file ----
+
+  let lastUrls = [];
+  // The clip's page with its pictures filled in from the file it reads
+  // from. Throws FileError when the file has moved or been deleted.
+  async function openLinked(meta) {
+    const html = await S().readPage(meta.id);
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const slots = [...doc.querySelectorAll("img[data-in]")];
+    if (!slots.length) return html;
+    let blob;
+    try {
+      blob = await C.platform.files.blob(meta.link, meta.file.size);
+    } catch (e) {
+      throw new FileError("Carry-on can't find " + meta.file.name + " any more. It may have been moved or deleted.");
+    }
+    for (const url of lastUrls) URL.revokeObjectURL(url);
+    lastUrls = [];
+    const entries = await B().zipEntries(blob).catch(() => null);
+    if (!entries) throw new FileError("Carry-on can't read " + meta.file.name + " any more.");
+    for (const img of slots) {
+      const e = entries.get(img.getAttribute("data-in"));
+      if (!e) { img.className = "co-missing"; continue; }
+      try {
+        const bytes = await B().zipRead(blob, e);
+        const url = URL.createObjectURL(new Blob([bytes], { type: B().imageType(bytes) || "image/jpeg" }));
+        lastUrls.push(url);
+        img.setAttribute("src", url);
+        img.removeAttribute("data-in");
+      } catch (err) { img.className = "co-missing"; }
+    }
+    return "<!doctype html>\n" + doc.documentElement.outerHTML;
   }
 
   // ---- Bringing one in ----
@@ -301,10 +383,21 @@
   // Writes a page's pictures one at a time: into images/ in the app, into
   // the page as data: addresses in a browser. The first becomes the card's
   // picture unless it's told which is the cover.
-  function picturesOut(id) {
+  function picturesOut(id, link) {
     const res = { bytes: 0, thumb: null, n: 0 };
-    res.put = async (img, b, type, cover) => {
-      const rel = "images/" + res.n++ + "." + MIME_EXT[type];
+    // Writes one picture, or leaves a slot for it when the clip reads from
+    // the file. The card's own picture is always written, so the library
+    // needs nothing but itself.
+    res.put = async (img, b, type, cover, at) => {
+      const first = cover || !res.thumb;
+      res.n++;
+      if (link && at) {
+        img.removeAttribute("src");
+        img.setAttribute("data-in", at);
+        if (first) res.thumb = await thumbnail(id, b, type);
+        return;
+      }
+      const rel = "images/" + (res.n - 1) + "." + MIME_EXT[type];
       if (C.platform.native) {
         await S().writeBytes(id, rel, b);
         img.setAttribute("src", rel);
@@ -312,12 +405,39 @@
         img.setAttribute("src", "data:" + type + ";base64," + S().toBase64(b));
       }
       res.bytes += b.length;
-      if (cover || !res.thumb) {
+      if (first) {
         res.thumb = rel;
         if (!C.platform.native) await S().writeThumb(id, img.getAttribute("src"));
       }
     };
     return res;
+  }
+
+  // The card's picture for a clip that keeps none: the first picture,
+  // redrawn small so a comic page doesn't cost a megabyte.
+  const THUMB_WIDTH = 480;
+  async function thumbnail(id, bytes, type) {
+    const rel = "images/cover." + MIME_EXT[type];
+    try {
+      const bmp = await createImageBitmap(new Blob([bytes], { type }));
+      const w = Math.min(THUMB_WIDTH, bmp.width);
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = Math.max(1, Math.round(bmp.height * w / bmp.width));
+      canvas.getContext("2d").drawImage(bmp, 0, 0, canvas.width, canvas.height);
+      bmp.close();
+      if (!C.platform.native) {
+        await S().writeThumb(id, canvas.toDataURL("image/jpeg", 0.8));
+        return "images/cover.jpg";
+      }
+      const blob = await new Promise((done) => canvas.toBlob(done, "image/jpeg", 0.8));
+      await S().writeBytes(id, "images/cover.jpg", new Uint8Array(await blob.arrayBuffer()));
+      return "images/cover.jpg";
+    } catch (e) {
+      if (!C.platform.native) { await S().writeThumb(id, "data:" + type + ";base64," + S().toBase64(bytes)); return rel; }
+      await S().writeBytes(id, rel, bytes);
+      return rel;
+    }
   }
 
   // The clip's body from the file: { root, title, byline, lang, dir },
@@ -330,7 +450,7 @@
         let b = null;
         try { b = await p.read(); } catch (e) { b = null; }
         const type = b && B().imageType(b);
-        if (MIME_EXT[type]) await pics.put(p.img, b, type);
+        if (MIME_EXT[type]) await pics.put(p.img, b, type, false, p.at);
         else p.img.remove();
         if (onProgress) onProgress(i + 1, got.panels.length, "pictures");
       }
@@ -338,6 +458,7 @@
       return { root: got.root, title: got.title };
     }
     let got;
+    if (kind === "pdf") return fromPdf(file, out, onProgress, pics);
     if (kind === "epub") got = await fromEpub(file, out);
     else {
       const text = decode(new Uint8Array(await file.arrayBuffer()));
@@ -366,21 +487,29 @@
     const cover = got.cover && !list.some((x) => x.cover) && got.pics.get(got.cover);
     if (cover) list.unshift({ img: out.createElement("img"), ...cover, cover: true });
     for (const [i, x] of list.entries()) {
-      await pics.put(x.img, x.bytes, x.type, x.cover);
+      await pics.put(x.img, x.bytes, x.type, x.cover, x.at);
       if (onProgress) onProgress(i + 1, list.length, "pictures");
     }
     return { root, title: got.title, byline: got.byline, lang: got.lang, dir: got.dir };
   }
 
-  // Makes a clip of `file`, `kind` from kindOf. Resolves to the clip's
-  // index entry, or { already } when `has(name, size)` says it's here.
-  async function bring(file, kind, { has, onProgress } = {}) {
+  // Whether reading from the file instead of copying would save anything:
+  // only where the pictures are most of the file.
+  const canLink = (kind) => LINKABLE.has(kind) || kind === "pdf";
+
+  // Makes a clip of `file`, `kind` from kindOf. `link` is the lasting
+  // permission on the file (platform.files) when the clip is to read from
+  // it; its pictures then stay in the file. Resolves to the clip's index
+  // entry, or { already } when `has(name, size)` says it's here.
+  async function bring(file, kind, { has, onProgress, link = null } = {}) {
     if (!KINDS[kind]) throw new FileError("Carry-on can't open this kind of file.");
     if (has && has(file.name, file.size)) return { already: true };
     const id = C.save.newId();
     const out = document.implementation.createHTMLDocument("");
     const ext = kind === "epub" || kind === "cbz" || !EXTS[extOf(file.name)] ? kind : extOf(file.name);
-    const pics = picturesOut(id);
+    // A PDF is read once into words or pages; there's nothing left in the
+    // file to come back for, so it's never a clip that reads from one.
+    const pics = picturesOut(id, link && LINKABLE.has(kind));
     let got;
     try {
       got = await content(file, kind, out, pics, onProgress);
@@ -398,13 +527,15 @@
       images: root.querySelectorAll("img").length, missing: 0, imageBytes: pics.bytes,
       file: { name: file.name.slice(0, 200), kind, ext, size: file.size },
     };
-    if (kind === "cbz") meta.comic = true;
+    if (kind === "cbz" || got.scan) meta.comic = true;
+    // The lasting permission is this device's own: it never syncs, and
+    // never goes in a backup another device might read.
+    if (link && LINKABLE.has(kind)) meta.link = link;
     if (pics.thumb) meta.thumb = pics.thumb;
     try {
       const html = C.save.savedPageHtml(meta, root, out);
       const text = C.save.plainText(root);
-      const kept = await S().writeOriginal(id, ext, file, (n, total) => onProgress && onProgress(n, total, "file"));
-      meta.bytes = pics.bytes + kept + await S().writePage(id, html, meta) + S().bytesOf(text);
+      meta.bytes = pics.bytes + await S().writePage(id, html, meta) + S().bytesOf(text);
       await S().writeText(id, text);
     } catch (e) {
       await S().removePage(id);
@@ -413,5 +544,5 @@
     return meta;
   }
 
-  C.files = { KINDS, kindOf, bring, markdown, plain, FileError };
+  C.files = { KINDS, LINKABLE, canLink, kindOf, bring, openLinked, markdown, plain, FileError };
 })();

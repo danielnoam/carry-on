@@ -3,7 +3,37 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
-- **A file of your own is a clip, its original kept beside it (0.31.0).**
+- **pdf.js in a frame with no origin (0.32.0).** A PDF is read by
+  Mozilla's pdf.js (vendored, Apache 2.0, like Readability), but never in
+  the app's own page: a script in a PDF could otherwise reach the
+  Capacitor plugins and every saved clip. It runs in an iframe with
+  `sandbox="allow-scripts"` and no `allow-same-origin`, so it has an
+  opaque origin, behind a CSP that allows nothing but blob: and inline.
+  An opaque origin sends `Origin: null`, and a module or a worker won't
+  load across origins, so the app passes the library's **text** in by
+  postMessage and the frame makes blob: URLs of its own for pdf.js and
+  its worker. `isEvalSupported: false`, scripting and XFA off. What comes
+  back is words, not a viewer: lines are grouped by their place on the
+  page into paragraphs, broken words rejoined, running heads and page
+  numbers dropped, bigger type read as a heading. Under about 40 letters
+  a page it's a scan, and the pages come back drawn as JPEGs instead.
+- **A copy, or reading from the file where it is (0.32.0).** Daniel,
+  6 Oct 2026. A copy is an ordinary clip: pictures beside it, no second
+  copy of the file (0.31.0 kept one, which doubled a comic). Reading from
+  the file keeps no pictures at all: each one is a slot (`data-in`, its
+  place inside the file) filled from the file when the clip opens, so a
+  400 MB comic costs a thumbnail. That needs a permission that outlives
+  the app, which only the system's own picker grants
+  (`takePersistableUriPermission`, or a stored handle in Chrome on a
+  computer); what the WebView's `<input type="file">` hands over is
+  readable once, so Open with and Share can only ever copy. It only saves
+  anything where the pictures are the file, so the question is asked for
+  a comic, a book or a PDF and nothing else. A PDF is read once into
+  words or pages, so there's nothing in the file to come back for: a PDF
+  is always a copy. The permission (`link` on the entry) is this device's
+  own, so it never syncs and a linked clip stays where it was opened.
+- **A file of your own is a clip, its original kept beside it (0.31.0, in
+  part undone by 0.32.0).**
   An EPUB, Markdown, text or HTML file is rebuilt through the same
   allowlist as a saved page (`save.cleanSaved`) and read in the same
   sandboxed reader, so it gets the themes, type, pages mode, read aloud,

@@ -109,27 +109,36 @@ for what you bring in (Naming). Order: what you open first, since it can
 be tried in the browser; the folder setting after, since it is mostly
 native code.
 
-### 0.31: open your own files
+### Done: 0.31.0 and 0.32.0
 
-- **Done in 0.31.0:** EPUB, Markdown, text, HTML and CBZ, opened from
-  Save's list button, a drop on the desktop, or Android's Open with and
-  Share; the Files part and its sidebar entry; the original kept beside
-  the clip and in backups (NOTES.md, 0.31.0).
-- **iOS Open in:** document types in Info.plist and the app's open-URL
-  event, so Files and Mail can hand a file to Carry-on. "Open a file"
-  already works there.
-- **PDF (0.31.1):** pdf.js, vendored (one release, its licence beside it, like
-  Readability), run in its own frame with `sandbox="allow-scripts"` and
-  no `allow-same-origin`, so it has no origin and can't reach the app or
-  Capacitor's plugins; a strict CSP, `isEvalSupported: false`, scripts in
-  PDFs off. The app hands it the bytes by postMessage and gets back pages
-  and text. The text layer gives search, read aloud and where you are.
-  Pages drawn as you reach them, so a big PDF doesn't fill memory.
-- **Sync:** a file goes up like a clip's text. GitHub's contents API
-  takes up to 100 MB a file, but reads over 1 MB need the blob API:
-  check, and decide a size above which a file stays on its device.
+- **0.31.0:** EPUB, Markdown, text, HTML and CBZ, opened from Save's list
+  button, a drop on the desktop, or Android's Open with and Share; the
+  Files part and its sidebar entry (NOTES.md, 0.31.0).
+- **0.32.0:** PDFs through pdf.js in a frame with no origin; the choice
+  between a copy and reading from the file where it is; the system's
+  picker; copies syncing with their pictures under 20 MB; the second copy
+  of the file 0.31.0 kept is gone (NOTES.md, 0.32.0).
 
-### 0.32: where Carry-on keeps its files (Settings)
+### Still open on files
+
+- **iOS, reading from a file where it is:** a Files plugin for iOS
+  (UIDocumentPicker and a security-scoped bookmark), so the choice shows
+  there too. Until then iOS always copies, and "Open a file" is the only
+  way in; Open in from Files and Mail wants document types in Info.plist
+  and the app's open-URL event.
+- **Exporting a clip that reads from a file:** its pictures are slots, so
+  an EPUB or HTML export of one would come out without them. The Export
+  tile is hidden on those clips for now; filling the slots first would
+  let it work.
+- **A PDF's own pages:** a scanned PDF is drawn once at about 1000 px and
+  kept as pictures. Drawing as you reach them, and keeping where you are
+  by page, would suit a long one better.
+- **Sync of a big file's clip:** over 20 MB of pictures a copy keeps them
+  on the device it was opened on. GitHub's contents API takes up to
+  100 MB a file (reads over 1 MB need the blob API), so the cap could go
+  up once it's clear how slow a 100 MB page is to write.
+
+### Next: where Carry-on keeps its files (Settings)
 
 - **The app's storage (default, recommended):** as now. Fastest; on iOS
   it already shows in Files under On My iPhone.
@@ -138,9 +147,12 @@ native code.
   files it made there before, so the library is brought back from a
   backup or sync, or the folder picked again with the third option.
 - **A folder you pick:** anywhere, an SD card too, through Android's
-  folder picker (a persisted permission). Pages and pictures load through
-  a small native plugin, a little slower. iOS: a folder in Files, kept as
-  a security-scoped bookmark.
+  folder picker, which 0.32.0's Files plugin already opens
+  (`pickFolder`). The work left is that a clip in such a folder has no
+  file:// address the WebView can load, so the reader's pictures and the
+  library's cards need a native scheme the WebView answers, and store.js
+  has to write every page through SAF rather than Filesystem. iOS: a
+  folder in Files, kept as a security-scoped bookmark.
 - **Moving:** copies everything with progress, checks every file, and
   only then removes the old copy; stopping half way leaves the old one in
   use.

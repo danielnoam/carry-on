@@ -2,6 +2,27 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.32.0] - 2026-10-06
+
+### Added
+- PDFs open in Carry-on. A PDF with words in it becomes a clip of those
+  words, so it takes your theme, your type, read aloud, search and your
+  place; a scanned one comes in as its pages, read like a comic.
+- When you open a comic, a book or a PDF, Carry-on asks whether to keep a
+  copy or to read from the file where it is. A copy is a clip like any
+  other and syncs to your other devices. Reading from the file costs
+  almost nothing on the phone: its pictures stay in the file and are read
+  as you open it. Those clips live in Files, and stay on this device.
+- Files you open go through the phone's own picker now, which is also
+  what lets Carry-on keep reading a file tomorrow.
+
+### Changed
+- A clip made from a file no longer keeps a second copy of the file
+  beside it, so a comic takes about half what it did in 0.31.0. The
+  copies 0.31.0 left are given back when this version starts.
+- Copies of files sync like any other clip, pictures and all, as long as
+  their pictures come to less than 20 MB.
+
 ## [0.31.0] - 2026-10-06
 
 ### Added

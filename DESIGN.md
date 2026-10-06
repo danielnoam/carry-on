@@ -170,9 +170,15 @@ and the page shows above it.
   a look: "2 previews missing · Retry" in warn, or "Images online".
   With no picture, the thumbnail is `--preview` with the site's icon
   centred at 32 px (`--s-6`), or the site's first letter in the serif,
-  heading size, `--muted` (0.27.6). A file of your own with no picture
-  shows its kind instead ("EPUB", "MD") in the sans at meta size, 600,
-  spaced a little (0.31.0), and its site line names the kind.
+  heading size, `--muted` (0.27.6). A clip made from a file of your own
+  with no picture shows its kind instead ("EPUB", "PDF") in the sans at
+  meta size, 600, spaced a little (0.31.0), and its site line names the
+  kind.
+- **Opening a file (0.32.0):** a comic, a book or a PDF asks first, as a
+  sheet of two rows, each a bold accent label over a line of grey saying
+  what it costs: "Keep a copy" first, since it's the one that syncs and
+  outlives the file, then "Read from where it is". Putting the sheet away
+  opens nothing.
 - **Reader bars:** top and bottom on `--bar`, the same as the strip under
   the status bar (a darker `--reader-bar` in 0.30.5 was taken back in
   0.30.8), checked for AA with ink, muted and accent. The
