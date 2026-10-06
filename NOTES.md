@@ -3,6 +3,22 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Where your library is (0.33.0).** Three places, Daniel's call: inside
+  the app (default; private, quickest, gone on uninstall), Documents/
+  Carry-on (Android 11+, plain files through Capacitor's Filesystem with
+  directory DOCUMENTS; no permission needed from 11 for files the app
+  makes), and a folder you pick (Android's folder access, so no file
+  paths: the Files plugin writes through DocumentsContract, and the
+  WebView reads it at `/_carryon_folder_/`, answered by a
+  BridgeWebViewClient the plugin sets in `load()`, which keeps
+  page-relative `images/3.jpg` working as the reader's <base>). store.js
+  has one backend per place and every read and write goes through it.
+  Moving copies every file, writes the joined index, reads it back, and
+  only then switches and clears the old place; a library already in the
+  new place is joined, never replaced. A place that can't be reached
+  reads as an empty library, so sync refuses to run then (an empty
+  library sent up would look like every clip deleted). On iOS Capacitor's
+  DATA is already Documents, so the plist keys show it in Files instead.
 - **Every file asks (0.32.2).** 0.32.0 asked only where reading from the
   file saved space (pictures). Daniel's rule is about where a file lives,
   not its size: anything you bring in is either a clip (copy, syncs) or a

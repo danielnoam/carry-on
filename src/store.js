@@ -1,6 +1,12 @@
-// Carry-on: where saved pages live. One directory per page under the app's
-// data directory, `pages/<id>/` with page.html, meta.json and images/, plus
-// library.json listing them (docs/PROPOSAL.md, "Store and read").
+// Carry-on: where saved pages live. One directory per page, `pages/<id>/`
+// with page.html, meta.json and images/, plus library.json listing them
+// (docs/PROPOSAL.md, "Store and read").
+//
+// Where that is, in the app (0.33.0): the app's own storage (the default),
+// Documents/Carry-on on the phone (Android 11 and later), or a folder you
+// picked, which Android lets the app reach only through its folder access
+// (the Files plugin; the WebView reads it at /_carryon_folder_/). Every
+// read and write below goes through `cur`, so that's the only difference.
 //
 // In a browser there is no directory: page.html, the index and a page's
 // card picture go to IndexedDB (the index was in localStorage before
@@ -9,22 +15,106 @@
 (function () {
   const P = window.CarryOn.platform;
   const FS = () => P.plugin("Filesystem");
-  const DIR = "DATA";
+  const F = () => P.plugin("Files");
   const INDEX_KEY = "carryon.library";
+  const PLACE_KEY = "carryon.storagePlace";
 
   const bytesOf = (text) => new Blob([text]).size;
 
-  // The data directory as a URL the WebView can load, so a page directory can be
-  // the reader's <base> and a card can show its preview. null in a browser.
+  // ---- Where the library is (0.33.0) ----
+
+  // { kind: "app" } | { kind: "documents" } | { kind: "folder", tree, name }
+  function savedPlace() {
+    try {
+      const p = JSON.parse(localStorage.getItem(PLACE_KEY));
+      if (p && (p.kind === "documents" || (p.kind === "folder" && p.tree))) return p;
+    } catch (e) { /* the default */ }
+    return { kind: "app" };
+  }
+
+  // One place's reads and writes. Paths are inside the library: "library.json",
+  // "pages/<id>/page.html". `data` is utf8 text, or base64 bytes.
+  function backend(place) {
+    if (place.kind === "folder") {
+      const tree = place.tree;
+      return {
+        place,
+        write: (path, data, utf8) => F().folderWrite({ tree, path, data, encoding: utf8 ? "utf8" : "base64" }),
+        read: async (path) => (await F().folderRead({ tree, path })).data,
+        async stat(path) {
+          const s = await F().folderStat({ tree, path });
+          if (!s.exists) throw new Error("missing " + path);
+          return s.size || 0;
+        },
+        remove: (path) => F().folderDelete({ tree, path }),
+        rmdir: (path) => F().folderDelete({ tree, path }),
+        list: async (path) => (await F().folderList({ tree, path })).files || [],
+        async download(url, path, page) {
+          const tmp = "incoming-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+          await P.downloadTo(url, tmp, page, "CACHE");
+          const { uri } = await FS().getUri({ path: tmp, directory: "CACHE" });
+          return (await F().folderMoveIn({ tree, path, from: uri })).size || 0;
+        },
+        base: async () => location.origin + "/_carryon_folder_/",
+      };
+    }
+    const directory = place.kind === "documents" ? "DOCUMENTS" : "DATA";
+    const pre = place.kind === "documents" ? "Carry-on/" : "";
+    return {
+      place, directory, pre,
+      write: (path, data, utf8) => FS().writeFile({ path: pre + path, data, directory, recursive: true, ...(utf8 ? { encoding: "utf8" } : {}) }),
+      read: async (path) => (await FS().readFile({ path: pre + path, directory, encoding: "utf8" })).data,
+      stat: async (path) => (await FS().stat({ path: pre + path, directory })).size || 0,
+      remove: (path) => FS().deleteFile({ path: pre + path, directory }),
+      rmdir: (path) => FS().rmdir({ path: pre + path, directory, recursive: true }),
+      list: async (path) => (await FS().readdir({ path: pre + path, directory })).files || [],
+      async download(url, path, page) {
+        await P.downloadTo(url, pre + path, page, directory);
+        return (await FS().stat({ path: pre + path, directory })).size || 0;
+      },
+      async base() {
+        const { uri } = await FS().getUri({ path: pre, directory });
+        const cap = window.Capacitor;
+        return (cap && cap.convertFileSrc ? cap.convertFileSrc(uri) : uri).replace(/\/?$/, "/");
+      },
+    };
+  }
+
+  let cur = null;
+  // The library's directory as a URL the WebView can load, so a page
+  // directory can be the reader's <base> and a card can show its preview.
+  // null in a browser.
   let dataUrl = null;
+  // Set when the library's place can't be reached (a picked folder that
+  // was deleted, or whose access was taken back): what to tell the reader.
+  let problem = null;
+
+  async function use(place) {
+    cur = backend(place);
+    if (F() && F().serve) await F().serve({ tree: place.kind === "folder" ? place.tree : null }).catch(() => {});
+    try { dataUrl = await cur.base(); } catch (e) { dataUrl = null; }
+  }
+
   const ready = (async () => {
     if (!FS()) return;
-    try {
-      const { uri } = await FS().getUri({ path: "", directory: DIR });
-      const cap = window.Capacitor;
-      dataUrl = (cap && cap.convertFileSrc ? cap.convertFileSrc(uri) : uri).replace(/\/?$/, "/");
-    } catch (e) { dataUrl = null; }
+    const place = savedPlace();
+    await use(place);
+    problem = null;
+    if (place.kind !== "app") {
+      try { await cur.stat("library.json"); }
+      catch (e) { problem = "Carry-on can't reach " + placeName(place) + ". Pick it again in Settings, under Storage."; }
+    }
   })();
+
+  function placeName(place) {
+    if (place.kind === "documents") return "Documents/Carry-on";
+    if (place.kind === "folder") return place.name || "the folder you picked";
+    return "the app's own storage";
+  }
+
+  // While the library moves, everything else waits for it.
+  let gate = Promise.resolve();
+  const B = async () => { await ready; await gate; return cur; };
 
   function idb() {
     return new Promise((resolve, reject) => {
@@ -51,8 +141,7 @@
   async function readIndex() {
     if (FS()) {
       try {
-        const { data } = await FS().readFile({ path: "library.json", directory: DIR, encoding: "utf8" });
-        return JSON.parse(data);
+        return JSON.parse(await (await B()).read("library.json"));
       } catch (e) { return []; }
     }
     try {
@@ -71,7 +160,7 @@
   async function writeIndexOnly(pages) {
     const text = JSON.stringify(pages);
     if (FS()) {
-      await FS().writeFile({ path: "library.json", data: text, directory: DIR, encoding: "utf8" });
+      await (await B()).write("library.json", text, true);
       return;
     }
     try {
@@ -130,8 +219,9 @@
   async function writePage(id, html, meta) {
     if (FS()) {
       const base = "pages/" + id + "/";
-      await FS().writeFile({ path: base + "page.html", data: html, directory: DIR, encoding: "utf8", recursive: true });
-      await FS().writeFile({ path: base + "meta.json", data: JSON.stringify(meta, null, 1), directory: DIR, encoding: "utf8", recursive: true });
+      const b = await B();
+      await b.write(base + "page.html", html, true);
+      await b.write(base + "meta.json", JSON.stringify(meta, null, 1), true);
     } else {
       await idbDo("readwrite", (s) => s.put(html, id));
     }
@@ -140,15 +230,14 @@
 
   async function readPage(id) {
     if (FS()) {
-      const { data } = await FS().readFile({ path: "pages/" + id + "/page.html", directory: DIR, encoding: "utf8" });
-      return data;
+      return (await B()).read("pages/" + id + "/page.html");
     }
     return idbDo("readonly", (s) => s.get(id));
   }
 
   async function removePage(id) {
     if (FS()) {
-      try { await FS().rmdir({ path: "pages/" + id, directory: DIR, recursive: true }); } catch (e) { /* already gone */ }
+      try { await (await B()).rmdir("pages/" + id); } catch (e) { /* already gone */ }
       return;
     }
     try { await idbDo("readwrite", (s) => { s.delete(id + ":text"); s.delete(id + ":thumb"); return s.delete(id); }); } catch (e) { /* already gone */ }
@@ -158,14 +247,14 @@
   // null when it was saved before 0.16.0 and hasn't been read for it yet.
   async function writeText(id, text) {
     if (FS()) {
-      await FS().writeFile({ path: "pages/" + id + "/text.txt", data: text, directory: DIR, encoding: "utf8", recursive: true });
+      await (await B()).write("pages/" + id + "/text.txt", text, true);
     } else {
       await idbDo("readwrite", (s) => s.put(text, id + ":text"));
     }
   }
   async function readText(id) {
     try {
-      if (FS()) return (await FS().readFile({ path: "pages/" + id + "/text.txt", directory: DIR, encoding: "utf8" })).data;
+      if (FS()) return await (await B()).read("pages/" + id + "/text.txt");
       const t = await idbDo("readonly", (s) => s.get(id + ":text"));
       return typeof t === "string" ? t : null;
     } catch (e) { return null; }
@@ -177,9 +266,7 @@
   // other sites' pages their pictures check it (0.22.0).
   async function download(id, rel, url, page) {
     if (!FS()) throw new Error("no directory");
-    const path = "pages/" + id + "/" + rel;
-    await P.downloadTo(url, path, page);
-    const { size } = await FS().stat({ path, directory: DIR });
+    const size = await (await B()).download(url, "pages/" + id + "/" + rel, page);
     if (!size) throw new Error("empty download");
     return size;
   }
@@ -187,7 +274,7 @@
   // A file's size in a page's directory, 0 when it isn't there.
   async function sizeOf(id, rel) {
     if (!FS()) return 0;
-    try { return (await FS().stat({ path: "pages/" + id + "/" + rel, directory: DIR })).size || 0; } catch (e) { return 0; }
+    try { return await (await B()).stat("pages/" + id + "/" + rel); } catch (e) { return 0; }
   }
 
   // Deletes one file in a page's directory; resolves to the bytes freed.
@@ -195,8 +282,9 @@
     if (!FS()) return 0;
     const path = "pages/" + id + "/" + rel;
     try {
-      const { size } = await FS().stat({ path, directory: DIR });
-      await FS().deleteFile({ path, directory: DIR });
+      const b = await B();
+      const size = await b.stat(path);
+      await b.remove(path);
       return size || 0;
     } catch (e) { return 0; }
   }
@@ -233,7 +321,7 @@
       const blob = await new Promise((resolve) => canvas.toBlob(resolve, clear ? "image/png" : "image/jpeg", 0.82));
       if (!blob || blob.size >= size) return same;
       const out = rel.replace(/\.[^./]*$/, "") + "s." + (clear ? "png" : "jpg");
-      await FS().writeFile({ path: "pages/" + id + "/" + out, data: await base64(blob), directory: DIR, recursive: true });
+      await (await B()).write("pages/" + id + "/" + out, await base64(blob));
       await removeFile(id, rel);
       return { rel: out, bytes: blob.size };
     } catch (e) { return same; }
@@ -263,7 +351,7 @@
     const out = [];
     async function walk(dir) {
       let files;
-      try { ({ files } = await FS().readdir({ path: "pages/" + id + (dir ? "/" + dir : ""), directory: DIR })); } catch (e) { return; }
+      try { files = await (await B()).list("pages/" + id + (dir ? "/" + dir : "")); } catch (e) { return; }
       for (const f of files) {
         const name = typeof f === "string" ? f : f.name;
         const rel = (dir ? dir + "/" : "") + name;
@@ -285,7 +373,7 @@
   }
 
   async function writeBytes(id, rel, bytes) {
-    await FS().writeFile({ path: "pages/" + id + "/" + rel, data: toBase64(bytes), directory: DIR, recursive: true });
+    await (await B()).write("pages/" + id + "/" + rel, toBase64(bytes));
   }
 
   // A file in the app's cache written a piece at a time, so a backup of
@@ -309,6 +397,67 @@
     return dataUrl ? dataUrl + "pages/" + id + "/" : null;
   }
 
-  window.CarryOn.store = { ready, readIndex, writeIndex, writeIndexOnly, set onIndex(f) { onIndex = f; }, writeThumb, readThumbs, storageInfo, keepStored, writePage, readPage, removePage, writeText, readText, download, removeFile, sizeOf, shrink, pageDirUrl, bytesOf,
+  // ---- Moving the library (0.33.0) ----
+
+  // Every file under `path` in a place, as paths inside the library.
+  async function walkAll(b, path) {
+    let files;
+    try { files = await b.list(path); } catch (e) { return []; }
+    const out = [];
+    for (const f of files) {
+      const name = typeof f === "string" ? f : f.name;
+      const rel = path + "/" + name;
+      if (f.type === "directory") out.push(...await walkAll(b, rel));
+      else out.push(rel);
+    }
+    return out;
+  }
+
+  // Moves the whole library to `next`, then uses it. A library already
+  // there is kept: its clips join this one's (the same clip in both, this
+  // one wins). The old place is cleared only once everything is across.
+  // onProgress(done, total). Resolves to the joined index.
+  async function moveTo(next, onProgress) {
+    await ready;
+    let open;
+    const turn = gate.then(() => new Promise((done) => { open = done; }));
+    const before = gate;
+    gate = turn;
+    await before;
+    try {
+      const from = cur;
+      const to = backend(next);
+      const fromBase = dataUrl;
+      const mine = JSON.parse(await from.read("library.json").catch(() => "[]"));
+      let there = [];
+      try { there = JSON.parse(await to.read("library.json")); } catch (e) { there = []; }
+      const files = await walkAll(from, "pages");
+      let done = 0;
+      if (onProgress) onProgress(0, files.length);
+      for (const path of files) {
+        const r = await fetch(fromBase + path.split("/").map(encodeURIComponent).join("/"));
+        if (!r.ok) throw new Error("Couldn't read " + path);
+        await to.write(path, toBase64(new Uint8Array(await r.arrayBuffer())));
+        if (onProgress) onProgress(++done, files.length);
+      }
+      const joined = [...mine, ...there.filter((p) => !mine.some((m) => m.id === p.id))];
+      await to.write("library.json", JSON.stringify(joined), true);
+      // Read back before anything is let go.
+      if (JSON.parse(await to.read("library.json")).length !== joined.length) throw new Error("The library didn't arrive whole.");
+      const old = from.place;
+      localStorage.setItem(PLACE_KEY, JSON.stringify(next));
+      await use(next);
+      problem = null;
+      try { await from.rmdir("pages"); } catch (e) { /* left behind */ }
+      try { await from.remove("library.json"); } catch (e) { /* left behind */ }
+      if (old.kind === "folder" && old.tree !== (next.tree || "")) P.files.release(old.tree);
+      return joined;
+    } finally {
+      open();
+    }
+  }
+
+  window.CarryOn.store = { ready,
+    get place() { return cur ? cur.place : savedPlace(); }, placeName, get problem() { return problem; }, moveTo, readIndex, writeIndex, writeIndexOnly, set onIndex(f) { onIndex = f; }, writeThumb, readThumbs, storageInfo, keepStored, writePage, readPage, removePage, writeText, readText, download, removeFile, sizeOf, shrink, pageDirUrl, bytesOf,
     listFiles, listSized, readBytes, writeBytes, cacheFile, toBase64 };
 })();

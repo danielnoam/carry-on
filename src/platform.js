@@ -322,23 +322,25 @@
   // Android's downloadFile ignores `recursive` (Filesystem 8): into a
   // folder that isn't there yet, every download failed, so a new page's
   // pictures all ended up missing (0.30.2). The folder is made first.
-  async function folderFor(FS, path) {
+  // `directory` is the library's (store.js, 0.33.0), or CACHE on the way
+  // into a picked folder.
+  async function folderFor(FS, path, directory) {
     const dir = path.split("/").slice(0, -1).join("/");
     if (!dir) return;
-    try { await FS.mkdir({ path: dir, directory: "DATA", recursive: true }); }
+    try { await FS.mkdir({ path: dir, directory, recursive: true }); }
     catch (e) { /* there already */ }
   }
-  async function downloadTo(url, path, page) {
+  async function downloadTo(url, path, page, directory = "DATA") {
     const FS = plugin("Filesystem");
     if (!FS) return null;
     // The page's own site as Referer, as a browser sends it (its origin,
     // not the whole address).
     const headers = { "User-Agent": USER_AGENT };
     try { if (page) headers.Referer = new URL(page).origin + "/"; } catch (e) { /* no referer */ }
-    await folderFor(FS, path);
-    await deadline(FS.downloadFile({ url, path, directory: "DATA", recursive: true, headers,
+    await folderFor(FS, path, directory);
+    await deadline(FS.downloadFile({ url, path, directory, recursive: true, headers,
       connectTimeout: FILE_TIMEOUT / 2, readTimeout: FILE_TIMEOUT }), FILE_TIMEOUT + 5000);
-    const { uri } = await FS.getUri({ path, directory: "DATA" });
+    const { uri } = await FS.getUri({ path, directory });
     return cap.convertFileSrc ? cap.convertFileSrc(uri) : uri;
   }
 
