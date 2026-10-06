@@ -85,6 +85,7 @@ test("the manifest gains the updater's permission and the share target, once", (
   assert.ok(/<manifest[^>]*>\s*<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" \/>/.test(once));
   const activity = once.slice(once.indexOf("<activity"), once.indexOf("</activity>"));
   assert.ok(/android.intent.action.SEND"[\s\S]*android.intent.category.DEFAULT"[\s\S]*android:mimeType="text\/plain"/.test(activity));
+  assert.ok(/android.intent.action.VIEW"[\s\S]*android:mimeType="application\/epub\+zip"[\s\S]*android:mimeType="application\/x-cbz"/.test(activity));
   assert.strictEqual(manifest.patch(once), once);
   assert.throws(() => manifest.patch("<manifest><application></application></manifest>"));
 });

@@ -14,6 +14,11 @@
 //   arrives as ACTION_SEND with the link in EXTRA_TEXT, which
 //   native/share's ShareTarget plugin hands to the page.
 //
+// - An intent filter for files (0.31.0): "Open with" (ACTION_VIEW) and
+//   a file shared from another app (ACTION_SEND with EXTRA_STREAM), for
+//   the kinds Carry-on opens. The ShareTarget plugin copies the file into
+//   the app's cache for the page to read.
+//
 // - The ML Kit meta-data that has Play services fetch its barcode scanner
 //   when the app is installed (0.30.1, sync's setup code), so the first
 //   scan doesn't wait for it. The scanner is Google's own screen, which is
@@ -32,6 +37,17 @@ const ENTRIES = [
       '                <action android:name="android.intent.action.SEND" />\n' +
       '                <category android:name="android.intent.category.DEFAULT" />\n' +
       '                <data android:mimeType="text/plain" />\n' +
+      '            </intent-filter>',
+  },
+  {
+    inside: "main-activity",
+    xml: '<intent-filter>\n' +
+      '                <action android:name="android.intent.action.VIEW" />\n' +
+      '                <action android:name="android.intent.action.SEND" />\n' +
+      '                <category android:name="android.intent.category.DEFAULT" />\n' +
+      ["application/epub+zip", "text/markdown", "text/x-markdown", "text/plain", "text/html",
+        "application/vnd.comicbook+zip", "application/x-cbz", "application/zip"]
+        .map((t) => '                <data android:mimeType="' + t + '" />\n').join("") +
       '            </intent-filter>',
   },
 ];

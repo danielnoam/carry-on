@@ -18,12 +18,21 @@
   const text = (v, n) => (typeof v === "string" ? v.slice(0, n) : "");
   const num = (v) => (typeof v === "number" && isFinite(v) ? v : 0);
 
+  // A clip made from a file of your own (0.31.0): what the file was.
+  const FILE_KINDS = ["epub", "md", "txt", "html", "cbz", "pdf"];
+  function cleanFile(f) {
+    if (!f || typeof f !== "object" || !FILE_KINDS.includes(f.kind) || !/^[a-z0-9]{1,8}$/.test(f.ext || "")) return null;
+    return { name: text(f.name, 200) || "file." + f.ext, kind: f.kind, ext: f.ext, size: num(f.size) };
+  }
+  const sameFile = (a, b) => !!(a.file && b.file && a.file.name === b.file.name && a.file.size === b.file.size);
+
   // An entry from a file, down to the fields an index entry has. null when
-  // it has no address to call home.
+  // it has no address to call home, and wasn't made from a file.
   function cleanMeta(m, id) {
-    if (!m || typeof m !== "object" || !httpUrl(m.url)) return null;
+    const file = m && typeof m === "object" ? cleanFile(m.file) : null;
+    if (!m || typeof m !== "object" || (!httpUrl(m.url) && !file)) return null;
     const out = {
-      id, url: httpUrl(m.url), title: text(m.title, 300) || httpUrl(m.url), site: text(m.site, 100), byline: text(m.byline, 200),
+      id, url: httpUrl(m.url), title: text(m.title, 300) || httpUrl(m.url) || file.name, site: text(m.site, 100), byline: text(m.byline, 200),
       licence: m.licence === "wikipedia" ? "wikipedia" : null, savedAt: num(m.savedAt) || Date.now(), minutes: Math.max(1, Math.round(num(m.minutes)) || 1),
       lang: text(m.lang, 20), dir: m.dir === "rtl" ? "rtl" : "", mode: ["previews", "full", "links"].includes(m.mode) ? m.mode : "previews",
       images: num(m.images), missing: num(m.missing), bytes: num(m.bytes),
@@ -44,6 +53,7 @@
     if (folder && m.folderFav === true) { out.folderFav = true; out.folderFavAt = num(m.folderFavAt) || out.savedAt; }
     if (folder && httpUrl(m.source)) out.source = httpUrl(m.source);
     if (text(m.series, 200)) out.series = text(m.series, 200);
+    if (file) out.file = file;
     return out;
   }
 
@@ -201,6 +211,9 @@
         if (html) await zip.add("pages/" + p.id + "/page.html", utf8(html));
         const words = await S().readText(p.id);
         if (words != null) await zip.add("pages/" + p.id + "/text.txt", utf8(words));
+        if (p.file) {
+          try { await zip.add("pages/" + p.id + "/original." + p.file.ext, new Uint8Array(await (await S().readOriginal(p.id, p.file.ext)).arrayBuffer())); } catch (e) { /* not kept */ }
+        }
       }
       if (onProgress) onProgress(++done, pages.length);
     }
@@ -208,7 +221,7 @@
     return native ? { uri: await file.uri(), name } : { blob: new Blob(parts, { type: "application/zip" }), name };
   }
 
-  const PAGE_FILE = /^(page\.html|meta\.json|text\.txt|images\/[A-Za-z0-9._-]{1,80})$/;
+  const PAGE_FILE = /^(page\.html|meta\.json|text\.txt|original\.[a-z0-9]{1,8}|images\/[A-Za-z0-9._-]{1,80})$/;
 
   // Merges a backup into the library: a page not here is added, one here
   // already is replaced only by a copy saved later, never the other way.
@@ -229,7 +242,7 @@
       const from = raw && typeof raw.id === "string" && ID.test(raw.id) ? raw.id : null;
       const meta = from && entries.has("pages/" + from + "/page.html") && cleanMeta(raw, from);
       if (meta) {
-        const i = pages.findIndex((p) => same(p.url, meta.url));
+        const i = pages.findIndex((p) => (meta.file ? sameFile(p, meta) : same(p.url, meta.url)));
         if (i >= 0 && (pages[i].savedAt || 0) >= meta.savedAt) kept++;
         else {
           if (i >= 0) { await S().removePage(pages[i].id); taken.delete(pages[i].id); }
@@ -271,6 +284,8 @@
       if (meta.thumb && pics.has(meta.thumb)) await S().writeThumb(meta.id, pics.get(meta.thumb));
       const words = entries.get(prefix + "text.txt");
       if (words) await S().writeText(meta.id, new TextDecoder().decode(await zipRead(blob, words)));
+      const original = meta.file && entries.get(prefix + "original." + meta.file.ext);
+      if (original) await S().writeOriginal(meta.id, meta.file.ext, new Blob([await zipRead(blob, original)]));
       return;
     }
     for (const [name, e] of entries) {
@@ -510,5 +525,5 @@
     return meta;
   }
 
-  C.backup = { cleanMeta, cleanFeed, crc32, zipWriter, zipEntries, zipRead, exportLibrary, restoreLibrary, exportPage, exportPages, exportMarkdown, exportMarkdownAll, importPage, imageType, mdBlocks };
+  C.backup = { cleanMeta, sameFile, cleanFeed, crc32, zipWriter, zipEntries, zipRead, exportLibrary, restoreLibrary, exportPage, exportPages, exportMarkdown, exportMarkdownAll, importPage, imageType, mdBlocks };
 })();

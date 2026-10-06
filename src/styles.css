@@ -377,6 +377,7 @@ html.native .top-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top));
 .site-mark img { position: absolute; width: var(--s-6); height: var(--s-6); object-fit: contain; opacity: 0; }
 .site-mark.has-icon img { opacity: 1; }
 .site-mark.has-icon .site-letter { visibility: hidden; }
+.site-letter.file-ext { font: 600 var(--fs-meta)/1 var(--sans); letter-spacing: 0.04em; }
 /* A folder's card: its first picture with two sheets peeking behind it. */
 .card-thumb.stack {
   position: relative; display: block; overflow: visible;

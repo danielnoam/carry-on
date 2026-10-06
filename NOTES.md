@@ -3,6 +3,23 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **A file of your own is a clip, its original kept beside it (0.31.0).**
+  An EPUB, Markdown, text or HTML file is rebuilt through the same
+  allowlist as a saved page (`save.cleanSaved`) and read in the same
+  sandboxed reader, so it gets the themes, type, pages mode, read aloud,
+  search and contents with no second reader. The book's own CSS is
+  dropped for that reason, and its scripts never reach the page. Each
+  chapter is a `<section id="cN">`, its ids prefixed `cN-`, so links
+  between chapters and footnotes become jumps within the clip. A CBZ is
+  a `.co-comic` page, its pictures in natural name order (2 before 10).
+  The file itself goes beside the clip as `original.<ext>`, written a
+  megabyte at a time (an IndexedDB Blob in a browser): Share sends it on,
+  a backup carries it, and the storage setting (0.32) will move it. The
+  entry has `url: ""` and `file: { name, kind, ext, size }`; name and
+  size say whether a file is already in. Book pictures wait behind
+  stand-in `data:` addresses while the page is cleaned, so a book's
+  pictures are never held as base64 text. Sync leaves files out until
+  their size limits are settled (TODO, Files).
 - **What sync leaves per device (0.30.10).** Daniel, 6 Oct 2026:
   settings stay on each device (a phone and a tablet want different type
   and themes), and nothing syncs while the app is closed. When Feeds was

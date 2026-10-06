@@ -2,6 +2,23 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.31.0] - 2026-10-06
+
+### Added
+- Open your own files: an EPUB book, a Markdown or text note, an HTML
+  page or a CBZ comic becomes a clip you read like any other, with your
+  place, tags, collections and favourites. Tap the list button beside
+  Save and Open a file, drop it on the window on a computer, or on
+  Android open it with Carry-on or share it to Carry-on from another app.
+- A book keeps its chapters, pictures, cover and footnotes; a comic reads
+  edge to edge in its page order.
+- Files have their own part of the library, after Clips, and a place in
+  the sidebar. Share on a file's ⋯ sends the file itself.
+
+### Changed
+- Files stay on the device they were opened on for now: sync leaves them
+  out. A backup carries them, original file included.
+
 ## [0.30.10] - 2026-10-06
 
 ### Changed

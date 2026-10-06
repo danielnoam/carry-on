@@ -170,7 +170,9 @@ and the page shows above it.
   a look: "2 previews missing · Retry" in warn, or "Images online".
   With no picture, the thumbnail is `--preview` with the site's icon
   centred at 32 px (`--s-6`), or the site's first letter in the serif,
-  heading size, `--muted` (0.27.6).
+  heading size, `--muted` (0.27.6). A file of your own with no picture
+  shows its kind instead ("EPUB", "MD") in the sans at meta size, 600,
+  spaced a little (0.31.0), and its site line names the kind.
 - **Reader bars:** top and bottom on `--bar`, the same as the strip under
   the status bar (a darker `--reader-bar` in 0.30.5 was taken back in
   0.30.8), checked for AA with ink, muted and accent. The
