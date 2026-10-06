@@ -1430,7 +1430,7 @@
     head.className = "co-head";
     const line = out.createElement("p");
     line.className = "co-meta";
-    line.textContent = [meta.site, "saved " + formatDate(meta.savedAt), meta.minutes + " min"].join(" · ");
+    line.textContent = [meta.site, (meta.file ? "added " : "saved ") + formatDate(meta.savedAt), meta.minutes + " min"].join(" · ");
     const h1 = out.createElement("h1");
     h1.textContent = meta.title;
     head.append(line, h1);
@@ -1442,10 +1442,12 @@
     }
     const foot = out.createElement("footer");
     foot.className = "co-licence";
+    // A file of your own (0.31.0) has no address to go back to.
+    if (meta.file) foot.append("Opened from " + meta.file.name + " on " + formatDate(meta.savedAt) + ".");
     const link = out.createElement("a");
     link.href = meta.url;
     link.textContent = "Read the original";
-    foot.append(meta.licence === "wikipedia"
+    if (!meta.file) foot.append(meta.licence === "wikipedia"
       ? "Text from Wikipedia, CC BY-SA 4.0, by Wikipedia contributors. "
       : "Saved from " + meta.site + " on " + formatDate(meta.savedAt) + ". ", link);
     const doc = out.implementation.createHTMLDocument(meta.title);

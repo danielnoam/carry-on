@@ -111,18 +111,14 @@ native code.
 
 ### 0.31: open your own files
 
-- **Bringing one in:** "Open a file" under Save, Android's Open with and
-  Share for these types, a drop on the desktop. The original file is
-  kept as it is (pages/<id>/original.<ext>) and is what's read; it gets
-  the library's marks: where you are, tags, collections, favourites.
-  The library gets a Files part beside Collections and Clips.
-- **EPUB:** its chapters' XHTML and its own CSS, cleaned through the same
-  allowlist as a saved page, in the sandboxed reader (no scripts), with
-  its table of contents, scroll or pages.
-- **Markdown, text, HTML:** Markdown drawn as formatting, text as text,
-  HTML cleaned and sandboxed like a saved page.
-- **Images and comic archives (CBZ):** in the comics reader.
-- **PDF:** pdf.js, vendored (one release, its licence beside it, like
+- **Done in 0.31.0:** EPUB, Markdown, text, HTML and CBZ, opened from
+  Save's list button, a drop on the desktop, or Android's Open with and
+  Share; the Files part and its sidebar entry; the original kept beside
+  the clip and in backups (NOTES.md, 0.31.0).
+- **iOS Open in:** document types in Info.plist and the app's open-URL
+  event, so Files and Mail can hand a file to Carry-on. "Open a file"
+  already works there.
+- **PDF (0.31.1):** pdf.js, vendored (one release, its licence beside it, like
   Readability), run in its own frame with `sandbox="allow-scripts"` and
   no `allow-same-origin`, so it has no origin and can't reach the app or
   Capacitor's plugins; a strict CSP, `isEvalSupported: false`, scripts in

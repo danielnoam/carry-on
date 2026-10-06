@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.30.10";
+  const APP_VERSION = "0.31.0";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -663,6 +663,8 @@
   // A card with no picture shows its site: the icon on the preview tint,
   // or the site's first letter when there's no icon to show.
   function siteMark(p) {
+    // A file with no picture shows what kind it is (0.31.0).
+    if (p.file) return el("span", { class: "card-thumb site-mark", "aria-hidden": "true" }, el("span", { class: "site-letter file-ext" }, p.file.ext.toUpperCase()));
     const letter = el("span", { class: "site-letter" }, (p.site || "?").replace(/^www\./, "").charAt(0).toUpperCase());
     const box = el("span", { class: "card-thumb site-mark", "aria-hidden": "true" }, letter);
     const src = iconUrl(p);
@@ -1072,24 +1074,35 @@
         el("button", { class: "btn-quiet part-back", type: "button", onclick: () => history.back() },
           el("span", { "aria-hidden": "true" }, "‹ "), "Library")));
       if (part) back();
-      if (folders.length && part !== "pages") {
+      // Files of your own (0.31.0) are a part of their own after Clips,
+      // unless a search or filter lists everything together.
+      const apart = !ts.length && state.filter === "all";
+      const mine = apart ? loose.filter((p) => p.file) : [];
+      const clips = apart ? loose.filter((p) => !p.file) : loose;
+      if (folders.length && (!part || part === "collections")) {
         const names = sorted(folders.map(asItem)).map((x) => x.folder);
         const label = "Collections · " + names.length;
         if (part) keep("h:folders:all", () => sectionHead(label), label);
         else keep("h:folders", () => partHead("collections", "Collections"));
         keep(part ? "folders:all" : "folders", () => { const strip = foldersStrip(names); if (part) strip.classList.add("folder-grid"); return strip; }, names.map(folderSig).join("‖"));
       }
-      if (loose.length && part !== "collections") {
+      if (clips.length && (!part || part === "pages")) {
         const label = (ts.length ? "Found" : state.filter === "all" ? "Clips"
-          : (status || favs) && folders.length ? filterName() + " clips" : filterName()) + " · " + loose.length;
-        if (part || ts.length || !folders.length) keep("h:pages", () => sectionHead(label), label);
+          : (status || favs) && folders.length ? filterName() + " clips" : filterName()) + " · " + clips.length;
+        if (part || ts.length || (!folders.length && !mine.length)) keep("h:pages", () => sectionHead(label), label);
         else keep("h:pages", () => partHead("pages", label), "link" + label);
       }
-      if (part !== "collections") for (const p of loose) {
+      if (!part || part === "pages") for (const p of clips) {
         if (ts.length) {
           const s = found.get(p.id);
           keep("q:" + p.id, () => pageCard(p, s), [pageSig(p), s].join("|"));
         } else keep("p:" + p.id, () => pageCard(p), pageSig(p));
+      }
+      if (mine.length && (!part || part === "files")) {
+        const label = "Files · " + mine.length;
+        if (part || (!folders.length && !clips.length)) keep("h:files", () => sectionHead(label), label);
+        else keep("h:files", () => partHead("files", label), "link" + label);
+        for (const p of mine) keep("p:" + p.id, () => pageCard(p), pageSig(p));
       }
     }
     if (n && !pages.length && ts.length) {
@@ -1111,6 +1124,7 @@
         el("p", { class: "empty-text" }, C.platform.native
           ? "Share a page to Carry-on from your browser, or paste its link below. It stays readable with no connection, with a link back to the original."
           : "Paste a Wikipedia link below, or bring the clips you saved on your phone: back up there, then open the backup here."),
+        el("button", { class: "btn-quiet empty-open", type: "button", onclick: () => pickFile() }, "Open a file"),
         C.platform.native ? null : el("button", { class: "btn-quiet empty-open", type: "button", onclick: () => openSettings(false, "storage") }, "Open a backup")));
     }
     root.replaceChildren(...nodes);
@@ -2764,14 +2778,16 @@
           el("p", { class: "meta" }, [p.site, p.folder, readingLine(p), formatSize(p.bytes || 0)].filter(Boolean).join(" · "))),
         el("div", { class: "tile-row" },
           inReader ? null : tileButton("open", "Open", () => back().then(() => openPage(p.id))),
-          tileButton("share", "Share", () => shareLink(p)),
-          tileButton("send", "Export", () => { exporting = true; draw(); }),
-          tileButton("original", "Original", () => C.platform.openOutside(p.url)),
+          // A file of your own shares the file itself, and has no page to
+          // go back to or to export (0.31.0).
+          tileButton("share", "Share", () => (p.file ? shareOriginal(p) : shareLink(p))),
+          p.file ? null : tileButton("send", "Export", () => { exporting = true; draw(); }),
+          p.file ? null : tileButton("original", "Original", () => C.platform.openOutside(p.url)),
           favTile(p, draw)),
         el("h3", { class: "overline" }, "This clip"),
         tagsRow(p, draw),
         folderRow(p, draw),
-        picturesRow(p, draw),
+        p.file ? null : picturesRow(p, draw),
         series.length ? el("h3", { class: "overline" }, "Series") : null,
         ...series,
         el("h3", { class: "overline" }, "More"),
@@ -3114,6 +3130,18 @@
     } catch (e) { toast("Couldn't share the link. Try again."); }
   }
 
+  // A file of your own handed on as it came (0.31.0): the share sheet in
+  // the app, a download in a browser.
+  async function shareOriginal(p) {
+    try {
+      if (C.platform.native) {
+        const uri = await C.store.originalForShare(p.id, p.file.ext, p.file.name);
+        if (await C.platform.shareFile(uri, p.file.name)) return;
+      }
+      C.platform.download(p.file.name, await C.store.readOriginal(p.id, p.file.ext));
+    } catch (e) { toast("Couldn't find this file's original. Delete it and open the file again."); }
+  }
+
   // ---- Export (0.25.2) ----
   // A page as a file of the kind picked, saved where the person picks or
   // handed to the share sheet. PDF goes through the print screen, where
@@ -3233,15 +3261,45 @@
   }
 
   // A backup (a zip) or one page's file, picked from the phone.
-  async function openFile(file, btn) {
+  // A file opened from Settings, the save screen, a drop or another app
+  // (0.31.0): a backup is restored, a clip sent as a file comes back, and
+  // a book, a note, a page or a comic becomes a clip of its own. `open`
+  // opens it once it's in.
+  const FILE_ACCEPT = ".epub,.md,.markdown,.txt,.html,.htm,.cbz,application/epub+zip,text/markdown,text/plain,text/html";
+  function pickFile(first) {
+    // Kept in the page while the picker is up, so it isn't collected.
+    document.querySelectorAll(".file-pick").forEach((n) => n.remove());
+    const input = el("input", { type: "file", accept: FILE_ACCEPT, class: "file-pick visually-hidden", tabindex: "-1", "aria-hidden": "true" });
+    document.body.append(input);
+    input.addEventListener("change", async () => {
+      const f = input.files[0];
+      input.remove();
+      if (!f) return;
+      if (first) await first();
+      openFile(f, null, true);
+    });
+    input.click();
+  }
+  // A file dropped on the window, on a computer.
+  addEventListener("dragover", (e) => { if (e.dataTransfer && [...e.dataTransfer.types].includes("Files")) e.preventDefault(); });
+  addEventListener("drop", async (e) => {
+    const files = [...((e.dataTransfer && e.dataTransfer.files) || [])];
+    if (!files.length) return;
+    e.preventDefault();
+    for (const f of files) await openFile(f, null, files.length === 1);
+  });
+  const hasFile = (name, size) => state.pages.some((p) => p.file && p.file.name === name && p.file.size === size);
+  const FILE_KINDS_LINE = "EPUB, Markdown, text, HTML and CBZ comic files";
+  async function openFile(file, btn, open) {
     if (!file) return;
-    const label = btn.querySelector(".row-label");
-    btn.disabled = true;
-    label.textContent = "Opening…";
+    const label = btn ? btn.querySelector(".row-label") : null;
+    const say = (t) => { if (label) label.textContent = t; };
+    if (btn) btn.disabled = true;
+    say("Opening…");
     try {
-      const head = new Uint8Array(await file.slice(0, 4).arrayBuffer());
-      if (head[0] === 0x50 && head[1] === 0x4b) {
-        const res = await C.backup.restoreLibrary(file, state.pages, sameUrl, (done, total) => { label.textContent = "Restoring, " + done + " of " + total; });
+      const kind = await C.files.kindOf(file);
+      if (kind === "backup") {
+        const res = await C.backup.restoreLibrary(file, state.pages, sameUrl, (done, total) => say("Restoring, " + done + " of " + total));
         state.pages = res.pages;
         await C.store.writeIndex(state.pages);
         texts.clear();
@@ -3251,23 +3309,37 @@
         const n = res.added + res.replaced;
         const what = [n ? countLine(n) : "", followed ? (followed === 1 ? "1 feed" : followed + " feeds") : ""].filter(Boolean).join(" and ");
         toast((what ? "Restored " + what : "Nothing new to restore") + (res.kept ? ". " + res.kept + " already here" + (res.kept === 1 ? " was" : " were") + " kept." : "."));
+      } else if (kind === "pdf") {
+        toast("PDFs open in Carry-on in the next update. For now it opens " + FILE_KINDS_LINE + ".");
+      } else if (kind === "zip") {
+        toast("This zip isn't a Carry-on backup, an EPUB or a comic, so it can't be opened here.");
+      } else if (!kind) {
+        toast("Carry-on opens " + FILE_KINDS_LINE + ", and its own backups.");
       } else {
-        const meta = await C.backup.importPage(await file.text(), (url) => !!savedAs(url));
+        if (!btn) toast("Opening " + file.name + "…");
+        const meta = kind === "clip" ? await C.backup.importPage(await file.text(), (url) => !!savedAs(url))
+          : await C.files.bring(file, kind, { has: hasFile,
+            onProgress: (done, total, what) => say(what === "file" ? "Keeping the file…" : "Pictures, " + done + " of " + total) });
         if (meta.already) {
           toast("Already in your library");
+          const had = open && kind !== "clip" && state.pages.find((p) => p.file && p.file.name === file.name && p.file.size === file.size);
+          if (had) openPage(had.id);
         } else {
           state.pages.unshift(meta);
           await C.store.writeIndex(state.pages);
           await loadThumbs();
           C.store.keepStored();
           toast("Added “" + meta.title + "”");
+          if (open) openPage(meta.id);
         }
       }
       renderLibrary();
     } catch (e) {
-      if (!/Carry-on|empty/.test(e.message)) console.error(e);
-      toast(/Carry-on|empty/.test(e.message) ? e.message : "Couldn't open that file. Try again.");
+      const told = e instanceof C.files.FileError || /Carry-on|empty/.test(e.message);
+      if (!told) console.error(e);
+      toast(told ? e.message : "Couldn't open that file. Try again.");
     }
+    if (btn) btn.disabled = false;
     if (state.settings) renderSettings();
     if (state.section) renderSection();
   }
@@ -3306,7 +3378,9 @@
     let res = null;
     try {
       res = await C.sync.run({
-        getPages: () => state.pages,
+        // Files of your own stay on this device for now (0.31.0): sync
+        // neither sees them nor takes them away.
+        getPages: () => state.pages.filter((p) => !p.file),
         // The same objects are kept and updated in place: the open page,
         // an open menu and the position timer hold on to them.
         setPages: async (list) => {
@@ -3316,7 +3390,7 @@
             if (!o || o === n) return n;
             for (const k of Object.keys(o)) if (!(k in n)) delete o[k];
             return Object.assign(o, n);
-          });
+          }).concat(state.pages.filter((p) => p.file)).sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
           await C.store.writeIndexOnly(state.pages);
           texts.clear();
           await loadThumbs();
@@ -3803,7 +3877,12 @@
       el("p", { class: "meta" }, "Carry-on read this page as a list of chapters."),
       el("button", { class: "btn-quiet batch-as-page", type: "button", onclick: () => { history.back(); savePage(from, null, { asPage: true }); } },
         "Save it as one clip instead")) : null;
-    const form = el("form", { class: "batch-form" }, asPage,
+    // A file of your own comes in from here too (0.31.0).
+    const fromFile = preset || from ? null : el("section", { class: "settings-section batch-file" }, el("h2", { class: "overline" }, "File"),
+      el("div", { class: "group" }, el("button", { class: "row", type: "button", onclick: () => pickFile(() => back()) },
+        el("span", { class: "row-label accent" }, "Open a file"))),
+      el("p", { class: "meta" }, "An EPUB book, a Markdown or text note, an HTML page or a CBZ comic. It stays " + ON_HERE + "."));
+    const form = el("form", { class: "batch-form" }, asPage, fromFile,
       el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Links"), area, count, finder, skipRow),
       el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Save as"),
         seg("batch-kind", "Save as", [{ value: "article", label: "Article" }, { value: "comic", label: "Comic" }], kind, (v) => {
@@ -4721,6 +4800,12 @@
     return box;
   }
 
+  const fileMark = () => {
+    const box = el("span", { class: "side-cover", "aria-hidden": "true" });
+    box.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>';
+    return box;
+  };
+
   function openFromSide(name) {
     return back().then(() => {
       if (state.place !== "library") { state.place = "library"; store(PLACE_KEY, "library"); paintPlace(); }
@@ -4743,9 +4828,14 @@
     const latest = (f) => Math.max(0, ...f.items.map(postAt));
     fill($("sidebar"),
       el("p", { class: "side-title" }, "Carry-on"),
-      item(feedIcon("library"), "Library", !inFeeds, count(state.pages.length, "side-count"), () => goPlace("library")),
+      item(feedIcon("library"), "Library", !inFeeds && state.part !== "files", count(state.pages.length, "side-count"), () => goPlace("library")),
       ...[...foldersByUse().filter(folderFav), ...foldersByUse().filter((f) => !folderFav(f))].slice(0, SIDE_MAX).map((name) =>
         item(sideCover(name), name, false, count(freshCount(name)), () => openFromSide(name), "side-sub")),
+      // Files of your own (0.31.0), their part of the library.
+      state.pages.some((p) => p.file) ? item(fileMark(), "Files", !inFeeds && state.part === "files", null, () => back().then(() => {
+        if (state.place !== "library") { state.place = "library"; store(PLACE_KEY, "library"); paintPlace(); }
+        if (state.part !== "files") openPart("files");
+      }), "side-sub") : null,
       el("hr", { class: "side-line" }),
       item(feedIcon("feeds"), "Feeds", inFeeds && !state.feed, fresh ? el("span", { class: "side-pill" }, fresh + " new") : null,
         () => goPlace("feeds")),
@@ -5564,6 +5654,19 @@
     if (!share) return;
     let got;
     try { got = await share.take(); } catch (e) { return; }
+    // A file opened with Carry-on, or shared to it (0.31.0): copied into
+    // the app's cache by the plugin, read back through the WebView.
+    if (got && got.file) {
+      await toLibrary();
+      try {
+        const cap = window.Capacitor;
+        const r = await fetch(cap && cap.convertFileSrc ? cap.convertFileSrc(got.file.uri) : got.file.uri);
+        if (!r.ok) throw new Error("unreadable");
+        const blob = await r.blob();
+        await openFile(new File([blob], got.file.name || "file", { type: got.file.mime || blob.type }), null, true);
+      } catch (e) { toast("Couldn't read that file. Try opening it again."); }
+      return;
+    }
     if (!got || !got.text) return;
     if (linksFrom(got.text).length > 1) { await toLibrary(); openBatch(got.text); return; }
     const url = linkFrom(got.text);
