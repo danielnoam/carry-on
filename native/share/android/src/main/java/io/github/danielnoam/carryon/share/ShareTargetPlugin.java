@@ -21,8 +21,9 @@ import java.io.OutputStream;
  *
  *   take()    what was shared, once: { text, subject }, or for a file
  *             opened with Carry-on or shared to it (0.31.0) { file: { uri,
- *             name, mime } } with uri a file:// copy in the app's cache,
- *             or {}
+ *             name, mime, link } } with uri a file:// copy in the app's
+ *             cache and link the original's address when the app that
+ *             sent it let Carry-on keep reading it (0.32.2), or {}
  *
  * and a "shared" event with nothing in it, a nudge to call take() when a
  * share brings the running app to the front. The intent filter that puts
@@ -127,6 +128,16 @@ public class ShareTargetPlugin extends Plugin {
         file.put("uri", Uri.fromFile(out).toString());
         file.put("name", name);
         if (mime != null) file.put("mime", mime);
+        // Kept only when the sender granted a lasting permission (the
+        // Files app usually does); then it can be read from where it is.
+        if ("content".equals(uri.getScheme())) {
+            try {
+                cr.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                file.put("link", uri.toString());
+            } catch (Exception e) {
+                // A copy is the only way in.
+            }
+        }
         JSObject res = new JSObject();
         res.put("file", file);
         return res;

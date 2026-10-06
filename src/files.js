@@ -9,9 +9,9 @@
 // where it is** keeps no pictures either: each one is a slot (data-in,
 // naming its place in the file) filled from the file when the clip is
 // opened, so a 400 MB comic costs a thumbnail. That needs a lasting
-// permission on the file (platform.files), and it only saves anything
-// where the pictures are the file, so Carry-on asks for a comic, an EPUB
-// or a PDF and copies anything else without asking.
+// permission on the file (platform.files). Every kind is asked about
+// (0.32.2): for a note or a page the words are kept either way, and the
+// choice is where it lives, Clips or Files, and whether it syncs.
 (function () {
   const C = window.CarryOn;
   const S = () => C.store;
@@ -20,6 +20,8 @@
   const KINDS = { epub: "EPUB", md: "Markdown", txt: "Text", html: "HTML", cbz: "Comic", pdf: "PDF" };
   // Kinds whose pictures can be left in the file and read as they're needed.
   const LINKABLE = new Set(["epub", "cbz", "pdf"]);
+  // Kinds that can be a clip reading from its file: all of them.
+  const canLink = (kind) => !!KINDS[kind];
   const EXTS = { epub: "epub", md: "md", markdown: "md", txt: "txt", text: "txt", html: "html", htm: "html", xhtml: "html", cbz: "cbz" };
   const PICTURE = /\.(jpe?g|png|gif|webp)$/i;
   const MIME_EXT = { "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp" };
@@ -515,10 +517,6 @@
     return { root, title: got.title, byline: got.byline, lang: got.lang, dir: got.dir };
   }
 
-  // Whether reading from the file instead of copying would save anything:
-  // only where the pictures are most of the file.
-  const canLink = (kind) => LINKABLE.has(kind);
-
   // Makes a clip of `file`, `kind` from kindOf. `link` is the lasting
   // permission on the file (platform.files) when the clip is to read from
   // it; its pictures then stay in the file. Resolves to the clip's index
@@ -550,7 +548,7 @@
     if (kind === "cbz" || got.scan) meta.comic = true;
     // The lasting permission is this device's own: it never syncs, and
     // never goes in a backup another device might read.
-    if (link && LINKABLE.has(kind)) meta.link = link;
+    if (link) meta.link = link;
     if (pics.thumb) meta.thumb = pics.thumb;
     try {
       const html = C.save.savedPageHtml(meta, root, out);

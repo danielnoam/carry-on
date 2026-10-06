@@ -3,6 +3,16 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Every file asks (0.32.2).** 0.32.0 asked only where reading from the
+  file saved space (pictures). Daniel's rule is about where a file lives,
+  not its size: anything you bring in is either a clip (copy, syncs) or a
+  file (Files, this device). So every kind asks; for text the words are
+  kept either way. Every way in tries for lasting access: the system
+  picker, `getAsFileSystemHandle` on a drop (asked for inside the drop
+  event, or it's gone), and `takePersistableUriPermission` on a file
+  opened or shared with Carry-on (works when the sender granted it). With
+  none, the second row is shown disabled rather than hidden, so the
+  choice never silently disappears.
 - **A PDF read from where it is, and drawn for print (0.32.1).** 0.32.0
   asked "copy or read from where it is" for a PDF and then copied anyway,
   on the reasoning that once its words are out there's nothing to come

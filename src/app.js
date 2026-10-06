@@ -1,7 +1,7 @@
 // Carry-on: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "0.32.1";
+  const APP_VERSION = "0.32.2";
   window.CarryOn.version = APP_VERSION;
 
   const C = window.CarryOn;
@@ -3298,13 +3298,15 @@
     input.click();
   }
 
-  // Keep a copy, or read from the file where it is? Asked only where it
-  // changes anything: a comic, a book or a PDF, whose pictures are most
-  // of the file. Resolves to true to link, false to copy, null to stop.
+  // Keep a copy, or read from the file where it is? Asked for every file
+  // of your own (0.32.2). `can` is false when the file came without a
+  // lasting permission (shared from another app that doesn't give one):
+  // the second way is shown, with what to do instead. Resolves to true to
+  // link, false to copy, null to stop.
   let askingFile = null;
-  function askKeep(file, kind) {
+  function askKeep(file, kind, can) {
     return new Promise((done) => {
-      askingFile = { file, kind, done, answered: false };
+      askingFile = { file, kind, done, can, answered: false };
       openMenu("file");
     });
   }
@@ -3321,17 +3323,28 @@
         el("button", { class: "row", type: "button", onclick: () => answer(false) },
           el("span", { class: "choice-text" }, el("span", { class: "choice-label accent" }, "Keep a copy"),
             el("span", { class: "choice-note" }, "A clip like any other: it syncs, and it stays when the file goes. About " + big + " " + ON_HERE + "."))),
-        el("button", { class: "row", type: "button", onclick: () => answer(true) },
-          el("span", { class: "choice-text" }, el("span", { class: "choice-label accent" }, "Read from where it is"),
-            el("span", { class: "choice-note" }, "Costs almost nothing here, and lives in Files. It needs the file to stay where it is, and doesn't sync.")))));
+        el("button", { class: "row", type: "button", ...(a.can ? {} : { disabled: "" }), onclick: () => answer(true) },
+          el("span", { class: "choice-text" }, el("span", { class: "choice-label" + (a.can ? " accent" : "") }, "Read from where it is"),
+            el("span", { class: "choice-note" }, a.can
+              ? "Lives in Files and costs almost nothing here. It needs the file to stay where it is, and doesn't sync."
+              : "Carry-on wasn't given lasting access to this file. Open it with Open a file to read it from where it is.")))));
   }
   // A file dropped on the window, on a computer.
   addEventListener("dragover", (e) => { if (e.dataTransfer && [...e.dataTransfer.types].includes("Files")) e.preventDefault(); });
+  // Chrome and Edge hand over a lasting handle too, so a dropped file can
+  // be read from where it is; it has to be asked for before the event ends.
   addEventListener("drop", async (e) => {
     const files = [...((e.dataTransfer && e.dataTransfer.files) || [])];
     if (!files.length) return;
     e.preventDefault();
-    for (const f of files) await openFile(f, null, files.length === 1);
+    const items = [...(e.dataTransfer.items || [])].filter((i) => i.kind === "file");
+    const handles = items.length === files.length && items.every((i) => i.getAsFileSystemHandle)
+      ? items.map((i) => i.getAsFileSystemHandle().catch(() => null)) : [];
+    for (const [i, f] of files.entries()) {
+      let got = null;
+      if (handles[i]) { try { got = await C.platform.files.adopt(await handles[i]); } catch (err) { got = null; } }
+      await openFile(f, null, files.length === 1, got && got.ref);
+    }
   });
   // The same file again is already here, unless it's being brought in the
   // other way this time (a copy of one read from where it is, or back).
@@ -3347,8 +3360,8 @@
     try {
       const kind = await C.files.kindOf(file);
       let link = null;
-      if (ref && C.files.canLink(kind)) {
-        const asked = await askKeep(file, kind);
+      if (C.files.canLink(kind) && (ref || C.platform.files.canLink)) {
+        const asked = await askKeep(file, kind, !!ref);
         if (asked == null) { if (btn) { btn.disabled = false; say("Restore or open a file"); } return; }
         link = asked ? ref : null;
       }
@@ -3399,7 +3412,7 @@
 
   function backupGroup() {
     const input = el("input", { type: "file", class: "visually-hidden", tabindex: "-1", "aria-hidden": "true" });
-    const open = el("button", { class: "row", type: "button", onclick: () => input.click() },
+    const open = el("button", { class: "row", type: "button", onclick: () => (C.platform.files.canLink ? pickFile() : input.click()) },
       el("span", { class: "row-label accent" }, "Restore or open a file"));
     input.addEventListener("change", () => { const f = input.files[0]; input.value = ""; openFile(f, open); });
     return el("section", { class: "settings-section", id: "backupSection" },
@@ -5731,7 +5744,7 @@
         const r = await fetch(cap && cap.convertFileSrc ? cap.convertFileSrc(got.file.uri) : got.file.uri);
         if (!r.ok) throw new Error("unreadable");
         const blob = await r.blob();
-        await openFile(new File([blob], got.file.name || "file", { type: got.file.mime || blob.type }), null, true);
+        await openFile(new File([blob], got.file.name || "file", { type: got.file.mime || blob.type }), null, true, got.file.link || undefined);
       } catch (e) { toast("Couldn't read that file. Try opening it again."); }
       return;
     }

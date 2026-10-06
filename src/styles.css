@@ -885,7 +885,7 @@ html { -webkit-tap-highlight-color: transparent; }
 /* A span styled as the button (the row is the button): centred like one. */
 .update-row .btn-small { display: inline-flex; align-items: center; justify-content: center; }
 .row:disabled { cursor: default; }
-.row:disabled .row-label { color: var(--muted); }
+.row:disabled .row-label, .row:disabled .choice-label { color: var(--muted); }
 .warn { color: var(--warn); }
 .update-notes { padding: var(--s-2) var(--s-4) var(--s-3); border-top: 1px solid var(--line); }
 .update-notes .overline { margin: var(--s-2) 0 0; }

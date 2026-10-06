@@ -2,6 +2,17 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [0.32.2] - 2026-10-06
+
+### Changed
+- Every file you open asks whether to keep a copy or read it from where
+  it is, not just comics, books and PDFs: notes, text and HTML pages too.
+  A file read from where it is lives in Files and doesn't sync.
+- "Restore or open a file" in Settings, a file dropped on the window in
+  Chrome or Edge, and a file opened with Carry-on from the Files app can
+  all be read from where they are now. When the file came without lasting
+  access, the choice still shows and says how to get it.
+
 ## [0.32.1] - 2026-10-06
 
 ### Fixed
