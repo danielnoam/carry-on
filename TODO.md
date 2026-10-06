@@ -24,19 +24,6 @@ asks from Daniel.
 
 ---
 
-## After the rename (Waypage 1.0.0, 6 Oct 2026)
-
-Carry-on became Waypage in 1.0.0: new app ID, repo danielnoam/waypage,
-Waypage.apk and .ipa, waypage.* keys, waypage-data for sync, the Open
-road icon (NOTES.md has what kept its old name and why). Left to do:
-
-- **Daniel's phones:** install Waypage beside Carry-on (0.36.0 offers
-  it), bring the library over by sync or "Send your library to
-  Waypage", check pictures, positions and feeds, then remove Carry-on.
-  Re-add the home screen widgets.
-- **Store listings and this Claude project's name,** last, once it runs.
-  Search Waypage in the Play Store and the App Store by hand first.
-
 ## Naming (Daniel, 5 Oct 2026)
 
 Library · Clips (web saves) · Files (imports) · Collections · Feeds ·
@@ -69,6 +56,11 @@ native code.
 
 ### Still open on files
 
+- **A watched folder (Daniel, 6 Oct 2026, next release):** pick a folder
+  (say Books) in Settings; each time Waypage opens or the library is
+  refreshed it looks there and brings in any file it hasn't seen, without
+  asking copy-or-outside each time. Android reuses the folder access
+  0.33.0's "a folder you pick" already has; iOS needs the bookmark below.
 - **iOS, reading from a file where it is:** a Files plugin for iOS
   (UIDocumentPicker and a security-scoped bookmark), so the choice shows
   there too. Until then iOS always copies, and "Open a file" is the only
