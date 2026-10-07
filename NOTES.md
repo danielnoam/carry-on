@@ -9,8 +9,11 @@ bold title and its version so a search finds it.
   `readAt` is. It syncs as one of READING, but the merge takes it from
   whichever side read later (`readFrom`), not key by key, so it can't end
   up naming one device beside another's place. The name is typed in
-  Settings, Sync ("This device's name"), else guessed from the platform
-  and screen (phone, tablet, iPhone, iPad, computer). A guessed name
+  Settings, Sync ("This device's name"), else on Android the name the
+  phone goes by (@capacitor/device: Settings, About phone, else the model,
+  "Pixel 8"), else guessed from the platform and screen (phone, tablet,
+  iPhone, iPad, computer). iOS 16 and later give apps only "iPhone" as
+  the name without a special entitlement, so iOS keeps the guess. A guessed name
   reads "on your phone", a typed one as typed ("on Pixel 8"); two devices
   with the same name read "on your other phone". A clip last read on a
   device from before 1.4.2 has no name and keeps the old wording.

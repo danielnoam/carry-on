@@ -674,6 +674,17 @@
     },
   };
 
+  // The name the phone goes by (1.4.2): on Android the one in Settings,
+  // About phone, else its model ("Pixel 8"). iOS gives every app just
+  // "iPhone" since iOS 16, so there it stays null.
+  let deviceName = null;
+  const named = (async () => {
+    const D = os === "android" ? plugin("Device") : null;
+    if (!D) return null;
+    try { const i = await D.getInfo(); deviceName = String(i.name || i.model || "").trim().slice(0, 40) || null; } catch (e) { /* unnamed */ }
+    return deviceName;
+  })();
+
   window.Waypage = window.Waypage || {};
   window.Waypage.platform = {
     native,
@@ -681,6 +692,8 @@
     ios: os === "ios",
     android: os === "android",
     ready,
+    named,
+    get deviceName() { return deviceName; },
     get build() { return build; },
     plugin,
     // Whether this copy can fetch any page itself (the app) or is limited by

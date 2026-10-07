@@ -1579,10 +1579,12 @@
   // toast offers to go there. The open never waits for it.
   let openedReadAt = 0;
   // Each device names itself for that toast (1.4.2): what you typed in
-  // Settings, Sync, or what kind of device it is. A guessed name reads
+  // Settings, Sync, the name Android knows it by, or what kind of device
+  // it is. A guessed name reads
   // "your phone", one you typed reads as you typed it.
   const GUESSED_NAMES = ["phone", "tablet", "iPhone", "iPad", "computer"];
   function guessedName() {
+    if (C.platform.deviceName) return C.platform.deviceName;
     const ios = C.platform.ios || /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
     const big = Math.min(screen.width, screen.height) >= 600;
     if (ios) return big ? "iPad" : "iPhone";
