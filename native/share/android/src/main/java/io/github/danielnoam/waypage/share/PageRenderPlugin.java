@@ -44,7 +44,7 @@ public class PageRenderPlugin extends Plugin {
             call.reject("Not a web address");
             return;
         }
-        long timeout = Math.max(5000, Math.min(60000, call.getLong("timeoutMs", 20000L)));
+        long timeout = Math.max(5000, Math.min(60000, call.getData().optLong("timeoutMs", 20000L)));
         new Handler(Looper.getMainLooper()).post(() -> new Job(call, url, timeout).start());
     }
 

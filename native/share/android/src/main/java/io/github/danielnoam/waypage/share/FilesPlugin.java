@@ -466,7 +466,10 @@ public class FilesPlugin extends Plugin {
     public void read(PluginCall call) {
         Uri uri = address(call);
         if (uri == null) return;
-        long offset = call.getLong("offset", 0L);
+        // Not call.getLong: Capacitor hands a long only when the number was
+        // stored as one, and any offset under 2 GB arrives as an Integer, so
+        // every read started at 0 and books read as damaged (1.1.2).
+        long offset = call.getData().optLong("offset", 0L);
         int length = call.getInt("length", 0);
         if (length <= 0 || length > (8 << 20)) {
             call.reject("Ask for between 1 byte and 8 MB");
