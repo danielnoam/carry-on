@@ -264,6 +264,9 @@ and the page shows above it.
   collection" in `--muted`. A tap opens the group in place: its pages
   indented, biggest first; the chevron turns down on the control spring.
   Reduced motion: it turns without easing.
+- **Launch (1.2.0):** until the library is read the list is blank and
+  the count line empty; the empty state appears only once it's known
+  there's nothing.
 - **Storage and backup (Now):** the total in the title size, the page
   count, "Pages by size" (tap one to read it), then Backup.
 - **Watched folder (Now, 1.1.0, Android):** in Storage, after where

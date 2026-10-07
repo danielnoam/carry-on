@@ -24,16 +24,20 @@ asks from Daniel.
 
 ---
 
-## Next: a speed pass (Daniel, 6 Oct 2026)
+## Speed, still open (Daniel, 6 Oct 2026; 1.2.0 did the first pass)
 
-The whole app feels slow, worse while downloads and sync run: opening
-the library and closing the sidebar lag. A pass over what runs on every
-change: renderLibrary rebuilding and comparing every card, writeIndex
-writing the whole library.json after each saved page, loadThumbs and
-updateWidgets after each one, sync's merge and JSON.stringify of the
-whole library every few seconds, and pictures fetched one page at a time
-on the main thread. Measure first (a big library, a run of 100 chapters
-with sync on), then batch and defer what doesn't need to be immediate.
+1.2.0 made the library's redraw and sync's merge cheap in a big library
+(NOTES.md, 1.2.0). Left for when the phone still feels slow:
+
+- **The first draw at launch** builds every card at once; a few hundred
+  cards could be drawn a screen at a time.
+- **library.json after every page:** the whole index (hundreds of KB in
+  a big library) crosses the bridge for each page that lands. A write
+  every few seconds during a run, and one at its end, would do.
+- **`inert` on the library** restyles every card when a screen opens or
+  closes (30 to 60 ms at 4x); a focus trap instead would avoid it.
+- **Sync's merge on a worker,** so a big library's sync never blocks a
+  tap at all.
 
 ## Naming (Daniel, 5 Oct 2026)
 

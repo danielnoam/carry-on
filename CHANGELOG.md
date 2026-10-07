@@ -2,6 +2,20 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.2.0] - 2026-10-07
+
+### Changed
+- A speed pass. In a library of hundreds of clips, every page that landed
+  redrew the library by scanning every clip once per collection; the
+  collections are now grouped once and kept until something moves. Sync
+  compared every clip with every other to find doubles; it's one pass
+  now, and it pauses between its heavy steps so a tap is answered. While
+  a run of saves is on, sync waits twenty seconds between runs instead of
+  four. A page landing while a screen or sheet is moving waits for it to
+  settle before the library is redrawn.
+- At launch the library no longer shows "Nothing saved yet" and the
+  empty-library message for the moment it takes to read your clips.
+
 ## [1.1.3] - 2026-10-07
 
 ### Fixed

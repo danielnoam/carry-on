@@ -29,6 +29,10 @@
 
   // frames move (transform only, on the spring); fade is [from, to, ms,
   // delay]; under reduced motion only the 120 ms fade runs.
+  // How many animations are running, so work that can wait (a library
+  // redraw as a page lands) waits for them (1.2.0).
+  let moving = 0;
+  const busy = () => moving > 0;
   function run(el, frames, kind, fade) {
     if (!el || !el.animate) return Promise.resolve();
     const done = [];
@@ -39,7 +43,8 @@
       if (fade) done.push(el.animate([{ opacity: fade[0] }, { opacity: fade[1] }],
         { duration: fade[2], delay: fade[3] || 0, easing: fade[1] > fade[0] ? FADE_IN : FADE_OUT, fill: "both" }));
     }
-    return Promise.all(done.map((a) => a.finished)).then(() => done.forEach((a) => a.cancel()), () => {});
+    moving++;
+    return Promise.all(done.map((a) => a.finished)).then(() => done.forEach((a) => a.cancel()), () => {}).finally(() => { moving--; });
   }
   const shift = () => Math.round(Math.min(72, innerWidth * 0.18)) + "px";
 
@@ -135,5 +140,5 @@
   root.setProperty("--fade-in", FADE_IN);
 
   window.Waypage = window.Waypage || {};
-  window.Waypage.motion = { timing, pushIn, popOut, rise, sink, slideIn, slideOut, slideBack, pageOut, pageIn, zoomIn, zoomOut, arrive, leave, through, reduced, FADE_IN };
+  window.Waypage.motion = { busy, timing, pushIn, popOut, rise, sink, slideIn, slideOut, slideBack, pageOut, pageIn, zoomIn, zoomOut, arrive, leave, through, reduced, FADE_IN };
 })();

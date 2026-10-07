@@ -1,7 +1,7 @@
 // Waypage: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "1.1.3";
+  const APP_VERSION = "1.2.0";
   window.Waypage.version = APP_VERSION;
 
   const C = window.Waypage;
@@ -364,7 +364,7 @@
   async function oneEach() {
     const web = state.pages.filter((p) => p.url && !p.file);
     const gone = {};
-    const kept = new Map(C.sync.oneCopyEach(web, gone, Date.now(), sameUrl).map((p) => [p.id, p]));
+    const kept = new Map(C.sync.oneCopyEach(web, gone, Date.now(), sameUrl, urlKey).map((p) => [p.id, p]));
     const ids = Object.keys(gone);
     if (!ids.length) return 0;
     state.pages = state.pages.filter((p) => !gone[p.id]).map((p) => {
@@ -1063,6 +1063,7 @@
   // page it matches, collections' pages too; a search lists only what it
   // found.
   let firstRender = true;
+  let loaded = false;
   // Android's version, from the Files plugin (0.33.0): what the storage
   // places and the empty library's way back (1.1.0) offer.
   let androidSdk = 0;
@@ -1074,7 +1075,9 @@
     if (n && state.filter.startsWith("#")
       && !allTags().some((t) => sameTag(t, state.filter.slice(1)))) { state.filter = "all"; store(FILTER_KEY, "all"); }
     renderTools();
-    $("libraryMeta").textContent = n ? pagesLine(n) : "Nothing saved yet";
+    // Until the library is read nothing is said (1.2.0): the empty state
+    // showed for the second it took, as if there were no clips.
+    $("libraryMeta").textContent = n ? pagesLine(n) : loaded ? "Nothing saved yet" : "";
     $("searchBtn").hidden = !n;
     paintSearch();
     const how = layout();
@@ -1184,7 +1187,7 @@
           : state.filter === "favourites" ? "No favourites yet. Hold a clip, or open a collection's ⋯, and tap Favourite." : "No clips tagged " + state.filter + "."),
         el("button", { class: "btn-quiet", type: "button", onclick: () => setFilter("all") }, "Show all")));
     }
-    if (!n) {
+    if (!n && loaded) {
       keep("empty", () => el("div", { class: "empty wide" },
         el("h2", { class: "empty-title" }, "Clips you take with you"),
         el("p", { class: "empty-text" }, C.platform.native
@@ -1236,8 +1239,29 @@
     return out;
   }
 
-  const sameUrl = (a, b) => a && b && a.split("#")[0].replace(/\/$/, "") === b.split("#")[0].replace(/\/$/, "");
-  const savedAs = (url) => state.pages.find((p) => sameUrl(p.url, url) || sameUrl(p.requested, url));
+  const urlKey = (u) => (u ? u.split("#")[0].replace(/\/$/, "") : "");
+  const sameUrl = (a, b) => a && b && urlKey(a) === urlKey(b);
+  // Every clip by each of its addresses, kept while the pages are the same
+  // objects with the same addresses (1.2.0): savedAs is asked many times
+  // a redraw, and each ask was a pass over every clip.
+  let urlCache = { list: [], u: [], r: [], by: new Map() };
+  function urlIndex() {
+    const pages = state.pages, c = urlCache;
+    let same = c.list.length === pages.length;
+    for (let i = 0; same && i < pages.length; i++) { const p = pages[i]; same = c.list[i] === p && c.u[i] === p.url && c.r[i] === p.requested; }
+    if (same) return c.by;
+    const by = new Map();
+    for (const p of pages) {
+      for (const u of [p.url, p.requested]) {
+        if (!u) continue;
+        const k = urlKey(u);
+        if (!by.has(k)) by.set(k, p);
+      }
+    }
+    urlCache = { list: pages.slice(), u: pages.map((p) => p.url), r: pages.map((p) => p.requested), by };
+    return by;
+  }
+  const savedAs = (url) => (url ? urlIndex().get(urlKey(url)) || null : null);
   // Being saved now, or waiting to be: a page sync is bringing in from its
   // link counts, under either of its addresses (1.1.0). Missing those let
   // Save new chapters save again what sync was already fetching.
@@ -1304,10 +1328,10 @@
       if (!state.saving.includes(job)) { stopped++; continue; }
       job.waiting = false;
       if (run) run.current = job;
-      renderLibrary();
+      renderLibraryLater();
       if (await runJob(job)) { saved++; if (run) run.saved++; } else { failed++; if (run) run.failed++; }
       if (run) { run.current = null; updateRunCard(run); }
-      if (state.folder) renderFolder();
+      renderLibraryLater();
     }
     endRun(run);
     if (run) renderLibrary();
@@ -1344,6 +1368,21 @@
       i = j;
     }
     return out;
+  }
+
+  // A page landing while something moves (a screen sliding in, a sheet
+  // rising) redraws the library once it has settled (1.2.0): a redraw of
+  // a few hundred cards in the middle of a slide dropped its frames.
+  let renderWait = 0;
+  function renderLibraryLater() {
+    if (renderWait) return;
+    const go = () => {
+      if (M.busy()) { renderWait = setTimeout(go, 120); return; }
+      renderWait = 0;
+      renderLibrary();
+      if (state.folder) renderFolder();
+    };
+    renderWait = setTimeout(go, 0);
   }
 
   // Saves one queued link; resolves to its meta, or null when it failed
@@ -1390,13 +1429,13 @@
       }
       state.saving = state.saving.filter((s) => s !== job);
       if (!job.run) finish({ key: "p:" + meta.id, page: meta.id });
-      renderLibrary();
+      renderLibraryLater();
       return meta;
     } catch (e) {
       job.error = e instanceof C.save.SaveError ? e.message : "Couldn't save this clip. Try again.";
       if (e instanceof C.save.ContentsPage) job.contents = e.contents;
       if (!(e instanceof C.save.SaveError)) console.error(e);
-      renderLibrary();
+      renderLibraryLater();
       return null;
     }
   }
@@ -2262,16 +2301,39 @@
   // most one, named by `folder` on its index entry, in the order it joined
   // (`folderAt`). Names match like tags, ignoring case.
 
+  // The pages of every folder, grouped once and kept while no page moved,
+  // came or went (1.2.0). Each redraw of the library asked for every
+  // collection's pages and scanned every clip each time, which was most
+  // of the time a page landing cost in a big library. The check is a pass
+  // over the pages (the same objects, in the same folders, at the same
+  // places), so a change made anywhere is seen at the next ask.
+  let folderCache = { list: [], f: [], at: [], by: new Map(), names: [] };
+  function folderIndex() {
+    const pages = state.pages, c = folderCache;
+    let same = c.list.length === pages.length;
+    for (let i = 0; same && i < pages.length; i++) {
+      const p = pages[i];
+      same = c.list[i] === p && c.f[i] === p.folder && c.at[i] === (p.folderAt || p.savedAt || 0);
+    }
+    if (same) return c;
+    const by = new Map(), names = [];
+    for (const p of pages) {
+      if (!p.folder) continue;
+      const k = p.folder.toLocaleLowerCase();
+      let g = by.get(k);
+      if (!g) { g = []; by.set(k, g); names.push(p.folder); }
+      g.push(p);
+    }
+    for (const g of by.values()) g.sort((a, b) => (a.folderAt || a.savedAt || 0) - (b.folderAt || b.savedAt || 0));
+    folderCache = { list: pages.slice(), f: pages.map((p) => p.folder), at: pages.map((p) => p.folderAt || p.savedAt || 0), by, names };
+    return folderCache;
+  }
   function folderPages(name) {
-    return state.pages.filter((p) => p.folder && sameTag(p.folder, name))
-      .sort((a, b) => (a.folderAt || a.savedAt || 0) - (b.folderAt || b.savedAt || 0));
+    const g = folderIndex().by.get(String(name).toLocaleLowerCase());
+    return g ? g.slice() : [];
   }
 
-  function allFolders() {
-    const names = [];
-    for (const p of state.pages) if (p.folder && !names.some((n) => sameTag(n, p.folder))) names.push(p.folder);
-    return names;
-  }
+  const allFolders = () => folderIndex().names.slice();
 
   // A favourite collection (0.30.9): a mark on its clips, so it goes
   // wherever they go, through a rename, a backup and sync, like a clip's.
@@ -3099,9 +3161,14 @@
 
   // Picks are painted onto the cards already there, so picking never
   // rebuilds the list or moves focus.
+  let picksPainted = false;
   function paintPicks() {
     const on = !!state.select;
     document.body.classList.toggle("selecting", on);
+    // Nothing to clear when nothing was picked (1.2.0): every card was
+    // visited on every redraw.
+    if (!on && !picksPainted) return;
+    picksPainted = on;
     for (const node of document.querySelectorAll("[data-ids]")) {
       const ids = node.dataset.ids.split(",");
       const isPicked = on && ids.every((id) => state.select.has(id));
@@ -3812,7 +3879,10 @@
   // here, one page at a time, like Retry.
   let syncTimer = null, syncQueue = [], fetchingPictures = false;
   const SYNCED_KEEP = ["savedAt", "title", "requested", "tags", "folder", "folderAt", "source", "series", "fav", "favAt", "folderFav", "folderFavAt", "at", "finished", "readAt"];
-  function syncSoon(ms = 4000) {
+  // While a run of saves is on, sync waits longer (1.2.0): each sync is a
+  // merge of the whole library, and one after every page landing was a
+  // stutter every few seconds.
+  function syncSoon(ms = runs.size ? 20000 : 4000) {
     if (!C.sync.on || C.sync.paused) return;
     clearTimeout(syncTimer);
     syncTimer = setTimeout(() => { syncTimer = null; if (C.sync.running) syncSoon(ms); else syncNow(); }, ms);
@@ -3829,6 +3899,7 @@
         // another one, so it stays here (0.32.0). A copy syncs like any
         // other clip, with its pictures inside it.
         getPages: () => state.pages.filter((p) => !p.link),
+        urlKey,
         // The same objects are kept and updated in place: the open page,
         // an open menu and the position timer hold on to them.
         setPages: async (list) => {
@@ -4513,7 +4584,15 @@
   // { [lower-case name]: { at, count } }.
   const NEW_MAX = 10;
   const DAY = 864e5;
-  const newChapters = () => load(NEW_KEY, {});
+  // Parsed once per value (1.2.0): it was read from localStorage and parsed
+  // for every collection on every redraw.
+  let newCache = { raw: undefined, all: {} };
+  const newChapters = () => {
+    let raw = null;
+    try { raw = localStorage.getItem(NEW_KEY); } catch (e) { raw = null; }
+    if (raw !== newCache.raw) { let all; try { all = JSON.parse(raw); } catch (e) { all = null; } newCache = { raw, all: all && typeof all === "object" ? all : {} }; }
+    return newCache.all;
+  };
   const newFor = (name) => newChapters()[String(name).toLowerCase()] || null;
   function setNewFor(name, entry) {
     const all = newChapters();
@@ -6240,8 +6319,12 @@
   }
 
   paintPlace();
-  Promise.all([C.platform.ready, C.store.ready]).then(() => Promise.all([C.store.readIndex(), loadThumbs()])).then(([pages]) => {
+  // The library is read as soon as its place is known, beside the build's
+  // details rather than after them (1.2.0).
+  const firstIndex = C.store.ready.then(() => Promise.all([C.store.readIndex(), loadThumbs()]));
+  Promise.all([C.platform.ready, firstIndex]).then(([, [pages]]) => {
     state.pages = Array.isArray(pages) ? pages : [];
+    loaded = true;
     setTimeout(() => oneEach().then((n) => { if (n) toast("Removed " + (n === 1 ? "a clip that was" : n + " clips that were") + " saved twice."); }), 1200);
     if (history.state && history.state.view) history.replaceState(null, "");
     paintPlace();
