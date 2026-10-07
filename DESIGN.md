@@ -272,7 +272,17 @@ and the page shows above it.
   accent rows "Look now" (reads "Looking…" while it looks) and "Pick
   another folder", and a warn-coloured "Stop watching"; the footnote
   counts its files and says folders become collections and deleted files
-  leave. What comes in is said in a toast. The empty library on Android
+  leave. What comes in is one card in Downloads (1.1.3), site line
+  "Watched folder", the folder's name as its title, "Notes.epub · page 3
+  of 40" as it reads, with Pause and Stop like a run of saves; Done
+  says "3 files added". A file opened by hand gets the same card with no
+  buttons. A file already there from the folder isn't added again
+  ("Already in your library, from Books"). A file read from where it is
+  says "This file" and "Remove from Waypage" in its sheet, not "Delete
+  this clip", and one removed from the watched folder stays out. A PDF
+  read from where it is opens as its printed pages (1.1.3), a small gap
+  between them; its sheet has "Show as text" and back "Show as printed
+  pages". The empty library on Android
   also offers a quiet "Get back your library from Documents" after a
   reinstall.
 - **In a browser (Now, 0.27.12):** the words say "in this browser"

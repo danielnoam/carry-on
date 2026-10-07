@@ -2,6 +2,22 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.1.3] - 2026-10-07
+
+### Fixed
+- PDFs read from where they are open as their printed pages, so a laid
+  out book keeps its figures, code and layout. "Show as text" in ⋯ sets
+  its words in Waypage's own type, for reading aloud.
+- EPUBs and other books read from where they are open and come in much
+  faster: the file is read once instead of a piece at a time.
+- A watched folder's files come in on one card in Downloads, with
+  progress, Pause and Stop. A file you open by hand shows its progress
+  there too.
+- A file you open by hand that's already in from the watched folder isn't
+  added a second time.
+- A file read from where it is says "Remove from Waypage", not "Delete
+  this clip", and one removed from the watched folder isn't added back.
+
 ## [1.1.2] - 2026-10-07
 
 ### Fixed

@@ -3,6 +3,30 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Linked files are read whole once (1.1.3).** Every stretch the zip
+  reader asked for (a chapter, a picture, and each one's 30-byte header
+  first) was its own bridge call, and each call opens the file again and
+  skips to the offset: an EPUB with hundreds of pictures took seconds to
+  open and longer to bring in. platform.files.blob now reads a file up to
+  64 MB whole the first time, four 4 MB pieces at a time, and slices
+  from memory. Bigger ones still read by the stretch.
+- **PDFs as printed (1.1.3).** Daniel's PDFs were designed books
+  (figures, code, two columns); taking the words out read as "the styling
+  is broken". He picked printed pages as the default for a PDF read from
+  where it is, with the words one tap away (`view: "text"`). The saved
+  clip still holds the words, for search and Show as text; at opening,
+  files.openLinked swaps .co-body's contents for a slot per page, drawn
+  as they're reached like a scan's. A copy keeps only the words, since
+  the PDF itself isn't kept, so it stays text.
+- **No second copy from the watched folder (1.1.3).** The two ways in
+  (read from where it is, a copy) were allowed side by side for the same
+  file on purpose, but a file in the watched folder that's also added by
+  hand is a duplicate to Daniel. Opening one by hand that matches a
+  watched clip by name and size is refused; a scan that meets a hand-added
+  linked clip of the same name and size adopts it into the folder, and
+  one meeting a copy leaves it. Removing a watched clip keeps its ref in
+  `waypage.watch.skip` until the file leaves the folder, or it would be
+  back at the next look.
 - **call.getLong reads only longs (1.1.2).** FilesPlugin.read took its
   offset with PluginCall.getLong, which returns the default unless the
   JSON value is already a Long; a JS number under 2^31 arrives as an

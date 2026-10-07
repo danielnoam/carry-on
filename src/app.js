@@ -1,7 +1,7 @@
 // Waypage: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "1.1.2";
+  const APP_VERSION = "1.1.3";
   window.Waypage.version = APP_VERSION;
 
   const C = window.Waypage;
@@ -335,9 +335,12 @@
   // its next run, so they'd start again seconds later. Stopped, they wait
   // until Waypage is next opened.
   let linksStopped = false;
+  // The same for a watched folder's files: Look now or a pull brings them.
+  let watchStopped = false;
   function stopRun(r) {
     if (!r) return;
     if (r.sync) linksStopped = true;
+    if (r.files) watchStopped = true;
     r.stopped = true;
     r.paused = false;
     if (r.wake) { r.wake(); r.wake = null; }
@@ -388,11 +391,13 @@
     const done = r.total ? r.saved + " of " + r.total + " saved" : r.saved + " saved";
     const failed = r.failed ? ", " + r.failed + " failed" : "";
     if (r.stopped) return done + failed + " · Stopping";
-    if (r.paused) return (r.current ? "Pausing after this one · " : "Paused · ") + done + failed;
+    if (r.paused) return (r.current || r.now ? "Pausing after this one · " : "Paused · ") + done + failed;
+    // Files (1.1.3): what the file in hand is up to.
+    if (r.files) return r.total === 1 ? r.now || "Opening" : done + failed + " · " + (r.now || "Next in a moment");
     return done + failed + " · " + (r.current && !r.current.waiting ? savingStatus(r.current) : "Next in a moment");
   }
   function runCard(r) {
-    return el("div", { class: "card saving run wide", role: "group", "aria-label": (r.again ? "Saving again in " : "Saving into ") + (r.folder || "the library") },
+    return el("div", { class: "card saving run wide", role: "group", "aria-label": r.files ? "Adding " + r.label : (r.again ? "Saving again in " : "Saving into ") + (r.folder || "the library") },
       el("span", { class: "card-body" },
         el("span", { class: "card-site" }, r.site, r.again ? " · Saving again" : null),
         el("span", { class: "card-title", dir: "auto" }, r.folder || r.label || "Saving several"),
@@ -401,7 +406,7 @@
         el("span", { class: "card-status accent" },
           el("span", { class: "spinner", "aria-hidden": "true" }),
           el("span", { class: "status-text" }, runStatus(r))),
-        el("span", { class: "card-actions" },
+        r.files && r.total === 1 ? null : el("span", { class: "card-actions" },
           el("button", { class: "btn-small run-pause", type: "button", onclick: () => pauseRun(r, !r.paused) }, r.paused ? "Resume" : "Pause"),
           el("button", { class: "btn-quiet danger", type: "button", onclick: () => stopRun(r) }, "Stop")),
         failedList(r)));
@@ -409,7 +414,7 @@
   // A run's bar is the whole run when its length is known, else the page
   // in progress.
   function runShare(r) {
-    const page = r.current && !r.current.waiting ? savingShare(r.current) : 0;
+    const page = r.files ? r.part : r.current && !r.current.waiting ? savingShare(r.current) : 0;
     if (!r.total || (page == null && !r.saved && !r.failed)) return page;
     return Math.min(1, (r.saved + r.failed + (page || 0)) / r.total);
   }
@@ -532,7 +537,8 @@
   function doneRunCard(e) {
     const r = e.run;
     const name = r.folder && folderPages(r.folder).length ? folderPages(r.folder)[0].folder : null;
-    const saved = r.saved ? countLine(r.saved) + (r.again ? " saved again" : " saved") : "Nothing saved";
+    const saved = r.files ? (r.saved === 1 ? "1 file added" : (r.saved || "No") + " files added")
+      : r.saved ? countLine(r.saved) + (r.again ? " saved again" : " saved") : "Nothing saved";
     return el("div", { class: "card done-run wide", role: "group", "aria-label": (r.folder || "Several clips") + ", done" },
       el("span", { class: "card-body" },
         el("span", { class: "card-site" }, r.site),
@@ -592,7 +598,7 @@
       return;
     }
     const one = active.length === 1 && !singles.length ? active[0] : null;
-    const title = one ? (one.again ? "Saving again in " : "Saving into ") + (one.folder || "your library")
+    const title = one ? (one.files ? "Adding " + one.label : (one.again ? "Saving again in " : "Saving into ") + (one.folder || "your library"))
       : !active.length && singles.length === 1 ? "Saving a clip from " + singles[0].site : "Saving " + Math.round(units) + " clips";
     const text = one ? (one.total ? one.saved + one.failed + " of " + one.total + " done" : countLine(one.saved) + " saved") + (one.paused ? " · Paused" : "")
       : Math.round(share * 100) + "% done";
@@ -1707,7 +1713,7 @@
     const p = state.open;
     if (!p) return;
     const texts = C.reader.readable({ footnotes: !!load(FOOTNOTES_KEY, false), edges: !!load(EDGES_KEY, false) });
-    if (!texts.length) { toast("There's no text in this clip to read aloud."); return; }
+    if (!texts.length) { toast(C.files.printed(p) ? "Switch this PDF to Show as text, in ⋯, to read it aloud." : "There's no text in this clip to read aloud."); return; }
     const block = spot ? spot.block : from == null ? C.reader.firstShown() : from;
     const parts = [];
     texts.forEach((text, b) => {
@@ -2867,9 +2873,10 @@
   async function removeFolder(withPages) {
     const name = state.folder;
     const list = folderPages(name);
-    if (withPages && !confirm("Delete “" + name + "” and its " + countLine(list.length) + " from " + HERE + "?" + alsoSynced())) return;
+    if (withPages && !confirm("Delete “" + name + "” and its " + countLine(list.length) + " from " + HERE + "?" + alsoSynced() + filesNote(list))) return;
+    if (withPages) forgetWatched(list);
     for (const p of list) {
-      if (withPages) { if (p.link) C.platform.files.release(p.link); await C.store.removePage(p.id); }
+      if (withPages) { if (p.link && !p.watched) C.platform.files.release(p.link); await C.store.removePage(p.id); }
       else { delete p.folder; delete p.folderAt; delete p.folderFav; delete p.folderFavAt; }
     }
     if (withPages) state.pages = state.pages.filter((p) => !list.includes(p));
@@ -2960,7 +2967,7 @@
           p.link ? null : tileButton("send", "Export", () => { exporting = true; draw(); }),
           p.file ? null : tileButton("original", "Original", () => C.platform.openOutside(p.url)),
           favTile(p, draw)),
-        el("h3", { class: "overline" }, "This clip"),
+        el("h3", { class: "overline" }, p.link ? "This file" : "This clip"),
         tagsRow(p, draw),
         folderRow(p, draw),
         p.file ? null : picturesRow(p, draw),
@@ -2968,9 +2975,11 @@
         ...series,
         el("h3", { class: "overline" }, "More"),
         el("div", { class: "group" },
+          p.link && p.file && p.file.kind === "pdf" && !p.comic
+            ? menuRow(p.view === "text" ? "Show as printed pages" : "Show as text", () => switchView(p, where)) : null,
           menuRow(p.finished ? "Mark as unread" : "Mark as read", () => markRead([p], !p.finished).then(draw)),
           inReader ? null : menuRow("Select", () => back().then(() => startSelect([p.id]))),
-          menuRow("Delete this clip", () => deletePage(p, where), "warn")));
+          menuRow(p.link ? "Remove from Waypage" : "Delete this clip", () => deletePage(p, where), "warn")));
     };
     draw();
     return box;
@@ -3016,9 +3025,31 @@
   // library (or out of a folder this emptied).
   // With sync on, a deletion reaches every device.
   const alsoSynced = () => (C.sync.on ? " With sync on, it goes from your other devices too." : "");
+  // A file read from where it is is only taken out of Waypage (1.1.3).
+  function linkedStays(list) {
+    const w = watched();
+    const inFolder = w && list.some((p) => p.watched === w.tree);
+    return (list.length === 1 ? "The file itself stays" : "The files themselves stay") + (inFolder ? " in " + w.name + ", and Waypage won't add " + (list.length === 1 ? "it" : "them") + " back." : " where " + (list.length === 1 ? "it is." : "they are."));
+  }
+  const filesNote = (list) => (list.some((p) => p.link) ? " Files read from where they are stay where they are." : "");
+  // A PDF read from where it is: its printed pages, or its words (1.1.3).
+  async function switchView(p, where) {
+    if (p.view === "text") delete p.view; else p.view = "text";
+    await C.store.writeIndex(state.pages);
+    await back();
+    if (where !== "reader" || state.open !== p) return;
+    let html = null;
+    try { html = await C.files.openLinked(p); } catch (e) { html = null; }
+    if (!html) { toast("Couldn't open this clip's file. Try again."); return; }
+    await show(p, html);
+    C.files.drawNear($("readerFrame"));
+  }
+
   async function deletePage(p, where) {
-    if (!confirm("Delete “" + p.title + "” from " + HERE + "?" + (p.link ? " The file itself stays where it is." : alsoSynced()))) return;
-    if (p.link) C.platform.files.release(p.link);
+    if (!confirm(p.link ? "Remove “" + p.title + "” from Waypage? " + linkedStays([p])
+      : "Delete “" + p.title + "” from " + HERE + "?" + alsoSynced())) return;
+    forgetWatched([p]);
+    if (p.link && !p.watched) C.platform.files.release(p.link);
     await C.store.removePage(p.id);
     state.pages = state.pages.filter((x) => x.id !== p.id);
     await C.store.writeIndex(state.pages);
@@ -3026,7 +3057,7 @@
     else await back(andFolder(1));
     renderLibrary();
     if (state.folder) renderFolder();
-    toast("Deleted");
+    toast(p.link ? "Removed" : "Deleted");
   }
 
   // ---- Picking several ----
@@ -3124,13 +3155,16 @@
 
   async function deletePicked() {
     const list = picked();
-    if (!list.length || !confirm("Delete " + countLine(list.length) + " from " + HERE + "?" + alsoSynced())) return;
-    for (const p of list) { if (p.link) C.platform.files.release(p.link); await C.store.removePage(p.id); }
+    if (!list.length || !confirm(list.every((p) => p.link)
+      ? "Remove " + (list.length === 1 ? "1 file" : list.length + " files") + " from Waypage? " + linkedStays(list)
+      : "Delete " + countLine(list.length) + " from " + HERE + "?" + alsoSynced() + filesNote(list))) return;
+    forgetWatched(list);
+    for (const p of list) { if (p.link && !p.watched) C.platform.files.release(p.link); await C.store.removePage(p.id); }
     state.pages = state.pages.filter((p) => !list.includes(p));
     await C.store.writeIndex(state.pages);
     await back(andFolder(1));
     renderLibrary();
-    toast("Deleted " + countLine(list.length));
+    toast((list.every((p) => p.link) ? "Removed " : "Deleted ") + countLine(list.length));
   }
 
   // ---- The library's sheet ----
@@ -3529,6 +3563,15 @@
     say("Opening…");
     try {
       const kind = await C.files.kindOf(file);
+      // Already here from the watched folder (1.1.3), copy or not.
+      const inFolder = C.files.KINDS[kind] && state.pages.find((p) => p.watched && p.file && p.file.name === file.name && p.file.size === file.size);
+      if (inFolder) {
+        if (ref) C.platform.files.release(ref);
+        toast("Already in your library, from " + ((watched() || {}).name || "your watched folder"));
+        if (open) openPage(inFolder.id);
+        if (btn) { btn.disabled = false; say("Restore or open a file"); }
+        return;
+      }
       let link = null;
       if (C.files.canLink(kind) && (ref || C.platform.files.canLink)) {
         const asked = await askKeep(file, kind, !!ref);
@@ -3552,10 +3595,21 @@
       } else if (!kind) {
         toast("Waypage opens " + FILE_KINDS_LINE + ", and its own backups.");
       } else {
-        if (!btn) toast("Opening " + file.name + "…");
-        const meta = kind === "clip" ? await C.backup.importPage(await file.text(), (url) => !!savedAs(url))
-          : await C.files.bring(file, kind, { has: (name, size) => hasFile(name, size, link), link,
-            onProgress: (done, total, what) => say(what === "words" ? "Reading, page " + done + " of " + total : "Pictures, " + done + " of " + total) });
+        // A file being read is a card in the library and Downloads (1.1.3).
+        const run = kind === "clip" ? null : Object.assign(startRun(null, "Adding a file", 1), { label: file.name, files: true, now: "Opening" });
+        if (run) runChanged();
+        const shown = run && fileProgress(run, "Reading");
+        let meta;
+        try {
+          meta = kind === "clip" ? await C.backup.importPage(await file.text(), (url) => !!savedAs(url))
+            : await C.files.bring(file, kind, { has: (name, size) => hasFile(name, size, link), link,
+              onProgress: (done, total, what) => {
+                shown(done, total, what);
+                say(what === "words" ? "Reading, page " + done + " of " + total : "Pictures, " + done + " of " + total);
+              } });
+        } finally {
+          if (run) { run.now = null; runs.delete(run); runChanged(); }
+        }
         if (meta.already) {
           toast("Already in your library");
           const had = open && kind !== "clip" && fileLike(file.name, file.size, link);
@@ -3593,13 +3647,14 @@
   let watching = null;
   const watched = () => { const w = load(WATCH_KEY, null); return w && w.tree ? w : null; };
   function watchSoon(ms = 1500) {
-    if (!C.platform.files.canWatch || !watched()) return;
+    if (!C.platform.files.canWatch || !watched() || watchStopped) return;
     clearTimeout(watchSoon.t);
     watchSoon.t = setTimeout(() => lookInFolder(), ms);
   }
   async function lookInFolder(said) {
     const w = watched();
     if (!w || !C.platform.files.canWatch) return null;
+    if (said !== undefined) watchStopped = false;
     if (watching) return watching;
     watching = (async () => {
       const got = await C.platform.files.scan(w.tree);
@@ -3613,6 +3668,8 @@
       if (w.lost) { delete w.lost; store(WATCH_KEY, w); }
       const there = got.files.filter((f) => WATCH_EXTS.test(f.name));
       const refs = new Set(there.map((f) => f.ref));
+      // Files removed from Waypage stay out while they're in the folder.
+      if (w.skip && w.skip.some((ref) => !refs.has(ref))) { w.skip = w.skip.filter((ref) => refs.has(ref)); store(WATCH_KEY, w); }
       const gone = state.pages.filter((p) => p.watched === w.tree && !refs.has(p.link));
       if (gone.length) {
         for (const p of gone) await C.store.removePage(p.id);
@@ -3621,17 +3678,39 @@
         if (state.folder) renderFolder();
       }
       const known = new Set(state.pages.filter((p) => p.link).map((p) => p.link));
-      const fresh = there.filter((f) => !known.has(f.ref)).sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true, sensitivity: "base" }));
+      // A file already brought in by hand (1.1.3) isn't brought in again:
+      // one read from where it is joins the folder, a copy stays a copy.
+      let joined = 0;
+      for (const f of there) {
+        if (known.has(f.ref)) continue;
+        const had = state.pages.find((p) => p.file && !p.watched && p.file.name === f.name && p.file.size === f.size);
+        if (!had) continue;
+        known.add(f.ref);
+        if (!had.link) continue;
+        if (had.link !== f.ref) C.platform.files.release(had.link);
+        Object.assign(had, { link: f.ref, watched: w.tree });
+        had.file.path = f.path.slice(0, 500);
+        joined++;
+      }
+      if (joined) await C.store.writeIndex(state.pages);
+      const fresh = there.filter((f) => !known.has(f.ref) && !(w.skip || []).includes(f.ref))
+        .sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true, sensitivity: "base" }));
       let added = 0;
       const failed = [];
-      if (fresh.length && said !== false) toast(fresh.length === 1 ? "Adding " + fresh[0].name + " from " + w.name + "…" : "Adding " + fresh.length + " files from " + w.name + "…");
+      // Each file is a step on one card in the library and Downloads,
+      // with Pause and Stop, like a run of saves (1.1.3).
+      const run = fresh.length ? Object.assign(startRun(null, "Watched folder", fresh.length), { label: w.name, files: true }) : null;
+      if (run) runChanged();
       for (const f of fresh) {
+        if (!(await gate(run))) break;
+        Object.assign(run, { now: "Opening " + f.name, part: null });
+        updateRunCard(run);
         try {
           const file = await C.platform.files.blob(f.ref, f.size);
           const kind = await C.files.kindOf(file);
-          if (!C.files.KINDS[kind]) continue;
-          const meta = await C.files.bring(file, kind, { link: f.ref, has: (name, size) => hasFile(name, size, f.ref) });
-          if (meta.already) continue;
+          if (!C.files.KINDS[kind]) { run.total--; continue; }
+          const meta = await C.files.bring(file, kind, { link: f.ref, has: (name, size) => hasFile(name, size, f.ref), onProgress: fileProgress(run, f.name) });
+          if (meta.already) { run.total--; continue; }
           meta.watched = w.tree;
           meta.file.path = f.path.slice(0, 500);
           const dir = f.path.split("/").slice(-2, -1)[0];
@@ -3639,21 +3718,30 @@
           state.pages.unshift(meta);
           await C.store.writeIndex(state.pages);
           added++;
+          run.saved++;
         } catch (e) {
           if (!(e instanceof C.files.FileError)) console.error(e);
           failed.push(f.name + ": " + (e && e.message ? e.message : "couldn't read it"));
+          run.failed++;
         }
       }
+      if (run) { run.now = null; run.part = null; endRun(run); }
       if (added) { await loadThumbs(); C.store.keepStored(); }
       // Said each time it looks, since they're tried again each time.
       if (failed.length && said !== false) toast(failed.length === 1 ? failed[0] : "Couldn't read " + failed.length + " files from " + w.name + ". " + failed[0]);
-      if (added || gone.length) { renderLibrary(); updateWidgets(); }
+      if (added || gone.length || joined) { renderLibrary(); updateWidgets(); }
       if (added && said !== false && !failed.length) toast("Added " + (added === 1 ? "1 file" : added + " files") + " from " + w.name);
       else if (said && !gone.length) toast("Nothing new in " + w.name + ".");
       return { added, gone: gone.length };
     })();
     try { return await watching; } finally { watching = null; if (state.section === "storage") renderSection(); }
   }
+  // "Page 3 of 40" on a file's card as it's read.
+  const fileProgress = (run, name) => (done, total, what) => {
+    run.now = name + " · " + (what === "words" ? "page " : "picture ") + done + " of " + total;
+    run.part = total ? done / total : null;
+    updateRunCard(run);
+  };
   function watchGroup() {
     if (!C.platform.files.canWatch) return null;
     const w = watched();
@@ -3683,6 +3771,15 @@
     store(WATCH_KEY, { tree: got.ref, name: got.name });
     if (state.section === "storage") renderSection();
     await lookInFolder(true);
+  }
+  // A file removed from Waypage that's still in the watched folder isn't
+  // added back the next time Waypage looks.
+  function forgetWatched(list) {
+    const w = watched();
+    const refs = w ? list.filter((p) => p.watched === w.tree && p.link).map((p) => p.link) : [];
+    if (!refs.length) return;
+    w.skip = [...new Set([...(w.skip || []), ...refs])];
+    store(WATCH_KEY, w);
   }
   async function stopWatching() {
     const w = watched();

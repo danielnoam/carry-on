@@ -103,6 +103,8 @@ figure .co-placeholder { border-width: 0 0 1.5px; border-radius: 0; }
 .co-comic { margin: 0 -20px; }
 .co-comic img { display: block; width: 100%; height: auto; margin: 0; border-radius: 0; background: var(--preview); cursor: default; }
 .co-comic .co-placeholder { margin: 0; border-radius: 0; }
+/* A PDF's printed pages (1.1.3): a gap shows where one page ends. */
+.co-printed img + img { margin-top: var(--s-2); }
 
 .co-licence {
   margin-top: var(--s-6); padding-top: var(--s-2);
