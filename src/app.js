@@ -1,7 +1,7 @@
 // Waypage: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "1.2.1";
+  const APP_VERSION = "1.2.2";
   window.Waypage.version = APP_VERSION;
 
   const C = window.Waypage;
@@ -1556,7 +1556,7 @@
     let html, trouble = null;
     opening = id;
     try {
-      html = p.link ? await C.files.openLinked(p) : await C.store.readPage(id);
+      html = p.link ? await openLinked(p) : await C.store.readPage(id);
     } catch (e) {
       html = null;
       trouble = e instanceof C.files.FileError ? e.message : null;
@@ -1568,6 +1568,19 @@
     await shown;
     if (p.link) C.files.drawNear($("readerFrame"));
     $("readerFrame").focus();
+  }
+
+  // A linked PDF from before 1.2.1 gets its cover as it opens (1.2.2): the
+  // card learns of it here.
+  async function openLinked(p) {
+    const had = p.thumb;
+    const html = await C.files.openLinked(p);
+    if (p.thumb !== had) {
+      await C.store.writeIndex(state.pages);
+      if (!C.platform.native) await loadThumbs();
+      renderLibrary();
+    }
+    return html;
   }
 
   // The history entry for a page in the reader (and the sheet over it).
@@ -3130,7 +3143,7 @@
     await back();
     if (where !== "reader" || state.open !== p) return;
     let html = null;
-    try { html = await C.files.openLinked(p); } catch (e) { html = null; }
+    try { html = await openLinked(p); } catch (e) { html = null; }
     if (!html) { toast("Couldn't open this clip's file. Try again."); return; }
     await show(p, html);
     C.files.drawNear($("readerFrame"));

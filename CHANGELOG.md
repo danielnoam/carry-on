@@ -2,6 +2,19 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.2.2] - 2026-10-07
+
+### Changed
+- Printed PDF pages and comics zoom in place: pinch to zoom, up to four
+  times, and pan with your finger; a double tap zooms in on that spot or
+  back out; on a desktop, Ctrl and the wheel. A zoomed PDF page is drawn
+  again at its new size, so it stays sharp. (1.2.1 opened the page on
+  its own instead.)
+
+### Fixed
+- PDFs that came in before 1.2.1 had no card picture. Each gets its
+  first page as its cover the next time it opens.
+
 ## [1.2.1] - 2026-10-07
 
 ### Changed
