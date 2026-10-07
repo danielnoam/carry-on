@@ -143,6 +143,10 @@
     };
   }
 
+  // A panel or printed page that is there to look at: not hidden, and not
+  // the blank that holds a page's place before it is drawn.
+  const drawn = (img) => !img.hidden && img.naturalWidth > 0 && !/^data:image\/svg/.test(img.getAttribute("src") || "");
+
   // In an image chapter a tap shows or hides the bar, as text does, and a
   // double tap opens the panel in the viewer, to zoom.
   let tapTimer = 0;
@@ -152,7 +156,7 @@
       if (tapTimer) {
         clearTimeout(tapTimer);
         tapTimer = 0;
-        if (!img.hidden && img.naturalWidth) onImage(imageInfo(img));
+        if (drawn(img)) onImage(imageInfo(img));
       } else tapTimer = setTimeout(() => { tapTimer = 0; if (onTap) onTap(); }, 280);
       e.preventDefault();
       return;
@@ -446,11 +450,21 @@
 
   // Turns pages with a swipe and the arrow keys. The page can't scroll on
   // its own (overflow hidden), so a sideways swipe is all a page turn.
+  // In an image chapter a pinch opens the panel or printed page under the
+  // fingers in the viewer, where pinch and double tap zoom it (1.2.1).
   function pagedInput() {
     let start = null;
     doc.addEventListener("touchstart", (e) => {
       start = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null;
-    }, { passive: true });
+      if (e.touches.length !== 2 || !comic || !onImage) return;
+      const [a, b] = e.touches;
+      const hit = doc.elementFromPoint((a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2);
+      const img = hit && hit.closest && hit.closest(".co-comic img");
+      if (!img || !drawn(img)) return;
+      e.preventDefault();
+      if (tapTimer) { clearTimeout(tapTimer); tapTimer = 0; }
+      onImage(imageInfo(img));
+    }, { passive: false });
     doc.addEventListener("touchend", (e) => {
       if (!start || !isPaged()) return;
       const t = e.changedTouches[0], dx = t.clientX - start.x, dy = t.clientY - start.y;

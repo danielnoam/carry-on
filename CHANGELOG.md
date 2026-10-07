@@ -2,6 +2,26 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.2.1] - 2026-10-07
+
+### Changed
+- The speed pass, second round. At launch the library draws its first
+  screen of clips and the rest right after, so a big library is on
+  screen sooner. While a run of saves is on, the library's index is
+  written every few seconds and at the run's end instead of after every
+  page. Sync's merge runs off the main thread, so a big library's sync
+  never holds a tap. The `inert` toggle on the library stays as it is
+  (NOTES.md).
+- PDFs read from where they are get their first page as their cover.
+- A pinch on a printed page or a comic panel opens it full screen, where
+  pinch and double tap zoom it. (A double tap on the page did already.)
+
+### Fixed
+- The Collection widget showed the Favourites widget's picture in the
+  widget picker. It has its own now, and shows the collection's name
+  with a Start button, Continue once you've read into it, or Read again
+  when all of it is read; the button opens the next clip.
+
 ## [1.2.0] - 2026-10-07
 
 ### Changed

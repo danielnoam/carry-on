@@ -3,6 +3,25 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **The speed pass, round two (1.2.1).** The first real draw of the
+  library builds thirty cards and the rest on the next turn
+  (FIRST_SCREEN), so the first screen is up before the rest is built.
+  During a run the index write is debounced three seconds (indexSoon)
+  and flushed at the run's end and when the app goes to the background,
+  so library.json crosses the bridge a few times a run, not once a page.
+  Sync's merge (every page cleaned as GitHub holds it, the three-way
+  merge, the comparison) runs on src/sync-worker.js, which loads
+  backup.js and sync.js with a window of its own; without a worker, or
+  if it fails, the merge runs in the page as before. The worker and the
+  app share one address rule (C.sync.urlKey), since the merge on the
+  worker can't be handed the app's. Measured as in 1.2.0 (4x slowed
+  CPU, 600 clips, sync on): first card at launch 379 to 307 ms (175 on
+  a second launch), a sync run's main-thread time 541 to 344 ms with no
+  long task, the first 8 s of a 30-chapter run 1486 to 1205 ms, the
+  sidebar during that run 590 to 381 ms. Left alone: toggling `inert` on the
+  library (30 to 60 ms at 4x). A focus trap instead would have to keep
+  every card out of the reading order by hand, and the cost lands after
+  the animation, where it isn't seen.
 - **The speed pass (1.2.0).** Measured with a 600-clip, 50-collection
   library on a 4x slowed CPU, sync on, 30 chapters saving (the scratch
   script speed.js, a profile per phase). Before: each library redraw cost

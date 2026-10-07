@@ -114,6 +114,8 @@ async function read(job) {
   // document with words in it.
   if (!job.draw && words / count >= 40) {
     out.blocks = blocksOf(pages);
+    // Its first page, small, for the card (1.2.1).
+    if (job.cover) { try { out.cover = await drawOne(doc, 1, 480); } catch (e) { out.cover = null; } }
     return out;
   }
   out.images = [];
@@ -231,7 +233,7 @@ post({ ready: true });
   // { title, byline, pages, blocks } or { title, byline, pages, images }.
   // `draw` skips the words and draws the pages, for a scan read from its
   // file each time it's opened.
-  async function read(bytes, onProgress, { draw = false, sizes = false, maxDraw = 0 } = {}) {
+  async function read(bytes, onProgress, { draw = false, sizes = false, maxDraw = 0, cover = false } = {}) {
     const { lib, worker } = await sources();
     const frame = document.createElement("iframe");
     frame.setAttribute("sandbox", "allow-scripts");
@@ -252,7 +254,7 @@ post({ ready: true });
         function onMessage(e) {
           if (e.source !== frame.contentWindow) return;
           const m = e.data || {};
-          if (m.ready) { frame.contentWindow.postMessage({ kind: "read", draw, sizes, maxDraw, lib, worker, bytes: copy.buffer }, "*", [copy.buffer]); return; }
+          if (m.ready) { frame.contentWindow.postMessage({ kind: "read", draw, sizes, maxDraw, cover, lib, worker, bytes: copy.buffer }, "*", [copy.buffer]); return; }
           if (m.progress) { if (onProgress) onProgress(m.progress, m.of, m.stage); return; }
           if (m.error) { done(null, new Error(m.error)); return; }
           done(m);

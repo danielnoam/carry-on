@@ -321,7 +321,7 @@
     let got;
     try {
       got = await C.pdf.read(bytes, (done, total, stage) => onProgress && onProgress(done, total, stage === "pages" ? "pictures" : "words"),
-        pics.link ? { sizes: true, maxDraw: 1 } : {});
+        pics.link ? { sizes: true, maxDraw: 1, cover: true } : { cover: true });
     } catch (e) {
       throw new FileError(/password|encrypt/i.test(String(e.message)) ? "This PDF is locked with a password."
         : "Waypage couldn't read this PDF. It may be damaged." + why(e));
@@ -360,6 +360,8 @@
         root.append(el);
       }
       if (!root.textContent.trim()) throw new FileError("There's nothing to read in this PDF.");
+      // The first page as the card's picture (1.2.1).
+      if (got.cover) await pics.cover(got.cover, "image/jpeg");
     }
     return { root, title: got.title || baseName(file.name), byline: got.byline, scan: !!got.images };
   }
@@ -494,6 +496,8 @@
   // picture unless it's told which is the cover.
   function picturesOut(id, link) {
     const res = { bytes: 0, thumb: null, n: 0, link: !!link };
+    // A card picture that isn't in the clip (a PDF's first page, 1.2.1).
+    res.cover = async (b, type) => { if (!res.thumb) res.thumb = await thumbnail(id, b, type); };
     // Writes one picture, or leaves a slot for it when the clip reads from
     // the file. The card's own picture is always written, so the library
     // needs nothing but itself.

@@ -198,11 +198,12 @@ final class Widgets {
     }
 
     static RemoteViews collection(Context ctx, int id) {
-        RemoteViews v = new RemoteViews(ctx.getPackageName(), R.layout.waypage_widget_favourites);
+        RemoteViews v = new RemoteViews(ctx.getPackageName(), R.layout.waypage_widget_collection);
         String name = picked(ctx, id);
         JSONObject c = name.isEmpty() ? null : find(ctx, name);
         for (int row : FAVS) v.setViewVisibility(row, View.GONE);
         v.setViewVisibility(R.id.w_empty, View.VISIBLE);
+        v.setViewVisibility(R.id.w_go, View.GONE);
         if (c == null) {
             v.setTextViewText(R.id.w_head, name.isEmpty() ? "Collection" : name);
             v.setTextViewText(R.id.w_empty, name.isEmpty() ? "Tap to pick a collection." : "This collection is gone. Tap to pick another.");
@@ -215,6 +216,15 @@ final class Widgets {
         name = c.optString("name", name);
         v.setTextViewText(R.id.w_head, name + " · " + c.optString("meta", ""));
         v.setOnClickPendingIntent(R.id.w_root, open(ctx, 1000 + id, collectionUri(name)));
+        // Start, Continue or Read again (1.2.1): the app names the button
+        // and the clip it opens.
+        String next = c.optString("next", "");
+        String button = c.optString("button", "");
+        if (!next.isEmpty() && !button.isEmpty()) {
+            v.setViewVisibility(R.id.w_go, View.VISIBLE);
+            v.setTextViewText(R.id.w_go, button);
+            v.setOnClickPendingIntent(R.id.w_go, open(ctx, 200000 + id, Uri.parse("waypage-widget://page/" + Uri.encode(next))));
+        }
         JSONArray clips = c.optJSONArray("clips");
         int n = clips == null ? 0 : Math.min(clips.length(), FAVS.length);
         v.setViewVisibility(R.id.w_empty, n == 0 ? View.VISIBLE : View.GONE);

@@ -47,6 +47,67 @@
   // the merge, the comparison); a tap between them is answered (1.2.0).
   const breathe = () => new Promise((go) => setTimeout(go, 0));
   const share = (p) => { const o = { ...p }; for (const k of DEVICE) delete o[k]; return o; };
+  // A clip's address without its fragment or trailing slash: how two
+  // copies of a page are told to be the same page.
+  const urlKey = (u) => (u ? u.split("#")[0].replace(/\/$/, "") : "");
+  const sameUrl = (a, b) => !!(a && b && urlKey(a) === urlKey(b));
+
+  // ---- The merge on a worker (1.2.1) ----
+  // A big library's merge (every page cleaned as GitHub holds it, the
+  // three-way merge, the comparison) ran on the main thread, between
+  // yields. On a worker it never holds a tap; where there is no worker
+  // (a test, an old browser) it runs here as before.
+  const SELF = typeof document !== "undefined" && document.currentScript ? document.currentScript.src : "";
+  let worker = null, seq = 0;
+  const jobs = new Map();
+  function helper() {
+    if (worker || worker === false) return worker;
+    try {
+      if (typeof Worker === "undefined" || !SELF) { worker = false; return worker; }
+      worker = new Worker(SELF.replace(/sync\.js(\?[^#]*)?$/, "sync-worker.js$1"));
+      worker.onmessage = (e) => {
+        const got = e.data || {};
+        const job = jobs.get(got.id);
+        if (!job) return;
+        jobs.delete(got.id);
+        if (got.error) job.reject(new Error(got.error)); else job.resolve(got);
+      };
+      worker.onerror = () => {
+        for (const job of jobs.values()) job.reject(new Error("worker"));
+        jobs.clear();
+        try { worker.terminate(); } catch (e) { /* gone */ }
+        worker = false;
+      };
+    } catch (e) { worker = false; }
+    return worker;
+  }
+  function ask(msg) {
+    const w = helper();
+    if (!w) return null;
+    return new Promise((resolve, reject) => {
+      const id = ++seq;
+      jobs.set(id, { resolve, reject });
+      try { w.postMessage({ ...msg, id }); } catch (e) { jobs.delete(id); worker.onerror(); reject(e); }
+    });
+  }
+  // The merge, on the worker when there is one.
+  async function mergeOff(before, base, remote, waiting, feeds, feedsSeen, now, sameUrlFn, urlKeyFn) {
+    const here = () => {
+      const view = before.map((p) => share(C.backup.cleanMeta(p, p.id) || p));
+      const remoteDoc = remote ? clean(remote) : null;
+      return { merged: merge(base, { pages: view, waiting, feeds, feedsSeen }, remoteDoc, now, sameUrlFn, urlKeyFn), remoteDoc };
+    };
+    // The worker merges with sync's own address rule; any other stays here.
+    if (sameUrlFn !== sameUrl || urlKeyFn !== urlKey) return here();
+    const off = ask({ op: "merge", before, base, remote, waiting, feeds, feedsSeen, now });
+    if (!off) return here();
+    try { return await off; } catch (e) { return here(); }
+  }
+  async function sameOff(a, b) {
+    const off = ask({ op: "same", a, b });
+    if (!off) return same(a, b);
+    try { return (await off).same; } catch (e) { return same(a, b); }
+  }
 
   // Tags: what both have, and what either added; a tag either removed goes.
   function mergeTags(b, l, r) {
@@ -479,9 +540,6 @@
     const feedsBefore = getFeeds ? getFeeds().map(feedShare) : null;
     const snapshot = new Map(before.map((p) => [p.id, JSON.stringify(p)]));
     await breathe();
-    // What GitHub would hold of each page, so the two compare like for like.
-    const view = before.map((p) => share(C.backup.cleanMeta(p, p.id) || p));
-    await breathe();
     const uploaded = {};
     const waiting = load(WAIT_KEY, []);
     // Links only (0.30.3): this device sends no text and takes none; pages
@@ -492,9 +550,12 @@
     for (let tries = 0; ; tries++) {
       remote = await readJson("library.json");
       if (remote && (!remote.data || !Array.isArray(remote.data.pages))) throw new SyncError("The library.json on GitHub isn't Waypage's. Move it away and sync again.");
-      const remoteDoc = remote && clean(remote.data);
       await breathe();
-      merged = merge(load(BASE_KEY, null), { pages: view, waiting, feeds: feedsBefore, feedsSeen: getSeen ? getSeen() : 0 }, remoteDoc, Date.now(), sameUrl, urlKey);
+      // What GitHub would hold of each page, so the two compare like for
+      // like; then the merge, off the main thread where it can be.
+      const got = await mergeOff(before, load(BASE_KEY, null), remote ? remote.data : null, waiting, feedsBefore, getSeen ? getSeen() : 0, Date.now(), sameUrl, urlKey);
+      merged = got.merged;
+      const remoteDoc = got.remoteDoc;
       for (const [id, f] of Object.entries(uploaded)) if (merged.pages.some((p) => p.id === id && p.savedAt === f.at)) merged.files[id] = f;
       // Text this device has and GitHub doesn't: every page saved here, or
       // saved again since.
@@ -527,7 +588,7 @@
         for (const [k, s] of (f.packs || []).entries()) await remove("pages/" + id + "/pack-" + k, s).catch(() => {});
       }
       await breathe();
-      if (remote && same(merged, remoteDoc)) break;
+      if (remote && await sameOff(merged, remoteDoc)) break;
       halt();
       try {
         await write("library.json", JSON.stringify(merged), remote && remote.sha, "Library: " + merged.pages.length + " pages");
@@ -653,6 +714,7 @@
 
   C.sync = {
     merge, mergeTags, mergeFeeds, oneCopyEach, outgoing, incoming, connect, disconnect, run, SyncError, KEY_URL, tokenIn, setupLink,
+    share, clean, same, urlKey, sameUrl,
     get on() { return !!cfg; },
     get account() { return cfg ? cfg.owner + "/" + cfg.repo : ""; },
     get running() { return !!running; },

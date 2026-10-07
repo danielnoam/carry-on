@@ -1,7 +1,7 @@
 // Waypage: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "1.2.0";
+  const APP_VERSION = "1.2.1";
   window.Waypage.version = APP_VERSION;
 
   const C = window.Waypage;
@@ -329,6 +329,8 @@
   function pauseRun(r, on) {
     r.paused = on;
     if (!on && r.wake) { r.wake(); r.wake = null; }
+    // A pause is a quiet moment: what landed is written now (1.2.1).
+    if (on) flushIndex();
     runChanged();
   }
   // Stop on sync's run (1.1.0): sync hands the same pages over again at
@@ -347,9 +349,26 @@
     state.saving = state.saving.filter((x) => !(x.run === r && x.waiting && !x.error));
     runChanged();
   }
+  // While a run of saves is on, the index is written every few seconds
+  // and when the run ends (1.2.1), not after every page: the whole
+  // library.json crossed the bridge for each chapter that landed. A page
+  // whose entry wasn't written yet is saved again from its link.
+  let indexTimer = 0;
+  function indexSoon() {
+    if (!runs.size) return C.store.writeIndex(state.pages);
+    if (!indexTimer) indexTimer = setTimeout(flushIndex, 3000);
+    return Promise.resolve();
+  }
+  function flushIndex() {
+    if (!indexTimer) return Promise.resolve();
+    clearTimeout(indexTimer);
+    indexTimer = 0;
+    return C.store.writeIndex(state.pages);
+  }
   function endRun(r) {
     if (!r) return;
     runs.delete(r);
+    flushIndex();
     oneEach();
     r.done = true;
     r.at = Date.now();
@@ -1064,6 +1083,7 @@
   // found.
   let firstRender = true;
   let loaded = false;
+  const FIRST_SCREEN = 30;
   // Android's version, from the Files plugin (0.33.0): what the storage
   // places and the empty library's way back (1.1.0) offer.
   let androidSdk = 0;
@@ -1121,8 +1141,14 @@
       }
     }
     const loose = flat || favs ? pages : pages.filter((p) => !p.folder);
+    // The first draw of a big library shows a screen's worth of cards and
+    // draws the rest right after (1.2.1): every card at once held the
+    // first paint back on a phone.
+    const first = loaded && firstRender ? FIRST_SCREEN : Infinity;
+    let more = false;
+    const some = (list) => { if (list.length <= first) return list; more = true; return list.slice(0, first); };
     if (how === "list" && !flat) {
-      const items = sorted([...folders.map(asItem), ...loose]);
+      const items = some(sorted([...folders.map(asItem), ...loose]));
       let group = null;
       for (const x of items) {
         const g = groupOf(x);
@@ -1161,7 +1187,7 @@
         if (part || ts.length || (!folders.length && !mine.length)) keep("h:pages", () => sectionHead(label), label);
         else keep("h:pages", () => partHead("pages", label), "link" + label);
       }
-      if (!part || part === "pages") for (const p of clips) {
+      if (!part || part === "pages") for (const p of some(clips)) {
         if (ts.length) {
           const s = found.get(p.id);
           keep("q:" + p.id, () => pageCard(p, s), [pageSig(p), s].join("|"));
@@ -1171,7 +1197,7 @@
         const label = "Files · " + mine.length;
         if (part || (!folders.length && !clips.length)) keep("h:files", () => sectionHead(label), label);
         else keep("h:files", () => partHead("files", label), "link" + label);
-        for (const p of mine) keep("p:" + p.id, () => pageCard(p), pageSig(p));
+        for (const p of some(mine)) keep("p:" + p.id, () => pageCard(p), pageSig(p));
       }
     }
     if (n && !pages.length && ts.length) {
@@ -1210,7 +1236,8 @@
     // Clips alone, a filter) comes in with the library's fade instead, as
     // two hundred animations at once dropped it to a few frames a second.
     if (!firstRender && fresh.length <= 6) fresh.forEach((node) => M.arrive(node));
-    firstRender = false;
+    if (loaded) firstRender = false;
+    if (more) setTimeout(renderLibrary, 0);
     paintPicks();
     renderDownloads();
     if (state.place === "feeds") renderFeeds();
@@ -1239,8 +1266,10 @@
     return out;
   }
 
-  const urlKey = (u) => (u ? u.split("#")[0].replace(/\/$/, "") : "");
-  const sameUrl = (a, b) => a && b && urlKey(a) === urlKey(b);
+  // One rule for when two addresses are the same clip, shared with sync
+  // (and its worker, 1.2.1).
+  const urlKey = C.sync.urlKey;
+  const sameUrl = C.sync.sameUrl;
   // Every clip by each of its addresses, kept while the pages are the same
   // objects with the same addresses (1.2.0): savedAs is asked many times
   // a redraw, and each ask was a pass over every clip.
@@ -1418,14 +1447,14 @@
         // it, with this copy's text and pictures.
         for (const k of SYNCED_KEEP) if (job.synced[k] !== undefined) meta[k] = job.synced[k];
         if (state.pages.some((p) => p.id === meta.id)) await C.store.removePage(meta.id).catch(() => {});
-        else { state.pages.unshift(meta); await C.store.writeIndex(state.pages); }
+        else { state.pages.unshift(meta); await indexSoon(); }
         syncSoon();
       } else {
         meta.requested = job.url;
         if (job.folder) { meta.folder = folderName(job.folder); meta.folderAt = job.folderAt || Date.now(); if (job.source) meta.source = job.source; }
         if (job.tags && job.tags.length) meta.tags = withTags([], job.tags);
         state.pages.unshift(meta);
-        await C.store.writeIndex(state.pages);
+        await indexSoon();
       }
       state.saving = state.saving.filter((s) => s !== job);
       if (!job.run) finish({ key: "p:" + meta.id, page: meta.id });
@@ -5047,7 +5076,12 @@
           const list = folderPages(name);
           const i = list.findIndex((x) => !x.finished);
           const from = i < 0 ? Math.max(0, list.length - 4) : i;
-          return { name, meta: readCount(list), clips: list.slice(from, from + 4).map((x) => ({ id: x.id, title: x.title, meta: clipMeta(x) })) };
+          // Its button (1.2.1): Start before anything in it was opened,
+          // Continue while reading, Read again when all of it is read.
+          const next = i < 0 ? list[0] : list[i];
+          const started = list.some((x) => x.readAt || x.finished || (x.at || 0) > 0.02);
+          return { name, meta: readCount(list), next: next ? next.id : "", button: !next ? "" : i < 0 ? "Read again" : started ? "Continue" : "Start",
+            clips: list.slice(from, from + 4).map((x) => ({ id: x.id, title: x.title, meta: clipMeta(x) })) };
         }),
       });
     }, 800);
@@ -6351,7 +6385,7 @@
     setTimeout(() => syncNow(), 2000);
     watchSoon(2500);
     document.addEventListener("visibilitychange", () => {
-      if (document.hidden) { if (positionTimer) savePositions(); updateWidgets(); if (syncTimer) syncNow(); return; }
+      if (document.hidden) { flushIndex(); if (positionTimer) savePositions(); updateWidgets(); if (syncTimer) syncNow(); return; }
       takeFeedNews();
       takeWidget();
       syncSoon(1000);

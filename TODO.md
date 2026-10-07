@@ -24,20 +24,16 @@ asks from Daniel.
 
 ---
 
-## Speed, still open (Daniel, 6 Oct 2026; 1.2.0 did the first pass)
+## Speed (Daniel, 6 Oct 2026; 1.2.0 and 1.2.1 did two passes)
 
 1.2.0 made the library's redraw and sync's merge cheap in a big library
 (NOTES.md, 1.2.0). Left for when the phone still feels slow:
 
-- **The first draw at launch** builds every card at once; a few hundred
-  cards could be drawn a screen at a time.
-- **library.json after every page:** the whole index (hundreds of KB in
-  a big library) crosses the bridge for each page that lands. A write
-  every few seconds during a run, and one at its end, would do.
+- Done in 1.2.1: the first draw a screen at a time, library.json a few
+  times a run instead of once a page, sync's merge on a worker.
 - **`inert` on the library** restyles every card when a screen opens or
-  closes (30 to 60 ms at 4x); a focus trap instead would avoid it.
-- **Sync's merge on a worker,** so a big library's sync never blocks a
-  tap at all.
+  closes (30 to 60 ms at 4x); a focus trap instead would avoid it. Left
+  as it is (NOTES.md, 1.2.1): the cost lands after the animation.
 
 ## Naming (Daniel, 5 Oct 2026)
 
