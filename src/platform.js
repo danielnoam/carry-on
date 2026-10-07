@@ -507,6 +507,7 @@
     "application/pdf", "application/vnd.comicbook+zip", "application/x-cbz", "application/zip"];
   const FILE_EXTS = [".epub", ".md", ".markdown", ".txt", ".html", ".htm", ".pdf", ".cbz"];
   const PIECE = 4 << 20;
+  const KEEP = 64 << 20;
 
   // A browser's handles live in IndexedDB; the entry keeps the key.
   function handles() {
@@ -613,7 +614,7 @@
       const info = await F.info({ uri: ref });
       if (!info || !info.ok) throw new Error("gone");
       const whole = info.size || size || 0;
-      const read = async (from, to) => {
+      const piece = async (from, to) => {
         const out = new Uint8Array(Math.max(0, Math.min(to, whole) - from));
         let at = 0;
         while (at < out.length) {
@@ -626,6 +627,22 @@
         }
         return at === out.length ? out : out.slice(0, at);
       };
+      // A book is read in many small stretches (each chapter and picture,
+      // two each), and each one over the bridge opens the file again: an
+      // EPUB with a few hundred pictures took many seconds (1.1.3). A file
+      // up to KEEP is read whole the first time, four pieces at once, and
+      // every stretch after that comes from memory.
+      let all = null;
+      const fill = () => all || (all = (async () => {
+        const out = new Uint8Array(whole);
+        const starts = [];
+        for (let s = 0; s < whole; s += PIECE) starts.push(s);
+        for (let i = 0; i < starts.length; i += 4) {
+          await Promise.all(starts.slice(i, i + 4).map(async (s) => out.set(await piece(s, s + PIECE), s)));
+        }
+        return out;
+      })().catch((e) => { all = null; throw e; }));
+      const read = async (from, to) => (whole <= KEEP ? (await fill()).slice(from, Math.min(to, whole)) : piece(from, to));
       // Enough of a File for the zip reader and files.js to work with.
       const part = (from, to) => ({
         name: info.name || "file",

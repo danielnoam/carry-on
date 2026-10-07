@@ -369,12 +369,18 @@
   let lastUrls = [];
   // The clip's page with its pictures filled in from the file it reads
   // from. Throws FileError when the file has moved or been deleted.
+  // A PDF with words read from where it is opens as its printed pages
+  // (1.1.3), drawn as they're reached like a scan's: its layout, figures
+  // and code are the book. Its words stay in the clip for search, and
+  // Show as text (`view: "text"`) sets them in Waypage's own type.
+  const printed = (meta) => !!(meta && meta.link && meta.file && meta.file.kind === "pdf" && !meta.comic && meta.view !== "text");
   async function openLinked(meta) {
     closeHeld();
     const html = await S().readPage(meta.id);
     const doc = new DOMParser().parseFromString(html, "text/html");
+    const into = printed(meta) ? doc.querySelector(".co-body") : null;
     const slots = [...doc.querySelectorAll("img[data-in]")];
-    if (!slots.length) return html;
+    if (!slots.length && !into) return html;
     let blob;
     try {
       blob = await C.platform.files.blob(meta.link, meta.file.size);
@@ -383,7 +389,7 @@
     }
     for (const url of lastUrls) URL.revokeObjectURL(url);
     lastUrls = [];
-    if (meta.file.kind === "pdf") return fillPdf(doc, slots, blob, meta);
+    if (meta.file.kind === "pdf") return fillPdf(doc, slots, blob, meta, into);
     const entries = await B().zipEntries(blob).catch(() => null);
     if (!entries) throw new FileError("Waypage can't read " + meta.file.name + " any more.");
     for (const img of slots) {
@@ -407,7 +413,7 @@
   // clip and has no slots.
   let held = null;
   const blank = (w, h) => "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '"/>');
-  async function fillPdf(doc, slots, blob, meta) {
+  async function fillPdf(doc, slots, blob, meta, into) {
     closeHeld();
     let pdf;
     try {
@@ -416,6 +422,16 @@
       throw new FileError("Waypage can't read " + meta.file.name + " any more.");
     }
     held = { pdf, urls: new Map(), busy: false };
+    if (into) {
+      into.classList.add("co-comic", "co-printed");
+      slots = pdf.sizes.map((s, i) => {
+        const img = doc.createElement("img");
+        img.setAttribute("alt", "Page " + (i + 1));
+        img.setAttribute("data-in", "page:" + (i + 1));
+        return img;
+      });
+      into.replaceChildren(...slots);
+    }
     for (const img of slots) {
       const n = Number(String(img.getAttribute("data-in")).replace(/^page:/, ""));
       const size = pdf.sizes[n - 1];
@@ -632,5 +648,5 @@
     return meta;
   }
 
-  C.files = { KINDS, LINKABLE, canLink, kindOf, bring, openLinked, drawNear, closeHeld, markdown, plain, FileError };
+  C.files = { KINDS, LINKABLE, canLink, kindOf, bring, openLinked, printed, drawNear, closeHeld, markdown, plain, FileError };
 })();
