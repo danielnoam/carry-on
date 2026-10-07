@@ -686,6 +686,11 @@
     // Whether this copy can fetch any page itself (the app) or is limited by
     // CORS (a browser).
     get canFetchPages() { return !!plugin("CapacitorHttp"); },
+    // Whether the connection is a metered one, mobile data (1.4.1): the
+    // WebView says on Android; a browser or an iPhone says nothing, so
+    // nothing waits there.
+    get metered() { const c = navigator.connection; return !!c && /^(cellular|wimax|bluetooth)$/.test(c.type || ""); },
+    onConnection(f) { const c = navigator.connection; if (c && c.addEventListener) c.addEventListener("change", f); },
     fetchText,
     render,
     get canRender() { return !!plugin("PageRender"); },

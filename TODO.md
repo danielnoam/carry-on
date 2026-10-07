@@ -112,9 +112,14 @@ on the program first; this release comes after.
   end. Open: the reader could scroll to the paragraph being read when the
   clip is opened again from the bar (it lights it, but stays where you
   left the page); and a Read next that goes on by itself, as a setting.
-- **Watched folders (1.4.0, Daniel, 7 Oct):** a list now. Open: looking
+- **Watched folders (1.4.0, Daniel, 7 Oct; their own page, Content, in
+  1.4.1):** a list now, with a look-now arrow per folder. Open: looking
   in many folders is one after the other; a slow memory card in one
   holds the rest.
+- **On mobile data (1.4.1, Daniel, 7 Oct):** Save or Wait for Wi-Fi in
+  Saving, Sync or Wait for Wi-Fi in Sync; Android only, since only the
+  WebView reports the connection type. Open: iOS has no way to tell from
+  the web layer (a Network plugin would).
 
 ## Sync: done for now (Daniel, 6 Oct 2026)
 
