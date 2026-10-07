@@ -39,6 +39,7 @@
       at: Math.min(1, Math.max(0, num(m.at))), finished: m.finished === true,
     };
     if (num(m.readAt)) out.readAt = num(m.readAt);
+    if (out.readAt && typeof m.readOn === "string" && m.readOn.trim()) out.readOn = m.readOn.trim().slice(0, 40);
     if (typeof m.spot === "string" && /^\d{1,6}\/\d{1,2}$/.test(m.spot)) out.spot = m.spot;
     if (typeof m.imageBytes === "number" && m.imageBytes >= 0) out.imageBytes = num(m.imageBytes);
     if (m.comic === true) out.comic = true;

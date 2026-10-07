@@ -2,6 +2,14 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.4.2] - 2026-10-07
+
+### Added
+- When another device read a clip further, the toast names it: "Read to
+  64% on Pixel 8". On Android Waypage uses the name the phone goes by;
+  elsewhere it says "your phone", "your iPad" or "your computer".
+- Settings, Sync: This device's name, to call a device something else.
+
 ## [1.4.1] - 2026-10-07
 
 ### Added
