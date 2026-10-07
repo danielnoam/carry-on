@@ -2,6 +2,23 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.3.0] - 2026-10-07
+
+### Added
+- Where you are in a clip syncs as a place in the text, so it lands on
+  the same paragraph on a phone and a tablet, whatever their width and
+  type size.
+- Open a clip that another device read further, and a toast says so:
+  "Read to 64% on your other device. Go there."
+- While Waypage is in front it checks GitHub for changes every minute,
+  cheaply, so a device reading alongside catches up within the minute.
+
+### Fixed
+- Opening a clip no longer moves your place by a hair: before, opening
+  on one device a clip you'd read further on another could make the
+  stale place win when the two synced.
+- Closing a clip sends where you got to at once, not a few seconds later.
+
 ## [1.2.4] - 2026-10-07
 
 ### Fixed

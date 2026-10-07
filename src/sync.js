@@ -32,9 +32,9 @@
   // Every field an index entry can carry through a backup or sync
   // (backup.cleanMeta); anything else on a page stays on its device.
   const SYNCED = new Set(["id", "url", "title", "site", "byline", "licence", "savedAt", "minutes", "lang", "dir", "mode", "images",
-    "at", "finished", "readAt", "comic", "next", "prev", "requested", "tags", "folder", "folderAt", "source", "series", "fav", "favAt", "folderFav", "folderFavAt", "file"]);
+    "at", "finished", "readAt", "spot", "comic", "next", "prev", "requested", "tags", "folder", "folderAt", "source", "series", "fav", "favAt", "folderFav", "folderFavAt", "file"]);
   // Where the reader is, which goes with whichever device read last.
-  const READING = ["at", "finished", "readAt"];
+  const READING = ["at", "finished", "readAt", "spot"];
 
   const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } };
   const keep = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* not kept */ } };
@@ -265,6 +265,46 @@
     try { r = await fetch(url, Object.assign({ cache: "no-store" }, opts)); }
     catch (e) { throw new SyncError("You're offline. Sync tries again when you're back online."); }
     return r;
+  }
+
+  // A look at the library on GitHub without a sync (1.3.0): for the
+  // furthest-read check when a clip opens, and for the poll while the app
+  // is in front. Asked with the ETag of the last answer, so an unchanged
+  // library is a 304 that GitHub doesn't count against the rate limit.
+  // Resolves to { pages, text, changed } or null when there is none.
+  let peeked = null;
+  async function peek() {
+    if (!cfg || cfg.paused) return null;
+    const h = headers({ Accept: "application/vnd.github.object+json" });
+    if (peeked && peeked.etag) h["If-None-Match"] = peeked.etag;
+    const r = await call(contents("library.json") + "?ref=" + encodeURIComponent(cfg.branch), { headers: h });
+    if (r.status === 304 && peeked) return { ...peeked, changed: false };
+    if (r.status === 404) { peeked = null; return null; }
+    if (!r.ok) throw await fail(r);
+    const j = await r.json();
+    let b64 = j.content;
+    if (!b64 && j.size) {
+      const br = await call(API + "/repos/" + cfg.owner + "/" + cfg.repo + "/git/blobs/" + j.sha, { headers: headers() });
+      if (!br.ok) throw await fail(br);
+      b64 = (await br.json()).content;
+    }
+    if (!b64) return null;
+    const text = b64decode(b64);
+    let data;
+    try { data = JSON.parse(text); } catch (e) { return null; }
+    const pages = data && Array.isArray(data.pages) ? data.pages : [];
+    const changed = !peeked || peeked.sha !== j.sha;
+    peeked = { etag: r.headers.get("ETag") || "", sha: j.sha, pages, text };
+    return { ...peeked, changed };
+  }
+  // Whether the library on GitHub differs from what this device last
+  // synced; cheap when nothing moved.
+  async function poll() {
+    const got = await peek();
+    if (!got) return false;
+    let baseText = null;
+    try { baseText = localStorage.getItem(BASE_KEY); } catch (e) { baseText = null; }
+    return got.text !== baseText;
   }
 
   // { data, sha } or null. Files past 1 MB come as a blob, as in LifeLog.
@@ -714,7 +754,7 @@
 
   C.sync = {
     merge, mergeTags, mergeFeeds, oneCopyEach, outgoing, incoming, connect, disconnect, run, SyncError, KEY_URL, tokenIn, setupLink,
-    share, clean, same, urlKey, sameUrl,
+    share, clean, same, urlKey, sameUrl, peek, poll,
     get on() { return !!cfg; },
     get account() { return cfg ? cfg.owner + "/" + cfg.repo : ""; },
     get running() { return !!running; },

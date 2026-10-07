@@ -116,8 +116,24 @@ favourite collections and 0.30.10 when Feeds was last looked at. Kept
 per device on purpose: settings (theme, reading type, layout, read aloud,
 the images default) and the new-chapter checks, which leave out chapters
 sync brings in. No sync with the app closed (Daniel: not needed).
+1.3.0 (Daniel, 7 Oct): the place in a clip syncs as a spot in the text,
+a furthest-read toast on open, sync at once on close, a cheap ETag poll
+every minute in front. Open: a device name in that toast ("on your
+phone"), which needs a name per device in the library.
 
 ---
+
+## Big screens: a browser and PC layout (Daniel, 7 Oct 2026)
+
+Daniel asked for a design for big screens, to use in a browser and on a
+PC. Five artboards are on the canvas and in `design/UI-Big-*.dc.html`
+(DESIGN.md §5 "Big screens"): one sidebar always open at 1024 px and
+wider, the save field at the top, the reader with a contents rail and
+keyboard hints, a two-column collection, Feeds, and a two-pane Settings.
+Open: Daniel's word on the direction, then build it in passes (sidebar
+and library first, reader rail and keys, settings panes). The web copy
+already runs in a browser; what it saves there is limited by CORS until
+the fetch worker above exists.
 
 ## Waiting on a decision, not on a release slot
 

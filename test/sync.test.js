@@ -150,4 +150,18 @@ test("the same look on both is not a change, so nothing is written", () => {
   assert.strictEqual(m.feedsSeen, remote.feedsSeen);
 });
 
+test("the place in the text (spot, 1.3.0) goes with the device that read last", () => {
+  const base = lib([page("a1b2", { at: 0.2, spot: "3/10", readAt: 100 })]);
+  const local = lib([page("a1b2", { at: 0.2, spot: "3/10", readAt: 100 })]);
+  const remote = lib([page("a1b2", { at: 0.6, spot: "9/40", readAt: 200 })]);
+  const m = S.merge(base, local, remote, NOW);
+  assert.strictEqual(m.pages[0].at, 0.6);
+  assert.strictEqual(m.pages[0].spot, "9/40");
+  assert.strictEqual(m.pages[0].readAt, 200);
+  // Both moved: the one read later wins all three together.
+  const l2 = lib([page("a1b2", { at: 0.3, spot: "5/0", readAt: 300 })]);
+  const m2 = S.merge(base, l2, remote, NOW);
+  assert.deepStrictEqual([m2.pages[0].at, m2.pages[0].spot], [0.3, "5/0"]);
+});
+
 console.log("\n" + passed + " passed");

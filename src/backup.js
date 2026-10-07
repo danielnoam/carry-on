@@ -39,6 +39,7 @@
       at: Math.min(1, Math.max(0, num(m.at))), finished: m.finished === true,
     };
     if (num(m.readAt)) out.readAt = num(m.readAt);
+    if (typeof m.spot === "string" && /^\d{1,6}\/\d{1,2}$/.test(m.spot)) out.spot = m.spot;
     if (typeof m.imageBytes === "number" && m.imageBytes >= 0) out.imageBytes = num(m.imageBytes);
     if (m.comic === true) out.comic = true;
     if (m.fav === true) { out.fav = true; out.favAt = num(m.favAt) || out.savedAt; }

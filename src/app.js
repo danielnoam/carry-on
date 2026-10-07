@@ -1,7 +1,7 @@
 // Waypage: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "1.2.4";
+  const APP_VERSION = "1.3.0";
   window.Waypage.version = APP_VERSION;
 
   const C = window.Waypage;
@@ -69,15 +69,16 @@
   }
 
   let toastTimer = null;
-  function toast(text) {
+  function toast(text, act, onAct) {
     const t = $("toast");
     const wasHidden = t.hidden;
-    t.textContent = text;
+    if (act) t.replaceChildren(el("span", {}, text), el("button", { class: "toast-act", type: "button", onclick: () => { t.hidden = true; onAct(); } }, act));
+    else t.textContent = text;
     t.hidden = false;
     if (wasHidden) M.arrive(t, 16);
     clearTimeout(toastTimer);
     const shown = text;
-    toastTimer = setTimeout(() => { M.leave(t).then(() => { if (t.textContent === shown) t.hidden = true; }); }, 3200);
+    toastTimer = setTimeout(() => { M.leave(t).then(() => { if (t.textContent === shown || (act && t.firstChild && t.firstChild.textContent === shown)) t.hidden = true; }); }, act ? 8000 : 3200);
   }
 
   // ---- Theme ----
@@ -1568,6 +1569,31 @@
     await shown;
     if (p.link) C.files.drawNear($("readerFrame"));
     $("readerFrame").focus();
+    furtherRead(p);
+  }
+
+  // The furthest-read check (1.3.0): a look at the library on GitHub as a
+  // clip opens, and when another device read it further and later, a
+  // toast offers to go there. The open never waits for it.
+  let openedReadAt = 0;
+  async function furtherRead(p) {
+    if (!C.sync.on || C.sync.paused || !navigator.onLine || p.link) return;
+    let got;
+    try { got = await C.sync.peek(); } catch (e) { got = null; }
+    if (!got || state.open !== p) return;
+    const other = got.pages.find((x) => x && x.id === p.id) || got.pages.find((x) => x && sameUrl(x.url, p.url));
+    if (!other || !(other.readAt > openedReadAt) || typeof other.at !== "number") return;
+    if (Math.abs(other.at - (p.at || 0)) < 0.01 && (!other.spot || other.spot === p.spot)) return;
+    const pct = Math.round(other.at * 100);
+    toast(other.finished || other.at >= 0.97 ? "Read to the end on your other device." : "Read to " + pct + "% on your other device.", "Go there", () => {
+      if (state.open !== p) return;
+      p.at = other.at;
+      if (other.spot) p.spot = other.spot;
+      if (other.finished) p.finished = true;
+      p.readAt = Math.max(other.readAt, Date.now());
+      C.reader.jump(other.at, other.spot || "");
+      savePositions();
+    });
   }
 
   // A linked PDF from before 1.2.1 gets its cover a moment after it opens
@@ -1594,17 +1620,21 @@
   function show(p, html) {
     if (aloud.key !== p.id) stopAloud();
     state.open = p;
+    // Opening counts as reading for the order of things (sort by read, the
+    // sidebar, Continue reading); the merge is safe because the place
+    // itself only changes when you move (notePosition, reader.js's
+    // restore doesn't count), and furtherRead compares with the time
+    // from before this open.
+    openedReadAt = p.readAt || 0;
     p.readAt = Date.now();
-    clearTimeout(positionTimer);
-    positionTimer = setTimeout(savePositions, 1500);
     showOffline();
     $("readProgress").dir = p.dir || "ltr";
     $("readerContents").hidden = true;
     $("readerView").classList.remove("bar-away");
     readerScrolled(p.at || 0, 0);
     return C.reader.open($("readerFrame"), html, p, {
-      at: p.at || 0, next: endLink(p),
-      onPosition: (f) => notePosition(p, f),
+      at: p.at || 0, spot: p.spot || "", next: endLink(p),
+      onPosition: (f, s) => notePosition(p, f, s),
       onScroll: readerScrolled,
       onImage: openImage,
       onTap: toggleBar,
@@ -1714,9 +1744,15 @@
   // the end, kept in the library index; written a moment after scrolling
   // stops, and when the page is closed.
   let positionTimer = null;
-  function notePosition(p, f) {
-    p.at = Math.round(f * 1000) / 1000;
+  function notePosition(p, f, s) {
+    const at = Math.round(f * 1000) / 1000;
+    const moved = at !== (p.at || 0) || (s || "") !== (p.spot || "");
+    p.at = at;
+    // An empty spot (Pages, with no block starting on this page) clears
+    // the old one, so the fraction decides the place.
+    if (s) p.spot = s; else delete p.spot;
     if (f >= 0.97) p.finished = true;
+    if (moved) p.readAt = Date.now();
     clearTimeout(positionTimer);
     positionTimer = setTimeout(savePositions, 1500);
   }
@@ -1730,6 +1766,8 @@
   function closeReader() {
     if (!state.open) return;
     if (positionTimer) savePositions();
+    // Where you got to goes to GitHub now, not in four seconds (1.3.0).
+    if (C.sync.on && navigator.onLine) syncNow();
     closeSheet(true);
     if (state.image) { state.image = false; $("imageViewer").hidden = true; $("viewerImg").removeAttribute("src"); }
     stopAloud();
@@ -3925,7 +3963,7 @@
   // every few minutes while open. Pages that came down get their pictures
   // here, one page at a time, like Retry.
   let syncTimer = null, syncQueue = [], fetchingPictures = false;
-  const SYNCED_KEEP = ["savedAt", "title", "requested", "tags", "folder", "folderAt", "source", "series", "fav", "favAt", "folderFav", "folderFavAt", "at", "finished", "readAt"];
+  const SYNCED_KEEP = ["savedAt", "title", "requested", "tags", "folder", "folderAt", "source", "series", "fav", "favAt", "folderFav", "folderFavAt", "at", "finished", "readAt", "spot"];
   // While a run of saves is on, sync waits longer (1.2.0): each sync is a
   // merge of the whole library, and one after every page landing was a
   // stutter every few seconds.
@@ -6412,6 +6450,15 @@
   });
   addEventListener("online", () => { dailyCheck(false); checkFeeds(false); syncSoon(1000); fetchPictures(); });
   setInterval(() => { if (!document.hidden) syncNow(); }, 5 * 6e4);
+  // Between those, a cheap look every minute (1.3.0): an unchanged library
+  // is a 304 GitHub doesn't count, so a device reading alongside catches
+  // up within the minute.
+  setInterval(async () => {
+    if (document.hidden || !C.sync.on || C.sync.paused || C.sync.running || !navigator.onLine) return;
+    let moved = false;
+    try { moved = await C.sync.poll(); } catch (e) { moved = false; }
+    if (moved) syncNow();
+  }, 6e4);
   // Feeds are due every few hours; asked about while the app is open.
   setInterval(() => checkFeeds(false), 15 * 6e4);
 
