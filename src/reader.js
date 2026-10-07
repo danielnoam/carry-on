@@ -187,6 +187,50 @@
     if (/^(https?|mailto):/.test(a.href)) C.platform.openOutside(a.href);
   }
 
+  // Where the reader is, as text (1.3.0): the block (paragraph, heading,
+  // list item, panel) at the top edge and how far into it, "12/37" for
+  // block 12, 37% in. A fraction of the scroll height (position) is not
+  // the same place at another width or type size; this is.
+  let anchors = [];
+  function findAnchors() {
+    anchors = doc ? [...doc.body.querySelectorAll(BLOCKS + ", .co-comic img")].filter((el) => !el.closest(SKIP) && !el.querySelector(BLOCKS)) : [];
+  }
+  let restoredAt = 0;
+  function spot() {
+    if (!doc || !anchors.length) return "";
+    const edge = (topSpace ? topSpace() : 0) + 8;
+    if (isPaged()) {
+      const p = page();
+      const i = anchors.findIndex((el) => pageOf(el) === p);
+      return i < 0 ? "" : i + "/0";
+    }
+    for (const [i, el] of anchors.entries()) {
+      const rct = el.getBoundingClientRect();
+      if (rct.bottom <= edge || !rct.height) continue;
+      return i + "/" + Math.max(0, Math.min(99, Math.round((edge - rct.top) / rct.height * 100)));
+    }
+    return "";
+  }
+  // Scrolls (or turns) to a spot; false when it names nothing here.
+  function toSpot(s) {
+    const m = /^(\d+)\/(\d+)$/.exec(s || "");
+    const el = m && anchors[Number(m[1])];
+    if (!el || !doc) return false;
+    const w = frame.contentWindow;
+    if (isPaged()) { goPage(pageOf(el), true); return true; }
+    const edge = (topSpace ? topSpace() : 0) + 8;
+    const rct = el.getBoundingClientRect();
+    w.scrollTo(0, Math.max(0, w.scrollY + rct.top + rct.height * Number(m[2]) / 100 - edge));
+    return true;
+  }
+  // Goes to where another device got to (app.js, the furthest-read toast).
+  function jump(at, s) {
+    if (!doc) return;
+    if (toSpot(s)) return;
+    const w = frame.contentWindow;
+    if (isPaged()) relayout(at); else w.scrollTo(0, at * (doc.documentElement.scrollHeight - w.innerHeight));
+  }
+
   // How far down the page the reader is, 0 to 1; a page shorter than the
   // screen counts as read to the end.
   function position() {
@@ -389,11 +433,13 @@
   const pages = () => Math.max(1, Math.round(doc.documentElement.scrollWidth / width()));
   // While a turn runs, the page is the one it's going to, so quick taps add up.
   const page = () => (turning ? turning.to : Math.round(Math.abs(frame.contentWindow.scrollX) / width()));
-  // The page an element starts on, from where it sits on screen now.
+  // The page an element starts on, from where it sits on screen now and
+  // how far the frame has really scrolled (mid-turn, page() is the one
+  // the turn is going to, so it can't be the base).
   function pageOf(el) {
     const r = el.getBoundingClientRect(), w = width();
     const x = rtl() ? w - r.right : r.left;
-    return Math.max(0, Math.min(pages() - 1, page() + Math.floor((x + 1) / w)));
+    return Math.max(0, Math.min(pages() - 1, Math.floor((x + Math.abs(frame.contentWindow.scrollX) + 1) / w)));
   }
   // A turn is a short ease-out of its own: the WebView's smooth scroll
   // takes most of a second for a screen's width.
@@ -560,7 +606,7 @@
   // `next` ({ over, title, go }) adds a link to the next page at the end;
   // `top` () gives the height the bar covers; onImage(info) opens a tapped
   // image.
-  function open(iframe, html, meta, { at = 0, onPosition, onScroll, next, top, onImage: image, onTap: tap, onSelect, pages: asPages, bottom } = {}) {
+  function open(iframe, html, meta, { at = 0, spot: spotAt = "", onPosition, onScroll, next, top, onImage: image, onTap: tap, onSelect, pages: asPages, bottom } = {}) {
     frame = iframe;
     turning = null;
     paged = !!asPages;
@@ -624,7 +670,8 @@
           clearTimeout(scrollTimer);
           scrollTimer = setTimeout(() => {
             swapNearImages();
-            if (onPosition) onPosition(position());
+            // The scroll that put the page back where it was isn't a move.
+            if (onPosition && performance.now() - restoredAt > 400) onPosition(position(), spot());
           }, 150);
         }, { passive: true });
         // Back to where the page was left, once the fonts have set the
@@ -634,9 +681,15 @@
           if (!doc) return;
           const w = iframe.contentWindow;
           const back = at > 0.01 && at < 0.97 ? at : 0;
+          findAnchors();
+          // By the text's spot where there is one (1.3.0), else by the
+          // fraction, as before. Pages lays the columns out first, so the
+          // spot's page is measured on the real layout.
           if (isPaged()) relayout(back);
-          else if (back) w.scrollTo(0, back * (doc.documentElement.scrollHeight - w.innerHeight));
-          if (!back && onPosition && position() === 1) onPosition(1);
+          if (back && toSpot(spotAt)) { /* there */ }
+          else if (back && !isPaged()) w.scrollTo(0, back * (doc.documentElement.scrollHeight - w.innerHeight));
+          restoredAt = performance.now();
+          if (!back && onPosition && position() === 1) onPosition(1, spot());
           if (onScroll) onScroll(position(), isPaged() ? 0 : w.scrollY);
         });
         resolve();
@@ -657,6 +710,7 @@
     nextLink = null;
     onNext = null;
     blocks = [];
+    anchors = [];
     lit = null;
   }
 
@@ -664,5 +718,5 @@
   addEventListener("resize", applyTop);
   addEventListener("offline", applyConnection);
 
-  C.reader = { open, close, position, setPaged, turn, get paged() { return isPaged(); }, pageInfo, headings, section, jumpTo, readable, firstShown, light, following, selectionSpot, clearSelection, applyTheme, applyConnection, srcdoc, CSP };
+  C.reader = { open, close, position, spot, jump, setPaged, turn, get paged() { return isPaged(); }, pageInfo, headings, section, jumpTo, readable, firstShown, light, following, selectionSpot, clearSelection, applyTheme, applyConnection, srcdoc, CSP };
 })();

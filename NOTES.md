@@ -3,6 +3,35 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Reading position across devices (1.3.0).** Daniel: "if I read and
+  exited we should sync". The sending side already did (a save 1.5 s
+  after the scroll stopped, a sync 4 s after the save, at once when the
+  app went to the background); the receiving side had the holes. The
+  real bug: the scroll that put the page back where it was fired the
+  reader's onPosition, whose rounding of the fraction could differ by a
+  thousandth from the saved one, so opening on device B a clip that A
+  had read further counted as a move on B: B's `at` and readAt were
+  newer, and in mergeEntry's READING rule B's stale place won. Now the
+  restore's own scroll doesn't report a position (reader.js, 400 ms
+  after it), and notePosition stamps readAt only when the place really
+  changed; show() still stamps readAt on open, since sort by read, the
+  sidebar and Continue reading mean "opened last" by it, and an
+  unchanged place loses nothing in the merge. In Pages, the spot is
+  measured after the columns are laid out, pageOf() counts from the
+  real scroll (mid-turn, page() is the turn's target), and a page with
+  no block starting on it clears the spot so the fraction decides. The furthest-read check: as a clip
+  opens, sync.peek() reads library.json (a conditional GET with the last
+  ETag; a 304 isn't counted against GitHub's rate limit) and if the
+  copy there has a newer readAt and a different place, a toast with one
+  action ("Go there") offers it; the open never waits. sync.poll() is
+  the same peek compared with the base, every minute while the app is
+  in front, between the five-minute syncs. closeReader syncs at once.
+  The place itself: reader.spot() is "block/percent", the block among
+  BLOCKS (and a comic's panels) at the top edge and how far into it;
+  toSpot() returns to it; the fraction `at` stays for the progress bar
+  and as the fallback when a spot names nothing (a page saved again, a
+  clip from before 1.3.0). `spot` is a READING field in sync and in
+  backup.cleanMeta.
 - **Opening a linked PDF (1.2.4).** Daniel: "you have to wait seconds".
   Measured in the browser at 4x CPU with a 300-page PDF: pdf.open took
   800 to 1000 ms, 600 of it the sandbox boot and the library's import,

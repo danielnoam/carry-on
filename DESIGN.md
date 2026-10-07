@@ -610,6 +610,11 @@ and the page shows above it.
   6 min left"), each row at least 44 dp; empty: "Hold a page in Waypage
   and tap Favourite, and it shows here." Favourite collections come
   first (0.35.0), "Collection · 2 of 9 read" under the name.
+- **A toast with one thing to do (1.3.0):** the toast's text and one
+  underlined action in the same bar, 44px tall, in the toast's colours
+  ("Read to 64% on your other device. Go there"); it stays eight
+  seconds instead of three. Used for the furthest-read offer when a clip
+  opens; the open never waits for it.
 - **Zoom on printed pages and panels (1.2.2):** a pinch zooms the
   chapter in place, up to 4x, following the fingers; once they lift the
   pages are laid out at that width and a drag pans them as the page's
@@ -632,6 +637,25 @@ and the page shows above it.
   "5 new posts" and "From The Slow Times, Kitchen Table and 1 more."
   Channel "New posts", default importance, one notification that counts
   up until the app is opened, then goes.
+
+- **Big screens (Target, 7 Oct 2026), `design/UI-Big-*.dc.html`:** at
+  1024 px and wider the sidebar stays open (272 px, the same list as
+  the phone's: Library with its recent collections, Files, Feeds with
+  its recent feeds and Add a feed, tags as chips, Settings at the foot)
+  and the save field moves to the top of the main column, 48 px, with
+  Save and the list button; links dropped anywhere on the window save.
+  The library keeps its sections: Continue reading as one wide card
+  with a Continue button, Collections as a row of 136 px covers, Clips
+  in three columns. The reader puts a contents rail where the sidebar
+  was (the headings, the current one on `--bar`, the licence and the
+  original link at its foot), the text on a centred 680 px measure,
+  the bar's buttons with their key in the tooltip, and a 40 px hints
+  strip at the bottom (J/K sections, arrows for pages, Esc, ? for all
+  shortcuts). A collection shows its cover, name, progress, Continue
+  and Check for new in a 300 px column beside the chapter list. Settings
+  is two panes: its sections in a 232 px list, the picked one on the
+  right in grouped rows with segmented controls and switches.
+  Narrower than 1024 px everything stacks back to the phone layout.
 
 ## 6. Voice
 

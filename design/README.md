@@ -11,3 +11,9 @@ them, and read DESIGN.md for the rules they follow.
 - `Library.dc.html` the library on a phone
 - `Reader.dc.html` the reader, with a theme switch
 - `Media.dc.html` image and video figures in each state, the save setting
+- `UI-Big-*.dc.html` (7 Oct 2026) the big-screen direction for a browser
+  or PC window, 1280 × 800: `Library` (one sidebar for the whole app,
+  always open, the save field at the top), `Reader` (a contents rail, a
+  centred 680 px measure, keyboard hints), `Collection` (cover and
+  Continue beside the chapter list), `Feeds`, `Settings` (two panes, in
+  Night). They link to each other, so Play walks through them.
