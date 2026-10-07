@@ -632,8 +632,21 @@
       // EPUB with a few hundred pictures took many seconds (1.1.3). A file
       // up to KEEP is read whole the first time, four pieces at once, and
       // every stretch after that comes from memory.
+      // Fetched whole from the app's own file server when it can be (1.2.4):
+      // no base64, and no walk to each piece's start, which for a file
+      // read by content address meant reading the file again per piece.
       let all = null;
+      const fetchWhole = async () => {
+        const cap = window.Capacitor;
+        if (!cap || !cap.convertFileSrc || !/^(content|file):/.test(ref)) return null;
+        const r = await fetch(cap.convertFileSrc(ref), { cache: "no-store" });
+        if (!r.ok) return null;
+        const out = new Uint8Array(await r.arrayBuffer());
+        return out.length === whole || !whole ? out : null;
+      };
       const fill = () => all || (all = (async () => {
+        const got = await fetchWhole().catch(() => null);
+        if (got) return got;
         const out = new Uint8Array(whole);
         const starts = [];
         for (let s = 0; s < whole; s += PIECE) starts.push(s);
