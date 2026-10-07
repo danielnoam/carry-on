@@ -107,6 +107,14 @@ on the program first; this release comes after.
 - **Try it on an iPhone:** the setup-code scanner (0.30.1, needs the
   camera prompt), Read aloud with the screen locked, and the updater's
   "Get it" link.
+- **Read aloud across clips (1.4.0, Daniel, 7 Oct):** reading goes on
+  outside the reader with a bar along the bottom, and Read next at the
+  end. Open: the reader could scroll to the paragraph being read when the
+  clip is opened again from the bar (it lights it, but stays where you
+  left the page); and a Read next that goes on by itself, as a setting.
+- **Watched folders (1.4.0, Daniel, 7 Oct):** a list now. Open: looking
+  in many folders is one after the other; a slow memory card in one
+  holds the rest.
 
 ## Sync: done for now (Daniel, 6 Oct 2026)
 

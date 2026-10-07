@@ -480,6 +480,10 @@ html.native .screen-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top
 .choice input:checked ~ .choice-check { opacity: 1; transform: none; }
 .row-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-value { flex-shrink: 0; color: var(--muted); font-size: var(--fs-meta); }
+/* A row with a Stop (×) at its end: the watched folders (1.4.0). */
+.watch-row { padding-inline-end: 0; }
+.row-x { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-inline-start: var(--s-1); border: 0; border-radius: var(--r-full); background: none; color: var(--muted); }
+.row-x:hover { color: var(--ink); background: var(--press); }
 .accent { color: var(--accent); font-weight: 500; }
 .muted { color: var(--muted); }
 
@@ -519,6 +523,36 @@ html.native .reader-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top
 .reader.aloud .read-section, .reader.aloud .read-time { flex: 1 1 0; }
 .reader.aloud .read-time { text-align: end; }
 .reader.aloud.bar-away .read-left { transform: none; opacity: 1; }
+/* Read next (1.4.0): at the end of a clip read aloud, in place of the
+   player, and on the bar along the bottom. */
+.aloud-read-next {
+  display: inline-flex; align-items: center; gap: var(--s-1); flex: none;
+  min-height: 44px; padding: 0 var(--s-4); border: 0; border-radius: var(--r-full);
+  background: var(--accent); color: var(--accent-ink);
+  font: 500 var(--fs-label) var(--sans); pointer-events: auto;
+}
+.aloud-read-next[hidden] { display: none; }
+/* The bar along the bottom while a clip is read aloud away from its page
+   (1.4.0): over every screen but under sheets and the toast; above the
+   library's bottom field when that's what's on screen. */
+.aloud-bar {
+  position: fixed; left: var(--gutter); right: var(--gutter); z-index: 12;
+  bottom: calc(var(--aloud-bar-lift, 0px) + var(--s-2) + env(safe-area-inset-bottom));
+  max-width: 40rem; margin: 0 auto;
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: var(--s-1) var(--s-2) var(--s-1) var(--s-1);
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg);
+  box-shadow: 0 8px 24px var(--shadow);
+}
+.aloud-bar[hidden] { display: none; }
+.aloud-bar .icon-btn { border-radius: var(--r-full); color: var(--ink); }
+.aloud-bar-text {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; align-items: flex-start;
+  min-height: 44px; justify-content: center; padding: 0 var(--s-1); border: 0; background: none; color: var(--ink); text-align: start;
+}
+.aloud-bar-title { font: 600 var(--fs-label) var(--serif); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aloud-bar-meta { font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.aloud-bar-up .library, body.aloud-bar-up .screen-body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
 .read-here {
   position: fixed; z-index: 3; transform: translateX(-50%);
   display: inline-flex; align-items: center; gap: var(--s-2);

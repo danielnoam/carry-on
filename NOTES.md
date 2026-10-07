@@ -3,6 +3,25 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Read aloud away from the page (1.4.0).** Daniel: leaving the clip
+  should keep it reading, with a bar showing what, like picture in
+  picture; and at the end a button for the next page. The speech already
+  ran outside the reader (the Speech service in the app, speechSynthesis
+  in a browser): closeReader() and show() stopped it. Now `aloud` keeps
+  its clip (key, map, state) whatever is on screen; the reader's player,
+  light and pressed button show only when that clip is the one open
+  (aloudHere), and otherwise #aloudBar, fixed along the bottom over every
+  screen (z 12, under sheets and the toast), lifted above the library's
+  bottom field when that's what's on screen. "ended" is a state of its
+  own now: while the clip has an endLink (the next chapter, or the page
+  it links to as next), the clip stays "being read" and Read next shows,
+  in the reader's foot and on the bar; readNext() opens it (saving it
+  first when it isn't saved) with aloudAuto set, and show() starts
+  reading from the top. With no next, ended is stopped.
+- **The Collection widget's blank (1.4.0).** From 1.2.3 the layout had
+  a bare `<View>` as the weighted spacer that pushes the button to the
+  bottom; RemoteViews only inflates its allowed classes, so Android drew
+  "problem loading widget". A FrameLayout spacer does the same job.
 - **Reading position across devices (1.3.0).** Daniel: "if I read and
   exited we should sync". The sending side already did (a save 1.5 s
   after the scroll stopped, a sync 4 s after the save, at once when the
