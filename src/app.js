@@ -1,7 +1,7 @@
 // Waypage: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "1.2.2";
+  const APP_VERSION = "1.2.3";
   window.Waypage.version = APP_VERSION;
 
   const C = window.Waypage;

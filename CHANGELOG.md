@@ -2,6 +2,12 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.2.3] - 2026-10-07
+
+### Changed
+- The Collection widget's Start or Continue button runs along the bottom
+  of the widget, under its clips.
+
 ## [1.2.2] - 2026-10-07
 
 ### Changed
