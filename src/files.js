@@ -27,6 +27,9 @@
   const MIME_EXT = { "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp" };
 
   class FileError extends Error {}
+  // What actually went wrong, after the plain words (1.1.1): "damaged"
+  // alone didn't say whether the file or the phone's handing it over failed.
+  const why = (e) => { const m = String((e && e.message) || "").trim(); return m ? " (" + m.slice(0, 80) + ")" : ""; };
 
   const extOf = (name) => ((String(name).match(/\.([a-z0-9]{1,8})$/i) || [])[1] || "").toLowerCase();
   const baseName = (name) => String(name).replace(/\.[a-z0-9]{1,8}$/i, "").replace(/[_]+/g, " ").trim() || "Untitled";
@@ -321,7 +324,7 @@
         pics.link ? { sizes: true, maxDraw: 1 } : {});
     } catch (e) {
       throw new FileError(/password|encrypt/i.test(String(e.message)) ? "This PDF is locked with a password."
-        : "Waypage couldn't read this PDF. It may be damaged.");
+        : "Waypage couldn't read this PDF. It may be damaged." + why(e));
     }
     const root = out.createElement("div");
     root.className = "co-body";
@@ -590,6 +593,7 @@
   async function bring(file, kind, { has, onProgress, link = null } = {}) {
     if (!KINDS[kind]) throw new FileError("Waypage can't open this kind of file.");
     if (has && has(file.name, file.size)) return { already: true };
+    if (!file.size) throw new FileError("Waypage got nothing from " + file.name + ". If it's in a cloud folder, make it available offline and try again.");
     const id = C.save.newId();
     const out = document.implementation.createHTMLDocument("");
     const ext = kind === "epub" || kind === "cbz" || !EXTS[extOf(file.name)] ? kind : extOf(file.name);
@@ -600,7 +604,7 @@
     } catch (e) {
       await S().removePage(id);
       if (!(e instanceof FileError)) console.error(e);
-      throw e instanceof FileError ? e : new FileError("Waypage couldn't read this " + KINDS[kind] + " file. It may be damaged.");
+      throw e instanceof FileError ? e : new FileError("Waypage couldn't read this " + KINDS[kind] + " file. It may be damaged." + why(e));
     }
     const { root } = got;
     const words = root.textContent;

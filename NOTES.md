@@ -3,6 +3,20 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **The library keeps its nodes in place (1.1.1).** renderLibrary ended
+  with root.replaceChildren(...nodes): every card it kept was taken out
+  and put back, which resets a horizontal strip's scrollLeft, so each
+  page landing sent the collections row back to its start. It now removes
+  what's gone and moves only what's out of place. The collections strip
+  itself is kept too, with its tiles redrawn one by one (fillStrip) when
+  their own signature changes, not all of them when any one does.
+- **Files with no size (1.1.1).** platform.files.blob reads a file
+  as far as its size says, and some providers give no size
+  (OpenableColumns.SIZE null), so every read came back empty and each
+  book read as damaged. FilesPlugin.info counts the bytes when the
+  provider doesn't say. An empty file is now its own error, and the
+  others carry the reason in brackets, since Daniel's books failed on the
+  phone and the tests couldn't make them fail.
 - **Room under the page (1.1.0).** The line along the bottom (section,
   minutes left, the read-aloud player) floats over the reader like the
   top bar, so the page's end sat under it, Next card and all. reader.js
