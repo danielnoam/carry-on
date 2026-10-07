@@ -3,6 +3,25 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Opening a linked PDF (1.2.4).** Daniel: "you have to wait seconds".
+  Measured in the browser at 4x CPU with a 300-page PDF: pdf.open took
+  800 to 1000 ms, 600 of it the sandbox boot and the library's import,
+  the rest asking every page for its size; a fresh sandbox was built
+  per open, and a document's destroy() took pdf.js's worker with it. On
+  the phone the file read came first: platform.files.blob read the file
+  in 4 MB pieces, and each piece's native read opened the content stream
+  and skipped to its offset, which for a content: address reads the file
+  from its start, so a big file was read many times over. Now: the file
+  is fetched whole from Capacitor's file server (convertFileSrc, no
+  base64, no skipping), with the pieces as the fallback; one sandbox
+  stays up for the app with the library and a shared PDFWorker, so
+  "open" after the first costs about 160 ms at 4x (was 1000), and
+  warm() brings it up 2.5 s after launch when a linked PDF is in the
+  library; the first 16 pages' sizes come with the open and the rest
+  follow in batches of 16 (pdf.onSizes), a slot past them taking the
+  last known size until its own arrives (fixSizes), since nearly every
+  PDF's pages are one size. The cover for an old PDF is drawn 1.5 s
+  after the open, so it never holds the open.
 - **Zoom in place on printed pages (1.2.2).** 1.2.1 answered "zoom" by
   opening the page in the image viewer; Daniel wanted a PDF viewer's
   pinch and pan. The chapter (`.co-comic`) is scaled with a transform

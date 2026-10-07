@@ -423,14 +423,22 @@
     } catch (e) {
       throw new FileError("Waypage can't read " + meta.file.name + " any more.");
     }
-    held = { pdf, urls: new Map(), busy: false };
-    // A PDF from before 1.2.1 has no card picture: its first page, now.
+    const h = held = { pdf, urls: new Map(), busy: false, frame: null };
+    // A PDF from before 1.2.1 has no card picture: its first page, once
+    // the reader is up (1.2.4), so the open isn't held for it.
     if (!meta.thumb) {
-      try { meta.thumb = await thumbnail(meta.id, await pdf.draw(1, THUMB_WIDTH), "image/jpeg"); } catch (e) { /* no cover */ }
+      setTimeout(async () => {
+        if (held !== h) return;
+        try { meta.thumb = await thumbnail(meta.id, await pdf.draw(1, THUMB_WIDTH), "image/jpeg"); if (onCover) onCover(meta); } catch (e) { /* no cover */ }
+      }, 1500);
     }
+    // The first pages' sizes are known now; a page past them takes the
+    // size of the last one known until its own arrives (pdf.onSizes), as
+    // nearly every PDF's pages are one size.
+    const sizeOf = (n) => pdf.sizes[n - 1] || pdf.sizes[pdf.sizes.length - 1] || null;
     if (into) {
       into.classList.add("co-comic", "co-printed");
-      slots = pdf.sizes.map((s, i) => {
+      slots = Array.from({ length: pdf.count || pdf.pages }, (_, i) => {
         const img = doc.createElement("img");
         img.setAttribute("alt", "Page " + (i + 1));
         img.setAttribute("data-in", "page:" + (i + 1));
@@ -440,17 +448,36 @@
     }
     for (const img of slots) {
       const n = Number(String(img.getAttribute("data-in")).replace(/^page:/, ""));
-      const size = pdf.sizes[n - 1];
+      const size = sizeOf(n);
       if (!size) { img.className = "co-missing"; continue; }
-      const w = Number(img.getAttribute("width")) || size[0], h = Number(img.getAttribute("height")) || size[1];
+      const w = Number(img.getAttribute("width")) || size[0], hh = Number(img.getAttribute("height")) || size[1];
       img.setAttribute("width", w);
-      img.setAttribute("height", h);
-      img.setAttribute("src", blank(w, h));
+      img.setAttribute("height", hh);
+      img.setAttribute("src", blank(w, hh));
       img.setAttribute("data-page", n);
+      if (!pdf.sizes[n - 1]) img.setAttribute("data-guess", "");
       img.removeAttribute("data-in");
     }
+    pdf.onSizes = () => { if (held === h && h.frame) fixSizes(h); };
     return "<!doctype html>\n" + doc.documentElement.outerHTML;
   }
+  // Slots that were given a guessed size take their page's real one.
+  function fixSizes(h) {
+    const win = h.frame && h.frame.contentWindow;
+    if (!win || !win.document) return;
+    for (const img of win.document.querySelectorAll("img[data-page][data-guess]")) {
+      const n = Number(img.getAttribute("data-page"));
+      const s = h.pdf.sizes[n - 1];
+      if (!s) continue;
+      img.removeAttribute("data-guess");
+      if (Number(img.getAttribute("width")) === s[0] && Number(img.getAttribute("height")) === s[1]) continue;
+      img.setAttribute("width", s[0]);
+      img.setAttribute("height", s[1]);
+      if (!h.urls.has(String(n))) img.setAttribute("src", blank(s[0], s[1]));
+    }
+  }
+  // Told when a PDF opened without a card picture has one (app.js).
+  let onCover = null;
   function closeHeld() {
     if (!held) return;
     held.pdf.close();
@@ -464,7 +491,9 @@
   async function drawNear(frame) {
     const h = held;
     const win = frame && frame.contentWindow;
-    if (!h || h.busy || !win || !win.document) return;
+    if (!h || !win || !win.document) return;
+    h.frame = frame;
+    if (h.busy) return;
     h.busy = true;
     try {
       for (;;) {
@@ -662,5 +691,5 @@
     return meta;
   }
 
-  C.files = { KINDS, LINKABLE, canLink, kindOf, bring, openLinked, printed, drawNear, closeHeld, markdown, plain, FileError };
+  C.files = { KINDS, LINKABLE, canLink, kindOf, bring, openLinked, printed, drawNear, closeHeld, markdown, plain, FileError, set onCover(f) { onCover = f; } };
 })();

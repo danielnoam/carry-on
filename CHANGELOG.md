@@ -2,6 +2,16 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.2.4] - 2026-10-07
+
+### Fixed
+- PDFs read from where they are open in a fraction of the time. The
+  file is read in one go instead of in pieces that each started from
+  the file's beginning; the PDF engine stays loaded between PDFs and is
+  readied after launch when there's a PDF in the library; and the pages'
+  sizes come in as you read instead of all before the first page shows.
+  An old PDF's cover is drawn a moment after it opens, not before.
+
 ## [1.2.3] - 2026-10-07
 
 ### Changed

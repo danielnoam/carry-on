@@ -23,22 +23,41 @@
   const BOOT = String.raw`
 const post = (m, t) => parent.postMessage(m, "*", t || []);
 let busy = false;
-// A PDF kept open to draw its pages as they're reached (1.1.0).
-let held = null, queue = Promise.resolve();
+// A PDF kept open to draw its pages as they're reached (1.1.0). The
+// sandbox stays up between PDFs (1.2.4): the library is imported once,
+// and "open" lets go of the one before. A page's size is asked of the
+// library page by page, so the first few come with the answer and the
+// rest follow in batches ("more"), for the reader to fix its slots.
+let held = null, queue = Promise.resolve(), opened = 0;
+const FIRST = 16, BATCH = 16;
 addEventListener("message", async (e) => {
   const job = e.data;
   if (!job) return;
-  if (job.kind === "open" || job.kind === "draw") {
+  if (job.kind === "open" || job.kind === "draw" || job.kind === "close") {
     queue = queue.then(async () => {
       try {
-        if (job.kind === "open") {
-          held = await load(job);
+        if (job.kind === "close") {
+          if (held) { const h = held; held = null; await h.destroy().catch(() => {}); }
+          post({ id: job.id, closed: true });
+        } else if (job.kind === "open") {
+          if (held) { const h = held; held = null; h.destroy().catch(() => {}); }
+          const doc = await load(job);
+          held = doc;
+          const mine = ++opened;
+          const count = Math.min(doc.numPages, 2000);
+          const sizeOf = async (n) => { const v = (await doc.getPage(n)).getViewport({ scale: 1 }); return [Math.round(v.width), Math.round(v.height)]; };
           const sizes = [];
-          for (let n = 1; n <= Math.min(held.numPages, 2000); n++) {
-            const v = (await held.getPage(n)).getViewport({ scale: 1 });
-            sizes.push([Math.round(v.width), Math.round(v.height)]);
-          }
-          post({ id: job.id, pages: held.numPages, sizes });
+          for (let n = 1; n <= Math.min(count, FIRST); n++) sizes.push(await sizeOf(n));
+          post({ id: job.id, pages: doc.numPages, sizes, count });
+          // The rest, between the page draws asked for meanwhile.
+          (async () => {
+            for (let from = FIRST; from < count && held === doc && opened === mine; from += BATCH) {
+              const more = [];
+              for (let n = from + 1; n <= Math.min(count, from + BATCH) && held === doc; n++) more.push(await sizeOf(n));
+              if (held === doc) post({ id: job.id, more, from });
+              await new Promise((go) => setTimeout(go, 0));
+            }
+          })().catch(() => {});
         } else {
           if (!held) throw new Error("No PDF open");
           const bytes = await drawOne(held, job.n, job.width);
@@ -55,12 +74,21 @@ addEventListener("message", async (e) => {
   busy = false;
 });
 
+// The library and its worker are made once and kept: a document's
+// destroy() would otherwise take the worker with it, and the next
+// document would start one again.
+let libOnce = null, libWorker = null;
 async function load(job) {
   const url = (text, type) => URL.createObjectURL(new Blob([text], { type }));
-  const lib = await import(url(job.lib, "text/javascript"));
-  lib.GlobalWorkerOptions.workerSrc = url(job.worker, "text/javascript");
+  if (!libOnce) {
+    libOnce = import(url(job.lib, "text/javascript")).then((lib) => { lib.GlobalWorkerOptions.workerSrc = url(job.worker, "text/javascript"); return lib; });
+    libOnce.catch(() => { libOnce = null; });
+  }
+  const lib = await libOnce;
+  if (!libWorker || libWorker.destroyed) libWorker = new lib.PDFWorker();
   return lib.getDocument({
     data: job.bytes,
+    worker: libWorker,
     isEvalSupported: false,
     disableAutoFetch: true,
     enableScripting: false,
@@ -267,11 +295,16 @@ post({ ready: true });
     }
   }
 
-  // A PDF kept open in its own sandbox, to draw pages one at a time as
-  // the reader reaches them (1.1.0). Resolves to { pages, sizes, draw(n,
-  // width) → JPEG bytes, close() }.
-  async function open(bytes) {
-    const { lib, worker } = await sources();
+  // A PDF kept open in a sandbox, to draw pages one at a time as the
+  // reader reaches them (1.1.0). The sandbox is one for the app and stays
+  // up between PDFs with the library loaded (1.2.4), so the second PDF
+  // opens without its boot; warm() brings it up ahead of the first.
+  // Resolves to { pages, sizes, onSizes, draw(n, width) → JPEG bytes,
+  // close() }. `sizes` has the first pages' sizes at once and fills in
+  // as the rest arrive; onSizes(from, count) is told each time.
+  let box = null;
+  function sandbox() {
+    if (box) return box;
     const frame = document.createElement("iframe");
     frame.setAttribute("sandbox", "allow-scripts");
     frame.setAttribute("aria-hidden", "true");
@@ -279,27 +312,28 @@ post({ ready: true });
     frame.srcdoc = '<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="' + CSP + '">'
       + "<script type=\"module\">" + BOOT + "<\/script>";
     const waiting = new Map();
-    let ids = 0, closed = false;
-    let ready;
+    let ids = 0, ready;
     const isReady = new Promise((go) => { ready = go; });
+    const b = { frame, waiting, isReady, ask: null, drop: null };
     function onMessage(e) {
       if (e.source !== frame.contentWindow) return;
       const m = e.data || {};
       if (m.ready) { ready(); return; }
       const w = waiting.get(m.id);
       if (!w) return;
+      if (m.more) { if (w.more) w.more(m); return; }
       waiting.delete(m.id);
       if (m.error) w.reject(new Error(m.error)); else w.resolve(m);
     }
-    const ask = (job, transfer) => new Promise((resolve, reject) => {
-      if (closed) { reject(new Error("closed")); return; }
+    b.ask = (job, transfer, more) => new Promise((resolve, reject) => {
       const id = ++ids;
-      waiting.set(id, { resolve, reject });
+      waiting.set(id, { resolve, reject, more });
       frame.contentWindow.postMessage({ ...job, id }, "*", transfer || []);
     });
-    const close = () => {
-      if (closed) return;
-      closed = true;
+    // The sandbox itself is let go only if it broke.
+    b.drop = () => {
+      if (box !== b) return;
+      box = null;
       removeEventListener("message", onMessage);
       frame.remove();
       for (const w of waiting.values()) w.reject(new Error("closed"));
@@ -307,17 +341,46 @@ post({ ready: true });
     };
     addEventListener("message", onMessage);
     document.body.append(frame);
+    box = b;
+    return b;
+  }
+  async function warm() {
+    try { await sources(); await sandbox().isReady; } catch (e) { /* later */ }
+  }
+  async function open(bytes) {
+    const { lib, worker } = await sources();
+    const b = sandbox();
+    let closed = false;
+    const handle = { pages: 0, sizes: [], onSizes: null, draw: null, close: null };
+    const close = () => {
+      if (closed) return;
+      closed = true;
+      if (box === b) b.ask({ kind: "close" }).catch(() => {});
+    };
     try {
-      await isReady;
+      await b.isReady;
       const copy = bytes.slice(0);
-      const got = await ask({ kind: "open", lib, worker, bytes: copy.buffer }, [copy.buffer]);
-      return {
-        pages: got.pages, sizes: got.sizes || [],
-        draw: async (n, width) => new Uint8Array((await ask({ kind: "draw", n, width })).bytes),
-        close,
+      const got = await b.ask({ kind: "open", lib, worker, bytes: copy.buffer }, [copy.buffer], (m) => {
+        if (closed) return;
+        for (const [i, s] of m.more.entries()) handle.sizes[m.from + i] = s;
+        if (handle.onSizes) handle.onSizes(m.from, m.more.length);
+      });
+      handle.pages = got.pages;
+      handle.count = got.count || got.pages;
+      for (const [i, s] of (got.sizes || []).entries()) handle.sizes[i] = s;
+      handle.draw = async (n, width) => {
+        if (closed) throw new Error("closed");
+        return new Uint8Array((await b.ask({ kind: "draw", n, width })).bytes);
       };
-    } catch (e) { close(); throw e; }
+      handle.close = close;
+      return handle;
+    } catch (e) {
+      close();
+      // A sandbox that can't answer is replaced next time.
+      if (!(e && /closed/.test(e.message))) b.drop();
+      throw e;
+    }
   }
 
-  C.pdf = { read, open, BOOT, CSP };
+  C.pdf = { read, open, warm, BOOT, CSP };
 })();
