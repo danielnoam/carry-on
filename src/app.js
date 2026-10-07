@@ -1,7 +1,7 @@
 // Waypage: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "1.1.0";
+  const APP_VERSION = "1.1.1";
   window.Waypage.version = APP_VERSION;
 
   const C = window.Waypage;
@@ -1140,7 +1140,11 @@
         const label = "Collections · " + names.length;
         if (part) keep("h:folders:all", () => sectionHead(label), label);
         else keep("h:folders", () => partHead("collections", "Collections"));
-        keep(part ? "folders:all" : "folders", () => { const strip = foldersStrip(names); if (part) strip.classList.add("folder-grid"); return strip; }, names.map(folderSig).join("‖"));
+        // The strip stays and only its changed tiles are drawn again (1.1.1):
+        // drawn whole, it lost where it was scrolled to with every page
+        // that landed in a collection.
+        keep(part ? "folders:all" : "folders", () => { const strip = foldersStrip([]); if (part) strip.classList.add("folder-grid"); return strip; });
+        fillStrip(nodes[nodes.length - 1], names, folderSig);
       }
       if (clips.length && (!part || part === "pages")) {
         const label = (ts.length ? "Found" : state.filter === "all" ? "Clips"
@@ -1188,7 +1192,11 @@
         C.platform.native ? null : el("button", { class: "btn-quiet empty-open", type: "button", onclick: () => openSettings(false, "storage") }, "Open a backup")),
       [androidSdk, C.store.place.kind].join("|"));
     }
-    root.replaceChildren(...nodes);
+    // Nodes that stay are left where they are and only what changed moves
+    // (1.1.1): taking them all out and back reset every strip's scroll.
+    const wanted = new Set(nodes);
+    for (const c of [...root.children]) if (!wanted.has(c)) c.remove();
+    nodes.forEach((node, i) => { if (root.children[i] !== node) root.insertBefore(node, root.children[i] || null); });
     // A card or two arriving springs in; a whole new list (Collections or
     // Clips alone, a filter) comes in with the library's fade instead, as
     // two hundred animations at once dropped it to a few frames a second.
@@ -2334,6 +2342,21 @@
   }
 
   // Scrolls sideways at phone width, wraps on a desktop.
+  function fillStrip(strip, names, folderSig) {
+    const had = new Map([...strip.children].map((t) => [t.dataset.name, t]));
+    const want = names.map((name) => {
+      const sig = folderSig(name), old = had.get(name);
+      if (old && old.dataset.sig === sig) return old;
+      const t = folderTile(name);
+      t.dataset.name = name;
+      t.dataset.sig = sig;
+      if (old) old.replaceWith(t);
+      return t;
+    });
+    for (const [name, t] of had) if (!names.includes(name)) t.remove();
+    // Moved only when the order changed, which a page landing doesn't do.
+    want.forEach((t, i) => { if (strip.children[i] !== t) strip.insertBefore(t, strip.children[i] || null); });
+  }
   const foldersStrip = (names) => el("div", { class: "folder-strip wide", role: "list", "aria-label": "Collections" }, ...names.map(folderTile));
 
   function openFolder(name, fromHistory) {
@@ -3600,6 +3623,7 @@
       const known = new Set(state.pages.filter((p) => p.link).map((p) => p.link));
       const fresh = there.filter((f) => !known.has(f.ref)).sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true, sensitivity: "base" }));
       let added = 0;
+      const failed = [];
       if (fresh.length && said !== false) toast(fresh.length === 1 ? "Adding " + fresh[0].name + " from " + w.name + "…" : "Adding " + fresh.length + " files from " + w.name + "…");
       for (const f of fresh) {
         try {
@@ -3617,11 +3641,14 @@
           added++;
         } catch (e) {
           if (!(e instanceof C.files.FileError)) console.error(e);
+          failed.push(f.name + ": " + (e && e.message ? e.message : "couldn't read it"));
         }
       }
       if (added) { await loadThumbs(); C.store.keepStored(); }
+      // Said each time it looks, since they're tried again each time.
+      if (failed.length && said !== false) toast(failed.length === 1 ? failed[0] : "Couldn't read " + failed.length + " files from " + w.name + ". " + failed[0]);
       if (added || gone.length) { renderLibrary(); updateWidgets(); }
-      if (added && said !== false) toast("Added " + (added === 1 ? "1 file" : added + " files") + " from " + w.name);
+      if (added && said !== false && !failed.length) toast("Added " + (added === 1 ? "1 file" : added + " files") + " from " + w.name);
       else if (said && !gone.length) toast("Nothing new in " + w.name + ".");
       return { added, gone: gone.length };
     })();

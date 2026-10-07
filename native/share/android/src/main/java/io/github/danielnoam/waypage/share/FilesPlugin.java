@@ -436,13 +436,30 @@ public class FilesPlugin extends Plugin {
     public void info(PluginCall call) {
         Uri uri = address(call);
         if (uri == null) return;
-        JSObject out = describe(uri);
-        try (InputStream in = getContext().getContentResolver().openInputStream(uri)) {
-            out.put("ok", in != null);
-        } catch (Exception e) {
-            out.put("ok", false);
-        }
-        call.resolve(out);
+        new Thread(() -> {
+            JSObject out = describe(uri);
+            try (InputStream in = getContext().getContentResolver().openInputStream(uri)) {
+                out.put("ok", in != null);
+                // Some providers (cloud drives, some file managers) don't
+                // say how big a file is; without it every read came back
+                // empty and the file read as damaged (1.1.1). Counted here.
+                if (in != null && out.optLong("size", 0) <= 0) {
+                    long n = 0;
+                    byte[] buf = new byte[1 << 16];
+                    for (;;) {
+                        long went = in.skip(1L << 30);
+                        if (went > 0) { n += went; continue; }
+                        int got = in.read(buf);
+                        if (got < 0) break;
+                        n += got;
+                    }
+                    out.put("size", n);
+                }
+            } catch (Exception e) {
+                out.put("ok", false);
+            }
+            call.resolve(out);
+        }).start();
     }
 
     @PluginMethod

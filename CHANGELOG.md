@@ -2,6 +2,17 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.1.1] - 2026-10-07
+
+### Fixed
+- The library no longer jumps back while pages download: the collections
+  row kept scrolling back to its start with every page that came in.
+- Files from places that don't say how big a file is (some cloud folders
+  and file managers) read as empty, so every book looked damaged. Waypage
+  now measures them itself.
+- When a file can't be read, the message says what went wrong, and a
+  watched folder says which of its files it couldn't read.
+
 ## [1.1.0] - 2026-10-06
 
 ### Added
