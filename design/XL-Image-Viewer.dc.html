@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>A picture, full window</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&amp;family=Instrument+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#2F5D8A}a:hover{color:#2F5D8A}
+input::placeholder{color:#5E5A53}
+</style>
+</helmet>
+<div style="width: 1280px; height: 800px; background: #0B0D10; position: relative; overflow: hidden; font-family: 'Instrument Sans', system-ui, sans-serif"><div style="position: absolute; left: 50%; top: 48px; transform: translateX(-50%); width: 920px; height: 560px; background: #3A4652; border-radius: 4px"></div><button type="button" aria-label="Close (Esc)" style="position: absolute; width: 44px; height: 44px; border-radius: 999px; border: 0; background: rgba(0, 0, 0, 0.55); color: #FFFFFF; display: flex; align-items: center; justify-content: center; padding: 0; cursor: pointer; top: 20px; right: 20px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"></path></svg></button><button type="button" aria-label="Previous picture (←)" style="position: absolute; width: 44px; height: 44px; border-radius: 999px; border: 0; background: rgba(0, 0, 0, 0.55); color: #FFFFFF; display: flex; align-items: center; justify-content: center; padding: 0; cursor: pointer; top: 306px; left: 24px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button><button type="button" aria-label="Next picture (→)" style="position: absolute; width: 44px; height: 44px; border-radius: 999px; border: 0; background: rgba(0, 0, 0, 0.55); color: #FFFFFF; display: flex; align-items: center; justify-content: center; padding: 0; cursor: pointer; top: 306px; right: 24px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"></path></svg></button><div style="position: absolute; bottom: 92px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 2px; background: rgba(0, 0, 0, 0.55); border-radius: 999px; padding: 2px; color: #FFFFFF"><button type="button" aria-label="Zoom out" style="width: 44px; height: 44px; border: 0; background: transparent; color: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4M8 11h6"></path></svg></button><span style="font: 600 13px/18px 'Instrument Sans', system-ui, sans-serif; min-width: 48px; text-align: center">100%</span><button type="button" aria-label="Zoom in" style="width: 44px; height: 44px; border: 0; background: transparent; color: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4M11 8v6M8 11h6"></path></svg></button></div><div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 0 26px; display: flex; justify-content: center"><div style="width: 920px; display: flex; gap: 24px; color: #FFFFFF; font: 400 14px/20px 'Instrument Sans', system-ui, sans-serif"><span style="flex-grow: 1">A 747-400 at Frankfurt. The hump holds the flight deck and an upper passenger deck.</span><span style="opacity: 0.75; white-space: nowrap">3 of 14 · full size</span></div></div></div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

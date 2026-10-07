@@ -17,3 +17,8 @@ them, and read DESIGN.md for the rules they follow.
   centred 680 px measure, keyboard hints), `Collection` (cover and
   Continue beside the chapter list), `Feeds`, `Settings` (two panes, in
   Night). They link to each other, so Play walks through them.
+- `XL-*.dc.html` (7 Oct 2026) the 1.5 big-screen proposal, on the
+  canvas's "1.5 Big screens" page: every screen at tablet (700–1023 px)
+  and wide (1024 px and up) widths. `XL-Widths` shows the three widths;
+  the rest are the library, collections, reader, reading aloud, saving,
+  Downloads, Feeds and every Settings section. Waiting on Daniel's word.
