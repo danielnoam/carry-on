@@ -19,57 +19,17 @@ Decisions every release keeps:
   library (zip, EPUB) is written small in src/, or is a native plugin in
   native/ beside share.
 
-Items marked **(new)** were gaps found when this order was written, not
-asks from Daniel.
-
 ---
-
-## Speed (Daniel, 6 Oct 2026; 1.2.0 and 1.2.1 did two passes)
-
-1.2.0 made the library's redraw and sync's merge cheap in a big library
-(NOTES.md, 1.2.0). Left for when the phone still feels slow:
-
-- Done in 1.2.1: the first draw a screen at a time, library.json a few
-  times a run instead of once a page, sync's merge on a worker.
-- **`inert` on the library** restyles every card when a screen opens or
-  closes (30 to 60 ms at 4x); a focus trap instead would avoid it. Left
-  as it is (NOTES.md, 1.2.1): the cost lands after the animation.
-
-## Naming (Daniel, 5 Oct 2026)
-
-Library · Clips (web saves) · Files (imports) · Collections · Feeds ·
-Tags. 0.30.7 renamed "pages" to "clips" in everything shown; storage
-keys, file paths and sync keep "page". The files release names imported
-documents Files. With Waypage, the set stays.
 
 ## Files: your own files, and where Waypage keeps everything (Daniel, 6 Oct 2026)
 
 Decided: PDFs through pdf.js, locked down; three places for files, the
 app's private storage the default and recommended. "Files" is the name
-for what you bring in (Naming). Order: what you open first, since it can
+for what you bring in. Order: what you open first, since it can
 be tried in the browser; the folder setting after, since it is mostly
 native code.
 
-### Done: 0.31.0 to 0.33.0
-
-- **0.31.0:** EPUB, Markdown, text, HTML and CBZ, opened from Save's list
-  button, a drop on the desktop, or Android's Open with and Share; the
-  Files part and its sidebar entry (NOTES.md, 0.31.0).
-- **0.32.0:** PDFs through pdf.js in a frame with no origin; the choice
-  between a copy and reading from the file where it is; the system's
-  picker; copies syncing with their pictures under 20 MB; the second copy
-  of the file 0.31.0 kept is gone (NOTES.md, 0.32.0).
-- **0.32.1, 0.32.2:** PDFs really read from where they are; every kind of
-  file asks.
-- **0.33.0:** where your library is, in Settings under Storage: inside
-  Waypage, Documents/Waypage, or a folder you pick; moving between them
-  (NOTES.md, 0.33.0).
-
 ### Still open on files and where Waypage keeps them
-
-1.1.0 shipped the watched folder, long PDFs drawn as you reach them,
-sync of a file's pictures up to 100 MB, and the way back to a library in
-Documents/Waypage after a reinstall.
 
 - **Moving a big library is file by file over the bridge:** fine for
   hundreds of megabytes; a native copy would be quicker for gigabytes.
@@ -109,25 +69,16 @@ on the program first; this release comes after.
   "Get it" link.
 - **Read aloud across clips (1.4.0, Daniel, 7 Oct):** reading goes on
   outside the reader with a bar along the bottom, and Read next at the
-  end. Open: the reader could scroll to the paragraph being read when the
-  clip is opened again from the bar (it lights it, but stays where you
-  left the page); and a Read next that goes on by itself, as a setting.
-- **Watched folders (1.4.0, Daniel, 7 Oct):** a list now. Open: looking
+  end; 1.4.1 opens the clip from the card at the paragraph being read.
+  Open: a Read next that goes on by itself, as a setting.
+- **Watched folders (1.4.0, Daniel, 7 Oct; their own page, Content, in
+  1.4.1):** a list now, with a look-now arrow per folder. Open: looking
   in many folders is one after the other; a slow memory card in one
   holds the rest.
-
-## Sync: done for now (Daniel, 6 Oct 2026)
-
-0.30.0 syncs the library and each page's text; pictures sync as each
-page's mode and every device fetches its own. 0.30.1 added feeds, 0.30.9
-favourite collections and 0.30.10 when Feeds was last looked at. Kept
-per device on purpose: settings (theme, reading type, layout, read aloud,
-the images default) and the new-chapter checks, which leave out chapters
-sync brings in. No sync with the app closed (Daniel: not needed).
-1.3.0 (Daniel, 7 Oct): the place in a clip syncs as a spot in the text,
-a furthest-read toast on open, sync at once on close, a cheap ETag poll
-every minute in front. Open: a device name in that toast ("on your
-phone"), which needs a name per device in the library.
+- **On mobile data (1.4.1, Daniel, 7 Oct):** Save or Wait for Wi-Fi in
+  Saving, Sync or Wait for Wi-Fi in Sync; Android only, since only the
+  WebView reports the connection type. Open: iOS has no way to tell from
+  the web layer (a Network plugin would).
 
 ---
 

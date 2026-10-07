@@ -3,6 +3,40 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Which device read further (1.4.2).** The furthest-read toast (1.3.0)
+  said "your other device"; now it names it. Each clip carries `readOn`,
+  the name of the device that last moved its place, set wherever
+  `readAt` is. It syncs as one of READING, but the merge takes it from
+  whichever side read later (`readFrom`), not key by key, so it can't end
+  up naming one device beside another's place. The name is typed in
+  Settings, Sync ("This device's name"), else on Android the name the
+  phone goes by (@capacitor/device: Settings, About phone, else the model,
+  "Pixel 8"), else guessed from the platform and screen (phone, tablet,
+  iPhone, iPad, computer). iOS 16 and later give apps only "iPhone" as
+  the name without a special entitlement, so iOS keeps the guess. A guessed name
+  reads "on your phone", a typed one as typed ("on Pixel 8"); two devices
+  with the same name read "on your other phone". A clip last read on a
+  device from before 1.4.2 has no name and keeps the old wording.
+- **Waiting for Wi-Fi (1.4.1).** Daniel: downloads, and maybe sync,
+  only on Wi-Fi; he asked for names and picked rows in Saving and Sync
+  over a page of their own. navigator.connection.type says "cellular"
+  in Android's WebView and nothing on iOS or a desktop, so the group
+  only shows on Android. Saves hold in wifiGate() (the job shows
+  "Waiting for Wi-Fi" in Downloads) and go on when the connection
+  changes; the quiet fetches skip their turn, and Sync now says
+  "Waiting for Wi-Fi".
+- **The movable reading card (1.4.1).** Daniel: the bar hid things,
+  above all in another clip's reader. It's a 240 px card now, dragged
+  by pointer events heard on the window (a quick drag leaves the card
+  before its first move event, and capturing the pointer on the card
+  would take the tap from its buttons), snapped to a side on release
+  with the side and height kept in localStorage. The label went too:
+  the state lives in its aria-label.
+- **Double scroll bar (1.4.1).** A screen is position: fixed over the
+  library, which still scrolls underneath: a wheel or fling that ran
+  out in .screen-body chained to the document. `overscroll-behavior:
+  contain` on .screen-body, and overflow: hidden plus contain on .screen
+  so the bar and padding catch it too.
 - **Read aloud away from the page (1.4.0).** Daniel: leaving the clip
   should keep it reading, with a bar showing what, like picture in
   picture; and at the end a button for the next page. The speech already

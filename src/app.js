@@ -1,7 +1,7 @@
 // Waypage: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "1.4.0";
+  const APP_VERSION = "1.4.2";
   window.Waypage.version = APP_VERSION;
 
   const C = window.Waypage;
@@ -23,6 +23,9 @@
   const THEME_KEY = "waypage.theme";
   const AUTO_KEY = "waypage.themeAuto";
   const IMAGES_KEY = "waypage.images";
+  // On mobile data (1.4.1): "any" saves and syncs as always, "wifi" waits.
+  const DATA_SAVE_KEY = "waypage.saveOnData";
+  const DATA_SYNC_KEY = "waypage.syncOnData";
   const READING_KEY = "waypage.reading";
   const FILTER_KEY = "waypage.filter";
   const SEEN_KEY = "waypage.seenVersion";
@@ -40,6 +43,7 @@
   const EXPORT_KEY = "waypage.exportKind";
   const RATE_KEY = "waypage.aloudRate";
   const VOICE_KEY = "waypage.aloudVoice";
+  const DEVICE_KEY = "waypage.deviceName";
 
   const $ = (id) => document.getElementById(id);
   const libTools = $("libTools");
@@ -280,7 +284,7 @@
   // What a save is doing, with the seconds it has taken once that's long
   // enough to wonder, so a slow site doesn't look stuck.
   function savingStatus(s) {
-    if (s.waiting) return "Waiting" + (s.folder ? " · into " + s.folder : "");
+    if (s.waiting) return (s.wifi ? "Waiting for Wi-Fi" : "Waiting") + (s.folder ? " · into " + s.folder : "");
     const secs = s.started ? Math.floor((Date.now() - s.started) / 1000) : 0;
     const took = secs >= 5 ? " · " + secs + " s" : "";
     if (s.total == null) return (s.drawing ? "Letting the page draw itself" : "Getting the page") + took;
@@ -1307,7 +1311,10 @@
     const job = { ...newJob(url, folder), ...how };
     state.saving.unshift(job);
     renderLibrary();
-    toast("Saving. It's in Downloads.");
+    toast(waitsForWifi(DATA_SAVE_KEY) ? "It saves when you're on Wi-Fi. It's in Downloads." : "Saving. It's in Downloads.");
+    await wifiGate(job);
+    if (!state.saving.includes(job)) return;
+    job.waiting = false;
     const meta = await runJob(job);
     if (meta) toast(meta.missing ? "Saved. Some previews are missing." : "Saved for offline reading");
     if (meta && !C.platform.native) C.store.keepStored();
@@ -1320,6 +1327,27 @@
     openBatch(job.contents.links.join("\n"), false, folderName(job.contents.title || job.site), job.url);
     toast("That's a list of chapters. Check them, then save.");
   }
+
+  // Waiting for Wi-Fi (1.4.1): with "Wait for Wi-Fi" on and the phone on
+  // mobile data, a save holds here, shown as waiting in Downloads, and goes
+  // on when the connection changes; the quiet fetches (pictures, feeds,
+  // new chapters) skip their turn instead.
+  const waitsForWifi = (key) => load(key, "any") === "wifi" && C.platform.metered;
+  const wifiWaiters = [];
+  async function wifiGate(job) {
+    while (waitsForWifi(DATA_SAVE_KEY)) {
+      if (job) { job.waiting = true; job.wifi = true; renderLibraryLater(); }
+      await new Promise((go) => wifiWaiters.push(go));
+    }
+    if (job) job.wifi = false;
+  }
+  C.platform.onConnection(() => {
+    if (C.platform.metered) return;
+    while (wifiWaiters.length) wifiWaiters.shift()();
+    if (!waitsForWifi(DATA_SYNC_KEY)) syncSoon(1000);
+    fetchPictures();
+    if (state.section === "sync" || state.section === "saving") renderSection();
+  });
 
   // Saves one after another are half a second apart, as WebToEpub spaces
   // them, so a long run doesn't hammer the site.
@@ -1355,6 +1383,7 @@
       }
       if (saved + failed) await new Promise((done) => setTimeout(done, PACE_MS));
       if (run && !(await gate(run))) { stopped++; continue; }
+      await wifiGate(job);
       if (!state.saving.includes(job)) { stopped++; continue; }
       job.waiting = false;
       if (run) run.current = job;
@@ -1435,7 +1464,7 @@
       if (old) {
         // Saved again: the new copy takes the old one's place, keeping its
         // collection, tags and read position.
-        for (const k of ["requested", "folder", "folderAt", "folderFav", "folderFavAt", "source", "tags", "at", "finished", "readAt", "fav", "favAt"]) if (old[k] !== undefined) meta[k] = old[k];
+        for (const k of ["requested", "folder", "folderAt", "folderFav", "folderFavAt", "source", "tags", "at", "finished", "readAt", "readOn", "fav", "favAt"]) if (old[k] !== undefined) meta[k] = old[k];
         const i = state.pages.indexOf(old);
         if (i < 0) await C.store.removePage(meta.id);
         else {
@@ -1577,6 +1606,26 @@
   // clip opens, and when another device read it further and later, a
   // toast offers to go there. The open never waits for it.
   let openedReadAt = 0;
+  // Each device names itself for that toast (1.4.2): what you typed in
+  // Settings, Sync, the name Android knows it by, or what kind of device
+  // it is. A guessed name reads
+  // "your phone", one you typed reads as you typed it.
+  const GUESSED_NAMES = ["phone", "tablet", "iPhone", "iPad", "computer"];
+  function guessedName() {
+    if (C.platform.deviceName) return C.platform.deviceName;
+    const ios = C.platform.ios || /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    const big = Math.min(screen.width, screen.height) >= 600;
+    if (ios) return big ? "iPad" : "iPhone";
+    if (C.platform.native || /Android/.test(navigator.userAgent)) return big ? "tablet" : "phone";
+    return "computer";
+  }
+  const deviceName = () => String(load(DEVICE_KEY, "") || "").trim().slice(0, 40) || guessedName();
+  function onDevice(name) {
+    if (!name) return "on your other device";
+    const mine = name === deviceName();
+    if (GUESSED_NAMES.includes(name)) return "on your " + (mine ? "other " : "") + name;
+    return mine ? "on your other device" : "on " + name;
+  }
   async function furtherRead(p) {
     if (!C.sync.on || C.sync.paused || !navigator.onLine || p.link) return;
     let got;
@@ -1586,12 +1635,14 @@
     if (!other || !(other.readAt > openedReadAt) || typeof other.at !== "number") return;
     if (Math.abs(other.at - (p.at || 0)) < 0.01 && (!other.spot || other.spot === p.spot)) return;
     const pct = Math.round(other.at * 100);
-    toast(other.finished || other.at >= 0.97 ? "Read to the end on your other device." : "Read to " + pct + "% on your other device.", "Go there", () => {
+    const where = onDevice(typeof other.readOn === "string" ? other.readOn : "");
+    toast(other.finished || other.at >= 0.97 ? "Read to the end " + where + "." : "Read to " + pct + "% " + where + ".", "Go there", () => {
       if (state.open !== p) return;
       p.at = other.at;
       if (other.spot) p.spot = other.spot;
       if (other.finished) p.finished = true;
       p.readAt = Math.max(other.readAt, Date.now());
+      p.readOn = deviceName();
       C.reader.jump(other.at, other.spot || "");
       savePositions();
     });
@@ -1627,6 +1678,7 @@
     // from before this open.
     openedReadAt = p.readAt || 0;
     p.readAt = Date.now();
+    p.readOn = deviceName();
     showOffline();
     $("readProgress").dir = p.dir || "ltr";
     $("readerContents").hidden = true;
@@ -1758,7 +1810,7 @@
     // the old one, so the fraction decides the place.
     if (s) p.spot = s; else delete p.spot;
     if (f >= 0.97) p.finished = true;
-    if (moved) p.readAt = Date.now();
+    if (moved) { p.readAt = Date.now(); p.readOn = deviceName(); }
     clearTimeout(positionTimer);
     positionTimer = setTimeout(savePositions, 1500);
   }
@@ -1992,16 +2044,80 @@
     }
     const ended = aloud.state === "ended";
     $("aloudBarTitle").textContent = p.title;
-    $("aloudBarMeta").textContent = ended ? "Read to the end" : (aloud.state === "paused" ? "Paused" : "Reading aloud") + (p.folder || p.site ? " · " + (p.folder || p.site) : "");
+    bar.setAttribute("aria-label", (ended ? "Read to the end: " : aloud.state === "paused" ? "Paused: " : "Reading aloud: ") + p.title);
     $("aloudBarPlay").hidden = ended;
     $("aloudBarPlay").classList.toggle("paused", aloud.state === "paused");
     $("aloudBarPlay").setAttribute("aria-label", aloud.state === "paused" ? "Play" : "Pause");
     $("aloudBarNext").hidden = !ended;
-    // Above the library's bottom field when that's what's on screen.
-    const top = document.querySelector(".screen:not([hidden]):not([data-leaving])");
-    bar.style.setProperty("--aloud-bar-lift", top ? "0px" : $("libraryView").querySelector(".save-bar").offsetHeight + "px");
     document.body.classList.add("aloud-bar-up");
     if (bar.hidden || bar.dataset.leaving) { delete bar.dataset.leaving; bar.hidden = false; M.arrive(bar, 16); }
+    placeAloudBar();
+  }
+
+  // Where the bar sits (1.4.1): a compact card you can drag anywhere. It
+  // snaps to the left or right edge when let go, and the side and height
+  // are remembered; until it's moved it sits at the bottom right, above
+  // the library's bottom field when that's what's on screen.
+  const ALOUD_BAR_KEY = "waypage.aloudBar";
+  function placeAloudBar() {
+    const bar = $("aloudBar");
+    if (bar.hidden) return;
+    const gutter = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--gutter")) || 16;
+    const safe = parseFloat(getComputedStyle(bar).getPropertyValue("--safe-bottom")) || 0;
+    const w = bar.offsetWidth, h = bar.offsetHeight;
+    const put = load(ALOUD_BAR_KEY, null);
+    let left, top;
+    if (put && typeof put.y === "number") {
+      left = put.side === "left" ? gutter : innerWidth - gutter - w;
+      top = Math.round(put.y * innerHeight);
+    } else {
+      const screen = document.querySelector(".screen:not([hidden]):not([data-leaving])");
+      const lift = screen ? 0 : $("libraryView").querySelector(".save-bar").offsetHeight;
+      left = innerWidth - gutter - w;
+      top = innerHeight - lift - safe - 8 - h;
+    }
+    top = Math.max(gutter, Math.min(top, innerHeight - safe - 8 - h));
+    bar.style.left = left + "px";
+    bar.style.top = top + "px";
+  }
+  {
+    const bar = $("aloudBar");
+    let drag = null;
+    bar.addEventListener("pointerdown", (e) => {
+      if (e.button) return;
+      const r = bar.getBoundingClientRect();
+      drag = { id: e.pointerId, x: e.clientX, y: e.clientY, left: r.left, top: r.top, moved: false };
+    });
+    // The moves are heard on the window: a quick drag leaves the card
+    // before its first move event, and capturing the pointer on the card
+    // would take the tap from its buttons.
+    addEventListener("pointermove", (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      if (!drag.moved && Math.hypot(dx, dy) < 6) return;
+      if (!drag.moved) { drag.moved = true; bar.classList.add("dragging"); }
+      bar.style.left = drag.left + dx + "px";
+      bar.style.top = drag.top + dy + "px";
+    });
+    const drop = (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const was = drag;
+      drag = null;
+      if (!was.moved) return;
+      bar.classList.remove("dragging");
+      // A drag isn't a tap: the click that follows it does nothing.
+      bar.dataset.dragged = "1";
+      setTimeout(() => delete bar.dataset.dragged, 0);
+      const r = bar.getBoundingClientRect();
+      const side = r.left + r.width / 2 < innerWidth / 2 ? "left" : "right";
+      store(ALOUD_BAR_KEY, { side, y: Math.max(0, Math.min(1, r.top / innerHeight)) });
+      bar.classList.add("snapping");
+      placeAloudBar();
+      setTimeout(() => bar.classList.remove("snapping"), 400);
+    };
+    addEventListener("pointerup", drop);
+    addEventListener("pointercancel", drop);
+    addEventListener("click", (e) => { if (bar.dataset.dragged) { e.stopPropagation(); e.preventDefault(); } }, true);
   }
   $("aloudBarPlay").addEventListener("click", () => $("aloudPlay").click());
   $("aloudBarStop").addEventListener("click", stopAloud);
@@ -2014,7 +2130,7 @@
     if (state.open) { await toLibrary(); }
     openPage(p.id);
   });
-  addEventListener("resize", () => { if (!$("aloudBar").hidden) showAloudBar(); });
+  addEventListener("resize", () => { if (!$("aloudBar").hidden) placeAloudBar(); });
 
   speech.onProgress(({ key, index, state: st }) => {
     if (!key || key !== aloud.key) return;
@@ -3899,8 +4015,8 @@
     watchSoon.t = setTimeout(() => lookInFolder(), ms);
   }
   // Looks in every watched folder; one toast for all of them when asked to.
-  async function lookInFolder(said) {
-    const list = watches();
+  async function lookInFolder(said, only) {
+    const list = only ? watches().filter((w) => w.tree === only.tree) : watches();
     if (!list.length || !C.platform.files.canWatch) return null;
     if (said !== undefined) watchStopped = false;
     if (watching) return watching;
@@ -3912,14 +4028,14 @@
       const lost = got.filter((g) => g.lost).map((g) => g.name);
       const names = list.length === 1 ? list[0].name : "your watched folders";
       // Said each time it looks, since they're tried again each time.
-      if (said && lost.length) toast("Waypage can't open " + lost.join(" or ") + " any more. Pick it again in Settings, Storage.");
+      if (said && lost.length) toast("Waypage can't open " + lost.join(" or ") + " any more. Pick it again in Settings, Content.");
       else if (failed.length && said !== false) toast(failed.length === 1 ? failed[0] : "Couldn't read " + failed.length + " files from " + names + ". " + failed[0]);
       else if (added && said !== false) toast("Added " + (added === 1 ? "1 file" : added + " files") + " from " + (list.length === 1 ? names : got.filter((g) => g.added).map((g) => g.name).join(", ")));
       else if (said && !gone) toast("Nothing new in " + names + ".");
       if (added || gone || got.some((g) => g.joined)) { renderLibrary(); updateWidgets(); }
       return { added, gone };
     })();
-    try { return await watching; } finally { watching = null; if (state.section === "storage") renderSection(); }
+    try { return await watching; } finally { watching = null; if (state.section === "content") renderSection(); }
   }
   async function lookInOne(w, said) {
     const out = { name: w.name, added: 0, gone: 0, joined: 0, failed: [], lost: false };
@@ -4005,7 +4121,7 @@
     run.part = total ? done / total : null;
     updateRunCard(run);
   };
-  // Watched folders in Settings, Storage (a list since 1.4.0): a row per
+  // Watched folders in Settings, Content (1.4.1; a list since 1.4.0): a row per
   // folder with how many files came from it and Stop watching at its end,
   // then Look now and Watch a folder.
   function watchGroup() {
@@ -4015,11 +4131,12 @@
     const rows = list.map((w) => el("div", { class: "row watch-row" },
       el("span", { class: "row-label" }, w.name),
       el("span", { class: "row-value" }, w.lost ? "Can't open it" : count(w) === 1 ? "1 file" : count(w) + " files"),
+      el("button", { class: "row-x row-refresh" + (watching ? " looking" : ""), type: "button", ...(watching ? { disabled: "" } : {}), "aria-label": "Look in " + w.name + " now", title: "Look now", onclick: () => lookInFolder(true, w) },
+        el("span", { class: "visually-hidden" }, "Look now"),
+        svgRefresh()),
       el("button", { class: "row-x", type: "button", "aria-label": "Stop watching " + w.name, title: "Stop watching", onclick: () => stopWatching(w) },
         el("span", { class: "visually-hidden" }, "Stop watching"),
         svgX())));
-    if (list.length) rows.push(el("button", { class: "row", type: "button", ...(watching ? { disabled: "" } : {}), onclick: () => lookInFolder(true) },
-      el("span", { class: "row-label accent" }, watching ? "Looking…" : "Look now")));
     rows.push(el("button", { class: "row", type: "button", onclick: pickWatched }, el("span", { class: "row-label accent" }, list.length ? "Watch another folder" : "Watch a folder")));
     const lost = list.filter((w) => w.lost).map((w) => w.name);
     return el("section", { class: "settings-section", id: "watchSection" },
@@ -4027,9 +4144,10 @@
       el("div", { class: "group" }, ...rows),
       el("p", { class: "footnote" }, list.length
         ? (lost.length ? "Waypage can't open " + lost.join(" or ") + " any more. Pick it again to carry on. " : "")
-          + "Waypage looks in " + (list.length === 1 ? "it" : "them") + " each time it opens. Their folders become collections, and a file you delete there leaves Waypage too."
+          + "Waypage looks in " + (list.length === 1 ? "it" : "them") + " each time it opens, or when you tap the arrow. Their folders become collections, and a file you delete there leaves Waypage too."
         : "Pick a folder, like Books, and Waypage adds what's in it each time it opens. Each file is read from where it is, so it doesn't sync."));
   }
+  const svgRefresh = () => { const s = el("span", { class: "row-x-icon", "aria-hidden": "true" }); s.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.3-5.7"></path><path d="M20 4v5h-5"></path></svg>'; return s; };
   const svgX = () => { const s = el("span", { class: "row-x-icon", "aria-hidden": "true" }); s.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>'; return s; };
   async function pickWatched() {
     let got = null;
@@ -4041,8 +4159,8 @@
       if (had.lost) { delete had.lost; saveWatch(had); }
       else toast("Already watching " + got.name + ".");
     } else store(WATCHES_KEY, [...list, { tree: got.ref, name: got.name }]);
-    if (state.section === "storage") renderSection();
-    await lookInFolder(true);
+    if (state.section === "content") renderSection();
+    await lookInFolder(true, { tree: got.ref });
   }
   // A file removed from Waypage that's still in its watched folder isn't
   // added back the next time Waypage looks.
@@ -4058,7 +4176,7 @@
     for (const p of state.pages) if (p.watched === w.tree) delete p.watched;
     await C.store.writeIndex(state.pages);
     store(WATCHES_KEY, watches().filter((x) => x.tree !== w.tree));
-    if (state.section === "storage") renderSection();
+    if (state.section === "content") renderSection();
     toast("Stopped watching " + w.name + ". Its files stay in your library.");
   }
 
@@ -4082,7 +4200,7 @@
   // every few minutes while open. Pages that came down get their pictures
   // here, one page at a time, like Retry.
   let syncTimer = null, syncQueue = [], fetchingPictures = false;
-  const SYNCED_KEEP = ["savedAt", "title", "requested", "tags", "folder", "folderAt", "source", "series", "fav", "favAt", "folderFav", "folderFavAt", "at", "finished", "readAt", "spot"];
+  const SYNCED_KEEP = ["savedAt", "title", "requested", "tags", "folder", "folderAt", "source", "series", "fav", "favAt", "folderFav", "folderFavAt", "at", "finished", "readAt", "readOn", "spot"];
   // While a run of saves is on, sync waits longer (1.2.0): each sync is a
   // merge of the whole library, and one after every page landing was a
   // stutter every few seconds.
@@ -4094,6 +4212,7 @@
   async function syncNow(quiet = true) {
     if (!C.sync.on || C.sync.paused) return null;
     if (!navigator.onLine && quiet) return null;
+    if (waitsForWifi(DATA_SYNC_KEY)) { if (!quiet) toast("Sync waits for Wi-Fi. Change that below."); return null; }
     clearTimeout(syncTimer);
     syncTimer = null;
     let res = null;
@@ -4179,7 +4298,7 @@
     fetchPictures();
   }
   async function fetchPictures() {
-    if (fetchingPictures || !C.platform.native) return;
+    if (fetchingPictures || !C.platform.native || waitsForWifi(DATA_SAVE_KEY)) return;
     fetchingPictures = true;
     try {
       while (syncQueue.length && navigator.onLine && !C.sync.paused) {
@@ -4208,7 +4327,7 @@
   // off, the three steps to a first device and a way in for the next one;
   // on, the state and a code that sets up another device.
   function syncSections() {
-    return C.sync.on ? [syncState(), syncWhat(), syncShare(), syncLeave()] : [syncSteps(), syncJoin()];
+    return C.sync.on ? [syncState(), dataGroup(DATA_SYNC_KEY, "Sync", "Syncs on any connection.", "Syncs when you're on Wi-Fi. Changes wait until then."), syncWhat(), syncShare(), syncLeave()] : [syncSteps(), syncJoin()];
   }
   async function connectSync(text, btn) {
     if (btn) { btn.disabled = true; btn.textContent = "Connecting…"; }
@@ -4296,6 +4415,7 @@
     const now = syncProgress();
     const paused = C.sync.paused;
     const status = C.sync.running ? now.text : paused ? "Paused" + (last.at ? ". Last synced " + whenText(last.at) : "")
+      : waitsForWifi(DATA_SYNC_KEY) ? "Waiting for Wi-Fi" + (last.at ? ". Last synced " + whenText(last.at) : "")
       : last.error ? last.error : last.at ? "Synced " + whenText(last.at) : "Not synced yet";
     const after = C.sync.running ? "" : syncAfter();
     return el("section", { class: "settings-section" },
@@ -4347,10 +4467,15 @@
         el("div", { class: "rc-list" },
           el("div", { class: "rc-row stack" }, el("span", { class: "rc-label" }, "Clips"),
             seg("sync-what", "What this device syncs", [{ value: "pages", label: "Clips too" }, { value: "links", label: "Links only" }],
-              C.sync.links ? "links" : "pages", (v) => { C.sync.links = v === "links"; renderSection(); syncSoon(500); })))),
+              C.sync.links ? "links" : "pages", (v) => { C.sync.links = v === "links"; renderSection(); syncSoon(500); })),
+          el("div", { class: "rc-row stack" }, el("label", { class: "rc-label", for: "deviceName" }, "This device's name"),
+            el("input", { class: "feed-input", id: "deviceName", type: "text", maxlength: "40", autocomplete: "off",
+              value: load(DEVICE_KEY, ""), placeholder: guessedName().replace(/^./, (c) => c.toUpperCase()),
+              onchange: (e) => store(DEVICE_KEY, e.target.value.trim().slice(0, 40)) })))),
       el("p", { class: "footnote" }, C.sync.links
         ? "Only links, tags, collections and where you are go up. Clips new to this device are saved again from their links, so one that changed or went away comes back different or not at all."
-        : "Each clip's text goes up with it, so another device gets the clip as you saved it, even if the site changes or takes it down."));
+        : "Each clip's text goes up with it, so another device gets the clip as you saved it, even if the site changes or takes it down."),
+      el("p", { class: "footnote" }, "The name shows on your other devices when this one read a clip further."));
   }
   // The setup link points at the web copy: inside the app this page is at
   // https://localhost, which no other device can open. The app's scanner
@@ -5030,6 +5155,7 @@
   let dailyRunning = false;
   async function dailyCheck(force) {
     if (dailyRunning || !navigator.onLine || (!force && !load(DAILY_KEY, true))) return 0;
+    if (waitsForWifi(DATA_SAVE_KEY)) { if (force) toast("Collections check for new chapters when you're on Wi-Fi."); return 0; }
     dailyRunning = true;
     let found = 0;
     try {
@@ -5321,6 +5447,7 @@
   // Every feed not checked in the last few hours, one at a time, quietly.
   async function checkFeeds(force) {
     if (feedsChecking || !navigator.onLine || !feeds.length) return;
+    if (waitsForWifi(DATA_SAVE_KEY)) { if (force) toast("Feeds check when you're on Wi-Fi."); return; }
     feedsChecking = true;
     paintFeeds();
     try {
@@ -5999,6 +6126,16 @@
       g.footnote ? el("p", { class: "footnote" }, g.footnote) : null);
   }
 
+  // On mobile data (1.4.1): save or sync as always, or wait for Wi-Fi.
+  // Only the app on Android can tell the two apart; elsewhere the group
+  // stays out.
+  function dataGroup(key, verb, anyNote, wifiNote) {
+    if (!C.platform.android || !navigator.connection) return null;
+    return choiceGroup({ key, label: "On mobile data", get: () => load(key, "any"),
+      set: (v) => { store(key, v); if (v === "any") { while (wifiWaiters.length) wifiWaiters.shift()(); if (key === DATA_SYNC_KEY) syncSoon(1000); else fetchPictures(); } if (state.section) renderSection(); },
+      options: [{ value: "any", label: verb, note: anyNote }, { value: "wifi", label: "Wait for Wi-Fi", note: wifiNote }] });
+  }
+
   // Which light and which dark theme Auto switches between.
   function autoGroup() {
     const a = autoThemes();
@@ -6251,10 +6388,12 @@
       choiceGroup({ key: LAYOUT_KEY, label: "Library layout", get: layout, set: (v) => { store(LAYOUT_KEY, v); renderLibrary(); }, options: LAYOUTS }),
       libraryGroup()],
       value: () => themeName(state.theme) },
-    saving: { title: "Saving", build: () => [choiceGroup(SETTINGS[1])],
+    saving: { title: "Saving", build: () => [choiceGroup(SETTINGS[1]), dataGroup(DATA_SAVE_KEY, "Save", "Pages and pictures come down on any connection.", "Saves wait in Downloads until you're on Wi-Fi; feeds, new chapters and missing pictures check then too.")],
       value: () => SETTINGS[1].options.find((o) => o.value === SETTINGS[1].get()).label },
     sync: { title: "Sync", build: syncSections, value: () => (C.sync.on ? (C.sync.last.error ? "Stopped" : "On") : "Off") },
-    storage: { title: "Storage and backup", build: () => [storageGroup(), placeGroup(), watchGroup(), browserStorageGroup(), backupGroup()], value: () => formatSize(totalBytes()) },
+    storage: { title: "Storage and backup", build: () => [storageGroup(), placeGroup(), browserStorageGroup(), backupGroup()], value: () => formatSize(totalBytes()) },
+    // Watched folders, a page of their own (1.4.1, Android).
+    content: { title: "Content", build: () => [watchGroup()], value: () => { const n = watches().length; return n ? n + (n === 1 ? " folder" : " folders") : "No watched folders"; } },
     updates: { title: "About", build: () => [updatesGroup(), aboutGroup()], value: () => (updateOut() ? upd.latest + " is out" : APP_VERSION) },
   };
 
@@ -6276,7 +6415,7 @@
             el("span", { class: "row-label accent" }, "Waypage " + upd.latest + " is out"),
             el("button", { class: "btn-small", type: "button", onclick: () => openSection("updates") }, "View"))) : null,
         el("div", { class: "group" }, row("appearance"), row("saving")),
-        el("div", { class: "group" }, row("storage"), row("sync")),
+        el("div", { class: "group" }, row("storage"), ...(C.platform.files.canWatch ? [row("content")] : []), row("sync")),
         el("div", { class: "group" }, row("updates"))));
   }
 

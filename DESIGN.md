@@ -269,14 +269,21 @@ and the page shows above it.
   there's nothing.
 - **Storage and backup (Now):** the total in the title size, the page
   count, "Pages by size" (tap one to read it), then Backup.
-- **Watched folders (Now, 1.1.0, Android; a list since 1.4.0):** in
-  Storage, after where your library is. None: one accent row "Watch a
-  folder" and a footnote saying what it does. Otherwise a row per folder,
-  its name, "12 files" (or "Can't open it") in `--muted` and a 44 px ×
-  at its end that stops watching it (its files stay as files), then
-  accent rows "Look now" (reads "Looking…" while it looks, looks in all
-  of them, one toast for the lot) and "Watch another folder"; the
-  footnote says folders become collections and deleted files leave. What comes in is one card in Downloads (1.1.3), site line
+- **Watched folders (Now, 1.1.0, Android; a list since 1.4.0; their own
+  page since 1.4.1):** Settings, Content, between Storage and Sync, its
+  value "2 folders" or "No watched folders". None: one accent row "Watch
+  a folder" and a footnote saying what it does. Otherwise a row per
+  folder: its name, "12 files" (or "Can't open it") in `--muted`, then
+  two 44 px icon buttons in `--muted`, a circular arrow that looks in
+  that folder now (it spins while looking; reduced motion: it dims) and
+  an × that stops watching it (its files stay as files); then the
+  accent row "Watch another folder"; the footnote says folders become
+  collections and deleted files leave.
+- **On mobile data (Now, 1.4.1, Android):** a choice group in Saving
+  ("Save" / "Wait for Wi-Fi") and in Sync ("Sync" / "Wait for Wi-Fi"),
+  each option with a note on what waits. A save made while waiting is a
+  card in Downloads whose status reads "Waiting for Wi-Fi"; Sync's
+  status row reads the same. What comes in is one card in Downloads (1.1.3), site line
   "Watched folder", the folder's name as its title, "Notes.epub · page 3
   of 40" as it reads, with Pause and Stop like a run of saves; Done
   says "3 files added". A file opened by hand gets the same card with no
@@ -428,17 +435,20 @@ and the page shows above it.
   the phone's default first, then the page language's voices under a
   head per country, best first, coded names as Voice 1, 2… with tags
   such as female, natural, online), Speed and a footnote.
-- **Reading aloud away from the page (Now, 1.4.0):** leaving the clip
-  keeps it reading. A bar fixed along the bottom of the app, `--surface`
-  on a `--line` hairline with `--r-lg` corners and the sheet shadow,
-  gutter margins and at most 40rem wide, arrives on the sheet spring
-  (16 px up and a 0.98 scale; reduced motion: a fade) over every screen,
-  under sheets and the toast, lifted above the library's bottom field
-  when that's on screen: the play or pause disc (accent, 44 px), the
-  clip's title in the serif at label size over "Reading aloud · site"
-  (or "Paused") in meta, a tap on which opens the clip, and a 44 px ×
-  that stops. In the clip's own reader the bar hides and the foot's
-  player shows instead. At the end of the clip, while it has a next (the
+- **Reading aloud away from the page (Now, 1.4.0; a movable card since
+  1.4.1):** leaving the clip keeps it reading. A card 240 px wide (less
+  on a narrow phone), `--surface` on a `--line` hairline with `--r-lg`
+  corners and the sheet shadow, arrives on the sheet spring (16 px up
+  and a 0.98 scale; reduced motion: a fade) over every screen, under
+  sheets and the toast: the play or pause disc (accent, 44 px), the
+  clip's title in the serif at label size, a tap on which opens the
+  clip, and a 44 px × that stops; its state is in its label for a
+  screen reader, not on screen. It starts at the bottom right, above
+  the library's bottom field when that's on screen; a drag takes it
+  anywhere (the cursor is a hand), it snaps to the nearer side on the
+  control spring when let go, and the side and height are kept. In the
+  clip's own reader the card hides and the foot's player shows instead,
+  with the paragraph being read lit and brought into view. At the end of the clip, while it has a next (the
   next chapter, or the page it links to as next), "Read next" takes the
   player's place in the foot and the disc's place on the bar: an accent
   pill, 44 px, with the speaker icon; it opens the next and reads from

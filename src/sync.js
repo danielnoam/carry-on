@@ -32,9 +32,9 @@
   // Every field an index entry can carry through a backup or sync
   // (backup.cleanMeta); anything else on a page stays on its device.
   const SYNCED = new Set(["id", "url", "title", "site", "byline", "licence", "savedAt", "minutes", "lang", "dir", "mode", "images",
-    "at", "finished", "readAt", "spot", "comic", "next", "prev", "requested", "tags", "folder", "folderAt", "source", "series", "fav", "favAt", "folderFav", "folderFavAt", "file"]);
+    "at", "finished", "readAt", "readOn", "spot", "comic", "next", "prev", "requested", "tags", "folder", "folderAt", "source", "series", "fav", "favAt", "folderFav", "folderFavAt", "file"]);
   // Where the reader is, which goes with whichever device read last.
-  const READING = ["at", "finished", "readAt", "spot"];
+  const READING = ["at", "finished", "readAt", "readOn", "spot"];
 
   const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } };
   const keep = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* not kept */ } };
@@ -129,6 +129,7 @@
     const readFrom = (r.readAt || 0) > (l.readAt || 0) ? r : l;
     for (const k of keys) {
       if (CONTENT.includes(k)) out[k] = !same(l.savedAt, r.savedAt) ? contentFrom[k] : pick(k);
+      else if (k === "readOn") out[k] = readFrom[k];
       else if (READING.includes(k)) out[k] = same(l[k], r[k]) ? l[k] : same(l[k], b[k]) ? r[k] : same(r[k], b[k]) ? l[k] : readFrom[k];
       else if (k === "tags") out[k] = mergeTags(b.tags, l.tags, r.tags);
       else out[k] = pick(k);

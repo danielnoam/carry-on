@@ -427,6 +427,10 @@ html.native .top-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top));
   display: flex; flex-direction: column;
   background: var(--bg);
   box-shadow: -8px 0 24px var(--shadow);
+  /* A scroll that runs out inside a screen stays there (1.4.1): before,
+     it went on to the page underneath, which scrolled the library out of
+     sight and showed a second scroll bar. */
+  overflow: hidden; overscroll-behavior: contain;
 }
 .screen[hidden] { display: none; }
 /* Screens, sheets and the sidebar move as their own layers, made before
@@ -442,7 +446,7 @@ html.native .top-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top));
 html.native .screen-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top)); }
 .bar-title { margin: 0; text-align: center; font: 600 var(--fs-label)/var(--lh-label) var(--sans); }
 .screen-body {
-  flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
   padding: var(--s-4) var(--gutter) calc(var(--s-7) + env(safe-area-inset-bottom));
 }
 .screen-body > * { max-width: 40rem; margin-left: auto; margin-right: auto; }
@@ -484,6 +488,9 @@ html.native .screen-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top
 .watch-row { padding-inline-end: 0; }
 .row-x { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-inline-start: var(--s-1); border: 0; border-radius: var(--r-full); background: none; color: var(--muted); }
 .row-x:hover { color: var(--ink); background: var(--press); }
+.row-refresh.looking .row-x-icon { display: inline-flex; animation: spin 0.8s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .row-refresh.looking .row-x-icon { animation: none; opacity: 0.5; } }
+.watch-row .row-x + .row-x { margin-inline-start: 0; }
 .accent { color: var(--accent); font-weight: 500; }
 .muted { color: var(--muted); }
 
@@ -532,27 +539,31 @@ html.native .reader-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top
   font: 500 var(--fs-label) var(--sans); pointer-events: auto;
 }
 .aloud-read-next[hidden] { display: none; }
-/* The bar along the bottom while a clip is read aloud away from its page
-   (1.4.0): over every screen but under sheets and the toast; above the
-   library's bottom field when that's what's on screen. */
+/* The card that shows a clip being read aloud away from its page (1.4.0):
+   over every screen but under sheets and the toast. Compact and movable
+   (1.4.1): app.js places it (left and top), a drag takes it anywhere, and
+   it snaps to a side when let go. */
 .aloud-bar {
-  position: fixed; left: var(--gutter); right: var(--gutter); z-index: 12;
-  bottom: calc(var(--aloud-bar-lift, 0px) + var(--s-2) + env(safe-area-inset-bottom));
-  max-width: 40rem; margin: 0 auto;
-  display: flex; align-items: center; gap: var(--s-2);
-  padding: var(--s-1) var(--s-2) var(--s-1) var(--s-1);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  position: fixed; left: 0; top: 0; z-index: 12;
+  width: min(240px, calc(100vw - 2 * var(--gutter)));
+  display: flex; align-items: center; gap: var(--s-1);
+  padding: var(--s-1); padding-inline-end: var(--s-1);
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg);
   box-shadow: 0 8px 24px var(--shadow);
+  touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab;
 }
+.aloud-bar.dragging { cursor: grabbing; box-shadow: 0 16px 40px var(--shadow); }
+.aloud-bar.snapping { transition: left var(--spring-control-ms, 300ms) var(--spring-control, ease-out), top var(--spring-control-ms, 300ms) var(--spring-control, ease-out); }
+@media (prefers-reduced-motion: reduce) { .aloud-bar.snapping { transition: none; } }
 .aloud-bar[hidden] { display: none; }
 .aloud-bar .icon-btn { border-radius: var(--r-full); color: var(--ink); }
 .aloud-bar-text {
-  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; align-items: flex-start;
-  min-height: 44px; justify-content: center; padding: 0 var(--s-1); border: 0; background: none; color: var(--ink); text-align: start;
+  flex: 1; min-width: 0; display: flex; align-items: center;
+  min-height: 44px; padding: 0 var(--s-1); border: 0; background: none; color: var(--ink); text-align: start; cursor: inherit;
 }
 .aloud-bar-title { font: 600 var(--fs-label) var(--serif); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.aloud-bar-meta { font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-body.aloud-bar-up .library, body.aloud-bar-up .screen-body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+body.aloud-bar-up .library, body.aloud-bar-up .screen-body { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
 .read-here {
   position: fixed; z-index: 3; transform: translateX(-50%);
   display: inline-flex; align-items: center; gap: var(--s-2);
