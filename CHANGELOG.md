@@ -2,6 +2,13 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.1.2] - 2026-10-07
+
+### Fixed
+- Books read from where they are on Android (EPUBs, PDFs, comics, and a
+  watched folder's files) open again. Every read started at the beginning
+  of the file, so EPUBs looked like plain zips and PDFs like damaged ones.
+
 ## [1.1.1] - 2026-10-07
 
 ### Fixed

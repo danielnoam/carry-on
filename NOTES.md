@@ -3,6 +3,17 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **call.getLong reads only longs (1.1.2).** FilesPlugin.read took its
+  offset with PluginCall.getLong, which returns the default unless the
+  JSON value is already a Long; a JS number under 2^31 arrives as an
+  Integer, so every read began at byte 0. A zip's directory at its end
+  read as its first bytes (an EPUB was "a zip that isn't an EPUB") and a
+  PDF's xref pointed into the wrong objects ("Page dictionary kid
+  reference points to wrong type of object"), Daniel's two errors on
+  1.1.1. The tests' stand-in for the plugin sliced correctly, so they
+  never saw it; a stand-in that ignores the offset reproduces both.
+  Numbers from JS are read with getData().optLong, which takes any
+  number.
 - **The library keeps its nodes in place (1.1.1).** renderLibrary ended
   with root.replaceChildren(...nodes): every card it kept was taken out
   and put back, which resets a horizontal strip's scrollLeft, so each
