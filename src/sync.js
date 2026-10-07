@@ -43,6 +43,9 @@
   // ---- Merging (pure, tested in test/sync.test.js) ----
 
   const same = (a, b) => JSON.stringify(a === undefined ? null : a) === JSON.stringify(b === undefined ? null : b);
+  // A sync of a big library is a few long steps (a copy of every page,
+  // the merge, the comparison); a tap between them is answered (1.2.0).
+  const breathe = () => new Promise((go) => setTimeout(go, 0));
   const share = (p) => { const o = { ...p }; for (const k of DEVICE) delete o[k]; return o; };
 
   // Tags: what both have, and what either added; a tag either removed goes.
@@ -78,10 +81,16 @@
 
   // Two copies of one address, saved separately on two devices: the one
   // saved last stays, with the other's tags, favourite and reading.
-  function oneCopyEach(pages, deleted, now, same) {
+  // `key(url)` names the address a page is known by, so a library of
+  // hundreds is one pass (1.2.0); without one each page is compared with
+  // every other through `same`.
+  function oneCopyEach(pages, deleted, now, same, key) {
     const kept = [];
+    const at = key ? new Map() : null;
     for (const p of pages) {
-      const i = kept.findIndex((x) => same(x.url, p.url));
+      let i;
+      if (at) { const k = key(p.url); i = at.has(k) ? at.get(k) : -1; if (i < 0) at.set(k, kept.length); }
+      else i = kept.findIndex((x) => same(x.url, p.url));
       if (i < 0) { kept.push(p); continue; }
       const [win, lose] = (p.savedAt || 0) > (kept[i].savedAt || 0) ? [{ ...p }, kept[i]] : [{ ...kept[i] }, p];
       const tags = mergeTags([], win.tags, lose.tags);
@@ -130,7 +139,7 @@
   // base and remote may be null (never synced, nothing on GitHub yet).
   // Resolves to the merged file. `same(a, b)` says two addresses are one
   // page.
-  function merge(base, local, remote, now = Date.now(), sameUrl = (a, b) => a === b) {
+  function merge(base, local, remote, now = Date.now(), sameUrl = (a, b) => a === b, urlKey) {
     const B = new Map(((base && base.pages) || []).map((p) => [p.id, p]));
     const L = new Map(local.pages.map((p) => [p.id, share(p)]));
     const R = new Map(((remote && remote.pages) || []).map((p) => [p.id, p]));
@@ -149,7 +158,7 @@
       else pages.push(r);
     }
     for (const [id, at] of Object.entries(deleted)) if (now - at > KEEP_DELETED) delete deleted[id];
-    const out = oneCopyEach(pages, deleted, now, sameUrl).sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0) || (a.id < b.id ? -1 : 1));
+    const out = oneCopyEach(pages, deleted, now, sameUrl, urlKey).sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0) || (a.id < b.id ? -1 : 1));
     const files = {};
     const fromRemote = (remote && remote.files) || {};
     for (const p of out) if (fromRemote[p.id]) files[p.id] = fromRemote[p.id];
@@ -439,14 +448,14 @@
     if (r.ok) { const name = (await r.json()).name; if (name && name !== cfg.repo) { cfg.repo = name; keep(CFG_KEY, cfg); } }
   }
 
-  function run({ getPages, setPages, getFeeds, setFeeds, getSeen, setSeen, sameUrl, onProgress }) {
+  function run({ getPages, setPages, getFeeds, setFeeds, getSeen, setSeen, sameUrl, urlKey, onProgress }) {
     if (!cfg || cfg.paused) return Promise.resolve(null);
     if (running) return running;
     const told = (p) => { progress = p; if (onProgress) onProgress(p); };
     running = (async () => {
       try {
         await settle().catch(() => {});
-        const res = await once(getPages, setPages, sameUrl || ((a, b) => a === b), told, getFeeds, setFeeds, getSeen, setSeen);
+        const res = await once(getPages, setPages, sameUrl || ((a, b) => a === b), told, getFeeds, setFeeds, getSeen, setSeen, urlKey);
         last = { at: Date.now(), error: "" };
         cfg.at = last.at;
         keep(CFG_KEY, cfg);
@@ -462,15 +471,17 @@
     return running;
   }
 
-  async function once(getPages, setPages, sameUrl, onProgress, getFeeds, setFeeds, getSeen, setSeen) {
+  async function once(getPages, setPages, sameUrl, onProgress, getFeeds, setFeeds, getSeen, setSeen, urlKey) {
     // A library Waypage can't reach reads as empty; sent as it is, that
     // would look like every clip deleted (0.33.0).
     if (C.store.problem) throw new Error(C.store.problem);
     const before = getPages().map((p) => ({ ...p }));
     const feedsBefore = getFeeds ? getFeeds().map(feedShare) : null;
     const snapshot = new Map(before.map((p) => [p.id, JSON.stringify(p)]));
+    await breathe();
     // What GitHub would hold of each page, so the two compare like for like.
     const view = before.map((p) => share(C.backup.cleanMeta(p, p.id) || p));
+    await breathe();
     const uploaded = {};
     const waiting = load(WAIT_KEY, []);
     // Links only (0.30.3): this device sends no text and takes none; pages
@@ -482,7 +493,8 @@
       remote = await readJson("library.json");
       if (remote && (!remote.data || !Array.isArray(remote.data.pages))) throw new SyncError("The library.json on GitHub isn't Waypage's. Move it away and sync again.");
       const remoteDoc = remote && clean(remote.data);
-      merged = merge(load(BASE_KEY, null), { pages: view, waiting, feeds: feedsBefore, feedsSeen: getSeen ? getSeen() : 0 }, remoteDoc, Date.now(), sameUrl);
+      await breathe();
+      merged = merge(load(BASE_KEY, null), { pages: view, waiting, feeds: feedsBefore, feedsSeen: getSeen ? getSeen() : 0 }, remoteDoc, Date.now(), sameUrl, urlKey);
       for (const [id, f] of Object.entries(uploaded)) if (merged.pages.some((p) => p.id === id && p.savedAt === f.at)) merged.files[id] = f;
       // Text this device has and GitHub doesn't: every page saved here, or
       // saved again since.
@@ -514,6 +526,7 @@
         await remove("pages/" + id + ".html", f.sha).catch(() => {});
         for (const [k, s] of (f.packs || []).entries()) await remove("pages/" + id + "/pack-" + k, s).catch(() => {});
       }
+      await breathe();
       if (remote && same(merged, remoteDoc)) break;
       halt();
       try {
@@ -524,7 +537,13 @@
         if ((e.status !== 409 && e.status !== 422) || tries >= 3) throw e;
       }
     }
-    keep(BASE_KEY, merged);
+    // Written only when it changed (1.2.0): a library of hundreds is a
+    // few hundred kilobytes, and localStorage writes on the main thread.
+    await breathe();
+    const mergedText = JSON.stringify(merged);
+    let baseText = null;
+    try { baseText = localStorage.getItem(BASE_KEY); } catch (e) { baseText = null; }
+    if (mergedText !== baseText) { try { localStorage.setItem(BASE_KEY, mergedText); } catch (e) { /* not kept */ } }
 
     // This device catches up: new pages' text comes down; deleted ones go.
     // `decided` is what each page becomes (null: removed).
@@ -567,6 +586,7 @@
       if (got.missing) downloads.push(meta);
       down++;
     }
+    await breathe();
     // Settled at once, with nothing awaited, so a change made while this
     // sync ran is kept (and sent next time) rather than written over.
     const live = getPages();

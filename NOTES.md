@@ -3,6 +3,29 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **The speed pass (1.2.0).** Measured with a 600-clip, 50-collection
+  library on a 4x slowed CPU, sync on, 30 chapters saving (the scratch
+  script speed.js, a profile per phase). Before: each library redraw cost
+  about 80 ms of main-thread time, most of it in folderPages, which
+  filtered every clip with sameTag for each of the 50 collections, four
+  times per collection per redraw; a sync run blocked for 500 ms, most
+  of it oneCopyEach comparing every page with every other through
+  sameUrl. After: the collections are grouped once (folderIndex) and the
+  grouping is checked, not rebuilt, on each ask (a pass over the pages:
+  same objects, same folder, same place), since 34 places change a
+  page's folder and a version counter would be missed somewhere;
+  savedAs looks up a map the same way; oneCopyEach takes a key for the
+  address; sync yields between its steps and writes its base only when
+  it changed; a landing page's redraw waits for animations
+  (motion.busy). Toggling `inert` on the library costs 30 to 60 ms at 4x
+  (it restyles every card) and is already deferred past the animation
+  (0.30.4); left as it is. Not measured here: the bridge's cost of
+  writing library.json after every page, and the first draw of hundreds
+  of cards at launch on a phone.
+- **No empty state until the library is read (1.2.0).** paintPlace ran
+  before readIndex resolved, so the empty library's message showed for
+  the moment it took (about a second on a phone with a big library);
+  `loaded` holds it back.
 - **Linked files are read whole once (1.1.3).** Every stretch the zip
   reader asked for (a chapter, a picture, and each one's 30-byte header
   first) was its own bridge call, and each call opens the file again and
