@@ -3,6 +3,26 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Waiting for Wi-Fi (1.4.1).** Daniel: downloads, and maybe sync,
+  only on Wi-Fi; he asked for names and picked rows in Saving and Sync
+  over a page of their own. navigator.connection.type says "cellular"
+  in Android's WebView and nothing on iOS or a desktop, so the group
+  only shows on Android. Saves hold in wifiGate() (the job shows
+  "Waiting for Wi-Fi" in Downloads) and go on when the connection
+  changes; the quiet fetches skip their turn, and Sync now says
+  "Waiting for Wi-Fi".
+- **The movable reading card (1.4.1).** Daniel: the bar hid things,
+  above all in another clip's reader. It's a 240 px card now, dragged
+  by pointer events heard on the window (a quick drag leaves the card
+  before its first move event, and capturing the pointer on the card
+  would take the tap from its buttons), snapped to a side on release
+  with the side and height kept in localStorage. The label went too:
+  the state lives in its aria-label.
+- **Double scroll bar (1.4.1).** A screen is position: fixed over the
+  library, which still scrolls underneath: a wheel or fling that ran
+  out in .screen-body chained to the document. `overscroll-behavior:
+  contain` on .screen-body, and overflow: hidden plus contain on .screen
+  so the bar and padding catch it too.
 - **Read aloud away from the page (1.4.0).** Daniel: leaving the clip
   should keep it reading, with a bar showing what, like picture in
   picture; and at the end a button for the next page. The speech already

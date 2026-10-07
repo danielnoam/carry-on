@@ -2,6 +2,27 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.4.1] - 2026-10-07
+
+### Added
+- On mobile data, in Settings, Saving and in Sync: save and sync as
+  always, or wait for Wi-Fi. A save made on mobile data waits in
+  Downloads and goes when Wi-Fi is back; feeds, new chapters and missing
+  pictures check then too. Android only, since only the app can tell.
+- Watched folders have their own Settings page, Content, with a look-now
+  arrow and a stop on each folder.
+
+### Changed
+- The reading-aloud card is small and movable: drag it anywhere, it
+  snaps to a side and stays there. It shows the clip's name, pause and
+  stop, nothing more.
+- Coming back to a clip from the card lights the paragraph being read
+  and brings it into view.
+
+### Fixed
+- A second scroll bar on the right in Settings and other screens: a
+  scroll that ran out in a screen went on to the library underneath.
+
 ## [1.4.0] - 2026-10-07
 
 ### Added

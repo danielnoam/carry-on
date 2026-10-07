@@ -373,6 +373,9 @@
     return Math.max(0, i);
   }
   function light(i) {
+    // Opened again while it's read aloud (1.4.1): the blocks are found
+    // afresh, so the one being read lights up and comes into view.
+    if (!blocks.length && doc && i >= 0) readable();
     if (lit) lit.classList.remove("co-speaking");
     lit = blocks[i] ? blocks[i].el : null;
     if (!lit || !frame) return;
