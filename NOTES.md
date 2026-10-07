@@ -3,6 +3,21 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Zoom in place on printed pages (1.2.2).** 1.2.1 answered "zoom" by
+  opening the page in the image viewer; Daniel wanted a PDF viewer's
+  pinch and pan. The chapter (`.co-comic`) is scaled with a transform
+  while the fingers are down, then laid out at that width (its
+  `width` in px) once they lift, with the scroll set so the content
+  under the fingers stays put. Panning is then the page's own scroll,
+  in both directions, with no code of its own; position() still works,
+  since it is a fraction of scrollHeight. The chapter has
+  `touch-action: pan-x pan-y` so the browser's own pinch doesn't
+  compete. drawNear draws a page at its shown width (up to 2400 px) and
+  again when that changes by a quarter, so a zoomed page is sharp; it
+  remembers the width each page was drawn at. The chapter's double tap
+  no longer opens the viewer, so a comic's panel can't be opened on its
+  own; nobody asked for that, and a 2.5x zoom on the spot is what a
+  double tap means in every PDF reader.
 - **The speed pass, round two (1.2.1).** The first real draw of the
   library builds thirty cards and the rest on the next turn
   (FIRST_SCREEN), so the first screen is up before the rest is built.

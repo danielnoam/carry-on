@@ -424,6 +424,10 @@
       throw new FileError("Waypage can't read " + meta.file.name + " any more.");
     }
     held = { pdf, urls: new Map(), busy: false };
+    // A PDF from before 1.2.1 has no card picture: its first page, now.
+    if (!meta.thumb) {
+      try { meta.thumb = await thumbnail(meta.id, await pdf.draw(1, THUMB_WIDTH), "image/jpeg"); } catch (e) { /* no cover */ }
+    }
     if (into) {
       into.classList.add("co-comic", "co-printed");
       slots = pdf.sizes.map((s, i) => {
@@ -450,11 +454,13 @@
   function closeHeld() {
     if (!held) return;
     held.pdf.close();
-    for (const url of held.urls.values()) URL.revokeObjectURL(url);
+    for (const u of held.urls.values()) URL.revokeObjectURL(u.url);
     held = null;
   }
   // Draws the pages within a screen and a half of what the reader `frame`
   // shows, nearest first, and lets go of those more than six screens away.
+  // A page is drawn at the width it is shown (a zoomed one wider, 1.2.2)
+  // and drawn again when that changes by a quarter or more.
   async function drawNear(frame) {
     const h = held;
     const win = frame && frame.contentWindow;
@@ -464,26 +470,30 @@
       for (;;) {
         if (held !== h) return;
         const tall = win.innerHeight || 800;
-        const width = Math.min(1600, Math.round((win.innerWidth || 400) * (win.devicePixelRatio || 1)));
+        const dpr = win.devicePixelRatio || 1;
         const pages = [...win.document.querySelectorAll("img[data-page]")];
-        let next = null, best = Infinity;
+        let next = null, best = Infinity, width = 0;
         for (const img of pages) {
           const r = img.getBoundingClientRect();
           const away = r.bottom < 0 ? -r.bottom : r.top > tall ? r.top - tall : 0;
           const n = img.getAttribute("data-page");
-          if (h.urls.has(n) && away > tall * 6) {
-            URL.revokeObjectURL(h.urls.get(n));
+          const want = Math.min(2400, Math.max(200, Math.round((r.width || win.innerWidth || 400) * dpr)));
+          const has = h.urls.get(n);
+          if (has && away > tall * 6) {
+            URL.revokeObjectURL(has.url);
             h.urls.delete(n);
             img.setAttribute("src", blank(img.getAttribute("width"), img.getAttribute("height")));
-          } else if (!h.urls.has(n) && away <= tall * 1.5 && away < best) { next = img; best = away; }
+          } else if ((!has || Math.abs(has.width - want) > want / 4) && away <= tall * 1.5 && away < best) { next = img; best = away; width = want; }
         }
         if (!next) return;
         const n = next.getAttribute("data-page");
         let bytes;
         try { bytes = await h.pdf.draw(Number(n), width); } catch (e) { return; }
         if (held !== h) return;
+        const was = h.urls.get(n);
+        if (was) URL.revokeObjectURL(was.url);
         const url = URL.createObjectURL(new Blob([bytes], { type: "image/jpeg" }));
-        h.urls.set(n, url);
+        h.urls.set(n, { url, width });
         next.setAttribute("src", url);
       }
     } finally { h.busy = false; }

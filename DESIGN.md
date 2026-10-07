@@ -610,9 +610,12 @@ and the page shows above it.
   6 min left"), each row at least 44 dp; empty: "Hold a page in Waypage
   and tap Favourite, and it shows here." Favourite collections come
   first (0.35.0), "Collection · 2 of 9 read" under the name.
-- **Zoom on printed pages and panels (1.2.1):** a pinch on a page or
-  panel in the reader opens it in the image viewer under the fingers,
-  as a double tap does; the viewer's own pinch and double tap zoom it.
+- **Zoom on printed pages and panels (1.2.2):** a pinch zooms the
+  chapter in place, up to 4x, following the fingers; once they lift the
+  pages are laid out at that width and a drag pans them as the page's
+  own scroll. A double tap goes to 2.5x on that spot, or back to the
+  page's width; Ctrl and the wheel do the same on a desktop. A single
+  tap still shows or hides the bar.
 - **Collection widget (0.35.0, Android):** its own card (1.2.1) with the
   collection's name and "2 of 9 read" as its head, a pill button at the
   head's right in `--accent` ("Start" before anything in it was opened,

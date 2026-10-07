@@ -143,20 +143,16 @@
     };
   }
 
-  // A panel or printed page that is there to look at: not hidden, and not
-  // the blank that holds a page's place before it is drawn.
-  const drawn = (img) => !img.hidden && img.naturalWidth > 0 && !/^data:image\/svg/.test(img.getAttribute("src") || "");
-
   // In an image chapter a tap shows or hides the bar, as text does, and a
-  // double tap opens the panel in the viewer, to zoom.
+  // double tap zooms in on that spot, or back out (1.2.2).
   let tapTimer = 0;
   function onClick(e) {
-    const img = onImage && e.target.closest && e.target.closest("img");
+    const img = e.target.closest && e.target.closest("img");
     if (img && img.closest(".co-comic")) {
       if (tapTimer) {
         clearTimeout(tapTimer);
         tapTimer = 0;
-        if (drawn(img)) onImage(imageInfo(img));
+        if (zoom > 1) setZoom(1, e.clientX, e.clientY); else setZoom(2.5, e.clientX, e.clientY);
       } else tapTimer = setTimeout(() => { tapTimer = 0; if (onTap) onTap(); }, 280);
       e.preventDefault();
       return;
@@ -448,23 +444,85 @@
     goPage(Math.round(keep * (n - 1)), true);
   }
 
+  // ---- Zoom on an image chapter (1.2.2) ----
+  // Printed pages and panels zoom in place, as in a PDF viewer: a pinch
+  // scales the chapter under the fingers and, once the fingers lift, the
+  // chapter is laid out at that width, so a pan is the page's own scroll,
+  // and the pages are drawn again at the new width (files.drawNear). A
+  // double tap goes to 2.5x on that spot, or back; Ctrl and the wheel do
+  // the same on a desktop.
+  const ZOOM_MAX = 4;
+  let zoom = 1, pinch = null;
+  const comicRoot = () => (doc && comic ? doc.querySelector(".co-comic") : null);
+  // The chapter's top left corner in the page's own coordinates, with any
+  // transform taken off it first.
+  function origin(root) {
+    const w = frame.contentWindow;
+    root.style.transform = "";
+    const r = root.getBoundingClientRect();
+    return { x: r.left + w.scrollX, y: r.top + w.scrollY, w };
+  }
+  // Lays the chapter out at `s` times its width, keeping the content that
+  // was at page point (px, py) under screen point (mx, my).
+  function setZoom(s, mx, my, px, py) {
+    const root = comicRoot();
+    if (!root) return;
+    const { x: ox, y: oy, w } = origin(root);
+    if (px == null) { px = w.scrollX + mx; py = w.scrollY + my; }
+    s = Math.min(ZOOM_MAX, Math.max(1, s));
+    if (s < 1.05) s = 1;
+    const base = root.offsetWidth / zoom;
+    const q = s / zoom;
+    zoom = s;
+    root.style.transformOrigin = "";
+    root.style.width = s === 1 ? "" : Math.round(base * s) + "px";
+    w.scrollTo(ox + (px - ox) * q - mx, oy + (py - oy) * q - my);
+  }
+  function zoomInput() {
+    doc.addEventListener("touchstart", (e) => {
+      if (e.touches.length !== 2 || !comicRoot()) { if (e.touches.length !== 2) pinch = null; return; }
+      const root = comicRoot();
+      const [a, b] = e.touches;
+      const { x: ox, y: oy, w } = origin(root);
+      const mx = (a.clientX + b.clientX) / 2, my = (a.clientY + b.clientY) / 2;
+      pinch = { root, d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), from: zoom, s: zoom, mx, my, x: mx, y: my,
+        px: w.scrollX + mx, py: w.scrollY + my, ox, oy };
+      root.style.transformOrigin = (pinch.px - ox) + "px " + (pinch.py - oy) + "px";
+      if (tapTimer) { clearTimeout(tapTimer); tapTimer = 0; }
+      e.preventDefault();
+    }, { passive: false });
+    doc.addEventListener("touchmove", (e) => {
+      if (!pinch || e.touches.length !== 2) return;
+      const [a, b] = e.touches;
+      const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      pinch.s = Math.min(ZOOM_MAX, Math.max(1, pinch.from * d / pinch.d));
+      pinch.x = (a.clientX + b.clientX) / 2;
+      pinch.y = (a.clientY + b.clientY) / 2;
+      pinch.root.style.transform = "translate(" + (pinch.x - pinch.mx) + "px," + (pinch.y - pinch.my) + "px) scale(" + (pinch.s / pinch.from) + ")";
+      e.preventDefault();
+    }, { passive: false });
+    const done = (e) => {
+      if (!pinch || e.touches.length >= 2) return;
+      const p = pinch;
+      pinch = null;
+      setZoom(p.s, p.x, p.y, p.px, p.py);
+    };
+    doc.addEventListener("touchend", done);
+    doc.addEventListener("touchcancel", done);
+    doc.addEventListener("wheel", (e) => {
+      if (!e.ctrlKey || !comicRoot()) return;
+      e.preventDefault();
+      setZoom(zoom * Math.exp(-e.deltaY / 300), e.clientX, e.clientY);
+    }, { passive: false });
+  }
+
   // Turns pages with a swipe and the arrow keys. The page can't scroll on
   // its own (overflow hidden), so a sideways swipe is all a page turn.
-  // In an image chapter a pinch opens the panel or printed page under the
-  // fingers in the viewer, where pinch and double tap zoom it (1.2.1).
   function pagedInput() {
     let start = null;
     doc.addEventListener("touchstart", (e) => {
       start = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null;
-      if (e.touches.length !== 2 || !comic || !onImage) return;
-      const [a, b] = e.touches;
-      const hit = doc.elementFromPoint((a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2);
-      const img = hit && hit.closest && hit.closest(".co-comic img");
-      if (!img || !drawn(img)) return;
-      e.preventDefault();
-      if (tapTimer) { clearTimeout(tapTimer); tapTimer = 0; }
-      onImage(imageInfo(img));
-    }, { passive: false });
+    }, { passive: true });
     doc.addEventListener("touchend", (e) => {
       if (!start || !isPaged()) return;
       const t = e.changedTouches[0], dx = t.clientX - start.x, dy = t.clientY - start.y;
@@ -507,6 +565,8 @@
     turning = null;
     paged = !!asPages;
     comic = false;
+    zoom = 1;
+    pinch = null;
     blocks = [];
     lit = null;
     onImage = image || null;
@@ -546,6 +606,7 @@
         comic = !!doc.querySelector(".co-comic");
         if (isPaged()) doc.documentElement.classList.add("co-paged");
         pagedInput();
+        zoomInput();
         if (onSelect) {
           let selTimer = 0;
           doc.addEventListener("selectionchange", () => {
