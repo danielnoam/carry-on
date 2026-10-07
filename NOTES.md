@@ -3,6 +3,17 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Which device read further (1.4.2).** The furthest-read toast (1.3.0)
+  said "your other device"; now it names it. Each clip carries `readOn`,
+  the name of the device that last moved its place, set wherever
+  `readAt` is. It syncs as one of READING, but the merge takes it from
+  whichever side read later (`readFrom`), not key by key, so it can't end
+  up naming one device beside another's place. The name is typed in
+  Settings, Sync ("This device's name"), else guessed from the platform
+  and screen (phone, tablet, iPhone, iPad, computer). A guessed name
+  reads "on your phone", a typed one as typed ("on Pixel 8"); two devices
+  with the same name read "on your other phone". A clip last read on a
+  device from before 1.4.2 has no name and keeps the old wording.
 - **Read aloud away from the page (1.4.0).** Daniel: leaving the clip
   should keep it reading, with a bar showing what, like picture in
   picture; and at the end a button for the next page. The speech already

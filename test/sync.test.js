@@ -164,4 +164,16 @@ test("the place in the text (spot, 1.3.0) goes with the device that read last", 
   assert.deepStrictEqual([m2.pages[0].at, m2.pages[0].spot], [0.3, "5/0"]);
 });
 
+test("the device that read last (readOn, 1.4.2) goes with its place", () => {
+  const base = lib([page("a1b2", { at: 0.2, readAt: 100, readOn: "phone" })]);
+  // The phone read again but older than the tablet: the tablet's name stays with the tablet's place.
+  const local = lib([page("a1b2", { at: 0.3, readAt: 150, readOn: "phone" })]);
+  const remote = lib([page("a1b2", { at: 0.6, readAt: 200, readOn: "tablet" })]);
+  const m = S.merge(base, local, remote, NOW);
+  assert.deepStrictEqual([m.pages[0].at, m.pages[0].readOn], [0.6, "tablet"]);
+  // A device from before 1.4.2 read last: no name, not the other's.
+  const old = lib([page("a1b2", { at: 0.8, readAt: 300 })]);
+  assert.strictEqual(S.merge(base, local, old, NOW).pages[0].readOn, undefined);
+});
+
 console.log("\n" + passed + " passed");

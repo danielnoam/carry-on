@@ -25,3 +25,9 @@ stops being true.
   pictures stay in the original file, so an export would need them pulled
   back out; the original is already on the device and can be shared as
   it is. Export stays hidden on those clips.
+- **A focus trap instead of `inert` on the library (Daniel, 7 Oct
+  2026).** Setting `inert` restyles every card, 30 to 60 ms on a 4x
+  slowed CPU, but it runs after the animation where it isn't seen
+  (NOTES.md, 1.2.0 and 1.2.1). A focus trap would have to keep every card
+  out of the reading order by hand. Worth another look only if a phone
+  shows a stall when a screen opens.

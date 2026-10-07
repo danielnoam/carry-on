@@ -40,6 +40,7 @@
   const EXPORT_KEY = "waypage.exportKind";
   const RATE_KEY = "waypage.aloudRate";
   const VOICE_KEY = "waypage.aloudVoice";
+  const DEVICE_KEY = "waypage.deviceName";
 
   const $ = (id) => document.getElementById(id);
   const libTools = $("libTools");
@@ -1435,7 +1436,7 @@
       if (old) {
         // Saved again: the new copy takes the old one's place, keeping its
         // collection, tags and read position.
-        for (const k of ["requested", "folder", "folderAt", "folderFav", "folderFavAt", "source", "tags", "at", "finished", "readAt", "fav", "favAt"]) if (old[k] !== undefined) meta[k] = old[k];
+        for (const k of ["requested", "folder", "folderAt", "folderFav", "folderFavAt", "source", "tags", "at", "finished", "readAt", "readOn", "fav", "favAt"]) if (old[k] !== undefined) meta[k] = old[k];
         const i = state.pages.indexOf(old);
         if (i < 0) await C.store.removePage(meta.id);
         else {
@@ -1577,6 +1578,24 @@
   // clip opens, and when another device read it further and later, a
   // toast offers to go there. The open never waits for it.
   let openedReadAt = 0;
+  // Each device names itself for that toast (1.4.2): what you typed in
+  // Settings, Sync, or what kind of device it is. A guessed name reads
+  // "your phone", one you typed reads as you typed it.
+  const GUESSED_NAMES = ["phone", "tablet", "iPhone", "iPad", "computer"];
+  function guessedName() {
+    const ios = C.platform.ios || /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    const big = Math.min(screen.width, screen.height) >= 600;
+    if (ios) return big ? "iPad" : "iPhone";
+    if (C.platform.native || /Android/.test(navigator.userAgent)) return big ? "tablet" : "phone";
+    return "computer";
+  }
+  const deviceName = () => String(load(DEVICE_KEY, "") || "").trim().slice(0, 40) || guessedName();
+  function onDevice(name) {
+    if (!name) return "on your other device";
+    const mine = name === deviceName();
+    if (GUESSED_NAMES.includes(name)) return "on your " + (mine ? "other " : "") + name;
+    return mine ? "on your other device" : "on " + name;
+  }
   async function furtherRead(p) {
     if (!C.sync.on || C.sync.paused || !navigator.onLine || p.link) return;
     let got;
@@ -1586,12 +1605,14 @@
     if (!other || !(other.readAt > openedReadAt) || typeof other.at !== "number") return;
     if (Math.abs(other.at - (p.at || 0)) < 0.01 && (!other.spot || other.spot === p.spot)) return;
     const pct = Math.round(other.at * 100);
-    toast(other.finished || other.at >= 0.97 ? "Read to the end on your other device." : "Read to " + pct + "% on your other device.", "Go there", () => {
+    const where = onDevice(typeof other.readOn === "string" ? other.readOn : "");
+    toast(other.finished || other.at >= 0.97 ? "Read to the end " + where + "." : "Read to " + pct + "% " + where + ".", "Go there", () => {
       if (state.open !== p) return;
       p.at = other.at;
       if (other.spot) p.spot = other.spot;
       if (other.finished) p.finished = true;
       p.readAt = Math.max(other.readAt, Date.now());
+      p.readOn = deviceName();
       C.reader.jump(other.at, other.spot || "");
       savePositions();
     });
@@ -1627,6 +1648,7 @@
     // from before this open.
     openedReadAt = p.readAt || 0;
     p.readAt = Date.now();
+    p.readOn = deviceName();
     showOffline();
     $("readProgress").dir = p.dir || "ltr";
     $("readerContents").hidden = true;
@@ -1758,7 +1780,7 @@
     // the old one, so the fraction decides the place.
     if (s) p.spot = s; else delete p.spot;
     if (f >= 0.97) p.finished = true;
-    if (moved) p.readAt = Date.now();
+    if (moved) { p.readAt = Date.now(); p.readOn = deviceName(); }
     clearTimeout(positionTimer);
     positionTimer = setTimeout(savePositions, 1500);
   }
@@ -4082,7 +4104,7 @@
   // every few minutes while open. Pages that came down get their pictures
   // here, one page at a time, like Retry.
   let syncTimer = null, syncQueue = [], fetchingPictures = false;
-  const SYNCED_KEEP = ["savedAt", "title", "requested", "tags", "folder", "folderAt", "source", "series", "fav", "favAt", "folderFav", "folderFavAt", "at", "finished", "readAt", "spot"];
+  const SYNCED_KEEP = ["savedAt", "title", "requested", "tags", "folder", "folderAt", "source", "series", "fav", "favAt", "folderFav", "folderFavAt", "at", "finished", "readAt", "readOn", "spot"];
   // While a run of saves is on, sync waits longer (1.2.0): each sync is a
   // merge of the whole library, and one after every page landing was a
   // stutter every few seconds.
@@ -4347,10 +4369,15 @@
         el("div", { class: "rc-list" },
           el("div", { class: "rc-row stack" }, el("span", { class: "rc-label" }, "Clips"),
             seg("sync-what", "What this device syncs", [{ value: "pages", label: "Clips too" }, { value: "links", label: "Links only" }],
-              C.sync.links ? "links" : "pages", (v) => { C.sync.links = v === "links"; renderSection(); syncSoon(500); })))),
+              C.sync.links ? "links" : "pages", (v) => { C.sync.links = v === "links"; renderSection(); syncSoon(500); })),
+          el("div", { class: "rc-row stack" }, el("label", { class: "rc-label", for: "deviceName" }, "This device's name"),
+            el("input", { class: "feed-input", id: "deviceName", type: "text", maxlength: "40", autocomplete: "off",
+              value: load(DEVICE_KEY, ""), placeholder: guessedName().replace(/^./, (c) => c.toUpperCase()),
+              onchange: (e) => store(DEVICE_KEY, e.target.value.trim().slice(0, 40)) })))),
       el("p", { class: "footnote" }, C.sync.links
         ? "Only links, tags, collections and where you are go up. Clips new to this device are saved again from their links, so one that changed or went away comes back different or not at all."
-        : "Each clip's text goes up with it, so another device gets the clip as you saved it, even if the site changes or takes it down."));
+        : "Each clip's text goes up with it, so another device gets the clip as you saved it, even if the site changes or takes it down."),
+      el("p", { class: "footnote" }, "The name shows on your other devices when this one read a clip further."));
   }
   // The setup link points at the web copy: inside the app this page is at
   // https://localhost, which no other device can open. The app's scanner
