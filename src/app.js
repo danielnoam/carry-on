@@ -1,7 +1,7 @@
 // Waypage: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "1.3.0";
+  const APP_VERSION = "1.4.0";
   window.Waypage.version = APP_VERSION;
 
   const C = window.Waypage;
@@ -1516,6 +1516,7 @@
     delete screen.dataset.leaving;
     const under = below(screen);
     screen.hidden = false;
+    showAloudBar();
     const from = zoomFrom(screen);
     if (from) zoomed.set(screen, from); else zoomed.delete(screen);
     const moved = from ? M.zoomIn(screen, from) : M.pushIn(screen);
@@ -1543,7 +1544,7 @@
     zoomed.delete(screen);
     const moved = from ? M.zoomOut(screen, from) : M.popOut(screen);
     afterSettle(() => { if (pushes.get(screen) === n) under.inert = false; });
-    return moved.then(hide);
+    return moved.then(hide).then(() => showAloudBar());
   }
 
   function showOffline() {
@@ -1618,7 +1619,6 @@
   const readerState = (p, sheet, image) => ({ view: "reader", page: p.id, folder: state.folder || undefined, sheet: sheet || undefined, image: image || undefined });
 
   function show(p, html) {
-    if (aloud.key !== p.id) stopAloud();
     state.open = p;
     // Opening counts as reading for the order of things (sort by read, the
     // sidebar, Continue reading); the merge is safe because the place
@@ -1642,7 +1642,13 @@
       pages: readingPrefs().layout === "pages",
       top: () => $("readerView").querySelector(".reader-bar").offsetHeight,
       bottom: () => $("readFoot").offsetHeight,
-    }).then(() => { $("readerContents").hidden = C.reader.headings().length < 2; });
+    }).then(() => {
+      $("readerContents").hidden = C.reader.headings().length < 2;
+      // Reading aloud carries on across clips (1.4.0): its light and
+      // player show again when its clip is the one open.
+      setAloud(aloud.state, aloud.index);
+      if (aloudAuto) { aloudAuto = false; startAloud(0); }
+    });
   }
 
   // A tap on the text brings the bar back, or hides it for reading.
@@ -1675,7 +1681,7 @@
     if (state.open && state.open.link) C.files.drawNear($("readerFrame"));
     if (readHere && !readHere.hidden) showReadHere(C.reader.selectionSpot());
     $("readProgress").firstElementChild.style.transform = "scaleX(" + at + ")";
-    if (!$("readerView").classList.contains("bar-away") || aloud.state !== "stopped") readerFoot(at);
+    if (!$("readerView").classList.contains("bar-away") || aloudHere()) readerFoot(at);
     const bar = $("readerView").querySelector(".reader-bar").offsetHeight;
     let away = $("readerView").classList.contains("bar-away");
     if (y <= bar || at >= 0.999 || state.sheet) away = false;
@@ -1770,9 +1776,10 @@
     if (C.sync.on && navigator.onLine) syncNow();
     closeSheet(true);
     if (state.image) { state.image = false; $("imageViewer").hidden = true; $("viewerImg").removeAttribute("src"); }
-    stopAloud();
+    // Reading aloud goes on (1.4.0): the bar along the bottom carries it.
     hideReadHere();
     state.open = null;
+    showAloudBar();
     // The library redraws (where you got to) once the reader is away, not
     // before it moves: in a big library that held Back up (0.30.4).
     popScreen($("readerView")).then(() => {
@@ -1792,6 +1799,13 @@
 
   const speech = C.platform.speech;
   const aloud = { key: "", map: [], state: "stopped", index: -1, arrived: false };
+  // Whether the clip being read aloud is the one open in the reader; when
+  // it isn't (another clip, the library, Settings), the bar along the
+  // bottom of the app shows it instead (1.4.0).
+  const aloudOn = () => aloud.state === "playing" || aloud.state === "paused";
+  const aloudHere = () => (aloudOn() || aloud.state === "ended") && !!state.open && state.open.id === aloud.key;
+  const aloudPage = () => state.pages.find((x) => x.id === aloud.key) || null;
+  let aloudAuto = false;
   // Speed is a slider since 0.34.0, from half to three times.
   const RATE_MIN = 0.5, RATE_MAX = 3;
   const FOOTNOTES_KEY = "waypage.aloudFootnotes";
@@ -1899,8 +1913,28 @@
 
   function stopAloud() {
     if (aloud.state === "stopped") return;
+    const was = aloud.state;
     setAloud("stopped", -1);
-    speech.stop();
+    if (was !== "ended") speech.stop();
+  }
+  // Read the next clip (1.4.0): the next chapter in the collection, or the
+  // page the clip links to as its next, saved first when it isn't yet. It
+  // opens in the reader and starts reading from the top.
+  async function readNext() {
+    const p = aloudPage();
+    const link = p && endLink(p);
+    if (!link) return;
+    aloudAuto = true;
+    if (state.open === p) { link.go(); return; }
+    let next = neighbour(p, 1) || (p.next ? savedAs(p.next) : null);
+    if (!next && p.next) {
+      if (!navigator.onLine) { aloudAuto = false; toast("You're offline. The next page saves when you're back online."); return; }
+      toast("Saving the next page…");
+      next = await follow(p, 1, true);
+    }
+    if (!next) { aloudAuto = false; return; }
+    await toLibrary();
+    openPage(next.id);
   }
 
   // The block that piece `i` is in, and the first piece of a block.
@@ -1915,14 +1949,20 @@
 
   function setAloud(st, index) {
     const on = st === "playing" || st === "paused";
-    aloud.state = on ? st : "stopped";
+    // At the end, the clip stays "being read" while there's a next clip
+    // to offer (1.4.0); otherwise the reading is over.
+    const p = aloudPage();
+    const ended = st === "ended" && !!(p && endLink(p));
+    aloud.state = on ? st : ended ? "ended" : "stopped";
     if (index >= 0 || !on) aloud.index = index;
+    const here = aloudHere();
     const btn = $("readerAloud");
-    btn.setAttribute("aria-pressed", String(on));
-    btn.setAttribute("aria-label", on ? "Stop reading aloud" : "Read aloud");
-    $("aloudPlayer").hidden = !on;
-    $("readerView").classList.toggle("aloud", on);
-    if (on && state.open) readerFoot(C.reader.position());
+    btn.setAttribute("aria-pressed", String(on && here));
+    btn.setAttribute("aria-label", on && here ? "Stop reading aloud" : "Read aloud");
+    $("aloudPlayer").hidden = !(on && here);
+    $("aloudReadNext").hidden = !(ended && here);
+    $("readerView").classList.toggle("aloud", here);
+    if (here && state.open) readerFoot(C.reader.position());
     const play = $("aloudPlay");
     play.classList.toggle("paused", st === "paused");
     play.setAttribute("aria-label", st === "paused" ? "Play" : "Pause");
@@ -1930,9 +1970,51 @@
     $("aloudPrev").disabled = !on || b <= 0;
     $("aloudNext").disabled = !on || b >= (aloud.map[aloud.map.length - 1] ?? 0);
     if (state.open && state.open.id === aloud.key) C.reader.light(on ? b : -1);
-    if (!on) aloud.key = "";
+    if (!on && !ended) aloud.key = "";
+    showAloudBar();
     if (st === "error") toast("The phone's voice stopped. Try again, or pick another voice in Aa.");
   }
+
+  // The bar along the bottom of the app while a clip is read aloud away
+  // from its page (1.4.0): pause or play, the clip's name (a tap opens
+  // it), and Stop; at the end, Read next.
+  function showAloudBar() {
+    const bar = $("aloudBar");
+    const p = aloudPage();
+    const show = !!p && (aloudOn() || aloud.state === "ended") && !aloudHere();
+    if (!show) {
+      if (!bar.hidden && !bar.dataset.leaving) {
+        bar.dataset.leaving = "1";
+        document.body.classList.remove("aloud-bar-up");
+        M.leave(bar).then(() => { if (bar.dataset.leaving) { bar.hidden = true; delete bar.dataset.leaving; } });
+      }
+      return;
+    }
+    const ended = aloud.state === "ended";
+    $("aloudBarTitle").textContent = p.title;
+    $("aloudBarMeta").textContent = ended ? "Read to the end" : (aloud.state === "paused" ? "Paused" : "Reading aloud") + (p.folder || p.site ? " · " + (p.folder || p.site) : "");
+    $("aloudBarPlay").hidden = ended;
+    $("aloudBarPlay").classList.toggle("paused", aloud.state === "paused");
+    $("aloudBarPlay").setAttribute("aria-label", aloud.state === "paused" ? "Play" : "Pause");
+    $("aloudBarNext").hidden = !ended;
+    // Above the library's bottom field when that's what's on screen.
+    const top = document.querySelector(".screen:not([hidden]):not([data-leaving])");
+    bar.style.setProperty("--aloud-bar-lift", top ? "0px" : $("libraryView").querySelector(".save-bar").offsetHeight + "px");
+    document.body.classList.add("aloud-bar-up");
+    if (bar.hidden || bar.dataset.leaving) { delete bar.dataset.leaving; bar.hidden = false; M.arrive(bar, 16); }
+  }
+  $("aloudBarPlay").addEventListener("click", () => $("aloudPlay").click());
+  $("aloudBarStop").addEventListener("click", stopAloud);
+  $("aloudBarNext").addEventListener("click", readNext);
+  $("aloudReadNext").addEventListener("click", readNext);
+  $("aloudBarOpen").addEventListener("click", async () => {
+    const p = aloudPage();
+    if (!p) return;
+    if (state.open === p) return;
+    if (state.open) { await toLibrary(); }
+    openPage(p.id);
+  });
+  addEventListener("resize", () => { if (!$("aloudBar").hidden) showAloudBar(); });
 
   speech.onProgress(({ key, index, state: st }) => {
     if (!key || key !== aloud.key) return;
@@ -1941,14 +2023,14 @@
   // Back from the lock screen: the reading may have moved on or ended
   // while the page slept.
   document.addEventListener("visibilitychange", async () => {
-    if (document.hidden || aloud.state === "stopped") return;
+    if (document.hidden || !aloudOn()) return;
     const now = await speech.state();
     if (now.key && now.key === aloud.key) setAloud(now.state, now.index);
     else setAloud("stopped", -1);
   });
 
   $("readerAloud").hidden = !speech.available;
-  $("readerAloud").addEventListener("click", () => (aloud.state === "stopped" ? startAloud() : stopAloud()));
+  $("readerAloud").addEventListener("click", () => (aloudOn() && aloudHere() ? stopAloud() : startAloud()));
   $("aloudPlay").addEventListener("click", () => {
     if (aloud.state === "playing") { setAloud("paused", aloud.index); speech.pause(); }
     else { setAloud("playing", aloud.index); speech.resume(); }
@@ -3174,9 +3256,8 @@
   const alsoSynced = () => (C.sync.on ? " With sync on, it goes from your other devices too." : "");
   // A file read from where it is is only taken out of Waypage (1.1.3).
   function linkedStays(list) {
-    const w = watched();
-    const inFolder = w && list.some((p) => p.watched === w.tree);
-    return (list.length === 1 ? "The file itself stays" : "The files themselves stay") + (inFolder ? " in " + w.name + ", and Waypage won't add " + (list.length === 1 ? "it" : "them") + " back." : " where " + (list.length === 1 ? "it is." : "they are."));
+    const w = list.map(watchOf).find(Boolean);
+    return (list.length === 1 ? "The file itself stays" : "The files themselves stay") + (w ? " in " + w.name + ", and Waypage won't add " + (list.length === 1 ? "it" : "them") + " back." : " where " + (list.length === 1 ? "it is." : "they are."));
   }
   const filesNote = (list) => (list.some((p) => p.link) ? " Files read from where they are stay where they are." : "");
   // A PDF read from where it is: its printed pages, or its words (1.1.3).
@@ -3719,7 +3800,7 @@
       const inFolder = C.files.KINDS[kind] && state.pages.find((p) => p.watched && p.file && p.file.name === file.name && p.file.size === file.size);
       if (inFolder) {
         if (ref) C.platform.files.release(ref);
-        toast("Already in your library, from " + ((watched() || {}).name || "your watched folder"));
+        toast("Already in your library, from " + ((watchOf(inFolder) || {}).name || "your watched folder"));
         if (open) openPage(inFolder.id);
         if (btn) { btn.disabled = false; say("Restore or open a file"); }
         return;
@@ -3794,34 +3875,68 @@
   // folder leaves the library. Clips from it carry `watched` (the folder).
   // This device's own, like any clip that reads from a file: never synced.
   // Android only for now; iOS needs a security-scoped bookmark (TODO.md).
+  // Since 1.4.0 any number of folders, a list under WATCHES_KEY; the one
+  // folder from before moves into it.
   const WATCH_KEY = "waypage.watch";
+  const WATCHES_KEY = "waypage.watches";
   const WATCH_EXTS = /\.(epub|pdf|cbz|md|markdown|txt|html?|xhtml)$/i;
   let watching = null;
-  const watched = () => { const w = load(WATCH_KEY, null); return w && w.tree ? w : null; };
+  function watches() {
+    let list = load(WATCHES_KEY, null);
+    if (!Array.isArray(list)) {
+      const w = load(WATCH_KEY, null);
+      list = w && w.tree ? [w] : [];
+      store(WATCHES_KEY, list);
+      localStorage.removeItem(WATCH_KEY);
+    }
+    return list.filter((w) => w && w.tree);
+  }
+  const saveWatch = (w) => store(WATCHES_KEY, watches().map((x) => (x.tree === w.tree ? w : x)));
+  const watchOf = (p) => (p && p.watched ? watches().find((w) => w.tree === p.watched) || null : null);
   function watchSoon(ms = 1500) {
-    if (!C.platform.files.canWatch || !watched() || watchStopped) return;
+    if (!C.platform.files.canWatch || !watches().length || watchStopped) return;
     clearTimeout(watchSoon.t);
     watchSoon.t = setTimeout(() => lookInFolder(), ms);
   }
+  // Looks in every watched folder; one toast for all of them when asked to.
   async function lookInFolder(said) {
-    const w = watched();
-    if (!w || !C.platform.files.canWatch) return null;
+    const list = watches();
+    if (!list.length || !C.platform.files.canWatch) return null;
     if (said !== undefined) watchStopped = false;
     if (watching) return watching;
     watching = (async () => {
+      const got = [];
+      for (const w of list) got.push(await lookInOne(w, said));
+      const added = got.reduce((n, g) => n + g.added, 0), gone = got.reduce((n, g) => n + g.gone, 0);
+      const failed = got.flatMap((g) => g.failed);
+      const lost = got.filter((g) => g.lost).map((g) => g.name);
+      const names = list.length === 1 ? list[0].name : "your watched folders";
+      // Said each time it looks, since they're tried again each time.
+      if (said && lost.length) toast("Waypage can't open " + lost.join(" or ") + " any more. Pick it again in Settings, Storage.");
+      else if (failed.length && said !== false) toast(failed.length === 1 ? failed[0] : "Couldn't read " + failed.length + " files from " + names + ". " + failed[0]);
+      else if (added && said !== false) toast("Added " + (added === 1 ? "1 file" : added + " files") + " from " + (list.length === 1 ? names : got.filter((g) => g.added).map((g) => g.name).join(", ")));
+      else if (said && !gone) toast("Nothing new in " + names + ".");
+      if (added || gone || got.some((g) => g.joined)) { renderLibrary(); updateWidgets(); }
+      return { added, gone };
+    })();
+    try { return await watching; } finally { watching = null; if (state.section === "storage") renderSection(); }
+  }
+  async function lookInOne(w, said) {
+    const out = { name: w.name, added: 0, gone: 0, joined: 0, failed: [], lost: false };
+    {
       const got = await C.platform.files.scan(w.tree);
       // A folder that can't be read (a memory card out, the permission
       // taken back) takes nothing away: its clips wait for it.
       if (!got.ok) {
-        w.lost = true; store(WATCH_KEY, w);
-        if (said) toast("Waypage can't open " + w.name + " any more. Pick it again in Settings, Storage.");
-        return { added: 0, gone: 0, lost: true };
+        w.lost = true; saveWatch(w);
+        out.lost = true;
+        return out;
       }
-      if (w.lost) { delete w.lost; store(WATCH_KEY, w); }
+      if (w.lost) { delete w.lost; saveWatch(w); }
       const there = got.files.filter((f) => WATCH_EXTS.test(f.name));
       const refs = new Set(there.map((f) => f.ref));
       // Files removed from Waypage stay out while they're in the folder.
-      if (w.skip && w.skip.some((ref) => !refs.has(ref))) { w.skip = w.skip.filter((ref) => refs.has(ref)); store(WATCH_KEY, w); }
+      if (w.skip && w.skip.some((ref) => !refs.has(ref))) { w.skip = w.skip.filter((ref) => refs.has(ref)); saveWatch(w); }
       const gone = state.pages.filter((p) => p.watched === w.tree && !refs.has(p.link));
       if (gone.length) {
         for (const p of gone) await C.store.removePage(p.id);
@@ -3845,6 +3960,7 @@
         joined++;
       }
       if (joined) await C.store.writeIndex(state.pages);
+      out.joined = joined;
       const fresh = there.filter((f) => !known.has(f.ref) && !(w.skip || []).includes(f.ref))
         .sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true, sensitivity: "base" }));
       let added = 0;
@@ -3879,14 +3995,9 @@
       }
       if (run) { run.now = null; run.part = null; endRun(run); }
       if (added) { await loadThumbs(); C.store.keepStored(); }
-      // Said each time it looks, since they're tried again each time.
-      if (failed.length && said !== false) toast(failed.length === 1 ? failed[0] : "Couldn't read " + failed.length + " files from " + w.name + ". " + failed[0]);
-      if (added || gone.length || joined) { renderLibrary(); updateWidgets(); }
-      if (added && said !== false && !failed.length) toast("Added " + (added === 1 ? "1 file" : added + " files") + " from " + w.name);
-      else if (said && !gone.length) toast("Nothing new in " + w.name + ".");
-      return { added, gone: gone.length };
-    })();
-    try { return await watching; } finally { watching = null; if (state.section === "storage") renderSection(); }
+      Object.assign(out, { added, gone: gone.length, failed });
+      return out;
+    }
   }
   // "Page 3 of 40" on a file's card as it's read.
   const fileProgress = (run, name) => (done, total, what) => {
@@ -3894,51 +4005,59 @@
     run.part = total ? done / total : null;
     updateRunCard(run);
   };
+  // Watched folders in Settings, Storage (a list since 1.4.0): a row per
+  // folder with how many files came from it and Stop watching at its end,
+  // then Look now and Watch a folder.
   function watchGroup() {
     if (!C.platform.files.canWatch) return null;
-    const w = watched();
-    const n = w ? state.pages.filter((p) => p.watched === w.tree).length : 0;
-    const rows = w
-      ? [el("div", { class: "row" }, el("span", { class: "row-label" }, "Folder"), el("span", { class: "row-value" }, w.name)),
-        el("button", { class: "row", type: "button", ...(watching ? { disabled: "" } : {}), onclick: () => lookInFolder(true) },
-          el("span", { class: "row-label accent" }, watching ? "Looking…" : "Look now")),
-        el("button", { class: "row", type: "button", onclick: pickWatched }, el("span", { class: "row-label accent" }, "Pick another folder")),
-        el("button", { class: "row", type: "button", onclick: stopWatching }, el("span", { class: "row-label warn" }, "Stop watching"))]
-      : [el("button", { class: "row", type: "button", onclick: pickWatched }, el("span", { class: "row-label accent" }, "Watch a folder"))];
+    const list = watches();
+    const count = (w) => state.pages.filter((p) => p.watched === w.tree).length;
+    const rows = list.map((w) => el("div", { class: "row watch-row" },
+      el("span", { class: "row-label" }, w.name),
+      el("span", { class: "row-value" }, w.lost ? "Can't open it" : count(w) === 1 ? "1 file" : count(w) + " files"),
+      el("button", { class: "row-x", type: "button", "aria-label": "Stop watching " + w.name, title: "Stop watching", onclick: () => stopWatching(w) },
+        el("span", { class: "visually-hidden" }, "Stop watching"),
+        svgX())));
+    if (list.length) rows.push(el("button", { class: "row", type: "button", ...(watching ? { disabled: "" } : {}), onclick: () => lookInFolder(true) },
+      el("span", { class: "row-label accent" }, watching ? "Looking…" : "Look now")));
+    rows.push(el("button", { class: "row", type: "button", onclick: pickWatched }, el("span", { class: "row-label accent" }, list.length ? "Watch another folder" : "Watch a folder")));
+    const lost = list.filter((w) => w.lost).map((w) => w.name);
     return el("section", { class: "settings-section", id: "watchSection" },
-      el("h2", { class: "overline" }, "Watched folder"),
+      el("h2", { class: "overline" }, list.length === 1 ? "Watched folder" : "Watched folders"),
       el("div", { class: "group" }, ...rows),
-      el("p", { class: "footnote" }, w
-        ? (w.lost ? "Waypage can't open this folder any more. Pick it again to carry on. " : (n === 1 ? "1 file" : n + " files") + " from it. ")
-          + "Waypage looks in it each time it opens. Its folders become collections, and a file you delete there leaves Waypage too."
+      el("p", { class: "footnote" }, list.length
+        ? (lost.length ? "Waypage can't open " + lost.join(" or ") + " any more. Pick it again to carry on. " : "")
+          + "Waypage looks in " + (list.length === 1 ? "it" : "them") + " each time it opens. Their folders become collections, and a file you delete there leaves Waypage too."
         : "Pick a folder, like Books, and Waypage adds what's in it each time it opens. Each file is read from where it is, so it doesn't sync."));
   }
+  const svgX = () => { const s = el("span", { class: "row-x-icon", "aria-hidden": "true" }); s.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>'; return s; };
   async function pickWatched() {
     let got = null;
     try { got = await C.platform.files.pickFolder(); } catch (e) { got = null; }
     if (!got) return;
-    const was = watched();
-    // Clips from the folder before stay, as files read from where they are.
-    if (was && was.tree !== got.ref) for (const p of state.pages) if (p.watched === was.tree) delete p.watched;
-    store(WATCH_KEY, { tree: got.ref, name: got.name });
+    const list = watches();
+    const had = list.find((w) => w.tree === got.ref);
+    if (had) {
+      if (had.lost) { delete had.lost; saveWatch(had); }
+      else toast("Already watching " + got.name + ".");
+    } else store(WATCHES_KEY, [...list, { tree: got.ref, name: got.name }]);
     if (state.section === "storage") renderSection();
     await lookInFolder(true);
   }
-  // A file removed from Waypage that's still in the watched folder isn't
+  // A file removed from Waypage that's still in its watched folder isn't
   // added back the next time Waypage looks.
   function forgetWatched(list) {
-    const w = watched();
-    const refs = w ? list.filter((p) => p.watched === w.tree && p.link).map((p) => p.link) : [];
-    if (!refs.length) return;
-    w.skip = [...new Set([...(w.skip || []), ...refs])];
-    store(WATCH_KEY, w);
+    for (const w of watches()) {
+      const refs = list.filter((p) => p.watched === w.tree && p.link).map((p) => p.link);
+      if (!refs.length) continue;
+      w.skip = [...new Set([...(w.skip || []), ...refs])];
+      saveWatch(w);
+    }
   }
-  async function stopWatching() {
-    const w = watched();
-    if (!w) return;
+  async function stopWatching(w) {
     for (const p of state.pages) if (p.watched === w.tree) delete p.watched;
     await C.store.writeIndex(state.pages);
-    localStorage.removeItem(WATCH_KEY);
+    store(WATCHES_KEY, watches().filter((x) => x.tree !== w.tree));
     if (state.section === "storage") renderSection();
     toast("Stopped watching " + w.name + ". Its files stay in your library.");
   }

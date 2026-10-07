@@ -2,6 +2,22 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.4.0] - 2026-10-07
+
+### Added
+- Reading aloud carries on when you leave the clip, for the library,
+  another clip or Settings. A bar along the bottom shows what's being
+  read, with pause, Stop, and a tap that takes you back to it.
+- When a clip read aloud reaches its end, Read next takes the player's
+  place: it opens the next chapter, or the page the clip links to as its
+  next, and reads it from the top.
+- Any number of watched folders: Storage lists them, each with how many
+  files came from it and a Stop, and Watch another folder adds one.
+
+### Fixed
+- The Collection widget showed "problem loading widget" since 1.2.3: its
+  layout used a view Android doesn't allow in widgets.
+
 ## [1.3.0] - 2026-10-07
 
 ### Added
