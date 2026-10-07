@@ -3,6 +3,26 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Big screens (1.5.0).** Daniel approved the 38 boards on the canvas
+  page "1.5 Big screens" "all at once": every screen, every width, one
+  release. The tiers are widths (700 px tablet, 1024 px pinned sidebar,
+  1280 px a third column and the Feeds pane), but row heights follow the
+  pointer, so a tablet with a finger keeps 44 px rows. The save field,
+  the library title, its size and Show and Order are the same nodes
+  moved by fitWidth() when the width crosses 700 px, not copies, so
+  every listener and paint still finds them. The pinned sidebar is the
+  phone's sidebar kept open (state.side stays false; sideShown() decides
+  when it is drawn); a tap in it steps back to the library through
+  history first (toLibrary), so Back still walks the same stack. Dialogs
+  and panels are the same screens and sheets placed differently, chosen
+  when they open (pushScreen's DIALOGS, the sheet's data-pop), so phone
+  code paths are untouched. Keys pressed inside the reader's page reach
+  the app through reader.js's onKey, since the sandboxed frame has the
+  focus. Two pages side by side are the same CSS columns as Pages, each
+  half of the screen laid out as one page, so turning, the progress and
+  where you were work as before. Search and Settings stay in the bar on
+  a tablet, where the sidebar is hidden, though the board had them only
+  in the sidebar: two taps for search was a step back.
 - **Which device read further (1.4.2).** The furthest-read toast (1.3.0)
   said "your other device"; now it names it. Each clip carries `readOn`,
   the name of the device that last moved its place, set wherever

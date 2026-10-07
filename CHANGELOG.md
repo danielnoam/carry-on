@@ -2,6 +2,38 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.5.0] - 2026-10-07
+
+### Added
+- Big screens. On a tablet the save field moves up beside the menu
+  button, clips go two columns, and sheets open as dialogs and panels
+  instead of rising from the bottom. On a laptop or a tablet held
+  sideways the sidebar stays open beside the library, with your tags and
+  Settings in it.
+- The reader on a wide window: the contents beside the text, the section
+  you're in marked, and the licence and the original link under them.
+  Reader settings, Layout: "Pages on a wide window" (One, Two, Auto) and
+  a switch for the contents.
+- Pages go two side by side on a wide window, and so do a PDF's printed
+  pages.
+- A collection on a wide window shows its cover and progress beside its
+  chapters. Feeds at 1280 px and wider opens a post beside the list.
+- Keyboard shortcuts: / to search, D for Downloads, G then L or F, J and
+  K for sections, A for reader settings, and more. Press ? to see them
+  all.
+- Right-click a clip for its menu. Shift-click to pick a run of clips.
+- Drop a link anywhere to save it, or press Ctrl V with no field
+  selected.
+- The picture viewer has previous and next arrows and zoom buttons.
+
+### Changed
+- Settings on a tablet or wider is two panes: its sections down the side
+  and the one you picked beside them, Storage and Sync in two columns.
+- Picking several clips on a big screen puts the actions in one bar at
+  the top.
+- The reading-aloud card sits at the foot of the sidebar when the
+  sidebar is pinned.
+
 ## [1.4.2] - 2026-10-07
 
 ### Added

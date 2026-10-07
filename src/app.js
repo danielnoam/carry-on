@@ -1,7 +1,7 @@
 // Waypage: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "1.4.2";
+  const APP_VERSION = "1.5.0";
   window.Waypage.version = APP_VERSION;
 
   const C = window.Waypage;
@@ -184,7 +184,7 @@
     { value: "heebo", label: "Heebo", family: '"Heebo"' },
   ];
   const MARGINS = { narrow: ["var(--s-3)", "44rem"], normal: ["20px", "38rem"], wide: ["var(--s-7)", "32rem"] };
-  const READING_DEFAULT = { size: 19, spacing: 1.6, font: "serif", hebrew: "auto", margins: "normal", layout: "scroll" };
+  const READING_DEFAULT = { size: 19, spacing: 1.6, font: "serif", hebrew: "auto", margins: "normal", layout: "scroll", spread: "auto", rail: true };
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
   // Before 0.24.0 size was a step of five and spacing a word.
@@ -198,6 +198,8 @@
     if (!HEBREW.some((f) => f.value === r.hebrew)) r.hebrew = READING_DEFAULT.hebrew;
     if (!MARGINS[r.margins]) r.margins = READING_DEFAULT.margins;
     if (r.layout !== "pages") r.layout = "scroll";
+    if (!["one", "two", "auto"].includes(r.spread)) r.spread = "auto";
+    r.rail = r.rail !== false;
     return r;
   }
 
@@ -224,9 +226,12 @@
     store(READING_KEY, { ...readingPrefs(), ...change });
     paintReading();
     if (C.reader && readingPrefs().layout !== was) C.reader.setPaged(readingPrefs().layout === "pages");
+    if (C.reader && "spread" in change) C.reader.setSpread(readingPrefs().spread);
+    if ("rail" in change) fitRail();
     document.querySelectorAll(".reading-controls").forEach(syncReadingControls);
   }
   paintReading();
+  if (C.reader) C.reader.setSpread(readingPrefs().spread);
   if (darkQuery && darkQuery.addEventListener) darkQuery.addEventListener("change", () => { if (state.theme === "system") paintTheme("system"); });
 
   function formatSize(bytes) {
@@ -1246,7 +1251,7 @@
     paintPicks();
     renderDownloads();
     if (state.place === "feeds") renderFeeds();
-    if (state.side) renderSide();
+    if (sideShown()) renderSide();
   }
 
   // The first link in whatever was pasted or shared ("Read this:
@@ -1510,8 +1515,15 @@
     : screen.id === "newsView" && state.section ? $("sectionView")
     : screen.id === "newsView" && state.settings ? $("settingsView") : $("libraryView"));
 
-  // Wide enough for Settings' menu to stay beside the section it opened.
-  const wide = window.matchMedia ? matchMedia("(min-width: 900px)") : { matches: false };
+  // Big screens (1.5.0). From 700 px wide (a tablet) the save field moves
+  // up beside the menu button, Settings' menu stays beside the section it
+  // opened, and sheets open as dialogs and panels. From 1024 px (a laptop,
+  // a tablet held sideways) the sidebar stays open beside the library.
+  const mq = (q) => (window.matchMedia ? matchMedia(q) : { matches: false, addEventListener() {} });
+  const wide = mq("(min-width: 700px)");
+  const pinned = mq("(min-width: 1024px)");
+  // The sidebar is drawn when it's open over the page or pinned beside it.
+  const sideShown = () => state.side || pinned.matches;
 
   // Each push counts, so a pop's animation ending after the same screen
   // was pushed again (back, then a quick tap on it) doesn't hide it and
@@ -1534,6 +1546,13 @@
     return t.rect;
   }
 
+  // On a big screen (1.5.0) Save with options opens as a dialog and
+  // Downloads as a panel under its button, each over a catch that closes
+  // it; a post opened from Feeds at 1280 px reads in a pane beside them.
+  const DIALOGS = { batchView: "dialog", downloadsView: "panel" };
+  const asDialog = (screen) => (wide.matches && DIALOGS[screen.id]) || "";
+  const asPane = (screen) => screen.id === "readerView" && pinned.matches && innerWidth >= 1280 && state.place === "feeds" && !state.folder;
+
   function pushScreen(screen) {
     pushes.set(screen, (pushes.get(screen) || 0) + 1);
     if (screen.id === "sectionView" && wide.matches) {
@@ -1542,6 +1561,25 @@
       return M.arrive(screen, 0);
     }
     delete screen.dataset.beside;
+    const dialog = asDialog(screen);
+    if (dialog || asPane(screen)) {
+      const again = !screen.hidden && !screen.dataset.leaving;
+      delete screen.dataset.leaving;
+      if (dialog) {
+        screen.dataset.dialog = dialog;
+        const c = $("screenCatch");
+        c.classList.toggle("clear", dialog === "panel");
+        c.hidden = false;
+        M.arrive(c, 0);
+        const n = pushes.get(screen);
+        afterSettle(() => { if (pushes.get(screen) === n && !screen.hidden && !screen.dataset.leaving) below(screen).inert = true; });
+      } else screen.dataset.pane = "1";
+      screen.hidden = false;
+      showAloudBar();
+      return again ? Promise.resolve() : M.arrive(screen, dialog === "panel" ? -8 : dialog ? 16 : 0);
+    }
+    delete screen.dataset.dialog;
+    delete screen.dataset.pane;
     delete screen.dataset.leaving;
     const under = below(screen);
     screen.hidden = false;
@@ -1567,6 +1605,15 @@
     const n = pushes.get(screen);
     const hide = () => { if (pushes.get(screen) === n) screen.hidden = true; };
     if (screen.dataset.beside) return M.leave(screen).then(hide);
+    if (screen.dataset.dialog || screen.dataset.pane) {
+      screen.dataset.leaving = "1";
+      if (screen.dataset.dialog) {
+        const c = $("screenCatch"), under = below(screen);
+        M.leave(c).then(() => { if (screen.dataset.leaving) c.hidden = true; });
+        afterSettle(() => { if (pushes.get(screen) === n) under.inert = false; });
+      }
+      return M.leave(screen).then(hide).then(() => showAloudBar());
+    }
     const under = below(screen);
     screen.dataset.leaving = "1";
     const from = zoomed.get(screen);
@@ -1593,7 +1640,9 @@
       trouble = e instanceof C.files.FileError ? e.message : null;
     } finally { opening = null; }
     if (!html) { toast(trouble || "This clip's file is missing. Delete it and save it again."); return; }
-    if (!fromHistory) history.pushState(readerState(p), "");
+    // Another post in the Feeds pane takes the place of the one there.
+    const swap = state.open && $("readerView").dataset.pane && !$("readerView").dataset.leaving;
+    if (!fromHistory) swap ? history.replaceState(readerState(p), "") : history.pushState(readerState(p), "");
     const shown = show(p, html);
     pushScreen($("readerView"));
     await shown;
@@ -1683,6 +1732,12 @@
     $("readProgress").dir = p.dir || "ltr";
     $("readerContents").hidden = true;
     $("readerView").classList.remove("bar-away");
+    // The rail is kept from the last clip while this one loads, so the
+    // text isn't laid out twice; fitRail settles it once it's in.
+    $("readerView").classList.toggle("railed", pinned.matches && readingPrefs().rail && !asPane($("readerView")));
+    $("readerRail").hidden = !$("readerView").classList.contains("railed");
+    fill($("railList"));
+    fill($("readerName"), p.site ? el("span", { class: "reader-site" }, p.site) : null, el("span", { class: "reader-title" }, p.title));
     readerScrolled(p.at || 0, 0);
     return C.reader.open($("readerFrame"), html, p, {
       at: p.at || 0, spot: p.spot || "", next: endLink(p),
@@ -1694,8 +1749,10 @@
       pages: readingPrefs().layout === "pages",
       top: () => $("readerView").querySelector(".reader-bar").offsetHeight,
       bottom: () => $("readFoot").offsetHeight,
+      onKey: onKeys,
     }).then(() => {
       $("readerContents").hidden = C.reader.headings().length < 2;
+      fitRail();
       // Reading aloud carries on across clips (1.4.0): its light and
       // player show again when its clip is the one open.
       setAloud(aloud.state, aloud.index);
@@ -1733,6 +1790,7 @@
     if (state.open && state.open.link) C.files.drawNear($("readerFrame"));
     if (readHere && !readHere.hidden) showReadHere(C.reader.selectionSpot());
     $("readProgress").firstElementChild.style.transform = "scaleX(" + at + ")";
+    railNow();
     if (!$("readerView").classList.contains("bar-away") || aloudHere()) readerFoot(at);
     const bar = $("readerView").querySelector(".reader-bar").offsetHeight;
     let away = $("readerView").classList.contains("bar-away");
@@ -1744,6 +1802,46 @@
     $("readerView").classList.toggle("bar-away", away);
     if (!away) readerFoot(at);
   }
+
+  // ---- The contents rail (1.5.0) ----
+  // From 1024 px the contents sit beside the text, the section being read
+  // marked, with Back, and the licence and the original link at the foot.
+  // Reader settings has a switch to keep it away.
+  const railOn = () => pinned.matches && readingPrefs().rail && !!state.open && !$("readerView").dataset.pane && C.reader.headings().length >= 2;
+  function fitRail() {
+    const on = railOn(), view = $("readerView");
+    const was = view.classList.contains("railed");
+    view.classList.toggle("railed", on);
+    $("readerRail").hidden = !on;
+    if (on) paintRail();
+    if (was !== on && state.open) C.reader.refit();
+  }
+  function paintRail() {
+    const p = state.open;
+    $("railBackLabel").textContent = state.folder || (state.place === "feeds" ? "Feeds" : "Library");
+    fill($("railList"), ...C.reader.headings().map((h, i) => el("li", null,
+      el("button", { class: "rail-row" + (h.level === 3 ? " sub" : ""), type: "button", dir: "auto", onclick: () => C.reader.jumpTo(i) }, h.text))));
+    const link = /^https?:/.test(p.url || "") ? el("button", { class: "rail-original", type: "button", onclick: () => C.platform.openOutside(p.url) }) : null;
+    if (link) link.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>Read the original';
+    fill($("railFoot"),
+      p.licence === "wikipedia" ? el("p", { class: "rail-licence" }, "Text from Wikipedia, CC BY-SA 4.0, by Wikipedia contributors.") : null, link);
+    railNow();
+  }
+  function railNow() {
+    const rail = $("readerRail");
+    if (rail.hidden) return;
+    const now = C.reader.section();
+    let current = -1;
+    C.reader.headings().forEach((h, i) => { if (h.text === now) current = i; });
+    rail.querySelectorAll(".rail-row").forEach((b, i) => {
+      if (i !== current) { b.removeAttribute("aria-current"); return; }
+      if (b.hasAttribute("aria-current")) return;
+      b.setAttribute("aria-current", "location");
+      const list = $("railList"), r = b.getBoundingClientRect(), box = list.getBoundingClientRect();
+      if (r.top < box.top || r.bottom > box.bottom) b.scrollIntoView({ block: "center" });
+    });
+  }
+  $("railBack").addEventListener("click", () => $("readerBack").click());
 
   // The page's h2 and h3 headings; a tap goes there.
   function contentsList() {
@@ -2037,7 +2135,7 @@
     if (!show) {
       if (!bar.hidden && !bar.dataset.leaving) {
         bar.dataset.leaving = "1";
-        document.body.classList.remove("aloud-bar-up");
+        document.body.classList.remove("aloud-bar-up", "aloud-docked");
         M.leave(bar).then(() => { if (bar.dataset.leaving) { bar.hidden = true; delete bar.dataset.leaving; } });
       }
       return;
@@ -2065,6 +2163,18 @@
     const gutter = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--gutter")) || 16;
     const safe = parseFloat(getComputedStyle(bar).getPropertyValue("--safe-bottom")) || 0;
     const w = bar.offsetWidth, h = bar.offsetHeight;
+    // Docked at the foot of the pinned sidebar (1.5.0), over Settings,
+    // when the sidebar is what's beside it.
+    const docked = pinned.matches && !document.querySelector("#readerView:not([hidden]), #settingsView:not([hidden])");
+    bar.classList.toggle("docked", docked);
+    document.body.classList.toggle("aloud-docked", docked);
+    if (docked) {
+      const settings = $("sidebar").querySelector(".side-settings");
+      const foot = settings ? settings.getBoundingClientRect().top : innerHeight - gutter;
+      bar.style.left = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--s-4")) + "px";
+      bar.style.top = foot - h - 8 + "px";
+      return;
+    }
     const put = load(ALOUD_BAR_KEY, null);
     let left, top;
     if (put && typeof put.y === "number") {
@@ -2084,7 +2194,7 @@
     const bar = $("aloudBar");
     let drag = null;
     bar.addEventListener("pointerdown", (e) => {
-      if (e.button) return;
+      if (e.button || bar.classList.contains("docked")) return;
       const r = bar.getBoundingClientRect();
       drag = { id: e.pointerId, x: e.clientX, y: e.clientY, left: r.left, top: r.top, moved: false };
     });
@@ -2277,6 +2387,16 @@
       row("Margins", seg(id + "-margins", "Margins", [
         { value: "narrow", label: "Narrow" }, { value: "normal", label: "Normal" }, { value: "wide", label: "Wide" },
       ], r.margins, (v) => setReading({ margins: v }))),
+      // Big screens (1.5.0): two pages side by side, and the contents
+      // beside the text.
+      wide.matches ? stack("Pages on a wide window", seg(id + "-spread", "Pages on a wide window", [
+        { value: "one", label: "One" }, { value: "two", label: "Two" }, { value: "auto", label: "Auto" },
+      ], r.spread, (v) => setReading({ spread: v }))) : null,
+      wide.matches ? el("label", { class: "rc-row switch-row" },
+        el("span", { class: "choice-text" }, el("span", { class: "rc-label" }, "Contents beside the text"),
+          el("span", { class: "choice-note" }, "On windows 1024 px and wider")),
+        el("input", { class: "switch", type: "checkbox", role: "switch", "data-pref": "rail", checked: r.rail,
+          onchange: (e) => setReading({ rail: e.target.checked }) })) : null,
       withTheme ? stack("Theme", seg(id + "-theme", "Theme",
         [{ value: "system", label: "Auto", swatch: autoSwatch(), auto: true }, ...themeOptions(THEMES)],
         state.theme, (v) => { setTheme(v); syncThemeInputs(); }, "themes scroll")) : null);
@@ -2292,7 +2412,7 @@
         el("button", { class: "step-btn large", type: "button", "data-step": "1", "aria-label": "Larger text", onclick: () => nudge(1) }, "A")), "size"),
       row("Spacing", el("div", { class: "stepper" },
         slider("Line spacing", SPACING_MIN, SPACING_MAX, 0.05, (v) => setReading({ spacing: v }))), "spacing"),
-      el("button", { class: "btn-quiet reset", type: "button", onclick: () => setReading({ ...READING_DEFAULT, layout: readingPrefs().layout, margins: readingPrefs().margins }) }, "Reset text"));
+      el("button", { class: "btn-quiet reset", type: "button", onclick: () => { const r0 = readingPrefs(); setReading({ ...READING_DEFAULT, layout: r0.layout, margins: r0.margins, spread: r0.spread, rail: r0.rail }); } }, "Reset text"));
     const box = el("div", { class: "reading-controls" }, layout, text);
     syncReadingControls(box);
     requestAnimationFrame(() => box.querySelectorAll(".seg.scroll").forEach(showPicked));
@@ -2316,12 +2436,14 @@
     box.querySelector('[data-value="spacing"]').textContent = r.spacing.toFixed(2);
     box.querySelector('[data-step="-1"]').disabled = r.size <= SIZE_MIN;
     box.querySelector('[data-step="1"]').disabled = r.size >= SIZE_MAX;
-    for (const k of ["layout", "margins"]) {
+    const rail = box.querySelector('[data-pref="rail"]');
+    if (rail) rail.checked = r.rail;
+    for (const k of ["layout", "margins", "spread"]) {
       box.querySelectorAll('input[name$="-' + k + '"]').forEach((i) => { i.checked = i.value === r[k]; });
     }
     box.querySelectorAll(".font-pick").forEach((d) => d.set(r[d.dataset.pref]));
     // Reset text leaves the layout as it is.
-    const dflt = Object.keys(READING_DEFAULT).every((k) => k === "layout" || k === "margins" || r[k] === READING_DEFAULT[k]);
+    const dflt = Object.keys(READING_DEFAULT).every((k) => ["layout", "margins", "spread", "rail"].includes(k) || r[k] === READING_DEFAULT[k]);
     box.querySelector(".reset").disabled = dflt;
   }
 
@@ -2378,8 +2500,22 @@
     $(s.button).setAttribute("aria-expanded", "true");
     $("readerView").classList.remove("bar-away");
     $("sheetCatch").hidden = false;
-    $("readingSheet").hidden = false;
-    M.rise($("readingSheet"));
+    const sheet = $("readingSheet");
+    sheet.hidden = false;
+    // From 700 px the sheet is a panel under its button (1.5.0).
+    if (wide.matches) {
+      const at = $(s.button).getBoundingClientRect(), box = $("readerView").getBoundingClientRect();
+      const left = at.left + at.width / 2 < box.left + box.width / 2;
+      sheet.dataset.pop = left ? "start" : "end";
+      sheet.style.top = at.bottom - box.top + 4 + "px";
+      sheet.style.left = left ? Math.max(8, at.left - box.left) + "px" : "";
+      sheet.style.right = left ? "" : Math.max(8, box.right - at.right) + "px";
+      M.arrive(sheet, -8);
+    } else {
+      delete sheet.dataset.pop;
+      sheet.style.top = sheet.style.left = sheet.style.right = "";
+      M.rise(sheet);
+    }
     const first = kind === "contents" ? $("readingSheet").querySelector("[aria-current]") || $("readingSheet").querySelector("button")
       : $("readingSheet").querySelector("button:not(:disabled), input:checked");
     if (first && kind !== "page") afterStart(() => { if (state.sheet === kind) first.focus({ preventScroll: true }); });
@@ -2393,7 +2529,7 @@
     $("sheetCatch").hidden = true;
     const sheet = $("readingSheet");
     if (now) { sheet.hidden = true; return; }
-    M.sink(sheet).then(() => { if (!state.sheet) sheet.hidden = true; });
+    (sheet.dataset.pop ? M.leave(sheet) : M.sink(sheet)).then(() => { if (!state.sheet) sheet.hidden = true; });
     afterStart(() => button.focus({ preventScroll: true }));
   }
 
@@ -2410,16 +2546,9 @@
     state.image = true;
     history.pushState(readerState(state.open, undefined, true), "");
     const viewer = $("imageViewer"), img = $("viewerImg");
-    img.alt = info.alt || info.caption || "";
-    img.src = info.src;
-    $("viewerCaption").textContent = info.caption;
-    $("viewerCaption").hidden = !info.caption;
-    if (info.full && info.full !== info.src && navigator.onLine) {
-      const probe = new Image();
-      probe.onload = () => { if (state.image && img.getAttribute("src") === info.src) img.src = info.full; };
-      probe.src = info.full;
-    }
-    resetView(false);
+    V.list = C.reader.images();
+    V.at = V.list.findIndex((x) => (x.currentSrc || x.src) === info.src);
+    viewImage(info);
     viewer.hidden = false;
     $("readerView").classList.remove("bar-away");
     afterStart(() => { if (state.image) $("viewerClose").focus({ preventScroll: true }); });
@@ -2436,6 +2565,37 @@
       img.animate([{ transform: "translate(" + dx + "px," + dy + "px) scale(" + k + ")" }, { transform: "none" }], t);
     };
     if (img.complete && img.naturalWidth) grow(); else img.addEventListener("load", grow, { once: true });
+  }
+
+  function viewImage(info) {
+    const img = $("viewerImg");
+    img.alt = info.alt || info.caption || "";
+    img.src = info.src;
+    $("viewerCaption").textContent = info.caption;
+    $("viewerCaption").hidden = !info.caption;
+    if (info.full && info.full !== info.src && navigator.onLine) {
+      const probe = new Image();
+      probe.onload = () => { if (state.image && img.getAttribute("src") === info.src) img.src = info.full; };
+      probe.src = info.full;
+    }
+    resetView(false);
+    const many = V.list && V.list.length > 1 && V.at >= 0;
+    $("viewerPrev").hidden = $("viewerNext").hidden = !many;
+    if (many) { $("viewerPrev").disabled = V.at === 0; $("viewerNext").disabled = V.at === V.list.length - 1; }
+  }
+  // The page's other pictures, by arrow buttons and keys (1.5.0).
+  function stepImage(d) {
+    if (!state.image || !V.list || V.at < 0) return;
+    const to = V.at + d;
+    if (to < 0 || to >= V.list.length) return;
+    V.at = to;
+    viewImage(C.reader.imageInfo(V.list[to]));
+    M.arrive($("viewerImg"), 0);
+  }
+  function zoomStep(d) {
+    const r = $("viewerStage").getBoundingClientRect();
+    zoomAt(d > 0 ? V.s * 1.5 : V.s / 1.5, r.left + r.width / 2, r.top + r.height / 2);
+    paintView(true);
   }
 
   function closeImage() {
@@ -2549,6 +2709,10 @@
     paintView(false);
   }, { passive: false });
   $("viewerClose").addEventListener("click", () => history.back());
+  $("viewerPrev").addEventListener("click", () => stepImage(-1));
+  $("viewerNext").addEventListener("click", () => stepImage(1));
+  $("viewerZoomIn").addEventListener("click", () => zoomStep(1));
+  $("viewerZoomOut").addEventListener("click", () => zoomStep(-1));
 
   // ---- Tags ----
   // Any number per page, as typed (trimmed, at most 32 characters), with
@@ -2720,6 +2884,7 @@
     $("folderBody").scrollTop = 0;
     pushScreen($("folderView")).then(() => $("folderBack").focus());
     updateCover(state.folder);
+    if (pinned.matches) renderSide();
   }
 
   function closeFolder() {
@@ -2728,6 +2893,7 @@
     folderMode = "";
     state.folder = null;
     popScreen($("folderView"));
+    if (pinned.matches) renderSide();
   }
 
   // The collection's screen is a book page (0.27.11): its cover and title,
@@ -2883,7 +3049,8 @@
       top = [el("div", { class: "order-hint" },
         el("p", { class: "meta" }, "Drag a chapter by its handle, or use the arrows."),
         el("button", { class: "btn-quiet sort-chapters", type: "button", onclick: () => sortByChapter(list) }, "Sort by chapter"))];
-    } else top = bookHead(list, next, done);
+    // On a big screen the book's cover and facts stand beside its list.
+    } else top = [el("div", { class: "book-side" }, ...bookHead(list, next, done))];
     const showList = folderMode !== "export";
     fill($("folderBody"),
       ...top,
@@ -3252,6 +3419,9 @@
     book: '<path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5zM5 19.5A1.5 1.5 0 0 0 6.5 21H19"/>',
     chapters: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 5.5v2M4.5 11.5v1M4 17h1.5l-1.5 2h1.5"/>',
     remove: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>',
+    tag: '<path d="M3 12V4h8l9 9-8 8z"/><circle cx="7.5" cy="8.5" r="1.2"/>',
+    folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
     star: '<path d="M12 3.5l2.6 5.3 5.9.9-4.25 4.1 1 5.85L12 16.9l-5.25 2.75 1-5.85L3.5 9.7l5.9-.9z"/>',
   };
   function tileButton(icon, label, onclick, cls) {
@@ -3398,7 +3568,8 @@
     state.pages = state.pages.filter((x) => x.id !== p.id);
     await C.store.writeIndex(state.pages);
     if (where === "reader") history.go(state.sheet ? -2 : -1);
-    else await back(andFolder(1));
+    // From a key or the right-click menu (1.5.0) no sheet was opened.
+    else if (where !== "keys") await back(andFolder(1));
     renderLibrary();
     if (state.folder) renderFolder();
     toast(p.link ? "Removed" : "Deleted");
@@ -3412,8 +3583,25 @@
   const picked = () => state.pages.filter((p) => state.select && state.select.has(p.id));
 
   // A tap on a card or a folder: opens it, or picks it while picking.
+  // Shift-click (1.5.0) picks every card from the last one tapped to
+  // this one, and starts picking if it hadn't begun.
+  let shiftTap = false, lastTap = null;
+  document.addEventListener("click", (e) => { shiftTap = e.shiftKey; }, true);
   function tapPages(ids, open) {
+    if (!state.select && shiftTap && open) { lastTap = ids; startSelect(ids); return; }
     if (!state.select) { open(); return; }
+    if (shiftTap && lastTap) {
+      const nodes = [...listNow().querySelectorAll("[data-ids]")];
+      const at = (list) => nodes.findIndex((n) => n.dataset.ids === list.join(","));
+      const a = at(lastTap), b = at(ids);
+      if (a >= 0 && b >= 0) {
+        for (const n of nodes.slice(Math.min(a, b), Math.max(a, b) + 1)) for (const id of n.dataset.ids.split(",")) state.select.add(id);
+        lastTap = ids;
+        paintPicks();
+        return;
+      }
+    }
+    lastTap = ids;
     const all = ids.every((id) => state.select.has(id));
     for (const id of ids) all ? state.select.delete(id) : state.select.add(id);
     paintPicks();
@@ -3530,6 +3718,8 @@
     remove: { label: "Remove collection", build: removeSheet },
     addFeed: { label: "Add a feed", build: addFeedSheet },
     feed: { label: "Feed", build: feedSheet },
+    export: { label: "Export", build: () => exportControls(state.menu.page, () => history.back()) },
+    keys: { label: "Keyboard shortcuts", build: keysSheet },
   };
   let menuUnder = [];
 
@@ -3543,7 +3733,9 @@
     $("menuCatch").hidden = false;
     $("menuSheet").hidden = false;
     M.arrive($("menuCatch"), 0);
-    M.rise($("menuSheet"));
+    // From 700 px a sheet is a dialog in the middle (1.5.0).
+    $("menuSheet").dataset.kind = kind;
+    if (wide.matches) M.arrive($("menuSheet"), 16); else M.rise($("menuSheet"));
     const open = state.menu;
     afterSettle(() => {
       if (state.menu !== open) return;
@@ -3566,7 +3758,7 @@
     menuUnder = [];
     const sheet = $("menuSheet"), catcher = $("menuCatch");
     M.leave(catcher).then(() => { if (!state.menu) catcher.hidden = true; });
-    M.sink(sheet).then(() => { if (!state.menu) sheet.hidden = true; });
+    (wide.matches ? M.leave(sheet) : M.sink(sheet)).then(() => { if (!state.menu) sheet.hidden = true; });
     afterSettle(() => was.forEach((n) => { n.inert = false; }));
   }
 
@@ -3657,10 +3849,11 @@
   }
 
   function longPress(root) {
-    let timer = null, start = null, fired = false;
+    let timer = null, start = null, fired = false, mouse = false;
     const cancel = () => { clearTimeout(timer); timer = null; };
     root.addEventListener("pointerdown", (e) => {
       fired = false;
+      mouse = e.pointerType === "mouse";
       const node = e.button === 0 && e.target.closest("[data-ids]");
       if (!node || e.target.closest(".card-retry, .move")) return;
       start = { x: e.clientX, y: e.clientY };
@@ -3681,9 +3874,80 @@
       e.preventDefault();
       cancel();
       if (fired) return;
+      // A right-click on a big screen opens a menu where it was clicked.
+      if (mouse && wide.matches && !state.select && !node.classList.contains("tile")) { clipMenu(node, e.clientX, e.clientY); return; }
       fired = true;
       onLongPress(node);
     });
+  }
+
+  // The right-click menu (1.5.0): what the clip's sheet does, as a list
+  // by the pointer, with each one's key.
+  function clipMenu(node, x, y) {
+    closeClipMenu(true);
+    const p = state.pages.find((q) => q.id === node.dataset.ids.split(",")[0]);
+    if (!p) return;
+    const item = (icon, label, onclick, opts = {}) => {
+      const b = el("button", { class: "pop-item" + (opts.warn ? " warn" : ""), type: "button", role: "menuitem", tabindex: "-1",
+        onclick: () => { closeClipMenu(true); onclick(); } },
+        el("span", { class: "pop-icon", "aria-hidden": "true" }), el("span", { class: "pop-label" }, label),
+        opts.key ? el("kbd", { class: "pop-key" }, opts.key) : null);
+      b.firstChild.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICONS[icon] + "</svg>";
+      return b;
+    };
+    const sep = () => el("div", { class: "pop-sep", role: "separator" });
+    const pop = el("div", { class: "pop-menu clip-pop", id: "clipPop", role: "menu", "aria-label": p.title },
+      item("open", "Open", () => openPage(p.id), { key: "Enter" }),
+      p.file ? null : item("original", "Open the original", () => C.platform.openOutside(p.url)),
+      sep(),
+      item("star", p.fav ? "Unfavourite" : "Favourite", () => setFavourite([p], !p.fav), { key: "F" }),
+      item("tag", "Tags and collection…", () => openMenu("page", p)),
+      item("check", p.finished ? "Mark as unread" : "Mark as read", () => markRead([p], !p.finished)),
+      sep(),
+      p.file ? null : item("share", "Share…", () => shareLink(p)),
+      p.link ? null : item("send", "Export…", () => openMenu("export", p), { key: "E" }),
+      item("select", "Select", () => startSelect([p.id]), { key: "X" }),
+      sep(),
+      item("remove", p.link ? "Remove from Waypage" : "Delete", () => deletePage(p, "keys"), { warn: true, key: "Del" }));
+    document.body.append(pop);
+    const w = pop.offsetWidth, h = pop.offsetHeight;
+    pop.style.left = Math.max(8, Math.min(x, innerWidth - w - 8)) + "px";
+    pop.style.top = Math.max(8, Math.min(y, innerHeight - h - 8)) + "px";
+    node.classList.add("menu-on");
+    clipMenuFor = node;
+    M.arrive(pop, -8);
+    const items = () => [...pop.querySelectorAll(".pop-item:not(:disabled)")];
+    items()[0].focus({ preventScroll: true });
+    pop.addEventListener("keydown", (e) => {
+      const all = items(), i = all.indexOf(document.activeElement);
+      const to = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: all.length - 1 }[e.key];
+      if (to !== undefined) { e.preventDefault(); all[(to + all.length) % all.length].focus(); }
+      else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeClipMenu(); }
+      else if (e.key === "Tab") closeClipMenu(true);
+    });
+    setTimeout(() => {
+      addEventListener("pointerdown", outsideClipMenu, true);
+      addEventListener("scroll", closeOnScroll, { capture: true, once: true });
+    });
+  }
+  let clipMenuFor = null;
+  const closeOnScroll = () => closeClipMenu(true);
+  function outsideClipMenu(e) {
+    const pop = $("clipPop");
+    if (pop && !pop.contains(e.target)) closeClipMenu(true);
+  }
+  function closeClipMenu(away) {
+    const pop = $("clipPop");
+    removeEventListener("pointerdown", outsideClipMenu, true);
+    removeEventListener("scroll", closeOnScroll, true);
+    const node = clipMenuFor;
+    clipMenuFor = null;
+    if (node) node.classList.remove("menu-on");
+    if (!pop) return;
+    pop.removeAttribute("id");
+    pop.style.pointerEvents = "none";
+    M.leave(pop).then(() => pop.remove());
+    if (!away && node) { const b = node.querySelector("button"); if (b) b.focus({ preventScroll: true }); }
   }
 
   // ---- Pages leaving the app, and coming back (backup.js) ----
@@ -4243,7 +4507,7 @@
         getFeeds: () => feeds,
         setFeeds: syncedFeeds,
         getSeen: () => load(FEEDS_SEEN_KEY, 0),
-        setSeen: (at) => { store(FEEDS_SEEN_KEY, at); if (state.side) renderSide(); },
+        setSeen: (at) => { store(FEEDS_SEEN_KEY, at); if (sideShown()) renderSide(); },
         sameUrl,
         onProgress: () => { if (state.section === "sync") renderSection(); paintDownloads(); },
       });
@@ -5494,7 +5758,7 @@
 
   function paintFeeds() {
     if (state.place === "feeds") renderFeeds();
-    if (state.side) renderSide();
+    if (sideShown()) renderSide();
     if (state.menu && state.menu.kind === "feed") redrawMenu();
   }
 
@@ -5515,11 +5779,15 @@
   }
 
   function goPlace(place, feed) {
+    // The pinned sidebar is there over a collection or Files too: a tap in
+    // it steps back to the library first.
+    if (pinned.matches && history.state && history.state.view) return toLibrary().then(() => goPlace(place, feed));
     state.place = place;
     state.feed = feed || null;
     store(PLACE_KEY, place);
     const done = state.side ? back() : Promise.resolve();
     paintPlace();
+    if (pinned.matches) renderSide();
     scrollTo(0, 0);
     return done;
   }
@@ -5653,7 +5921,9 @@
     } finally { previewing = null; }
     got.meta.feed = f.url;
     got.meta.post = it.url;
-    history.pushState(readerState(got.meta), "");
+    const swap = state.open && $("readerView").dataset.pane && !$("readerView").dataset.leaving;
+    if (swap) { closeSheet(true); history.replaceState(readerState(got.meta), ""); }
+    else history.pushState(readerState(got.meta), "");
     const shown = show(got.meta, got.html);
     pushScreen($("readerView"));
     await shown;
@@ -5695,8 +5965,13 @@
     return box;
   };
 
+  // Off the sidebar to the library: the sidebar put away, or with it
+  // pinned, whatever is open over the library.
+  const fromSide = () => (pinned.matches ? toLibrary() : back());
+
   function openFromSide(name) {
-    return back().then(() => {
+    if (pinned.matches && state.folder === name) return Promise.resolve();
+    return fromSide().then(() => {
       if (state.place !== "library") { state.place = "library"; store(PLACE_KEY, "library"); paintPlace(); }
       openFolder(name);
     });
@@ -5715,13 +5990,18 @@
     const fresh = freshPosts();
     const inFeeds = state.place === "feeds";
     const latest = (f) => Math.max(0, ...f.items.map(postAt));
+    const big = wide.matches;
+    const inLibrary = !inFeeds && state.part !== "files" && !state.folder;
     fill($("sidebar"),
-      el("p", { class: "side-title" }, "Waypage"),
-      item(feedIcon("library"), "Library", !inFeeds && state.part !== "files", count(state.pages.length, "side-count"), () => goPlace("library")),
+      el("div", { class: "side-head" },
+        el("p", { class: "side-title" }, "Waypage"),
+        big && !inFeeds ? el("button", { class: "icon-btn side-search", type: "button", "aria-label": "Search", title: "Search (/)",
+          onclick: () => (pinned.matches ? toLibrary() : back()).then(() => { if (state.place !== "library") goPlace("library"); openSearch(); }) }, sideSvg("search")) : null),
+      item(feedIcon("library"), "Library", inLibrary, count(state.pages.length, "side-count"), () => goPlace("library")),
       ...[...foldersByUse().filter(folderFav), ...foldersByUse().filter((f) => !folderFav(f))].slice(0, SIDE_MAX).map((name) =>
-        item(sideCover(name), name, false, count(freshCount(name)), () => openFromSide(name), "side-sub")),
+        item(sideCover(name), name, state.folder === name, count(freshCount(name)), () => openFromSide(name), "side-sub")),
       // Files of your own (0.31.0), their part of the library.
-      state.pages.some((p) => p.link) ? item(fileMark(), "Files", !inFeeds && state.part === "files", null, () => back().then(() => {
+      state.pages.some((p) => p.link) ? item(fileMark(), "Files", !inFeeds && state.part === "files", null, () => fromSide().then(() => {
         if (state.place !== "library") { state.place = "library"; store(PLACE_KEY, "library"); paintPlace(); }
         if (state.part !== "files") openPart("files");
       }), "side-sub") : null,
@@ -5729,11 +6009,43 @@
       item(feedIcon("feeds"), "Feeds", inFeeds && !state.feed, fresh ? el("span", { class: "side-pill" }, fresh + " new") : null,
         () => goPlace("feeds")),
       ...[...feeds].sort((a, b) => latest(b) - latest(a)).slice(0, SIDE_MAX).map((f) =>
-        withFeed(item(feedMark(f, true), f.title, inFeeds && state.feed === f.url, count(waitingIn(f)), () => goPlace("feeds", f.url), "side-sub"), f)));
+        withFeed(item(feedMark(f, true), f.title, inFeeds && state.feed === f.url, count(waitingIn(f)), () => goPlace("feeds", f.url), "side-sub"), f)),
+      // On a big screen the sidebar carries the rest (1.5.0): Add a feed,
+      // the tags, and Settings at its foot.
+      ...(big ? sideMore() : []));
+  }
+
+  function sideMore() {
+    const tags = allTags().slice(0, 12);
+    const leave = () => (state.side ? back() : Promise.resolve());
+    return [
+      el("button", { class: "side-link", type: "button", onclick: () => leave().then(() => openMenu("addFeed", { url: "" })) }, "Add a feed"),
+      tags.length ? el("hr", { class: "side-line" }) : null,
+      tags.length ? el("p", { class: "side-over" }, "Tags") : null,
+      tags.length ? el("div", { class: "side-tags" }, ...tags.map((t) => {
+        const on = state.place === "library" && state.filter === "#" + t;
+        const b = el("button", { class: "chip side-tag" + (on ? " on" : ""), type: "button", "aria-pressed": String(on), dir: "auto",
+          onclick: () => goPlace("library").then(() => setFilter(on ? "all" : "#" + t)) }, "#" + t);
+        return b;
+      })) : null,
+      el("span", { class: "side-gap", "aria-hidden": "true" }),
+      el("button", { class: "side-item side-settings", type: "button", onclick: () => leave().then(() => openSettings()) },
+        sideSvg("settings"), el("span", { class: "side-label" }, "Settings")),
+    ];
+  }
+
+  const SIDE_SVG = {
+    search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
+    settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+  };
+  function sideSvg(name) {
+    const box = el("span", { class: "side-icon", "aria-hidden": "true" });
+    box.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + SIDE_SVG[name] + "</svg>";
+    return box;
   }
 
   function openSide() {
-    if (state.side) return;
+    if (state.side || pinned.matches) return;
     state.side = true;
     history.pushState({ view: "side" }, "");
     renderSide();
@@ -5757,6 +6069,13 @@
     state.side = false;
     sideByBack = false;
     const side = $("sidebar"), catcher = $("sideCatch");
+    // The window grew wide enough to pin it while it was open: it stays.
+    if (pinned.matches) {
+      catcher.hidden = true;
+      side.style.pointerEvents = "";
+      $("libraryView").inert = false;
+      return;
+    }
     const had = side.contains(document.activeElement);
     $("sideBtn").setAttribute("aria-expanded", "false");
     side.style.pointerEvents = "none";
@@ -5768,6 +6087,200 @@
       if (state.side) return;
       $("libraryView").inert = false;
       if (had) $("sideBtn").focus({ preventScroll: true });
+    });
+  }
+
+  // ---- Big screens (1.5.0) ----
+  // From 700 px the save field sits in the bar at the top, and the
+  // library's name, size, Show and Order share a row under it. From 1024 px
+  // the sidebar is pinned beside everything but the reader and Settings.
+  const libHead = el("div", { class: "lib-head" });
+  function fitWidth() {
+    const bar = $("topBar"), form = $("saveForm"), top = $("libraryView").querySelector(".top");
+    if (wide.matches && form.parentElement !== bar) {
+      bar.insertBefore(form, bar.querySelector(".top-actions"));
+      top.prepend(libHead);
+      libHead.append($("placeTitle"), $("libraryMeta"), $("libTools"));
+    } else if (!wide.matches && form.parentElement === bar) {
+      $("libraryView").querySelector(".save-bar").append(form);
+      bar.insertBefore($("placeTitle"), bar.querySelector(".top-actions"));
+      top.prepend($("libraryMeta"));
+      $("searchNote").after($("libTools"));
+      libHead.remove();
+    }
+    const side = $("sidebar");
+    document.body.classList.toggle("pinned", pinned.matches);
+    if (pinned.matches) {
+      if (state.side) history.back();
+      side.hidden = false;
+      side.style.pointerEvents = "";
+      renderSide();
+    } else if (!state.side) side.hidden = true;
+    else renderSide();
+    if (state.open) fitRail();
+    if (!$("aloudBar").hidden) placeAloudBar();
+  }
+
+  // ---- Keys (1.5.0) ----
+  // Escape steps back; in pages the arrows turn them. With a keyboard the
+  // rest of the app has letters too, listed behind "?". Keys pressed in
+  // the reader's page come here through reader.js.
+  const KEYS = [
+    ["Anywhere", [["/", "Search the library"], [(/Mac/.test(navigator.platform) && navigator.maxTouchPoints < 2 ? "⌘" : "Ctrl") + " V", "Save a copied link"], ["G then L", "Go to the library"],
+      ["G then F", "Go to Feeds"], ["D", "Downloads"], [",", "Settings"], ["?", "These shortcuts"]]],
+    ["In the library", [["↑ ↓", "Move between clips"], ["Enter", "Open"], ["X", "Pick, to act on several"], ["Shift-click", "Pick a run"],
+      ["F", "Favourite"], ["E", "Export"], ["Del", "Delete"]]],
+    ["Reading", [["Space  ← →", "Next or previous page"], ["J  K", "Next or previous section"], ["T", "Contents beside the text"],
+      ["S", "Read aloud"], ["A", "Reader settings"], ["+  −", "Text size"], ["O", "Open the original"], ["Esc", "Back"]]],
+  ];
+  function keysSheet() {
+    return el("div", { class: "keys-sheet" },
+      el("h2", { class: "menu-title" }, "Keyboard shortcuts"),
+      el("div", { class: "keys-groups" }, ...KEYS.map(([title, rows]) => el("section", { class: "keys-group" },
+        el("h3", { class: "overline" }, title),
+        el("dl", { class: "keys-list" }, ...rows.flatMap(([k, what]) => [
+          el("dt", null, ...k.split(/(\s+then\s+|\s{2}|\s(?=\S))/).filter((x) => x.trim()).map((x) => /then/.test(x) ? el("span", { class: "keys-then" }, " then ") : el("kbd", null, x.trim()))),
+          el("dd", null, what)]))))));
+  }
+
+  const typingIn = (t) => !!(t && t.closest && t.closest("input, textarea, select, [contenteditable]"));
+  // The card or collection with focus, in the list on screen.
+  const listNow = () => (state.folder ? $("folderBody") : state.place === "feeds" ? $("feeds") : $("library"));
+  const focusedNode = () => { const a = document.activeElement; return a && a.closest && listNow().contains(a) ? a.closest("[data-ids]") : null; };
+  const focusedPage = () => {
+    const n = focusedNode();
+    const ids = n ? n.dataset.ids.split(",") : [];
+    return ids.length === 1 && !n.classList.contains("tile") ? state.pages.find((p) => p.id === ids[0]) || null : null;
+  };
+  function moveFocus(d) {
+    const all = [...listNow().querySelectorAll(".card-open, .post-open")].filter((b) => b.offsetParent);
+    if (!all.length) return false;
+    const at = all.indexOf(document.activeElement);
+    const to = all[at < 0 ? (d > 0 ? 0 : all.length - 1) : Math.max(0, Math.min(all.length - 1, at + d))];
+    to.focus({ preventScroll: true });
+    to.closest(".card, .tile, .post").scrollIntoView({ block: "nearest" });
+    return true;
+  }
+  function jumpSection(d) {
+    const list = C.reader.headings();
+    if (!list.length) return;
+    const now = C.reader.section();
+    let at = -1;
+    list.forEach((h, i) => { if (h.text === now) at = i; });
+    C.reader.jumpTo(Math.max(0, Math.min(list.length - 1, at + d)));
+  }
+
+  let gAt = 0;
+  function onKeys(e) {
+    if (e.defaultPrevented || e.isComposing) return;
+    const k = e.key, inFrame = e.target && e.target.ownerDocument !== document;
+    if (k === "Escape" && (state.sheet || state.image || state.menu || state.select || state.side)) { history.back(); return; }
+    if (state.image && !e.altKey && !e.ctrlKey && !e.metaKey) {
+      const act = { ArrowLeft: () => stepImage(-1), ArrowRight: () => stepImage(1), "+": () => zoomStep(1), "=": () => zoomStep(1), "-": () => zoomStep(-1) }[k];
+      if (act) { e.preventDefault(); act(); }
+      return;
+    }
+    if (e.altKey || e.ctrlKey || e.metaKey || typingIn(e.target)) return;
+    // In pages, the arrow keys turn them (inside the page, src/reader.js
+    // does the same).
+    if (state.open && !state.sheet && !state.image && C.reader.paged) {
+      const rtl = state.open.dir === "rtl";
+      const d = { ArrowRight: rtl ? -1 : 1, ArrowLeft: rtl ? 1 : -1, PageDown: 1, PageUp: -1 }[k];
+      if (d) { e.preventDefault(); C.reader.turn(d); return; }
+    }
+    const go = (fn) => { e.preventDefault(); fn(); };
+    if (k === "?") { go(() => { if (state.menu && state.menu.kind === "keys") history.back(); else if (!state.menu) openMenu("keys"); }); return; }
+    if (state.menu || state.sheet || state.image || state.side || state.batch || state.downloads || state.news) return;
+    if (state.open) {
+      const p = state.open;
+      const size = (d) => setReading({ size: clamp(readingPrefs().size + d, SIZE_MIN, SIZE_MAX) });
+      const acts = {
+        Escape: () => $("readerBack").click(),
+        j: () => jumpSection(1), k: () => jumpSection(-1),
+        t: () => (pinned.matches ? setReading({ rail: !readingPrefs().rail }) : !$("readerContents").hidden && toggleSheet("contents")),
+        s: () => !$("readerAloud").hidden && $("readerAloud").click(),
+        a: () => toggleSheet("reading"),
+        "+": () => size(1), "=": () => size(1), "-": () => size(-1), "−": () => size(-1),
+        o: () => /^https?:/.test(p.url || "") && C.platform.openOutside(p.url),
+        // In scroll, Space in the page scrolls it already.
+        " ": () => (C.reader.paged ? C.reader.turn(e.shiftKey ? -1 : 1)
+          : !inFrame && $("readerFrame").contentWindow.scrollBy({ top: (e.shiftKey ? -0.85 : 0.85) * $("readerFrame").clientHeight, behavior: M.reduced() ? "auto" : "smooth" })),
+      };
+      const act = acts[k.length === 1 ? k.toLowerCase() : k];
+      if (act && !(k === " " && inFrame && !C.reader.paged)) go(act);
+      return;
+    }
+    if (state.settings) {
+      if (k === "Escape") go(() => history.go(state.section && wide.matches ? -2 : -1));
+      return;
+    }
+    if (Date.now() - gAt < 1200) {
+      gAt = 0;
+      const to = { l: "library", f: "feeds" }[k.toLowerCase()];
+      if (to) go(() => goPlace(to));
+      return;
+    }
+    const p = focusedPage(), node = focusedNode();
+    const acts = {
+      g: () => { gAt = Date.now(); },
+      "/": () => (state.folder ? toLibrary() : Promise.resolve()).then(() => (state.place === "feeds" ? goPlace("library") : null)).then(openSearch),
+      d: () => openDownloads(),
+      ",": () => openSettings(),
+      Escape: () => history.state && history.state.view && history.back(),
+      ArrowDown: () => moveFocus(1), ArrowUp: () => moveFocus(-1),
+      x: () => node && (state.select ? tapPages(node.dataset.ids.split(",")) : startSelect(node.dataset.ids.split(","))),
+      f: () => p && setFavourite([p], !p.fav),
+      e: () => p && !p.link && openMenu("export", p),
+      Delete: () => (state.select ? deletePicked() : p && deletePage(p, "keys")),
+      Backspace: () => (state.select ? deletePicked() : p && deletePage(p, "keys")),
+    };
+    const act = acts[k.length === 1 ? k.toLowerCase() : k];
+    if (act) go(act);
+  }
+
+  // Ctrl V (⌘ V) with no field to paste into saves the link, from 700 px.
+  document.addEventListener("paste", (e) => {
+    if (!wide.matches || typingIn(e.target) || state.open || state.menu || state.settings || state.batch) return;
+    const text = (e.clipboardData && e.clipboardData.getData("text")) || "";
+    const links = linksFrom(text);
+    if (!links.length) return;
+    e.preventDefault();
+    saveTyped(text);
+  });
+
+  // A link dropped anywhere on the library is saved (1.5.0); a list of
+  // them goes to Save with options.
+  function saveTyped(text) {
+    if (state.place === "feeds") { openMenu("addFeed", { url: text.trim() }); return; }
+    if (linksFrom(text).length > 1) { openBatch(text); return; }
+    const url = linkFrom(text);
+    if (!url) { toast("That doesn't look like a link. Paste the page's address."); return; }
+    savePage(url);
+  }
+  {
+    const zone = $("dropZone");
+    const linky = (e) => !!e.dataTransfer && [...e.dataTransfer.types].some((t) => t === "text/uri-list" || t === "text/plain")
+      && !state.open && !state.menu && !state.settings && !state.batch;
+    let depth = 0;
+    const hide = () => { depth = 0; if (!zone.hidden && !zone.dataset.leaving) { zone.dataset.leaving = "1"; M.leave(zone).then(() => { if (zone.dataset.leaving) { zone.hidden = true; delete zone.dataset.leaving; } }); } };
+    document.addEventListener("dragenter", (e) => {
+      if (!linky(e)) return;
+      depth++;
+      if (zone.hidden || zone.dataset.leaving) {
+        $("dropTitle").textContent = state.place === "feeds" ? "Drop to follow" : "Drop to save";
+        delete zone.dataset.leaving;
+        zone.hidden = false;
+        M.arrive(zone, 0);
+      }
+    });
+    document.addEventListener("dragover", (e) => { if (linky(e)) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; } });
+    document.addEventListener("dragleave", () => { if (--depth <= 0) hide(); });
+    document.addEventListener("drop", (e) => {
+      if (!linky(e)) { hide(); return; }
+      e.preventDefault();
+      hide();
+      const text = e.dataTransfer.getData("text/uri-list").split(/\r?\n/).filter((l) => l && !l.startsWith("#")).join("\n") || e.dataTransfer.getData("text/plain");
+      if (text) saveTyped(text);
     });
   }
 
@@ -5811,7 +6324,7 @@
   const backOpens = C.platform.onBack(({ canGoBack }) => {
     if (state.side && sideByBack) { C.platform.exitApp(); return; }
     if (canGoBack && history.state && history.state.view) { history.back(); return; }
-    if (!state.side) { openSide(); sideByBack = true; return; }
+    if (!state.side && !pinned.matches) { openSide(); sideByBack = true; return; }
     C.platform.exitApp();
   });
 
@@ -6422,6 +6935,7 @@
   function renderSection() {
     const s = SECTIONS[state.section];
     $("sectionTitle").textContent = s.title;
+    $("sectionBody").dataset.key = state.section;
     fill($("sectionBody"), ...s.build());
   }
 
@@ -6449,6 +6963,8 @@
   // `at` names a section to open over the menu (the update bar opens Updates).
   function openSettings(fromHistory, at) {
     if (state.settings) return;
+    // With room for the section beside the menu, the first one is open.
+    if (wide.matches && !at && !fromHistory) at = "appearance";
     state.settings = true;
     renderSettings();
     if (!fromHistory) history.pushState({ view: "settings" }, "");
@@ -6478,7 +6994,12 @@
     if (view !== "news") closeNews();
     if (view !== "downloads") closeDownloads();
     if (!inSettings) closeSettings();
-    else if (!s.section) closeSection();
+    else if (!s.section) {
+      // Back from a section beside the menu leaves Settings altogether.
+      const had = state.section && state.settings && wide.matches && view === "settings";
+      closeSection();
+      if (had) { history.back(); return; }
+    }
     if (view !== "batch") closeBatch();
     if (view === "batch") openBatch("", true, s.folder);
     const part = (view === "part" && s.part) || (["folder", "reader", "menu", "select"].includes(view) && state.part) || null;
@@ -6512,6 +7033,9 @@
 
   $("settingsBtn").addEventListener("click", () => openSettings());
   $("sideBtn").addEventListener("click", openSide);
+  fitWidth();
+  wide.addEventListener("change", fitWidth);
+  pinned.addEventListener("change", fitWidth);
   holdFeeds($("feeds"));
   holdFeeds($("sidebar"));
   swipeToSide($("libraryView"));
@@ -6520,6 +7044,8 @@
   $("sideCatch").addEventListener("click", () => history.back());
   $("downloadsBtn").addEventListener("click", () => openDownloads());
   $("downloadsBack").addEventListener("click", () => history.back());
+  $("screenCatch").addEventListener("click", () => history.back());
+  $("readKeys").addEventListener("click", () => openMenu("keys"));
   // The notification's Stop (Android) stops every run.
   C.platform.downloads.onStop(() => {
     for (const r of [...runs]) stopRun(r);
@@ -6546,7 +7072,7 @@
   $("menuCatch").addEventListener("click", () => history.back());
   longPress($("library"));
   longPress($("folderBody"));
-  $("settingsBack").addEventListener("click", () => history.back());
+  $("settingsBack").addEventListener("click", () => history.go(state.section && wide.matches ? -2 : -1));
   $("folderBack").addEventListener("click", () => history.back());
   $("folderMore").addEventListener("click", openFolderMenu);
   $("folderCancel").addEventListener("click", () => setFolderMode(""));
@@ -6608,17 +7134,7 @@
   $("readerAa").addEventListener("click", () => toggleSheet("reading"));
   $("readerContents").addEventListener("click", () => toggleSheet("contents"));
   $("sheetCatch").addEventListener("click", () => history.back());
-  addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !e.defaultPrevented && (state.sheet || state.image || state.menu || state.select || state.side)) history.back();
-    // In pages, the arrow keys turn them (inside the page, src/reader.js
-    // does the same).
-    if (state.open && !state.sheet && !state.image && C.reader.paged && !e.altKey && !e.ctrlKey && !e.metaKey
-      && !(e.target.closest && e.target.closest("input, textarea, select, [contenteditable]"))) {
-      const rtl = state.open.dir === "rtl";
-      const d = { ArrowRight: rtl ? -1 : 1, ArrowLeft: rtl ? 1 : -1, PageDown: 1, PageUp: -1 }[e.key];
-      if (d) { e.preventDefault(); C.reader.turn(d); }
-    }
-  });
+  addEventListener("keydown", onKeys);
   addEventListener("popstate", (e) => route(e.state));
   addEventListener("online", () => { showOffline(); renderLibrary(); });
   addEventListener("offline", () => { showOffline(); renderLibrary(); });

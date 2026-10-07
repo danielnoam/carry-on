@@ -105,6 +105,10 @@ figure .co-placeholder { border-width: 0 0 1.5px; border-radius: 0; }
 .co-comic .co-placeholder { margin: 0; border-radius: 0; }
 /* A PDF's printed pages (1.1.3): a gap shows where one page ends. */
 .co-printed img + img { margin-top: var(--s-2); }
+/* Two side by side on a wide window (1.5.0). */
+html.co-spread body:has(.co-printed) { max-width: 76rem; }
+html.co-spread .co-printed { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); margin: 0; }
+html.co-spread .co-printed img + img { margin-top: 0; }
 
 .co-licence {
   margin-top: var(--s-6); padding-top: var(--s-2);

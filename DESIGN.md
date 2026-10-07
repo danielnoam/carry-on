@@ -664,24 +664,36 @@ and the page shows above it.
   Channel "New posts", default importance, one notification that counts
   up until the app is opened, then goes.
 
-- **Big screens (Target, 7 Oct 2026), `design/UI-Big-*.dc.html`:** at
-  1024 px and wider the sidebar stays open (272 px, the same list as
-  the phone's: Library with its recent collections, Files, Feeds with
-  its recent feeds and Add a feed, tags as chips, Settings at the foot)
-  and the save field moves to the top of the main column, 48 px, with
-  Save and the list button; links dropped anywhere on the window save.
-  The library keeps its sections: Continue reading as one wide card
-  with a Continue button, Collections as a row of 136 px covers, Clips
-  in three columns. The reader puts a contents rail where the sidebar
-  was (the headings, the current one on `--bar`, the licence and the
-  original link at its foot), the text on a centred 680 px measure,
-  the bar's buttons with their key in the tooltip, and a 40 px hints
-  strip at the bottom (J/K sections, arrows for pages, Esc, ? for all
-  shortcuts). A collection shows its cover, name, progress, Continue
-  and Check for new in a 300 px column beside the chapter list. Settings
-  is two panes: its sections in a 232 px list, the picked one on the
-  right in grouped rows with segmented controls and switches.
-  Narrower than 1024 px everything stacks back to the phone layout.
+- **Big screens (Now, 1.5.0), `design/XL-*.dc.html`:** three widths.
+  Under 700 px is the phone layout, unchanged. From 700 px (a tablet)
+  the save field sits in the bar at the top (48 px, a link icon inside,
+  Save and the options button as one pair, Downloads beside), the
+  library's name, size, Show and Order share one row under it, clips go
+  two columns (three from 1280 px, Grid three then four), sheets over
+  the library open as dialogs in the middle (480 px, the shortcuts list
+  wider), the reader's Aa, ⋯ and Contents open as 376 px panels under
+  their buttons, Save with options is a 640 px dialog and Downloads a
+  416 px panel under its button, picking several puts Cancel, the count
+  and the actions in one bar along the top, and Settings is two panes:
+  its own 300 px sidebar ("‹ Library", the title, the sections) and the
+  section beside it, opened on Appearance. From 1024 px the sidebar is
+  pinned (`--side-w`, 272 px: Waypage and Search, Library and recent
+  collections, Files, Feeds and recent feeds, Add a feed, Tags as chips,
+  Settings at its foot), a collection opens beside it in two columns
+  (cover and facts, then the chapter list), the reading-aloud card docks
+  at the sidebar's foot, the reader puts its contents in a rail
+  (`--rail-w`, 272 px: Back, the headings with the one being read on
+  `--bar`, the licence and Read the original at its foot; Reader
+  settings has a switch for it), Pages go two side by side (Reader
+  settings: One, Two, Auto from 1000 px), and so do a PDF's printed
+  pages; Storage and Sync take two columns. From 1280 px a post opened
+  in Feeds reads in a pane beside the 500 px river. Everywhere from
+  700 px: right-click on a clip opens a menu at the pointer with each
+  item's key, a link dropped anywhere saves ("Drop to save"), Ctrl V with
+  no field focused saves the copied link, the image viewer has previous,
+  next and zoom buttons, and the keys are listed behind "?" (the reader's
+  foot shows "? Shortcuts" with a mouse). Row heights follow the pointer,
+  not the width: 44 px or more for a finger, 40 px for a mouse.
 
 ## 6. Voice
 

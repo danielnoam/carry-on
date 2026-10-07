@@ -143,6 +143,10 @@
     };
   }
 
+  // The page's pictures in order, for the viewer's previous and next
+  // (1.5.0); icons and the like are left out.
+  const images = () => (doc ? [...doc.body.querySelectorAll("img")].filter((img) => !img.closest(".co-next") && (img.closest("figure") || img.width >= 120)) : []);
+
   // In an image chapter a tap shows or hides the bar, as text does, and a
   // double tap zooms in on that spot, or back out (1.2.2).
   let tapTimer = 0;
@@ -424,6 +428,8 @@
   // and at the bottom for the line under it (1.1.0), so the end of a page
   // (its Next card) clears it.
   function applyTop() {
+    // A PDF's printed pages go two side by side as the text does (1.5.0).
+    if (doc) doc.documentElement.classList.toggle("co-spread", !!doc.querySelector(".co-printed") && twoUp(width()));
     if (doc && topSpace) doc.documentElement.style.setProperty("--co-top", topSpace() + "px");
     if (doc && bottomSpace) doc.documentElement.style.setProperty("--co-bottom", bottomSpace() + "px");
     if (isPaged()) relayout();
@@ -473,8 +479,18 @@
     goPage(n);
   }
 
+  // Two pages side by side on a wide window (1.5.0): "one", "two", or
+  // "auto", which goes two-up from 1000 px.
+  let spread = "auto";
+  const twoUp = (w) => (spread === "two" ? w >= 640 : spread === "auto" ? w >= 1000 : false);
+  function setSpread(v) {
+    spread = v;
+    if (doc) applyTop();
+  }
+
   // Column sizes for this width: a column as wide as the reading measure
-  // allows, centred, so a column and its gap are one screen.
+  // allows, centred, so a column and its gap are one screen. Two-up, each
+  // half of the screen is laid out the same way.
   function relayout(at) {
     const root = doc.documentElement;
     const keep = at == null ? position() : at;
@@ -484,8 +500,12 @@
     const measure = probe.getBoundingClientRect().width, pad = parseFloat(getComputedStyle(probe).paddingLeft) || 20;
     probe.remove();
     const w = width();
-    const col = Math.floor(Math.min(measure - 2 * pad, w - 2 * pad));
-    const side = (w - col) / 2;
+    const half = twoUp(w) ? w / 2 : w;
+    // Two pages keep a margin of at least 40 px each side, so they read as two.
+    const edge = half < w ? Math.max(pad, 40) : pad;
+    const col = Math.floor(Math.min(measure - 2 * pad, half - 2 * edge));
+    const side = (half - col) / 2;
+    root.classList.toggle("co-two", half < w);
     root.style.setProperty("--co-col", col + "px");
     root.style.setProperty("--co-side", side + "px");
     root.style.setProperty("--co-gap", 2 * side + "px");
@@ -609,7 +629,7 @@
   // `next` ({ over, title, go }) adds a link to the next page at the end;
   // `top` () gives the height the bar covers; onImage(info) opens a tapped
   // image.
-  function open(iframe, html, meta, { at = 0, spot: spotAt = "", onPosition, onScroll, next, top, onImage: image, onTap: tap, onSelect, pages: asPages, bottom } = {}) {
+  function open(iframe, html, meta, { at = 0, spot: spotAt = "", onPosition, onScroll, next, top, onImage: image, onTap: tap, onSelect, pages: asPages, bottom, onKey } = {}) {
     frame = iframe;
     turning = null;
     paged = !!asPages;
@@ -656,6 +676,9 @@
         if (isPaged()) doc.documentElement.classList.add("co-paged");
         pagedInput();
         zoomInput();
+        // Keys pressed in the page that it doesn't use itself go to the
+        // app's shortcuts (1.5.0).
+        if (onKey) doc.addEventListener("keydown", (e) => { if (!e.defaultPrevented) onKey(e); });
         if (onSelect) {
           let selTimer = 0;
           doc.addEventListener("selectionchange", () => {
@@ -721,5 +744,5 @@
   addEventListener("resize", applyTop);
   addEventListener("offline", applyConnection);
 
-  C.reader = { open, close, position, spot, jump, setPaged, turn, get paged() { return isPaged(); }, pageInfo, headings, section, jumpTo, readable, firstShown, light, following, selectionSpot, clearSelection, applyTheme, applyConnection, srcdoc, CSP };
+  C.reader = { open, close, position, spot, jump, setPaged, turn, get paged() { return isPaged(); }, pageInfo, headings, section, jumpTo, readable, firstShown, light, following, selectionSpot, clearSelection, applyTheme, applyConnection, srcdoc, CSP, setSpread, refit: applyTop, images, imageInfo };
 })();

@@ -302,6 +302,7 @@ html.native .top-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top));
 }
 .btn-small:disabled { opacity: 0.7; cursor: default; }
 .save-form { display: flex; gap: var(--s-2); }
+.save-link-icon { display: none; }
 .save-form input {
   flex: 1; min-width: 0;
   height: 48px; padding: 0 14px;
@@ -1138,19 +1139,6 @@ html { -webkit-tap-highlight-color: transparent; }
 .settings-section > .section-lead { margin-bottom: var(--s-5); }
 .update-card { border-color: var(--accent); }
 
-/* Desktop: two columns of pages, Settings' menu beside its section. */
-@media (min-width: 900px) {
-  .app { max-width: 64rem; }
-  .library { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; }
-  .library > .wide { grid-column: 1 / -1; }
-  .folder-strip { flex-wrap: wrap; overflow: visible; margin: 0; padding: var(--s-1) 0 var(--s-2); }
-  #settingsView .screen-body > * { margin-left: 0; max-width: 320px; }
-  #sectionView { left: 360px; box-shadow: -1px 0 0 var(--line); z-index: 11; }
-  .select-head, .select-bar { max-width: 64rem; margin: 0 auto; }
-}
-@media (min-width: 900px) {
-  #settingsView .screen-bar { width: 360px; }
-}
 
 /* 0.19.1: the filters between Folders and the pages, and a switch. */
 .filter-box .filters { margin-top: 0; }
@@ -1271,13 +1259,8 @@ html { -webkit-tap-highlight-color: transparent; }
 [data-layout="grid"] .card-thumb.site-mark img { width: var(--s-7); height: var(--s-7); }
 
 /* At phone width rows sit edge to edge, their hairlines between them. */
-@media (max-width: 899px) {
+@media (max-width: 699px) {
   :is([data-layout="shelf"], [data-layout="list"]) .library > :is(.tile, .page-card:not(.continue)) + :is(.tile, .page-card) { margin-top: calc(-1 * var(--s-3)); }
-}
-@media (min-width: 900px) {
-  :is([data-layout="shelf"], [data-layout="grid"]) .tile { flex-basis: 136px; }
-  [data-layout="grid"] .folder-strip { grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); }
-  [data-layout="grid"] .library { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 /* ---- 0.27.9: Downloads ---- */
@@ -1622,6 +1605,325 @@ html { -webkit-tap-highlight-color: transparent; }
   overflow: visible; margin: 0; padding: var(--s-1) 0 var(--s-2);
 }
 .folder-grid .tile { flex: none; }
-@media (min-width: 900px) {
-  .folder-strip.folder-grid { grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); }
+
+
+/* ---- 1.5.0: big screens ----
+   Phone under 700 px is as above. A tablet (700 px and up) gets the save
+   field in the bar at the top, two columns of clips, and dialogs and
+   panels for sheets. From 1024 px the sidebar is pinned beside the
+   library. Row heights follow the pointer, not the width: 44 px for a
+   finger, 40 px for a mouse. DESIGN.md §5 has the rules. */
+:root { --side-w: 272px; --rail-w: 272px; --content-max: 76rem; }
+
+@media (min-width: 700px) {
+  :root { --gutter: var(--s-5); }
+  .app { max-width: none; margin: 0; }
+  #libraryView { padding-top: 0; }
+  /* Everything in the library lines up on one column, as wide as the
+     window allows. */
+  :root { --lib-left: 0px; --lib-pad: max(var(--gutter), calc((100vw - var(--lib-left) - var(--content-max)) / 2)); }
+  #libraryView > :is(.top-bar, .top, .library, .feeds, .save-bar) {
+    padding-inline: max(var(--gutter), calc((100% - var(--content-max)) / 2));
+  }
+  .top-bar { padding-block: var(--s-4) var(--s-3); gap: var(--s-3); }
+  html.native .top-bar { padding-top: calc(var(--s-4) + env(safe-area-inset-top)); }
+  .top-bar .save-form { flex: 1; min-width: 0; }
+  .top-bar .menu-btn { margin-inline-start: calc(-1 * var(--s-2)); }
+  .save-form input { padding-inline-start: calc(var(--s-4) + 20px + var(--s-3)); }
+  .save-link-icon { display: flex; position: absolute; inset-inline-start: var(--s-4); top: 14px; color: var(--muted); pointer-events: none; }
+  .save-form { position: relative; }
+  /* The bottom bar is left with the update notice alone. */
+  .save-bar { border-top: 0; padding-block: 0 var(--s-3); }
+  .save-bar:not(:has(.update-bar:not([hidden]))) { display: none; }
+  .update-bar { margin-bottom: 0; }
+
+  .lib-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--s-1) var(--s-3); padding-top: var(--s-2); }
+  .lib-head .screen-title { margin: 0; }
+  .lib-head .meta { margin: 0; flex: 1; min-width: 0; }
+  .lib-head .lib-tools { margin: 0 calc(-1 * var(--s-2)) 0 0; align-self: center; gap: var(--s-4); }
+  .top { padding-bottom: var(--s-3); }
+  [data-place="feeds"] .top { display: block; }
+  [data-place="feeds"] .top > :not(.lib-head), [data-place="feeds"] .lib-head > :not(.screen-title) { display: none; }
+
+  /* Two columns of clips; Continue reading, collections and section
+     heads take the whole width. */
+  .library { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; column-gap: var(--s-6); }
+  .library > :is(.wide, .section-head, .continue, .folder-strip, .card:not(.page-card), .empty) { grid-column: 1 / -1; }
+  [data-layout="grid"] .library { grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: var(--s-3); }
+  :is([data-layout="shelf"], [data-layout="grid"]) .tile { flex-basis: 152px; }
+  .folder-strip { margin-inline: 0; padding-inline: 0; }
+  [data-layout="grid"] .folder-strip, .folder-strip.folder-grid { grid-template-columns: repeat(auto-fill, minmax(152px, 1fr)); }
+  .continue { padding: var(--s-4); }
+
+  /* The sidebar over the page (tablet) and pinned (wide) share a look. */
+  .sidebar { width: min(var(--side-w), 85vw); padding: calc(var(--s-5) + env(safe-area-inset-top)) var(--s-4) calc(var(--s-4) + env(safe-area-inset-bottom)); }
+  .side-head { display: flex; align-items: center; justify-content: space-between; margin: 0 0 var(--s-4) var(--s-3); }
+  .side-head .side-title { margin: 0; }
+  .side-search { color: var(--muted); }
+  .side-item { margin: 0; }
+  .side-line { margin: var(--s-3) var(--s-3); }
+  .side-link {
+    align-self: flex-start; min-height: var(--tap); margin-inline-start: calc(var(--s-3) + 20px + var(--s-3)); padding: 0;
+    border: 0; background: none; color: var(--accent); font: 500 var(--fs-label)/var(--lh-label) var(--sans); cursor: pointer;
+  }
+  .side-over { margin: 0 var(--s-3) var(--s-2); font: 600 var(--fs-meta)/var(--lh-meta) var(--sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .side-tags { display: flex; flex-wrap: wrap; gap: var(--s-2); padding: 0 var(--s-3); }
+  .side-tag { min-height: 32px; }
+  .side-gap { flex: 1; min-height: var(--s-4); }
+  .side-settings .side-icon { color: var(--muted); }
+}
+@media (min-width: 700px) and (pointer: fine) {
+  .side-item { min-height: 40px; }
+  .side-sub { min-height: 40px; }
+}
+
+@media (min-width: 1024px) {
+  :root { --gutter: var(--s-7); }
+  /* The pinned sidebar: under every screen, beside the library. */
+  body.pinned .sidebar {
+    z-index: 9; width: var(--side-w);
+    box-shadow: none; touch-action: auto;
+  }
+  body.pinned { --lib-left: var(--side-w); --lib-pad: max(var(--gutter), calc((100vw - var(--side-w) - var(--content-max)) / 2)); }
+  body.pinned #libraryView { margin-inline-start: var(--side-w); }
+  body.pinned .menu-btn, body.pinned #searchBtn, body.pinned #settingsBtn { display: none; }
+  body.pinned .side-catch { display: none; }
+  /* A collection opens beside the sidebar; the reader and Settings cover
+     everything. */
+  body.pinned #folderView { left: var(--side-w); box-shadow: none; }
+  :is([data-layout="shelf"], [data-layout="grid"]) .folder-strip .tile { flex-basis: calc((100% - 5 * var(--s-5)) / 6); }
+  .folder-strip { gap: var(--s-5); }
+  [data-layout="grid"] .library { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (min-width: 1280px) {
+  :is([data-layout="shelf"], [data-layout="list"]) .library { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* Phone: none of the big-screen parts show. */
+.reader-rail, .reader-name, .read-keys, .back-label, .close-icon, .pane-note { display: none; }
+.screen-catch { position: fixed; inset: 0; z-index: 12; background: var(--scrim); }
+.screen-catch.clear { background: transparent; }
+.screen-catch[hidden] { display: none; }
+.drop-zone {
+  position: fixed; inset: 0; z-index: 20; pointer-events: none;
+  display: flex; align-items: center; justify-content: center; padding: var(--s-5);
+  background: var(--scrim);
+}
+.drop-zone[hidden] { display: none; }
+.drop-card {
+  display: flex; flex-direction: column; align-items: center; gap: var(--s-2);
+  width: min(28rem, 100%); padding: var(--s-7) var(--s-5);
+  border: 2px dashed var(--accent); border-radius: var(--r-lg);
+  background: var(--surface); color: var(--accent); text-align: center;
+}
+.drop-title { margin: 0; font: 700 var(--fs-heading)/var(--lh-heading) var(--serif); color: var(--ink); }
+.drop-note { margin: 0; color: var(--muted); font-size: var(--fs-meta); line-height: var(--lh-meta); }
+kbd {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px;
+  border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 6px;
+  background: var(--surface); color: var(--ink); font: 600 12px/1 var(--sans);
+}
+.pop-key { margin-inline-start: auto; color: var(--muted); }
+.clip-pop { position: fixed; z-index: 16; width: 264px; }
+.card.menu-on, .tile.menu-on { outline: 2px solid var(--accent); outline-offset: var(--s-1); border-radius: var(--r-md); }
+
+/* The shortcuts list. */
+.keys-sheet { display: flex; flex-direction: column; gap: var(--s-4); }
+.keys-groups { display: grid; gap: var(--s-5); }
+.keys-list { display: grid; grid-template-columns: auto 1fr; gap: var(--s-2) var(--s-4); align-items: center; margin: 0; }
+.keys-list dt { display: flex; align-items: center; gap: var(--s-1); white-space: nowrap; }
+.keys-list dd { margin: 0; }
+.keys-then { color: var(--muted); font-size: var(--fs-meta); }
+
+@media (min-width: 700px) {
+  /* Sheets over the library are dialogs in the middle. */
+  .menu-sheet {
+    inset: 0; margin: auto; width: min(30rem, calc(100vw - 2 * var(--s-5))); max-width: none;
+    height: fit-content; max-height: calc(100dvh - 2 * var(--s-7));
+    padding: var(--s-5); border: 1px solid var(--line); border-radius: var(--r-lg);
+    box-shadow: 0 24px 64px var(--shadow);
+  }
+  .menu-sheet .sheet-grip, .reader .sheet .sheet-grip { display: none; }
+  .menu-sheet .sheet-body { max-height: calc(100dvh - 2 * var(--s-7) - 2 * var(--s-5)); margin: 0 calc(-1 * var(--s-5)); padding: 0 var(--s-5) var(--s-1); }
+  .menu-sheet[data-kind="keys"] { width: min(52rem, calc(100vw - 2 * var(--s-5))); }
+  .keys-groups { grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); }
+
+  /* The reader's sheets are panels under their buttons. */
+  .reader .sheet {
+    left: auto; right: auto; bottom: auto; width: min(23.5rem, calc(100% - 2 * var(--s-3))); max-width: none; margin: 0;
+    padding: var(--s-4); border: 1px solid var(--line); border-radius: var(--r-lg);
+    box-shadow: 0 12px 40px var(--shadow);
+  }
+  .reader .sheet-body { max-height: calc(100dvh - 140px); margin: 0 calc(-1 * var(--s-4)); padding: 0 var(--s-4) var(--s-1); }
+  .reader-name {
+    display: flex; align-items: baseline; gap: var(--s-2); min-width: 0; margin: 0 0 0 var(--s-2);
+    overflow: hidden; white-space: nowrap;
+  }
+  .reader-site { flex-shrink: 0; color: var(--muted); font-size: var(--fs-meta); }
+  .reader-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+  .reader-start { flex: 1; min-width: 0; }
+
+  /* Save with options: a dialog. Downloads: a panel under its button. */
+  .screen[data-dialog] { z-index: 13; box-shadow: 0 24px 64px var(--shadow); border: 1px solid var(--line); border-radius: var(--r-lg); }
+  .screen[data-dialog="dialog"] { inset: 0; margin: auto; width: min(40rem, calc(100vw - 2 * var(--s-5))); height: min(46rem, calc(100dvh - 2 * var(--s-7))); }
+  .screen[data-dialog="panel"] {
+    inset: auto; top: calc(var(--s-4) + 48px + var(--s-2)); right: var(--lib-pad);
+    width: min(26rem, calc(100vw - 2 * var(--s-5))); height: auto; max-height: min(36rem, calc(100dvh - 120px));
+  }
+  .screen[data-dialog] .back-icon { display: none; }
+  .screen[data-dialog] .close-icon { display: block; }
+  .screen[data-dialog] .screen-bar { grid-template-columns: var(--tap) 1fr var(--tap); }
+  .screen[data-dialog] #downloadsBack, .screen[data-dialog] #batchBack { grid-column: 3; grid-row: 1; }
+  .screen[data-dialog] .bar-title { grid-column: 1 / 3; grid-row: 1; text-align: start; padding-inline-start: var(--s-2); font-size: var(--fs-card); }
+  .screen[data-dialog] .bar-spacer { display: none; }
+  .screen[data-dialog="panel"] .screen-body { padding-bottom: var(--s-4); }
+
+  /* Picking several: one bar at the top, the actions at its end. */
+  .select-head {
+    top: var(--s-4); left: calc(var(--lib-left) + var(--lib-pad)); right: var(--lib-pad);
+    height: 52px; padding: 0 var(--s-2); justify-content: flex-start; gap: var(--s-4);
+    background: var(--bar); border: 0; border-radius: var(--r-md);
+  }
+  .select-count { flex: none; }
+  .select-bar {
+    top: calc(var(--s-4) + 4px); bottom: auto; left: auto; right: calc(var(--lib-pad) + 4px);
+    height: 44px; padding: 0; gap: var(--s-2); background: transparent; border: 0; justify-content: flex-end;
+  }
+  .select-act {
+    flex: none; max-width: none; min-height: 44px; flex-direction: row; gap: var(--s-2); padding: 0 var(--s-4);
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md);
+    font-size: var(--fs-label); line-height: var(--lh-label); font-weight: 600;
+  }
+  .select-act svg { width: 18px; height: 18px; }
+  .selecting .library, .selecting .screen-body { padding-bottom: var(--s-5); }
+  .selecting .top-bar { visibility: hidden; }
+
+  /* Settings: the menu as its own sidebar, the section beside it. */
+  :root { --settings-w: 300px; }
+  #settingsView .screen-bar {
+    width: var(--settings-w); display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-2);
+    padding: var(--s-4) var(--s-4) 0; border: 0;
+  }
+  #settingsBack { width: auto; padding: 0 var(--s-3) 0 var(--s-1); gap: var(--s-1); color: var(--ink); }
+  #settingsBack .back-label { display: inline; font-weight: 500; }
+  #settingsBack svg { width: 18px; height: 18px; }
+  #settingsView .bar-title { padding: 0 var(--s-3); text-align: start; font: 700 var(--fs-screen)/var(--lh-screen) var(--serif); }
+  #settingsView .bar-spacer { display: none; }
+  #settingsView .screen-body { width: var(--settings-w); padding: var(--s-4) var(--s-4) var(--s-5); }
+  #settingsView .screen-body > * { margin: 0; max-width: none; }
+  #settingsView { border-inline-end: 0; }
+  #settingsView .settings-menu { gap: 0; }
+  #settingsView .settings-menu > .group:not(.update-card) { background: transparent; border: 0; border-radius: 0; overflow: visible; }
+  #settingsView .settings-menu > .group:not(.update-card) + .group { margin-top: var(--s-2); padding-top: var(--s-2); border-top: 1px solid var(--line); border-radius: 0; }
+  #settingsView .update-card { margin-bottom: var(--s-4); }
+  #settingsView .nav-row { min-height: 46px; border-radius: var(--r-md); padding-inline: var(--s-3); }
+  #settingsView .nav-row + .nav-row { border-top: 0; }
+  #settingsView .nav-row .row-chev { display: none; }
+  #settingsView .nav-row[aria-current] { background: var(--bar); font-weight: 600; }
+  #sectionView { left: var(--settings-w); z-index: 11; box-shadow: none; border-inline-start: 1px solid var(--line); }
+  #sectionView .screen-bar { display: block; padding: var(--s-6) var(--s-7) 0; border: 0; }
+  #sectionBack, #sectionView .bar-spacer { display: none; }
+  #sectionView .bar-title { text-align: start; font: 700 var(--fs-screen)/var(--lh-screen) var(--serif); }
+  #sectionView .screen-body { padding: var(--s-5) var(--s-7) var(--s-8); }
+  #sectionView .screen-body > * { margin-left: 0; max-width: 42rem; }
+}
+@media (min-width: 700px) and (pointer: fine) {
+  .menu-sheet .sheet-row, .reader .sheet .row { min-height: 40px; }
+}
+
+@media (min-width: 1024px) {
+  /* The reader: the contents rail beside the text. */
+  .reader.railed .reader-rail {
+    position: absolute; top: 0; bottom: 0; left: 0; z-index: 4; width: var(--rail-w);
+    display: flex; flex-direction: column; gap: var(--s-1);
+    padding: var(--s-4) var(--s-4) var(--s-4); padding-top: calc(var(--s-4) + env(safe-area-inset-top));
+    background: var(--bg); border-inline-end: 1px solid var(--line);
+  }
+  .reader.railed .reader-rail[hidden] { display: none; }
+  .reader.railed :is(.reader-bar, .read-foot) { left: var(--rail-w); }
+  .reader.railed .reader-frame { margin-inline-start: var(--rail-w); width: calc(100% - var(--rail-w)); }
+  .reader.railed .sheet[data-pop="start"] { margin-inline-start: 0; }
+  .reader.railed #readerBack, .reader.railed #readerContents { display: none; }
+  .reader.railed .reader-name { margin-inline-start: var(--s-4); }
+  .rail-back {
+    display: inline-flex; align-items: center; gap: var(--s-2); align-self: flex-start; min-height: var(--tap); padding: 0 var(--s-3);
+    border: 0; border-radius: var(--r-md); background: transparent; color: var(--ink); font: 500 var(--fs-label)/var(--lh-label) var(--sans); cursor: pointer;
+  }
+  .rail-over { margin: var(--s-3) var(--s-3) var(--s-1); }
+  .rail-list { flex: 1; min-height: 0; overflow-y: auto; margin: 0; padding: 0; list-style: none; overscroll-behavior: contain; }
+  .rail-row {
+    display: block; width: 100%; min-height: 40px; padding: var(--s-2) var(--s-3); margin-bottom: 2px;
+    border: 0; border-radius: var(--r-md); background: transparent; color: var(--ink); text-align: start;
+    font: 500 var(--fs-label)/var(--lh-label) var(--sans); cursor: pointer;
+  }
+  .rail-row.sub { padding-inline-start: var(--s-6); color: var(--muted); font-size: var(--fs-meta); line-height: var(--lh-meta); font-weight: 400; }
+  .rail-row:hover { background: var(--press); }
+  .rail-row[aria-current] { background: var(--bar); font-weight: 600; color: var(--ink); }
+  .rail-foot { display: flex; flex-direction: column; gap: var(--s-2); padding: var(--s-4) var(--s-3) 0; border-top: 1px solid var(--line); }
+  .rail-foot:empty { display: none; }
+  .rail-licence { margin: 0; color: var(--muted); font-size: var(--fs-meta); line-height: var(--lh-meta); }
+  .rail-original {
+    display: inline-flex; align-items: center; gap: var(--s-2); align-self: flex-start; min-height: var(--tap); padding: 0;
+    border: 0; background: none; color: var(--accent); font: 500 var(--fs-meta)/var(--lh-meta) var(--sans); cursor: pointer;
+  }
+  .reader .reader-bar { padding-inline: var(--s-4); }
+
+  /* Feeds at 1280 px: the river in a column, the post beside it. */
+  .aloud-bar.docked { width: calc(var(--side-w) - 2 * var(--s-4)); cursor: default; }
+  body.aloud-docked .side-gap { min-height: calc(var(--s-9) + var(--s-2)); }
+
+  /* Storage and Sync have room for two columns. */
+  #sectionBody:is([data-key="storage"], [data-key="sync"]) > * { max-width: 62rem; }
+  #sectionBody:is([data-key="storage"], [data-key="sync"]) { column-count: 2; column-gap: var(--s-6); }
+  #sectionBody:is([data-key="storage"], [data-key="sync"]) > .settings-section { break-inside: avoid; margin: 0 0 var(--s-6); display: inline-block; width: 100%; }
+}
+@media (min-width: 1024px) and (pointer: fine) {
+  .read-keys {
+    display: inline-flex; align-items: center; gap: var(--s-2); flex: none; min-height: 32px; margin: -6px 0; padding: 0;
+    border: 0; background: none; color: var(--muted); font: inherit; pointer-events: auto; cursor: pointer;
+  }
+  .reader.aloud .read-keys { display: none; }
+}
+@media (min-width: 1280px) {
+  body.pinned #libraryView[data-place="feeds"] { width: 500px; border-inline-end: 1px solid var(--line); }
+  body.pinned #libraryView[data-place="feeds"] > * { padding-inline: var(--s-5); }
+  body.pinned:has(#libraryView[data-place="feeds"]):has(#readerView[hidden]) .pane-note {
+    display: flex; position: fixed; inset: 0 0 0 calc(var(--side-w) + 500px); align-items: center; justify-content: center; margin: 0;
+    color: var(--muted);
+  }
+  #readerView[data-pane] { left: calc(var(--side-w) + 500px); box-shadow: none; }
+}
+@media (min-width: 1024px) and (pointer: fine) {
+  .read-left .read-time { margin-inline-start: auto; }
+}
+.book-side { display: contents; }
+@media (min-width: 1024px) {
+  #folderBody:has(> .book-side) {
+    display: grid; grid-template-columns: minmax(16rem, 20rem) minmax(0, 44rem); grid-template-rows: auto 1fr;
+    column-gap: var(--s-7); justify-content: center; align-content: start; padding-top: var(--s-5);
+  }
+  #folderBody:has(> .book-side) > * { max-width: none; margin: 0; }
+  #folderBody > .book-side { display: block; grid-row: 1 / span 2; }
+  #folderBody > .book-side .book-head { flex-direction: column; align-items: flex-start; }
+  #folderBody > .book-side .book-cover { width: 13.75rem; }
+  #folderBody > .book-side .book-facts { width: 100%; }
+  #folderBody:has(> .book-side) > .section-head { grid-column: 2; grid-row: 1; margin-top: 0; }
+  #folderBody:has(> .book-side) > .folder-list { grid-column: 2; grid-row: 2; align-self: start; }
+}
+
+/* The image viewer's arrows and zoom (1.5.0), from 700 px. */
+.viewer-step, .viewer-zoom { display: none; }
+@media (min-width: 700px) {
+  .viewer-step:not([hidden]) {
+    display: inline-flex; position: absolute; top: 50%; margin-top: calc(-1 * var(--tap) / 2);
+    color: var(--on-video); background: var(--scrim); border-radius: var(--r-full);
+  }
+  .viewer-step:disabled { opacity: 0.35; cursor: default; }
+  .viewer-prev { left: var(--s-4); }
+  .viewer-next { right: var(--s-4); }
+  .viewer-zoom {
+    display: flex; position: absolute; top: calc(var(--s-2) + env(safe-area-inset-top)); right: calc(var(--s-2) + var(--tap) + var(--s-2));
+    background: var(--scrim); border-radius: var(--r-full);
+  }
+  .viewer-zoom .icon-btn { color: var(--on-video); border-radius: var(--r-full); }
 }
