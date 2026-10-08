@@ -71,10 +71,12 @@ jobs:
 
       - run: npx cap sync ios
 
-      # The log's tail is where xcodebuild says what failed; the default shell
-      # runs with pipefail, so a failed build still fails the step.
+      # The log's tail is where xcodebuild says what failed. `shell: bash`
+      # is what runs with pipefail (the default is plain bash -e), so a
+      # failed build fails the step rather than the packaging after it.
       - name: Build
         working-directory: ios/App
+        shell: bash
         run: >-
           xcodebuild -workspace App.xcworkspace -scheme App -configuration Release
           -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build

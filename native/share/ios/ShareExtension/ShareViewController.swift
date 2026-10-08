@@ -8,11 +8,12 @@
 // once; if that open is refused, the app finds the link in the group the
 // next time it comes to the front. Opening another app isn't something iOS
 // offers a share extension, so it's done through the responder chain's
-// UIApplication, which is why this target is built without
-// APPLICATION_EXTENSION_API_ONLY (tools/ios-extensions.rb).
+// UIApplication, called through the Objective-C runtime since an
+// extension's code may not name UIApplication.open.
 //
 // Pages that draw themselves with scripts don't need Safari's JavaScript
 // preprocessing file here: the app draws those itself (PageRenderPlugin).
+import ObjectiveC
 import UIKit
 import UniformTypeIdentifiers
 
@@ -88,10 +89,12 @@ class ShareViewController: UIViewController {
     }
 
     private func openApp(_ url: URL) -> Bool {
+        typealias Open = @convention(c) (AnyObject, Selector, NSURL, NSDictionary, AnyObject?) -> Void
+        let sel = NSSelectorFromString("openURL:options:completionHandler:")
         var r: UIResponder? = self
         while let at = r {
-            if let app = at as? UIApplication {
-                app.open(url, options: [:], completionHandler: nil)
+            if at is UIApplication, let m = class_getInstanceMethod(type(of: at), sel) {
+                unsafeBitCast(method_getImplementation(m), to: Open.self)(at, sel, url as NSURL, NSDictionary(), nil)
                 return true
             }
             r = at.next

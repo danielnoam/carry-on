@@ -10,10 +10,7 @@
 # where they are, not copied, so the repo holds one copy. Both are embedded
 # in the app, share an App Group with it, and carry the app's version, as iOS
 # requires of an extension.
-#
-# The share extension is built without APPLICATION_EXTENSION_API_ONLY: it
-# opens the app through the responder chain's UIApplication, which that
-# setting forbids (ShareViewController.swift says why).
+
 #
 # Run after tools/ios-project.js (it reads the version that stamps) and
 # before `npx cap sync ios` (pod install then adds its build phases after
@@ -28,11 +25,11 @@ SRC = '../../native/share/ios'
 EXTENSIONS = [
   { name: 'WaypageShareExtension', id: 'io.github.danielnoam.waypage.share', dir: 'ShareExtension',
     sources: %w[ShareExtension/ShareViewController.swift], entitlements: 'ShareExtension/WaypageShare.entitlements',
-    min_ios: '15.5', api_only: 'NO' },
+    min_ios: '15.5' },
   # containerBackground, which a widget needs from iOS 17 on, is iOS 17.
   { name: 'WaypageWidgets', id: 'io.github.danielnoam.waypage.widgets', dir: 'Widgets',
     sources: %w[Widgets/WaypageWidgets.swift], entitlements: 'Widgets/WaypageWidgets.entitlements',
-    min_ios: '17.0', api_only: 'YES' },
+    min_ios: '17.0' },
 ].freeze
 
 project = Xcodeproj::Project.open(PROJECT)
@@ -70,7 +67,7 @@ EXTENSIONS.each do |e|
     s['IPHONEOS_DEPLOYMENT_TARGET'] = e[:min_ios]
     s['TARGETED_DEVICE_FAMILY'] = '1,2'
     s['SKIP_INSTALL'] = 'YES'
-    s['APPLICATION_EXTENSION_API_ONLY'] = e[:api_only]
+    s['APPLICATION_EXTENSION_API_ONLY'] = 'YES'
     s['LD_RUNPATH_SEARCH_PATHS'] = ['$(inherited)', '@executable_path/Frameworks', '@executable_path/../../Frameworks']
     s['MARKETING_VERSION'] = app_settings['MARKETING_VERSION']
     s['CURRENT_PROJECT_VERSION'] = app_settings['CURRENT_PROJECT_VERSION']

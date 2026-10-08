@@ -2,6 +2,36 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.6.0] - 2026-10-08
+
+The iPhone release: what Android had and iOS didn't. Built without an
+iPhone to try it on, so each of these still wants a first try there.
+
+### Added
+- iPhone: Waypage in the share sheet. Share a page from Safari or any
+  app, and Waypage opens and saves it.
+- iPhone: home screen widgets, Keep reading, Feeds and Favourites, as on
+  Android. Keep reading also fits the lock screen.
+- iPhone: feeds are checked with the app closed, and a notification says
+  when there are new posts. iOS decides when that runs, so it can be late.
+- iPhone: open a book, PDF, comic or note in Waypage from the Files app,
+  Mail or any app's "Open in".
+- iPhone: Open a file can read a file from where it is, as on Android,
+  instead of always copying it.
+- iPhone: your library can live in a folder you pick in the Files app,
+  like one in iCloud Drive (Settings, Storage).
+- iPhone: watched folders, in Settings, Content.
+- iPhone: pages that build themselves with JavaScript save, drawn first
+  out of sight as on Android.
+- iPhone: "Wait for Wi-Fi" for saving and sync, now that Waypage can tell
+  mobile data from Wi-Fi there.
+- Read aloud, in Aa: "Go on to the next clip" starts the next chapter, or
+  the page a clip links to, by itself at the end.
+
+### Changed
+- Watched folders are all looked in at once, so a slow memory card holds
+  up only its own files.
+
 ## [1.5.1] - 2026-10-08
 
 ### Added
