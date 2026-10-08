@@ -95,6 +95,8 @@
     const http = plugin("CapacitorHttp");
     const headers = { "User-Agent": USER_AGENT, Accept: "text/html,application/xhtml+xml", ...(opts.headers || {}) };
     if (http) {
+      const cookie = await signedCookie(url);
+      if (cookie) headers.Cookie = cookie;
       let res;
       try {
         res = await deadline(http.request({ url, method: "GET", headers, responseType: "text",
@@ -109,6 +111,49 @@
     const res = await deadline(fetch(url, { headers }), PAGE_TIMEOUT);
     return { status: res.status, url: res.url || url, text: await res.text() };
   }
+
+  // Saving signed in (1.8.0): native/share's SignIn plugin opens a site in a
+  // browser inside the app, and its cookies go with Waypage's own requests
+  // to that site afterwards, so a subscriber's article saves whole. Only
+  // the sites signed in to here, kept on this device and never synced, get
+  // them. The plugin:
+  //   open({ url })          resolves once the browser is closed
+  //   cookies({ url })       { cookie }: the Cookie header for that address
+  //   signOut({ host })      forgets the site's cookies and storage
+  const SIGNED_KEY = "waypage.signedIn";
+  const bareHost = (url) => { try { return new URL(url).hostname.toLowerCase().replace(/^www\./, ""); } catch (e) { return ""; } };
+  function signedSites() {
+    try { const v = JSON.parse(localStorage.getItem(SIGNED_KEY)); return Array.isArray(v) ? v : []; } catch (e) { return []; }
+  }
+  const keepSigned = (list) => { try { localStorage.setItem(SIGNED_KEY, JSON.stringify(list)); } catch (e) { /* full */ } };
+  function signedFor(url) {
+    const h = bareHost(url);
+    return (h && signedSites().find((s) => h === s.host || h.endsWith("." + s.host))) || null;
+  }
+  async function signedCookie(url) {
+    const S = plugin("SignIn");
+    if (!S || !signedFor(url)) return "";
+    try { const r = await deadline(S.cookies({ url }), 5000); return (r && r.cookie) || ""; } catch (e) { return ""; }
+  }
+  const signIn = {
+    get available() { return !!plugin("SignIn"); },
+    sites: signedSites,
+    for: signedFor,
+    host: bareHost,
+    async open(url) {
+      const S = plugin("SignIn");
+      const host = bareHost(url);
+      if (!S || !host) return false;
+      await S.open({ url });
+      keepSigned([{ host, at: Date.now() }, ...signedSites().filter((s) => s.host !== host)]);
+      return true;
+    },
+    async signOut(host) {
+      const S = plugin("SignIn");
+      if (S) await S.signOut({ host }).catch(() => {});
+      keepSigned(signedSites().filter((s) => s.host !== host));
+    },
+  };
 
   // A page that builds itself with JavaScript, drawn in a hidden WebView by
   // native/share's PageRender plugin: { text, url } of the HTML it ended up
@@ -729,6 +774,7 @@
       if (c && c.addEventListener) c.addEventListener("change", f);
     },
     fetchText,
+    signIn,
     render,
     get canRender() { return !!plugin("PageRender"); },
     downloadTo,
