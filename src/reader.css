@@ -124,6 +124,24 @@ html.co-spread .co-printed img + img { margin-top: 0; }
   -webkit-box-decoration-break: clone; box-decoration-break: clone;
 }
 
+/* Where a paywalled article stops (1.7.0). */
+.co-cut {
+  margin: var(--s-6) 0 0; padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  font: 400 var(--fs-meta)/var(--lh-meta) var(--sans); color: var(--muted);
+}
+.co-cut a { display: block; margin-top: var(--s-2); color: var(--accent); font-weight: 600; }
+
+/* Highlights (1.7.0): marked words, and a dotted underline on those
+   with a note. A tap on one opens it in the clip's sheet. */
+mark.co-mark {
+  background: var(--mark); color: inherit;
+  border-radius: 2px;
+  -webkit-box-decoration-break: clone; box-decoration-break: clone;
+  cursor: pointer;
+}
+mark.co-mark.co-noted { text-decoration: underline dotted var(--muted); text-underline-offset: 3px; }
+
 /* Pages (0.29.0): the text in screen-wide columns, one column a page,
    turned by src/reader.js. Each page keeps the bar's room at its top.
    --co-col, --co-side and --co-gap are set from the frame's width so a

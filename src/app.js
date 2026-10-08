@@ -1,7 +1,7 @@
 // Waypage: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "1.6.0";
+  const APP_VERSION = "1.7.0";
   window.Waypage.version = APP_VERSION;
 
   const C = window.Waypage;
@@ -488,6 +488,12 @@
     return b;
   }
 
+  // A paywalled article (1.7.0) says so as it lands, with the way to the rest.
+  function savedToast(meta) {
+    if (meta.cut) toast("Saved, but the site kept the rest for subscribers.", "Open it", () => C.platform.openOutside(meta.url));
+    else toast(meta.missing ? "Saved. Some previews are missing." : "Saved for offline reading");
+  }
+
   // Saves a failed page again where it was headed: its collection, its
   // place there, its tags, or the page it was replacing.
   async function retryJob(s) {
@@ -496,7 +502,7 @@
     const meta = await runJob(s);
     if (meta) {
       if (s.run) { s.run.saved++; s.run.failed = Math.max(0, s.run.failed - 1); }
-      toast("Saved for offline reading");
+      savedToast(meta);
       renderDownloads();
     } else if (s.contents) contentsFound(s);
     if (state.folder) renderFolder();
@@ -703,6 +709,7 @@
     const started = !p.finished && p.at > 0.02;
     const status = p.missing
       ? el("span", { class: "warn" }, p.missing + (p.missing === 1 ? " preview" : " previews") + " missing")
+      : p.cut ? el("span", { class: "warn" }, "Only the start")
       : p.mode === "links" ? el("span", null, "Images online") : null;
     // The whole card opens the page (a button stretched under everything);
     // Retry sits above it, since a button can't hold another.
@@ -882,11 +889,12 @@
     if (f === "unread") return unread(p);
     if (f === "finished") return !!p.finished;
     if (f === "favourites") return !!p.fav;
+    if (f === "highlights") return !!(p.marks && p.marks.length);
     if (f.startsWith("#")) return (p.tags || []).some((t) => sameTag(t, f.slice(1)));
     return true;
   }
 
-  const FILTER_NAMES = { unread: "Unread", finished: "Finished", favourites: "Favourites" };
+  const FILTER_NAMES = { unread: "Unread", finished: "Finished", favourites: "Favourites", highlights: "Highlighted" };
   const filterName = () => FILTER_NAMES[state.filter] || state.filter;
 
   function setFilter(f) {
@@ -901,7 +909,7 @@
   // doesn't close a menu that's open.
   function renderTools() {
     const tags = allTags();
-    const sig = [state.pages.length > 0, state.filter, state.sort, tags.join("\u0000")].join("|");
+    const sig = [state.pages.length > 0, state.filter, state.sort, state.pages.some((p) => p.marks && p.marks.length), tags.join("\u0000")].join("|");
     if (libTools.dataset.sig === sig) return;
     libTools.dataset.sig = sig;
     libTools.hidden = !state.pages.length;
@@ -910,6 +918,7 @@
       label: "Show", cls: "start show-wrap" + (state.filter === "all" ? "" : " on"),
       icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>',
       options: [{ value: "all", label: "All clips" }, { value: "unread", label: "Unread" }, { value: "finished", label: "Finished" }, { value: "favourites", label: "Favourites" },
+        ...(state.pages.some((p) => p.marks && p.marks.length) || state.filter === "highlights" ? [{ value: "highlights", label: "Highlighted" }] : []),
         ...(tags.length ? [{ head: "Tags" }, ...tags.map((t) => ({ value: "#" + t, label: "#" + t }))] : [])],
       value: state.filter,
       onpick: setFilter,
@@ -1321,7 +1330,7 @@
     if (!state.saving.includes(job)) return;
     job.waiting = false;
     const meta = await runJob(job);
-    if (meta) toast(meta.missing ? "Saved. Some previews are missing." : "Saved for offline reading");
+    if (meta) savedToast(meta);
     if (meta && !C.platform.native) C.store.keepStored();
     else if (job.contents) contentsFound(job);
   }
@@ -1648,6 +1657,13 @@
     await shown;
     if (p.link) C.files.drawNear($("readerFrame"));
     $("readerFrame").focus();
+    if (markAfterOpen) {
+      const id = markAfterOpen, d = $("readerFrame").contentDocument;
+      markAfterOpen = null;
+      // After the reader has gone back to where it was left.
+      await (d && d.fonts ? d.fonts.ready : null);
+      requestAnimationFrame(() => { if (state.open === p) C.reader.toMark(id); });
+    }
     furtherRead(p);
   }
 
@@ -1745,12 +1761,15 @@
       onScroll: readerScrolled,
       onImage: openImage,
       onTap: toggleBar,
+      onMark: openMark,
       onSelect: showReadHere,
       pages: readingPrefs().layout === "pages",
       top: () => $("readerView").querySelector(".reader-bar").offsetHeight,
       bottom: () => $("readFoot").offsetHeight,
       onKey: onKeys,
     }).then(() => {
+      lostMarks = new Set();
+      paintMarks(p);
       $("readerContents").hidden = C.reader.headings().length < 2;
       fitRail();
       // Reading aloud carries on across clips (1.4.0): its light and
@@ -1788,7 +1807,7 @@
   function readerScrolled(at, y) {
     readerY = y;
     if (state.open && state.open.link) C.files.drawNear($("readerFrame"));
-    if (readHere && !readHere.hidden) showReadHere(C.reader.selectionSpot());
+    if (readHere && !readHere.hidden) showReadHere();
     $("readProgress").firstElementChild.style.transform = "scaleX(" + at + ")";
     railNow();
     if (!$("readerView").classList.contains("bar-away") || aloudHere()) readerFoot(at);
@@ -2072,31 +2091,162 @@
     return space < 0 ? 0 : space + 1;
   }
 
-  // "Read from here", under a selection while one is up.
+  // Under a selection while one is up: Highlight (1.7.0), and Read from
+  // here when the phone can read aloud.
   let readHere = null;
-  function showReadHere(spot) {
-    if (!spot || !speech.available || !state.open || state.sheet) { hideReadHere(); return; }
+  function showReadHere() {
+    const p = state.open;
+    const mark = p && !p.preview && !state.sheet ? C.reader.selectionMark() : null;
+    const spot = p && speech.available && !state.sheet ? C.reader.selectionSpot() : null;
+    const box = (mark && mark.box) || spot;
+    if (!box) { hideReadHere(); return; }
     if (!readHere) {
-      readHere = el("button", { class: "read-here", type: "button", onclick: () => {
+      const aloudBtn = el("button", { class: "sel-aloud", type: "button", onclick: () => {
         const s = C.reader.selectionSpot();
         hideReadHere();
         C.reader.clearSelection();
         if (s) startAloud(null, s);
       } });
-      readHere.innerHTML = $("readerAloud").innerHTML;
-      readHere.append("Read from here");
+      aloudBtn.innerHTML = $("readerAloud").innerHTML;
+      aloudBtn.append("Read from here");
+      const markBtn = el("button", { class: "sel-mark", type: "button", onclick: addMark });
+      markBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICONS.mark + "</svg>";
+      markBtn.append("Highlight");
+      readHere = el("div", { class: "read-here", role: "toolbar", "aria-label": "Selection" }, markBtn, aloudBtn);
       $("readerView").append(readHere);
     }
+    readHere.querySelector(".sel-mark").hidden = !mark;
+    readHere.querySelector(".sel-aloud").hidden = !spot;
     const frame = $("readerFrame").getBoundingClientRect();
     const h = 44, room = frame.bottom - 72;
-    let top = frame.top + spot.bottom + 12;
-    if (top + h > room) top = frame.top + spot.top - h - 12;
+    let top = frame.top + box.bottom + 12;
+    if (top + h > room) top = frame.top + box.top - h - 12;
     top = Math.max(frame.top + 8, Math.min(top, room - h));
     readHere.style.top = top + "px";
-    readHere.style.left = Math.max(8, Math.min(frame.left + (spot.left + spot.right) / 2, innerWidth - 8)) + "px";
     readHere.hidden = false;
+    // Kept on screen whole, however wide its buttons make it.
+    const half = readHere.offsetWidth / 2;
+    readHere.style.left = Math.max(8 + half, Math.min(frame.left + (box.left + box.right) / 2, innerWidth - 8 - half)) + "px";
   }
   function hideReadHere() { if (readHere) readHere.hidden = true; }
+
+  // ---- Highlights (1.7.0) ----
+  // Kept on the clip's index entry as `marks`, so they sync, back up and
+  // export with it: [{ id, block, start, endBlock, end, text, note, at }].
+  // reader.js finds and paints them; a tap on one opens it here.
+  const byPlace = (a, b) => a.block - b.block || a.start - b.start;
+  // Ids of the open clip's highlights that this copy of it has no place for.
+  let lostMarks = new Set();
+  function paintMarks(p) {
+    if (state.open !== p) return;
+    const found = new Set(C.reader.paintMarks(p.marks || []));
+    lostMarks = new Set((p.marks || []).map((m) => m.id).filter((id) => !found.has(id)));
+  }
+  async function saveMarks(p) {
+    if (p.marks && !p.marks.length) delete p.marks;
+    await C.store.writeIndex(state.pages);
+    paintMarks(p);
+    renderLibrary();
+  }
+  async function addMark() {
+    const p = state.open;
+    const m = C.reader.selectionMark();
+    hideReadHere();
+    C.reader.clearSelection();
+    if (!p || !m) return;
+    // A highlight over one already there takes its place, keeping its note.
+    const over = (p.marks || []).filter((x) => !(x.endBlock < m.block || (x.endBlock === m.block && x.end <= m.start)
+      || x.block > m.endBlock || (x.block === m.endBlock && x.start >= m.end)));
+    const keep = { id: C.save.newId(), block: m.block, start: m.start, endBlock: m.endBlock, end: m.end, text: m.text.slice(0, 4000), at: Date.now() };
+    const notes = over.map((x) => x.note).filter(Boolean);
+    if (notes.length) keep.note = notes.join("\n\n");
+    p.marks = [...(p.marks || []).filter((x) => !over.includes(x)), keep].sort(byPlace);
+    await saveMarks(p);
+    toast("Highlighted", "Add a note", () => { if (state.open === p) openMark(keep.id); });
+  }
+  // A tap on a highlight in the text.
+  let markFocus = null;
+  function openMark(id) {
+    if (!state.open) return;
+    markFocus = id;
+    if (state.sheet === "marks") { $("readingBody").replaceChildren(SHEETS.marks.build()); return; }
+    openSheet("marks");
+  }
+  // After opening a clip from its highlights in the library, go to one.
+  let markAfterOpen = null;
+
+  // The clip's highlights: a list to jump from, or one with its note.
+  // `back` (from the clip's sheet) returns to it.
+  function marksView(p, back) {
+    const box = el("div", { class: "marks" });
+    const inReader = state.open === p;
+    const draw = () => {
+      const one = markFocus && (p.marks || []).find((m) => m.id === markFocus);
+      if (!one) markFocus = null;
+      fill(box, one ? markOne(p, one, draw) : markList(p, back, draw));
+    };
+    const markList = (p, back, draw) => {
+      const list = p.marks || [];
+      const rows = list.map((m) => {
+        const lost = inReader && lostMarks.has(m.id);
+        const go = () => {
+          if (lost) { markFocus = m.id; draw(); return; }
+          if (inReader) { history.back(); setTimeout(() => C.reader.toMark(m.id), 0); return; }
+          markAfterOpen = m.id;
+          back(true);
+        };
+        return el("li", { class: "mark-item" },
+          el("button", { class: "row mark-row", type: "button", onclick: go },
+            el("span", { class: "mark-quote", dir: "auto" }, m.text),
+            m.note ? el("span", { class: "mark-note", dir: "auto" }, m.note) : null,
+            lost ? el("span", { class: "meta" }, "Not found in this copy of the clip") : null),
+          el("button", { class: "icon-btn mark-edit", type: "button", "aria-label": "Note and more", onclick: () => { markFocus = m.id; draw(); } },
+            svgIcon("rename", 18)));
+      });
+      return el("div", { class: "marks-list" },
+        el("div", { class: "export-top" },
+          back ? el("button", { class: "btn-quiet export-back", type: "button", onclick: () => back() }, "Back") : null,
+          el("p", { class: "menu-title" }, list.length === 1 ? "1 highlight" : list.length + " highlights"),
+          list.length ? el("button", { class: "btn-quiet marks-copy", type: "button", onclick: () => copyText(C.backup.marksMarkdown(p), "Highlights copied") }, "Copy all") : null),
+        list.length ? el("ol", { class: "group marks-rows" }, ...rows)
+          : el("p", { class: "footnote" }, "Select words in the text and tap Highlight. Highlights go with the clip to your other devices, and into its Markdown export."));
+    };
+    const markOne = (p, m, draw) => {
+      const note = el("textarea", { class: "mark-note-field", rows: "3", placeholder: "Add a note", "aria-label": "Note", dir: "auto" });
+      note.value = m.note || "";
+      let timer = 0;
+      const keepNote = () => {
+        clearTimeout(timer);
+        const v = note.value.trim().slice(0, 4000);
+        if ((m.note || "") === v) return;
+        if (v) m.note = v; else delete m.note;
+        m.at = Date.now();
+        saveMarks(p);
+      };
+      note.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(keepNote, 800); });
+      note.addEventListener("blur", keepNote);
+      return el("div", { class: "mark-one" },
+        el("div", { class: "export-top" },
+          el("button", { class: "btn-quiet export-back", type: "button", onclick: () => { keepNote(); markFocus = null; draw(); } }, "All highlights")),
+        el("blockquote", { class: "mark-quote big", dir: "auto" }, m.text),
+        note,
+        el("div", { class: "group" },
+          inReader && !lostMarks.has(m.id) ? menuRow("Go to it", () => { keepNote(); markFocus = null; history.back(); setTimeout(() => C.reader.toMark(m.id), 0); }) : null,
+          menuRow("Copy", () => copyText(m.text + (m.note ? "\n\n" + m.note : ""), "Copied")),
+          menuRow("Remove highlight", () => {
+            clearTimeout(timer);
+            p.marks = (p.marks || []).filter((x) => x !== m);
+            markFocus = null;
+            saveMarks(p).then(draw);
+          }, "warn")));
+    };
+    draw();
+    return box;
+  }
+  async function copyText(text, done) {
+    try { await navigator.clipboard.writeText(text); toast(done); }
+    catch (e) { toast("Couldn't copy. Try Export instead."); }
+  }
 
   function stopAloud() {
     if (aloud.state === "stopped") return;
@@ -2530,6 +2680,7 @@
     reading: { button: "readerAa", label: "Reader settings", build: readerSettings },
     page: { button: "readerMore", label: "This clip", build: () => state.open.preview ? previewSheet(state.open) : pageSheet(state.open, "reader") },
     contents: { button: "readerContents", label: "Contents", build: contentsList },
+    marks: { button: "readerMore", label: "Highlights", build: () => marksView(state.open) },
   };
 
   function openSheet(kind, fromHistory) {
@@ -3466,7 +3617,13 @@
     folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
     check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
     star: '<path d="M12 3.5l2.6 5.3 5.9.9-4.25 4.1 1 5.85L12 16.9l-5.25 2.75 1-5.85L3.5 9.7l5.9-.9z"/>',
+    mark: '<path d="M14.5 4.5l5 5L11 18H6v-5z"/><path d="M4 21h16"/>',
   };
+  function svgIcon(name, size) {
+    const box = el("span", { class: "svg-icon", "aria-hidden": "true" });
+    box.innerHTML = '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICONS[name] + "</svg>";
+    return box;
+  }
   function tileButton(icon, label, onclick, cls) {
     const b = el("button", { class: "tile-btn" + (cls ? " " + cls : ""), type: "button", onclick }, el("span", { class: "tile-icon", "aria-hidden": "true" }), label);
     b.firstChild.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICONS[icon] + "</svg>";
@@ -3506,8 +3663,18 @@
   function pageSheet(p, where) {
     const box = el("div", { class: "page-controls" });
     const inReader = where === "reader";
-    let exporting = false;
+    let exporting = false, marking = false;
     const draw = () => {
+      if (marking) {
+        fill(box, marksView(p, (open) => {
+          marking = false;
+          if (open && !inReader) { back().then(() => openPage(p.id)); return; }
+          draw();
+          focusFirst(box);
+        }));
+        focusFirst(box);
+        return;
+      }
       if (exporting) {
         fill(box, exportControls(p, () => { exporting = false; draw(); focusFirst(box); }));
         focusFirst(box);
@@ -3526,6 +3693,10 @@
           p.file ? null : tileButton("original", "Original", () => C.platform.openOutside(p.url)),
           favTile(p, draw)),
         el("h3", { class: "overline" }, p.link ? "This file" : "This clip"),
+        p.preview || (!inReader && !(p.marks || []).length) ? null : el("div", { class: "group" },
+          el("button", { class: "row", type: "button", onclick: () => { markFocus = null; marking = true; draw(); } },
+            el("span", { class: "row-label" }, "Highlights"),
+            el("span", { class: "row-value" }, String((p.marks || []).length)))),
         tagsRow(p, draw),
         folderRow(p, draw),
         p.file ? null : picturesRow(p, draw),
@@ -4511,7 +4682,7 @@
   // every few minutes while open. Pages that came down get their pictures
   // here, one page at a time, like Retry.
   let syncTimer = null, syncQueue = [], fetchingPictures = false;
-  const SYNCED_KEEP = ["savedAt", "title", "requested", "tags", "folder", "folderAt", "source", "series", "fav", "favAt", "folderFav", "folderFavAt", "at", "finished", "readAt", "readOn", "spot"];
+  const SYNCED_KEEP = ["savedAt", "title", "requested", "tags", "folder", "folderAt", "source", "series", "fav", "favAt", "folderFav", "folderFavAt", "at", "finished", "readAt", "readOn", "spot", "marks"];
   // While a run of saves is on, sync waits longer (1.2.0): each sync is a
   // merge of the whole library, and one after every page landing was a
   // stutter every few seconds.

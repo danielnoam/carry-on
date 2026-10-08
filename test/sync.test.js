@@ -176,4 +176,21 @@ test("the device that read last (readOn, 1.4.2) goes with its place", () => {
   assert.strictEqual(S.merge(base, local, old, NOW).pages[0].readOn, undefined);
 });
 
+test("highlights merge by id: both sides' new ones stay, a removed one goes, the later note wins", () => {
+  const m = (id, more) => ({ id, block: 1, start: 0, endBlock: 1, end: 4, text: "word", at: 10, ...more });
+  const base = lib([page("a1b2", { marks: [m("x"), m("y")] })]);
+  const local = lib([page("a1b2", { marks: [m("x", { note: "mine", at: 30 }), m("y"), m("l", { block: 0 })] })]);
+  const remote = lib([page("a1b2", { marks: [m("x", { note: "theirs", at: 20 }), m("r", { block: 2 })] })]);
+  const got = S.merge(base, local, remote, NOW).pages[0].marks;
+  assert.deepStrictEqual(got.map((x) => x.id), ["l", "x", "r"]);
+  assert.strictEqual(got.find((x) => x.id === "x").note, "mine");
+});
+
+test("removing every highlight on one device removes them everywhere", () => {
+  const m = { id: "x", block: 1, start: 0, endBlock: 1, end: 4, text: "word", at: 10 };
+  const base = lib([page("a1b2", { marks: [m] })]);
+  const r = S.merge(base, lib([page("a1b2", { tags: ["t"] })]), lib([page("a1b2", { marks: [m], at: 0.5, readAt: 5 })]), NOW);
+  assert.strictEqual(r.pages[0].marks, undefined);
+});
+
 console.log("\n" + passed + " passed");
