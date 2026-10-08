@@ -82,19 +82,6 @@ on the program first; this release comes after.
 
 ---
 
-## Big screens, after 1.5.0
-
-1.5.0 built the approved boards (`design/XL-*.dc.html`). Left for later:
-- A PDF's printed pages with a thumbnail rail beside them (the board
-  shows one); 1.5.0 has the pages two side by side but no thumbnails.
-- Check on a real Android tablet and an iPad: the pinned sidebar with a
-  keyboard attached, Ctrl V, drag and drop from another app in split
-  screen.
-- Files dropped on the window (an EPUB, a PDF) could import like Open a
-  file; 1.5.0 takes dropped links only.
-
----
-
 ## Waiting on a decision, not on a release slot
 
 - **Saving any site in a browser: a server, later (Daniel, 4 Oct

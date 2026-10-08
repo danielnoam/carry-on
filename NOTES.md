@@ -3,6 +3,23 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Big screens finished (1.5.1).** The rail beside a book of pictures
+  (a scan, a PDF read from its file, a comic) lists its pages instead of
+  headings, chosen by railPages(): a page is any `.co-comic > img`. A PDF
+  read from its file draws each rail page from the open PDF
+  (files.pageThumb), and waits while drawNear is drawing the pages being
+  read, so the rail never slows reading; the others reuse the picture
+  already in the page. Dropped files were already opened by the window's
+  drop handler; the drop card now shows for them ("Drop to open"), and a
+  file manager's drag, which also carries file:// links, is no longer
+  tried as a link. Clip pictures are 64 by 96 (2:3, the collection
+  covers' shape) and 4:5 in Grid; Continue reading keeps its wide
+  picture, 3:1 from 700 px so it doesn't fill the screen. Checked in an
+  emulated iPad (touch, coarse pointer, 1180 by 820 and 820 by 1180,
+  Split View widths): the pinned sidebar, hardware keys, Ctrl V and a
+  dropped link all work. A real iPad and Android tablet, and a drag
+  from another app in Split View, still need a person.
+
 - **Big screens (1.5.0).** Daniel approved the 38 boards on the canvas
   page "1.5 Big screens" "all at once": every screen, every width, one
   release. The tiers are widths (700 px tablet, 1024 px pinned sidebar,

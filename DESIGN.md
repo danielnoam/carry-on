@@ -159,7 +159,7 @@ and the page shows above it.
     collection's cover, 80 × 120, when it has one), "Collections" (a row
     of standing covers, 112 px wide at 2:3, 136 px at 900 px and wider),
     then "Pages in no collection · N" as rows: no box, a hairline under
-    each, a 64 px picture.
+    each, a 64 × 96 picture standing like a cover (1.5.1).
   - **One list:** Continue reading, then collections and pages in one
     list of rows, in the chosen order, under overlines: Today, Yesterday,
     This week, This month, Earlier (or Not started, under Last read) for
@@ -167,8 +167,9 @@ and the page shows above it.
     collection's row has its cover standing at 64 × 96 and "Collection ·
     3 of 12 read · 4 MB".
   - **Grid:** Continue reading as a card with its picture across the top
-    (2:1), collections as covers three across, pages as cards two across
-    (three at 900 px), the picture on top at 16:10 and a label-size title.
+    (2:1, 3:1 from 700 px), collections as covers three across, pages as
+    cards two across (three at 900 px), the picture on top at 4:5 (1.5.1)
+    and a label-size title.
   At 900 px and wider, Shelf and One list put their rows in two columns.
 - **Library card (Now):** thumbnail, site line (site, collection, #tags),
   serif title, then the reading line ("9 min", "6 min left" with a 3 px
@@ -686,7 +687,10 @@ and the page shows above it.
   `--bar`, the licence and Read the original at its foot; Reader
   settings has a switch for it), Pages go two side by side (Reader
   settings: One, Two, Auto from 1000 px), and so do a PDF's printed
-  pages; Storage and Sync take two columns. From 1280 px a post opened
+  pages; a book of pictures (a scan, a PDF read from its file, a comic)
+  has its pages in the rail instead, 112 px wide with the number under
+  each, the one at the top of the screen ringed in `--accent` (1.5.1).
+  Storage and Sync take two columns. From 1280 px a post opened
   in Feeds reads in a pane beside the 500 px river. Everywhere from
   700 px: right-click on a clip opens a menu at the pointer with each
   item's key, a link dropped anywhere saves ("Drop to save"), Ctrl V with

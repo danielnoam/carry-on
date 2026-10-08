@@ -2,6 +2,18 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.5.1] - 2026-10-08
+
+### Added
+- A PDF, a scan or a comic on a wide window shows its pages small down
+  the side, the one you're on marked. Tap one to go there.
+- Drop an EPUB, a PDF or any file Open a file takes onto the window to
+  bring it in. The window says "Drop to open" while you hold it there.
+
+### Changed
+- Clip pictures in the library stand taller, like collection covers, so
+  more of the picture shows: in Shelf and One list rows, and in Grid.
+
 ## [1.5.0] - 2026-10-07
 
 ### Added

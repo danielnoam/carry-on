@@ -1,7 +1,7 @@
 // Waypage: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "1.5.0";
+  const APP_VERSION = "1.5.1";
   window.Waypage.version = APP_VERSION;
 
   const C = window.Waypage;
@@ -1807,7 +1807,13 @@
   // From 1024 px the contents sit beside the text, the section being read
   // marked, with Back, and the licence and the original link at the foot.
   // Reader settings has a switch to keep it away.
-  const railOn = () => pinned.matches && readingPrefs().rail && !!state.open && !$("readerView").dataset.pane && C.reader.headings().length >= 2;
+  // A book of pictures (a scan, a PDF read from its file, a comic) has its
+  // pages there instead, drawn small (1.5.1).
+  const railPages = () => C.reader.headings().length >= 2 ? [] : C.reader.printedPages();
+  const railOn = () => pinned.matches && readingPrefs().rail && !!state.open && !$("readerView").dataset.pane
+    && (C.reader.headings().length >= 2 || C.reader.printedPages().length >= 2);
+  const RAIL_THUMB = 112;
+  let railSeen = null;
   function fitRail() {
     const on = railOn(), view = $("readerView");
     const was = view.classList.contains("railed");
@@ -1819,8 +1825,33 @@
   function paintRail() {
     const p = state.open;
     $("railBackLabel").textContent = state.folder || (state.place === "feeds" ? "Feeds" : "Library");
-    fill($("railList"), ...C.reader.headings().map((h, i) => el("li", null,
-      el("button", { class: "rail-row" + (h.level === 3 ? " sub" : ""), type: "button", dir: "auto", onclick: () => C.reader.jumpTo(i) }, h.text))));
+    const pages = railPages();
+    $("readerRail").classList.toggle("paged", pages.length > 0);
+    $("readerRail").setAttribute("aria-label", pages.length ? "Pages" : "Contents");
+    $("railOver").textContent = pages.length ? "Pages" : "Contents";
+    if (railSeen) railSeen.disconnect();
+    if (pages.length) {
+      // Each page is drawn as it scrolls into the rail.
+      railSeen = new IntersectionObserver((seen) => {
+        for (const x of seen) {
+          if (!x.isIntersecting) continue;
+          railSeen.unobserve(x.target);
+          const img = x.target, at = pages[Number(img.dataset.n) - 1];
+          const put = (url) => { if (url && img.isConnected) { img.src = url; img.classList.add("in"); } };
+          if (at.page) C.files.pageThumb(at.page, Math.round(RAIL_THUMB * (devicePixelRatio || 1))).then(put);
+          else put(C.reader.printedPages()[at.n - 1].src);
+        }
+      }, { root: $("railList"), rootMargin: "200px 0px" });
+      fill($("railList"), ...pages.map((x) => {
+        const img = el("img", { class: "rail-thumb", alt: "", "data-n": x.n });
+        railSeen.observe(img);
+        return el("li", null, el("button", { class: "rail-page", type: "button", "aria-label": "Page " + x.n, onclick: () => C.reader.toPrinted(x.n) },
+          img, el("span", { class: "rail-num" }, String(x.n))));
+      }));
+    } else {
+      fill($("railList"), ...C.reader.headings().map((h, i) => el("li", null,
+        el("button", { class: "rail-row" + (h.level === 3 ? " sub" : ""), type: "button", dir: "auto", onclick: () => C.reader.jumpTo(i) }, h.text))));
+    }
     const link = /^https?:/.test(p.url || "") ? el("button", { class: "rail-original", type: "button", onclick: () => C.platform.openOutside(p.url) }) : null;
     if (link) link.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>Read the original';
     fill($("railFoot"),
@@ -1830,10 +1861,13 @@
   function railNow() {
     const rail = $("readerRail");
     if (rail.hidden) return;
-    const now = C.reader.section();
     let current = -1;
-    C.reader.headings().forEach((h, i) => { if (h.text === now) current = i; });
-    rail.querySelectorAll(".rail-row").forEach((b, i) => {
+    if (rail.classList.contains("paged")) current = C.reader.printedNow() - 1;
+    else {
+      const now = C.reader.section();
+      C.reader.headings().forEach((h, i) => { if (h.text === now) current = i; });
+    }
+    rail.querySelectorAll(".rail-row, .rail-page").forEach((b, i) => {
       if (i !== current) { b.removeAttribute("aria-current"); return; }
       if (b.hasAttribute("aria-current")) return;
       b.setAttribute("aria-current", "location");
@@ -6259,15 +6293,21 @@
   }
   {
     const zone = $("dropZone");
-    const linky = (e) => !!e.dataTransfer && [...e.dataTransfer.types].some((t) => t === "text/uri-list" || t === "text/plain")
+    // Files are opened by the window's own drop handler above; the zone
+    // only says so. A file manager's drag also carries file:// links,
+    // which aren't saved as pages.
+    const filey = (e) => !!e.dataTransfer && [...e.dataTransfer.types].includes("Files");
+    const linky = (e) => !!e.dataTransfer && !filey(e) && [...e.dataTransfer.types].some((t) => t === "text/uri-list" || t === "text/plain")
       && !state.open && !state.menu && !state.settings && !state.batch;
+    const shown = (e) => filey(e) ? !state.menu : linky(e);
     let depth = 0;
     const hide = () => { depth = 0; if (!zone.hidden && !zone.dataset.leaving) { zone.dataset.leaving = "1"; M.leave(zone).then(() => { if (zone.dataset.leaving) { zone.hidden = true; delete zone.dataset.leaving; } }); } };
     document.addEventListener("dragenter", (e) => {
-      if (!linky(e)) return;
+      if (!shown(e)) return;
       depth++;
       if (zone.hidden || zone.dataset.leaving) {
-        $("dropTitle").textContent = state.place === "feeds" ? "Drop to follow" : "Drop to save";
+        $("dropTitle").textContent = filey(e) ? "Drop to open" : state.place === "feeds" ? "Drop to follow" : "Drop to save";
+        $("dropNote").textContent = filey(e) ? FILE_KINDS_LINE : state.place === "feeds" ? "Followed like an added feed" : "Saved for reading offline, like a pasted link";
         delete zone.dataset.leaving;
         zone.hidden = false;
         M.arrive(zone, 0);
@@ -6276,6 +6316,7 @@
     document.addEventListener("dragover", (e) => { if (linky(e)) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; } });
     document.addEventListener("dragleave", () => { if (--depth <= 0) hide(); });
     document.addEventListener("drop", (e) => {
+      if (filey(e) && state.menu) { e.preventDefault(); e.stopPropagation(); hide(); return; }
       if (!linky(e)) { hide(); return; }
       e.preventDefault();
       hide();

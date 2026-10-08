@@ -273,6 +273,30 @@
     w.scrollTo(0, h.getBoundingClientRect().top + w.scrollY - (topSpace ? topSpace() : 0) - 8);
   }
 
+  // A book of pictures (1.5.1): a scan or a PDF read from its file, or a
+  // comic. Its pages, the one at the top of the screen, and a jump to one,
+  // for the rail of pages beside it.
+  const printed = () => (doc ? [...doc.querySelectorAll(".co-comic > img")] : []);
+  function printedPages() {
+    return printed().map((img, i) => ({ n: i + 1, page: Number(img.getAttribute("data-page")) || 0,
+      src: /^(blob|data:image\/(?!svg)|https?|capacitor|file)/.test(img.getAttribute("src") || "") ? img.src : "" }));
+  }
+  function printedNow() {
+    const edge = (topSpace ? topSpace() : 0) + 24;
+    let cur = 1;
+    for (const [i, img] of printed().entries()) {
+      if (img.getBoundingClientRect().top > edge) break;
+      cur = i + 1;
+    }
+    return cur;
+  }
+  function toPrinted(n) {
+    const img = printed()[n - 1];
+    if (!img || !frame) return;
+    const w = frame.contentWindow;
+    w.scrollTo(w.scrollX, img.getBoundingClientRect().top + w.scrollY - (topSpace ? topSpace() : 0) - 8);
+  }
+
   // Read aloud (0.27.0): the page's text as blocks in reading order, and
   // the one being read lit up and kept in view.
   const BLOCKS = "h1, h2, h3, h4, h5, h6, p, li, blockquote, pre, figcaption, dt, dd, td, th";
@@ -744,5 +768,5 @@
   addEventListener("resize", applyTop);
   addEventListener("offline", applyConnection);
 
-  C.reader = { open, close, position, spot, jump, setPaged, turn, get paged() { return isPaged(); }, pageInfo, headings, section, jumpTo, readable, firstShown, light, following, selectionSpot, clearSelection, applyTheme, applyConnection, srcdoc, CSP, setSpread, refit: applyTop, images, imageInfo };
+  C.reader = { open, close, position, spot, jump, setPaged, turn, get paged() { return isPaged(); }, pageInfo, headings, section, jumpTo, readable, firstShown, light, following, selectionSpot, clearSelection, applyTheme, applyConnection, srcdoc, CSP, setSpread, refit: applyTop, images, imageInfo, printedPages, printedNow, toPrinted };
 })();

@@ -340,7 +340,7 @@ html.native .top-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top));
 .card, .tile { isolation: isolate; }
 /* A long library: cards off screen skip style, layout and paint until
    they scroll near, so opening and closing things stays quick (0.30.4). */
-.library > .page-card:not(.continue) { content-visibility: auto; contain-intrinsic-size: auto 96px; }
+.library > .page-card:not(.continue) { content-visibility: auto; contain-intrinsic-size: auto 120px; }
 .card-open {
   position: absolute; inset: 0; z-index: 0;
   border: 0; border-radius: inherit; background: transparent; cursor: pointer;
@@ -366,7 +366,7 @@ html.native .top-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top));
   font-weight: 500; cursor: pointer;
 }
 .card-thumb {
-  width: 76px; height: 76px; flex-shrink: 0;
+  width: 64px; height: 96px; flex-shrink: 0;
   border-radius: 10px; object-fit: cover;
   background: var(--preview);
 }
@@ -1212,7 +1212,7 @@ html { -webkit-tap-highlight-color: transparent; }
   background: transparent; border: 0; border-radius: 0;
   box-shadow: inset 0 -1px 0 var(--line);
 }
-:is([data-layout="shelf"], [data-layout="list"]) .page-card:not(.continue) .card-thumb { width: 64px; height: 64px; }
+:is([data-layout="shelf"], [data-layout="list"]) .page-card:not(.continue) .card-thumb { width: 64px; height: 96px; }
 .selecting:is([data-layout="shelf"], [data-layout="list"]) .picked.page-card:not(.continue) { box-shadow: inset 0 -2px 0 var(--accent); }
 
 /* Shelf and Grid: collections are covers, two to three wide. */
@@ -1252,10 +1252,11 @@ html { -webkit-tap-highlight-color: transparent; }
 [data-layout="grid"] .library { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: var(--s-3); }
 [data-layout="grid"] .library > :is(.wide, .card:not(.page-card)) { grid-column: 1 / -1; }
 [data-layout="grid"] .page-card:not(.has-cover) { flex-direction: column; gap: 0; padding: 0; overflow: hidden; }
-[data-layout="grid"] .page-card:not(.has-cover) .card-thumb { width: 100%; height: auto; aspect-ratio: 16 / 10; border-radius: 0; }
+[data-layout="grid"] .page-card:not(.has-cover) .card-thumb { width: 100%; height: auto; aspect-ratio: 4 / 5; border-radius: 0; }
 [data-layout="grid"] .page-card:not(.has-cover) .card-body { padding: var(--s-3); }
 [data-layout="grid"] .page-card:not(.continue) .card-title { font-size: var(--fs-label); line-height: var(--lh-label); }
 [data-layout="grid"] .continue:not(.has-cover) .card-thumb { aspect-ratio: 2 / 1; }
+@media (min-width: 700px) { [data-layout="grid"] .continue:not(.has-cover) .card-thumb { aspect-ratio: 3 / 1; } }
 [data-layout="grid"] .card-thumb.site-mark img { width: var(--s-7); height: var(--s-7); }
 
 /* At phone width rows sit edge to edge, their hairlines between them. */
@@ -1296,7 +1297,7 @@ html { -webkit-tap-highlight-color: transparent; }
 .downloads .empty { margin: var(--s-6) auto 0; }
 .card.done-run { cursor: default; }
 .card.done-run:active { transform: none; background-image: none; }
-.card.done-page .card-thumb { width: var(--s-8); height: var(--s-8); }
+.card.done-page .card-thumb { width: var(--s-7); height: calc(var(--s-7) * 1.5); }
 
 /* A run's failed pages, inside its card. */
 .failed-list {
@@ -1859,6 +1860,20 @@ kbd {
   .rail-row.sub { padding-inline-start: var(--s-6); color: var(--muted); font-size: var(--fs-meta); line-height: var(--lh-meta); font-weight: 400; }
   .rail-row:hover { background: var(--press); }
   .rail-row[aria-current] { background: var(--bar); font-weight: 600; color: var(--ink); }
+  .paged .rail-list { padding-top: var(--s-1); }
+  .rail-page {
+    display: flex; flex-direction: column; align-items: center; gap: var(--s-1); width: 100%; padding: var(--s-2) 0;
+    border: 0; border-radius: var(--r-md); background: transparent; color: var(--muted);
+    font: 500 var(--fs-meta)/var(--lh-meta) var(--sans); cursor: pointer;
+  }
+  .rail-page:hover { background: var(--press); }
+  .rail-thumb {
+    display: block; width: calc(var(--s-9) + var(--s-7)); aspect-ratio: 3 / 4; object-fit: contain;
+    background: var(--preview); box-shadow: 0 0 0 1px var(--line);
+  }
+  .rail-thumb.in { aspect-ratio: auto; background: transparent; }
+  .rail-page[aria-current] { color: var(--ink); font-weight: 600; }
+  .rail-page[aria-current] .rail-thumb { box-shadow: 0 0 0 2px var(--accent); }
   .rail-foot { display: flex; flex-direction: column; gap: var(--s-2); padding: var(--s-4) var(--s-3) 0; border-top: 1px solid var(--line); }
   .rail-foot:empty { display: none; }
   .rail-licence { margin: 0; color: var(--muted); font-size: var(--fs-meta); line-height: var(--lh-meta); }

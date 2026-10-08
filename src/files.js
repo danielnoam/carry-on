@@ -482,6 +482,7 @@
     if (!held) return;
     held.pdf.close();
     for (const u of held.urls.values()) URL.revokeObjectURL(u.url);
+    for (const u of (held.thumbs || new Map()).values()) u.then((x) => x && URL.revokeObjectURL(x));
     held = null;
   }
   // Draws the pages within a screen and a half of what the reader `frame`
@@ -526,6 +527,23 @@
         next.setAttribute("src", url);
       }
     } finally { h.busy = false; }
+  }
+
+  // A page drawn small for the rail beside a PDF (1.5.1), kept while the
+  // PDF is open. The pages being read are drawn first: a thumbnail waits
+  // while drawNear is busy.
+  function pageThumb(n, width) {
+    const h = held;
+    if (!h) return Promise.resolve(null);
+    h.thumbs = h.thumbs || new Map();
+    if (!h.thumbs.has(n)) {
+      h.thumbs.set(n, (async () => {
+        while (h.busy && held === h) await new Promise((r) => setTimeout(r, 120));
+        if (held !== h) return null;
+        try { return URL.createObjectURL(new Blob([await h.pdf.draw(n, width)], { type: "image/jpeg" })); } catch (e) { h.thumbs.delete(n); return null; }
+      })());
+    }
+    return h.thumbs.get(n);
   }
 
   // ---- Bringing one in ----
@@ -691,5 +709,5 @@
     return meta;
   }
 
-  C.files = { KINDS, LINKABLE, canLink, kindOf, bring, openLinked, printed, drawNear, closeHeld, markdown, plain, FileError, set onCover(f) { onCover = f; } };
+  C.files = { KINDS, LINKABLE, canLink, kindOf, bring, openLinked, printed, drawNear, pageThumb, closeHeld, markdown, plain, FileError, set onCover(f) { onCover = f; } };
 })();
