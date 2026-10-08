@@ -3,6 +3,31 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Saving signed in (1.8.0).** native/share's SignIn plugin opens the
+  site in a WebView (Android, a full-screen dialog) or a WKWebView on the
+  default data store (iOS), and keeps nothing else: the cookies stay in
+  the system's cookie store. platform.js keeps the list of sites signed
+  in to (`waypage.signedIn`, this device only, never synced) and adds a
+  Cookie header to CapacitorHttp requests for those sites alone, not for
+  every site PageRender has visited, so a site's metered-paywall counter
+  doesn't follow every save. On iOS, cookies() also copies them into
+  HTTPCookieStorage.shared, since URLSession replaces a hand-set Cookie
+  header with what that storage holds. Signing out on Android expires
+  each cookie the site's address would send under every domain it could
+  have been set for, as CookieManager can't list them; iOS deletes them
+  by domain, plus the site's website data, never the app's own
+  (localhost). Neither was run on a phone before 1.8.0 shipped.
+- **Every highlight in one place (1.8.0).** A third place beside Library
+  and Feeds (`state.place = "highlights"`), drawn from the index alone,
+  so it's as quick as the library. Its search field stays in the page
+  while the list under it redraws, so typing keeps focus. At 1280 px it
+  reads in the pane beside the list, as Feeds does.
+- **Translate and Look up (1.8.0)** open the web (Google Translate,
+  Wiktionary in the phone's language) through openOutside. The phone's
+  own selection menu may offer the same, depending on the phone and the
+  apps on it; these are always in the same place. Too wide for a phone,
+  the bar drops Read from here's words first, then every label.
+
 - **The bubble that stayed (1.7.1).** Daniel, on his phone: after a
   highlight "a small bubble" stayed until he left the app. Not seen in
   Chromium, so three likely causes are all dealt with: Android's WebView
