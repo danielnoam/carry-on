@@ -1,4 +1,4 @@
-// The app itself, driven in a browser (1.7.0): `node test/ui.test.js`.
+// The app itself, driven in a browser (1.7.0, 1.8.0): `node test/ui.test.js`.
 // Starts server.js, saves test/fixtures/article.html (same origin, so the
 // browser's fetch can reach it), reads it, highlights it, searches for it,
 // and opens the app in every theme at phone and desktop width, failing on
@@ -127,6 +127,47 @@ const frameText = (p) => p.frameLocator("#readerFrame").locator("body");
       await p.locator("#readerView").waitFor({ state: "hidden" });
     });
 
+    await test("Highlights in the sidebar lists every highlight, and a tap opens the clip", async () => {
+      await p.click("#sideBtn");
+      await p.locator("#sidebar .side-item", { hasText: "Highlights" }).click();
+      await p.locator("#sidebar").waitFor({ state: "hidden" });
+      assert.strictEqual(await p.textContent("#placeTitle"), "Highlights");
+      const row = p.locator("#highlights .mark-row", { hasText: "marmalade sky" });
+      await row.locator(".mark-note", { hasText: "Dawn over the ocean" }).waitFor();
+      await p.fill("#highlights .hl-search input", "zeppelinxyz");
+      await p.locator("#highlights .hl-none").waitFor();
+      await p.fill("#highlights .hl-search input", "dawn");
+      await row.click();
+      await p.locator("#readerView:not([hidden])").waitFor();
+      await p.frameLocator("#readerFrame").locator("mark.co-mark").first().waitFor();
+      await p.goBack();
+      await p.locator("#readerView").waitFor({ state: "hidden" });
+      assert.strictEqual(await p.textContent("#placeTitle"), "Highlights");
+      await p.click("#sideBtn");
+      await p.locator("#sidebar .side-item", { hasText: "Library" }).click();
+      await p.locator("#sidebar").waitFor({ state: "hidden" });
+    });
+
+    await test("Translate and Look up open the selected words on the web", async () => {
+      await p.evaluate(() => { window.__opened = []; window.Waypage.platform.openOutside = (u) => window.__opened.push(u); });
+      await p.locator(".page-card", { hasText: "The Long Haul Flight" }).first().click();
+      await frameText(p).getByText("oceanic track").waitFor();
+      await p.frameLocator("#readerFrame").locator("p", { hasText: "oceanic track" }).evaluate((el) => {
+        const t = [...el.childNodes].find((n) => n.nodeType === 3 && n.data.includes("oceanic"));
+        const r = el.ownerDocument.createRange();
+        r.setStart(t, t.data.indexOf("oceanic"));
+        r.setEnd(t, t.data.indexOf("oceanic") + "oceanic".length);
+        const sel = el.ownerDocument.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(r);
+      });
+      await p.locator(".read-here .sel-look:not([hidden])").click();
+      const opened = await p.evaluate(() => window.__opened);
+      assert.ok(/wiktionary\.org\/.*search=oceanic$/.test(opened[0] || ""), "opened " + opened);
+      await p.goBack();
+      await p.locator("#readerView").waitFor({ state: "hidden" });
+    });
+
     await test("the Highlights button lists them, and words already highlighted can be unhighlighted", async () => {
       await p.locator(".page-card", { hasText: "The Long Haul Flight" }).first().click();
       const marks = p.frameLocator("#readerFrame").locator("mark.co-mark");
@@ -190,6 +231,24 @@ const frameText = (p) => p.frameLocator("#readerFrame").locator("body");
       await q.reload();
       await q.locator(".page-card").first().waitFor();
       await q.waitForFunction(() => document.querySelectorAll(".library .page-card").length >= 400, null, { timeout: 15000 });
+      assert.deepStrictEqual(q.errors, [], q.errors.join(" | "));
+      await q.context().close();
+    });
+
+    await test("a collection's new-chapters badge saves them without opening it", async () => {
+      const q = await page(browser, 390);
+      await q.evaluate(async (next) => {
+        const list = [0, 1].map((i) => ({ id: "ser" + i, url: "https://example.com/ch" + i, title: "Chapter " + (i + 1), site: "example.com", savedAt: 1000 + i, minutes: 3, mode: "links", at: 0, finished: false, folder: "Series A", folderAt: i, next }));
+        await window.Waypage.store.writeIndex(list);
+        localStorage.setItem("waypage.newChapters", JSON.stringify({ "series a": { count: 1, at: 2000 } }));
+      }, ARTICLE);
+      await q.reload();
+      const pip = q.locator(".tile-new").first();
+      await pip.waitFor();
+      assert.strictEqual(await pip.getAttribute("aria-label"), "Save 1 new clip of Series A");
+      await pip.click();
+      await q.waitForFunction(() => window.Waypage.store.readIndex().then((l) => l.length === 3), null, { timeout: 10000 });
+      assert.ok(await q.evaluate(() => document.getElementById("readerView").hidden), "the collection or reader opened");
       assert.deepStrictEqual(q.errors, [], q.errors.join(" | "));
       await q.context().close();
     });

@@ -65,14 +65,19 @@ on a phone yet. Left:
 
 ---
 
-## Saving pages you're signed in to (after 1.7.0)
+## Saving signed in: what 1.8.0 left
 
-1.7.0 says when a paywalled article saved as only its start. The fix is
-saving it signed in: an in-app browser (a WebView screen, Android first)
-where you sign in to a site once, whose cookies CapacitorHttp and
-PageRender then send, so a subscriber's article saves whole. Native code
-on both phones, and a privacy note: those cookies stay on the device and
-go to that site only.
+- **Pages drawn by script, signed in, on iOS.** iOS's PageRender keeps
+  nothing between pages (a non-persistent data store), so a signed-in
+  site whose article only appears after its scripts run still saves as
+  the start there. Copying the site's cookies into that store before the
+  page loads would do it. Android's PageRender already shares them.
+- **"Sign in with Google" in the sign-in browser.** Google refuses sign-in
+  in embedded browsers, so a site whose only sign-in is Google's can't be
+  signed in to. Email and password sign-ins work. Not worth working
+  around: the way around is against Google's terms.
+- **Privacy forms**, when the store listings are written: sign-in cookies
+  stay on the phone and go only to their own site.
 
 ## Waiting on a decision, not on a release slot
 

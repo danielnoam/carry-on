@@ -2,6 +2,31 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.8.0] - 2026-10-08
+
+### Added
+- Highlights has a place of its own in the sidebar, under Feeds: every
+  highlight in your library, grouped by clip, the latest first, with
+  their notes. Search them, copy them all as Markdown, and tap one to
+  open the clip right at it.
+- Translate and Look up on the bar over selected words. Translate opens
+  the words in Google Translate into your phone's language; Look up (for
+  up to three words) opens them in Wiktionary.
+- Save signed in. When an article saves as only its start, tap Sign in
+  (on the toast, or in the clip's ⋯ menu): the site opens inside
+  Waypage, you sign in once, and the clip saves again whole, keeping its
+  highlights and your place. Settings, Saving lists the sites you're
+  signed in to, signs you out of one, and signs you in to another.
+  Sign-ins stay on the phone and don't sync.
+- Tap a collection's "+3" badge to save its new chapters, without
+  opening it.
+
+### Fixed
+- Saving a clip again kept its collection, tags and place but lost its
+  highlights. They stay now.
+- The bar over a selection could sit off its words when the reader had
+  scrolled under the frame.
+
 ## [1.7.1] - 2026-10-08
 
 ### Added
