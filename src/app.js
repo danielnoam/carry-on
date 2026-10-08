@@ -2100,28 +2100,50 @@
     return space < 0 ? 0 : space + 1;
   }
 
-  // Under a selection while one is up: Highlight (1.7.0), and Read from
-  // here when the phone can read aloud.
+  // Under a selection while one is up: Highlight (1.7.0), Read from here
+  // when the phone can read aloud, and Translate and Look up (1.8.0), which
+  // open the words on the web.
   let readHere = null, quietUntil = 0;
+  const LOOK_UP_WORDS = 3;
+  const myLang = () => (navigator.language || "en").split("-")[0].toLowerCase().replace(/^iw$/, "he");
+  function lookOutside(url) {
+    hideReadHere();
+    C.reader.clearSelection();
+    if (!navigator.onLine) { toast("You're offline. Translate and Look up open on the web."); return; }
+    C.platform.openOutside(url);
+  }
+  const translateUrl = (text) => "https://translate.google.com/?sl=auto&tl=" + myLang() + "&op=translate&text=" + encodeURIComponent(text.slice(0, 1500));
+  const lookUpUrl = (text) => "https://" + myLang() + ".wiktionary.org/wiki/Special:Search?go=Go&search=" + encodeURIComponent(text);
   function showReadHere() {
     const p = state.open;
     const mark = p && !p.preview && !state.sheet && Date.now() > quietUntil ? C.reader.selectionMark() : null;
     const spot = p && speech.available && !state.sheet ? C.reader.selectionSpot() : null;
-    const box = (mark && mark.box) || spot;
+    const picked = p && !state.sheet && Date.now() > quietUntil ? C.reader.selectionText() : null;
+    const box = (mark && mark.box) || spot || (picked && picked.box);
     if (!box) { hideReadHere(); return; }
     if (!readHere) {
-      const aloudBtn = el("button", { class: "sel-aloud", type: "button", onclick: () => {
+      const aloudBtn = el("button", { class: "sel-aloud", type: "button", "aria-label": "Read from here", onclick: () => {
         const s = C.reader.selectionSpot();
         hideReadHere();
         C.reader.clearSelection();
         if (s) startAloud(null, s);
       } });
       aloudBtn.innerHTML = $("readerAloud").innerHTML;
-      aloudBtn.append("Read from here");
+      aloudBtn.append(el("span", { class: "sel-label" }, "Read from here"));
       const markBtn = el("button", { class: "sel-mark", type: "button", onclick: () => (markBtn.dataset.remove ? removeMarks(markBtn.dataset.remove.split(",")) : addMark()) });
       markBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICONS.mark + "</svg>";
-      markBtn.append(el("span", { class: "sel-mark-label" }, "Highlight"));
-      readHere = el("div", { class: "read-here", role: "toolbar", "aria-label": "Selection" }, markBtn, aloudBtn);
+      markBtn.append(el("span", { class: "sel-label sel-mark-label" }, "Highlight"));
+      const outBtn = (cls, label, icon, url) => {
+        const b = el("button", { class: cls + " sel-icon", type: "button", "aria-label": label, title: label, onclick: () => {
+          const s = C.reader.selectionText();
+          if (s) lookOutside(url(s.text));
+        } });
+        b.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + icon + "</svg>";
+        return b;
+      };
+      readHere = el("div", { class: "read-here", role: "toolbar", "aria-label": "Selection" }, markBtn, aloudBtn,
+        outBtn("sel-translate", "Translate", ICONS.translate, translateUrl),
+        outBtn("sel-look", "Look up", ICONS.lookUp, lookUpUrl));
       $("readerView").append(readHere);
     }
     const markBtn = readHere.querySelector(".sel-mark");
@@ -2130,7 +2152,11 @@
     const on = mark ? C.reader.selectionMarks() : { all: false };
     if (on.all) markBtn.dataset.remove = on.ids.join(","); else delete markBtn.dataset.remove;
     markBtn.querySelector(".sel-mark-label").textContent = on.all ? "Remove highlight" : "Highlight";
+    markBtn.setAttribute("aria-label", on.all ? "Remove highlight" : "Highlight");
     readHere.querySelector(".sel-aloud").hidden = !spot;
+    readHere.querySelector(".sel-translate").hidden = !picked;
+    // A dictionary is for a word or a short phrase.
+    readHere.querySelector(".sel-look").hidden = !picked || picked.text.split(/\s+/).length > LOOK_UP_WORDS;
     const frame = $("readerFrame").getBoundingClientRect();
     const h = 44, room = frame.bottom - 72;
     const bar = $("readerView").classList.contains("bar-away") ? 0 : $("readerView").querySelector(".reader-bar").offsetHeight;
@@ -2142,9 +2168,18 @@
     if (top < frame.top + bar + 8) top = room - h;
     readHere.style.top = top + "px";
     readHere.hidden = false;
+    // Too wide for the screen, Read from here is its icon alone, then
+    // every button is.
+    readHere.classList.remove("tight", "tighter");
+    if (readHere.offsetWidth > innerWidth - 16) readHere.classList.add("tight");
+    if (readHere.offsetWidth > innerWidth - 16) readHere.classList.add("tighter");
     // Kept on screen whole, however wide its buttons make it.
     const half = readHere.offsetWidth / 2;
     readHere.style.left = Math.max(8 + half, Math.min(frame.left + (box.left + box.right) / 2, innerWidth - 8 - half)) + "px";
+    // The reader can be scrolled a little itself, under the frame, which
+    // moves the bar with it: it's put back where it was meant to go.
+    const off = readHere.getBoundingClientRect().top - top;
+    if (Math.abs(off) > 1) readHere.style.top = top - off + "px";
   }
   function hideReadHere() { if (readHere) readHere.hidden = true; }
 
@@ -3661,6 +3696,8 @@
     check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
     star: '<path d="M12 3.5l2.6 5.3 5.9.9-4.25 4.1 1 5.85L12 16.9l-5.25 2.75 1-5.85L3.5 9.7l5.9-.9z"/>',
     mark: '<path d="M14.5 4.5l5 5L11 18H6v-5z"/><path d="M4 21h16"/>',
+    translate: '<path d="M4 5h9M8.5 3v2M11 5c-1 4-3.5 7-7 8.5M6.5 8.5c1.2 2 3 3.5 5 4.5"/><path d="M13 21l4-9 4 9M14.5 18h5"/>',
+    lookUp: '<path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5z"/><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19"/><circle cx="11.5" cy="9.5" r="2.5"/><path d="M13.5 11.5l2 2"/>',
   };
   function svgIcon(name, size) {
     const box = el("span", { class: "svg-icon", "aria-hidden": "true" });

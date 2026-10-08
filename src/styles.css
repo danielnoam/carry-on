@@ -600,6 +600,8 @@ body.aloud-bar-up .library, body.aloud-bar-up .screen-body { padding-bottom: cal
 .read-here button[hidden] { display: none; }
 .read-here button:not([hidden]) ~ button:not([hidden]) { border-inline-start: 1px solid color-mix(in srgb, var(--accent-ink) 35%, transparent); }
 .read-here button:active { background-image: linear-gradient(var(--press), var(--press)); }
+.read-here .sel-icon, .read-here.tight .sel-aloud, .read-here.tighter button { width: var(--tap); padding: 0; justify-content: center; }
+.read-here.tight .sel-aloud .sel-label, .read-here.tighter .sel-label { display: none; }
 .aloud-controls { display: flex; flex-direction: column; gap: var(--s-3); }
 .aloud-controls > .overline { margin: var(--s-2) 0 calc(-1 * var(--s-1)) var(--s-1); }
 .aloud-controls .footnote { margin: 0 var(--s-1); }
