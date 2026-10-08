@@ -155,6 +155,15 @@
     },
   };
 
+  // Words to the phone's translate app (1.8.1), through native/share's
+  // Translate plugin on Android: true when an app took them, false where
+  // there's none (iOS, a browser), and the caller opens the web instead.
+  async function translateText(text) {
+    const T = plugin("Translate");
+    if (!T) return false;
+    try { const r = await T.translate({ text: String(text).slice(0, 5000) }); return !!(r && r.done); } catch (e) { return false; }
+  }
+
   // A page that builds itself with JavaScript, drawn in a hidden WebView by
   // native/share's PageRender plugin: { text, url } of the HTML it ended up
   // with. null where there's no such plugin (iOS for now, a browser) or the
@@ -775,6 +784,7 @@
     },
     fetchText,
     signIn,
+    translateText,
     render,
     get canRender() { return !!plugin("PageRender"); },
     downloadTo,
