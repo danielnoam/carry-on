@@ -1500,8 +1500,8 @@ html { -webkit-tap-highlight-color: transparent; }
 .install-hint { margin-top: var(--s-3); }
 
 /* ---- 0.28.0: the sidebar and Feeds ---- */
-.library[hidden], .feeds[hidden] { display: none; }
-[data-place="feeds"] .top, [data-place="feeds"] #searchBtn { display: none; }
+.library[hidden], .feeds[hidden], .highlights[hidden] { display: none; }
+:is([data-place="feeds"], [data-place="highlights"]) :is(.top, #searchBtn) { display: none; }
 
 .side-catch { z-index: 17; }
 .sidebar {
@@ -1555,6 +1555,28 @@ html { -webkit-tap-highlight-color: transparent; }
 .feed-mark img { width: var(--s-5); height: var(--s-5); }
 .feed-mark.small { width: var(--s-5); height: var(--s-5); font-size: var(--fs-meta); }
 .feed-mark.small img { width: var(--s-4); height: var(--s-4); }
+
+/* Every highlight in one place (1.8.0): each clip's under its title. */
+.highlights {
+  flex: 1; padding: 0 var(--gutter) var(--s-5);
+  display: flex; flex-direction: column; gap: var(--s-3);
+}
+[data-place="highlights"] .save-form { display: none; }
+[data-place="highlights"] .save-bar:not(:has(.update-bar:not([hidden]))) { display: none; }
+.hl-head[hidden] { display: none; }
+.hl-search { margin-top: var(--s-1); }
+.hl-line { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); margin-top: var(--s-1); }
+.hl-line .meta { margin: 0; }
+.hl-list { display: flex; flex-direction: column; gap: var(--s-5); }
+.hl-clip { display: flex; flex-direction: column; gap: var(--s-2); }
+.hl-title {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: var(--tap);
+  padding: 0; border: 0; background: none; color: var(--ink); font: inherit; text-align: start; cursor: pointer;
+}
+.hl-name { font: 600 var(--fs-label)/var(--lh-label) var(--sans); }
+.hl-title .meta { margin: 0; }
+.hl-title:active .hl-name { color: var(--muted); }
+.hl-none { margin: var(--s-6) auto 0; text-align: center; }
 
 /* The river: chips per feed, then the posts by day. */
 .feeds {
@@ -1675,7 +1697,7 @@ html { -webkit-tap-highlight-color: transparent; }
   /* Everything in the library lines up on one column, as wide as the
      window allows. */
   :root { --lib-left: 0px; --lib-pad: max(var(--gutter), calc((100vw - var(--lib-left) - var(--content-max)) / 2)); }
-  #libraryView > :is(.top-bar, .top, .library, .feeds, .save-bar) {
+  #libraryView > :is(.top-bar, .top, .library, .feeds, .highlights, .save-bar) {
     padding-inline: max(var(--gutter), calc((100% - var(--content-max)) / 2));
   }
   .top-bar { padding-block: var(--s-4) var(--s-3); gap: var(--s-3); }
@@ -1695,8 +1717,8 @@ html { -webkit-tap-highlight-color: transparent; }
   .lib-head .meta { margin: 0; flex: 1; min-width: 0; }
   .lib-head .lib-tools { margin: 0 calc(-1 * var(--s-2)) 0 0; align-self: center; gap: var(--s-4); }
   .top { padding-bottom: var(--s-3); }
-  [data-place="feeds"] .top { display: block; }
-  [data-place="feeds"] .top > :not(.lib-head), [data-place="feeds"] .lib-head > :not(.screen-title) { display: none; }
+  :is([data-place="feeds"], [data-place="highlights"]) .top { display: block; }
+  :is([data-place="feeds"], [data-place="highlights"]) :is(.top > :not(.lib-head), .lib-head > :not(.screen-title)) { display: none; }
 
   /* Two columns of clips; Continue reading, collections and section
      heads take the whole width. */
@@ -1952,9 +1974,9 @@ kbd {
   .reader.aloud .read-keys { display: none; }
 }
 @media (min-width: 1280px) {
-  body.pinned #libraryView[data-place="feeds"] { width: 500px; border-inline-end: 1px solid var(--line); }
-  body.pinned #libraryView[data-place="feeds"] > * { padding-inline: var(--s-5); }
-  body.pinned:has(#libraryView[data-place="feeds"]):has(#readerView[hidden]) .pane-note {
+  body.pinned #libraryView:is([data-place="feeds"], [data-place="highlights"]) { width: 500px; border-inline-end: 1px solid var(--line); }
+  body.pinned #libraryView:is([data-place="feeds"], [data-place="highlights"]) > * { padding-inline: var(--s-5); }
+  body.pinned:has(#libraryView:is([data-place="feeds"], [data-place="highlights"])):has(#readerView[hidden]) .pane-note {
     display: flex; position: fixed; inset: 0 0 0 calc(var(--side-w) + 500px); align-items: center; justify-content: center; margin: 0;
     color: var(--muted);
   }
