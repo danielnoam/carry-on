@@ -2,6 +2,26 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.7.1] - 2026-10-08
+
+### Added
+- A Highlights button in the reader's bar, beside Read aloud (or press
+  H). It lists the clip's highlights; they're no longer in the ⋯ menu.
+- Select words that are already highlighted and the button under them
+  says Remove highlight.
+- The library shows "Opening your library" in the middle while it's
+  read, instead of a blank screen.
+
+### Fixed
+- The bar of buttons over a selection could stay up after highlighting,
+  until you left the app. The highlight's own toast no longer has a
+  button that kept it up longer, and the selection ends properly.
+- The Highlight button could hide: over a long selection it went to the
+  top of the screen, under the reader's bar and the phone's Copy bar. It
+  now goes to the bottom when there's no room under or over the words.
+  Words in text with no paragraph of its own (lines split by line
+  breaks) can be highlighted too.
+
 ## [1.7.0] - 2026-10-08
 
 ### Added

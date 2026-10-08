@@ -66,6 +66,11 @@ const frameText = (p) => p.frameLocator("#readerFrame").locator("body");
   try {
     const p = await page(browser, 390);
 
+    await test("the library says it's opening before it's read", async () => {
+      const html = await (await fetch(ROOT)).text();
+      assert.ok(/class="lib-loading/.test(html));
+    });
+
     await test("the empty library loads with no errors", async () => {
       await p.waitForTimeout(300);
       assert.deepStrictEqual(p.errors, [], p.errors.join(" | "));
@@ -118,6 +123,31 @@ const frameText = (p) => p.frameLocator("#readerFrame").locator("body");
       const marks = p.frameLocator("#readerFrame").locator("mark.co-mark.co-noted");
       await marks.first().waitFor();
       assert.strictEqual((await marks.allTextContents()).join(""), "marmalade sky");
+      await p.goBack();
+      await p.locator("#readerView").waitFor({ state: "hidden" });
+    });
+
+    await test("the Highlights button lists them, and words already highlighted can be unhighlighted", async () => {
+      await p.locator(".page-card", { hasText: "The Long Haul Flight" }).first().click();
+      const marks = p.frameLocator("#readerFrame").locator("mark.co-mark");
+      await marks.first().waitFor();
+      // The bar may have slid away for reading, as it does on a scroll.
+      await p.locator("#readerMarks").evaluate((b) => b.click());
+      await p.locator("#readingSheet:not([hidden]) .mark-quote", { hasText: "marmalade sky" }).waitFor();
+      await p.goBack();
+      await p.locator("#readingSheet").waitFor({ state: "hidden" });
+      await p.frameLocator("#readerFrame").locator("mark.co-mark").first().evaluate((mk) => {
+        const r = mk.ownerDocument.createRange();
+        r.selectNodeContents(mk);
+        const sel = mk.ownerDocument.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(r);
+      });
+      const btn = p.locator(".read-here .sel-mark:not([hidden])");
+      await btn.getByText("Remove highlight").waitFor();
+      await btn.click();
+      await p.waitForFunction(() => !document.getElementById("readerFrame").contentDocument.querySelector("mark.co-mark"));
+      await p.locator(".read-here").waitFor({ state: "hidden" });
       await p.goBack();
       await p.locator("#readerView").waitFor({ state: "hidden" });
     });
