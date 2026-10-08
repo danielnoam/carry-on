@@ -3,6 +3,24 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **The bubble that stayed (1.7.1).** Daniel, on his phone: after a
+  highlight "a small bubble" stayed until he left the app. Not seen in
+  Chromium, so three likely causes are all dealt with: Android's WebView
+  can keep its own Copy and Share bar up when a script clears the
+  selection, so clearSelection also takes focus out of the frame; the
+  painted highlight changes the selection, which could bring the
+  Highlight bar back, so it stays quiet for 600 ms after; and the
+  "Highlighted" toast had an Add a note button, which kept it up for 8 s.
+  If it still happens on the phone, ask which bubble it is.
+  The Highlight button that sometimes didn't show (same day): not
+  reproduced in Chromium either. Two causes fixed: a selection taller
+  than the screen put the bar at the very top, under the reader's bar
+  and Android's own selection bar, so it now pins to the bottom; and
+  text outside any leaf block (between <br>s) had no block to anchor to,
+  so highlights now use their own list of blocks (leaf blocks plus
+  wrapLoose's runs). Spot keeps its anchors, so reading places don't
+  move; 1.7.0 highlights on such pages are found again by their words.
+
 - **Highlights (1.7.0).** Kept on the clip's index entry as `marks`
   ({ id, block, start, endBlock, end, text, note, at }), so sync, backups
   and restore carry them with no file of their own. `block` is one of the

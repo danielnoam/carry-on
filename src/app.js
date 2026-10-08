@@ -1,7 +1,7 @@
 // Waypage: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "1.7.0";
+  const APP_VERSION = "1.7.1";
   window.Waypage.version = APP_VERSION;
 
   const C = window.Waypage;
@@ -1237,6 +1237,9 @@
           : state.filter === "favourites" ? "No favourites yet. Hold a clip, or open a collection's ⋯, and tap Favourite." : "No clips tagged " + state.filter + "."),
         el("button", { class: "btn-quiet", type: "button", onclick: () => setFilter("all") }, "Show all")));
     }
+    // Until it's read, the library says it's on its way (1.7.1); the first
+    // one is in index.html, there before any script runs.
+    if (!loaded) keep("loading", () => el("div", { class: "lib-loading wide", role: "status" }, el("span", { class: "spinner", "aria-hidden": "true" }), "Opening your library"));
     if (!n && loaded) {
       keep("empty", () => el("div", { class: "empty wide" },
         el("h2", { class: "empty-title" }, "Clips you take with you"),
@@ -2098,10 +2101,10 @@
 
   // Under a selection while one is up: Highlight (1.7.0), and Read from
   // here when the phone can read aloud.
-  let readHere = null;
+  let readHere = null, quietUntil = 0;
   function showReadHere() {
     const p = state.open;
-    const mark = p && !p.preview && !state.sheet ? C.reader.selectionMark() : null;
+    const mark = p && !p.preview && !state.sheet && Date.now() > quietUntil ? C.reader.selectionMark() : null;
     const spot = p && speech.available && !state.sheet ? C.reader.selectionSpot() : null;
     const box = (mark && mark.box) || spot;
     if (!box) { hideReadHere(); return; }
@@ -2114,19 +2117,28 @@
       } });
       aloudBtn.innerHTML = $("readerAloud").innerHTML;
       aloudBtn.append("Read from here");
-      const markBtn = el("button", { class: "sel-mark", type: "button", onclick: addMark });
+      const markBtn = el("button", { class: "sel-mark", type: "button", onclick: () => (markBtn.dataset.remove ? removeMarks(markBtn.dataset.remove.split(",")) : addMark()) });
       markBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICONS.mark + "</svg>";
-      markBtn.append("Highlight");
+      markBtn.append(el("span", { class: "sel-mark-label" }, "Highlight"));
       readHere = el("div", { class: "read-here", role: "toolbar", "aria-label": "Selection" }, markBtn, aloudBtn);
       $("readerView").append(readHere);
     }
-    readHere.querySelector(".sel-mark").hidden = !mark;
+    const markBtn = readHere.querySelector(".sel-mark");
+    markBtn.hidden = !mark;
+    // Words already highlighted (1.7.1): the button takes the highlight off.
+    const on = mark ? C.reader.selectionMarks() : { all: false };
+    if (on.all) markBtn.dataset.remove = on.ids.join(","); else delete markBtn.dataset.remove;
+    markBtn.querySelector(".sel-mark-label").textContent = on.all ? "Remove highlight" : "Highlight";
     readHere.querySelector(".sel-aloud").hidden = !spot;
     const frame = $("readerFrame").getBoundingClientRect();
     const h = 44, room = frame.bottom - 72;
+    const bar = $("readerView").classList.contains("bar-away") ? 0 : $("readerView").querySelector(".reader-bar").offsetHeight;
+    // Under the selection, else over it; a selection taller than the
+    // screen pins it to the bottom (1.7.1), since at the top it sat under
+    // the reader's bar and the phone's own Copy and Share bar.
     let top = frame.top + box.bottom + 12;
     if (top + h > room) top = frame.top + box.top - h - 12;
-    top = Math.max(frame.top + 8, Math.min(top, room - h));
+    if (top < frame.top + bar + 8) top = room - h;
     readHere.style.top = top + "px";
     readHere.hidden = false;
     // Kept on screen whole, however wide its buttons make it.
@@ -2158,6 +2170,8 @@
     const m = C.reader.selectionMark();
     hideReadHere();
     C.reader.clearSelection();
+    // The selection change the new highlight makes doesn't bring the bar back.
+    quietUntil = Date.now() + 600;
     if (!p || !m) return;
     // A highlight over one already there takes its place, keeping its note.
     const over = (p.marks || []).filter((x) => !(x.endBlock < m.block || (x.endBlock === m.block && x.end <= m.start)
@@ -2167,7 +2181,17 @@
     if (notes.length) keep.note = notes.join("\n\n");
     p.marks = [...(p.marks || []).filter((x) => !over.includes(x)), keep].sort(byPlace);
     await saveMarks(p);
-    toast("Highlighted", "Add a note", () => { if (state.open === p) openMark(keep.id); });
+    toast("Highlighted. Tap it to add a note.");
+  }
+  async function removeMarks(ids) {
+    const p = state.open;
+    hideReadHere();
+    C.reader.clearSelection();
+    quietUntil = Date.now() + 600;
+    if (!p) return;
+    p.marks = (p.marks || []).filter((x) => !ids.includes(x.id));
+    await saveMarks(p);
+    toast(ids.length === 1 ? "Highlight removed" : ids.length + " highlights removed");
   }
   // A tap on a highlight in the text.
   let markFocus = null;
@@ -2685,7 +2709,7 @@
     reading: { button: "readerAa", label: "Reader settings", build: readerSettings },
     page: { button: "readerMore", label: "This clip", build: () => state.open.preview ? previewSheet(state.open) : pageSheet(state.open, "reader") },
     contents: { button: "readerContents", label: "Contents", build: contentsList },
-    marks: { button: "readerMore", label: "Highlights", build: () => marksView(state.open) },
+    marks: { button: "readerMarks", label: "Highlights", build: () => marksView(state.open) },
   };
 
   function openSheet(kind, fromHistory) {
@@ -3698,7 +3722,7 @@
           p.file ? null : tileButton("original", "Original", () => C.platform.openOutside(p.url)),
           favTile(p, draw)),
         el("h3", { class: "overline" }, p.link ? "This file" : "This clip"),
-        p.preview || (!inReader && !(p.marks || []).length) ? null : el("div", { class: "group" },
+        p.preview || inReader || !(p.marks || []).length ? null : el("div", { class: "group" },
           el("button", { class: "row", type: "button", onclick: () => { markFocus = null; marking = true; draw(); } },
             el("span", { class: "row-label" }, "Highlights"),
             el("span", { class: "row-value" }, String((p.marks || []).length)))),
@@ -6354,7 +6378,7 @@
     ["In the library", [["↑ ↓", "Move between clips"], ["Enter", "Open"], ["X", "Pick, to act on several"], ["Shift-click", "Pick a run"],
       ["F", "Favourite"], ["E", "Export"], ["Del", "Delete"]]],
     ["Reading", [["Space  ← →", "Next or previous page"], ["J  K", "Next or previous section"], ["T", "Contents beside the text"],
-      ["S", "Read aloud"], ["A", "Reader settings"], ["+  −", "Text size"], ["O", "Open the original"], ["Esc", "Back"]]],
+      ["S", "Read aloud"], ["A", "Reader settings"], ["H", "Highlights"], ["+  −", "Text size"], ["O", "Open the original"], ["Esc", "Back"]]],
   ];
   function keysSheet() {
     return el("div", { class: "keys-sheet" },
@@ -6423,6 +6447,7 @@
         t: () => (pinned.matches ? setReading({ rail: !readingPrefs().rail }) : !$("readerContents").hidden && toggleSheet("contents")),
         s: () => !$("readerAloud").hidden && $("readerAloud").click(),
         a: () => toggleSheet("reading"),
+        h: () => !$("readerMarks").hidden && $("readerMarks").click(),
         "+": () => size(1), "=": () => size(1), "-": () => size(-1), "−": () => size(-1),
         o: () => /^https?:/.test(p.url || "") && C.platform.openOutside(p.url),
         // In scroll, Space in the page scrolls it already.
@@ -7363,6 +7388,7 @@
   }
   $("readerMore").addEventListener("click", () => toggleSheet("page"));
   $("readerAa").addEventListener("click", () => toggleSheet("reading"));
+  $("readerMarks").addEventListener("click", () => { if (state.sheet !== "marks") markFocus = null; toggleSheet("marks"); });
   $("readerContents").addEventListener("click", () => toggleSheet("contents"));
   $("sheetCatch").addEventListener("click", () => history.back());
   addEventListener("keydown", onKeys);

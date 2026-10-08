@@ -441,9 +441,12 @@
     return { block: i, offset: pre.toString().replace(/\s+/g, " ").replace(/^ /, "").length,
       word: sel.toString().trim().split(/\s+/)[0], top: box.top, bottom: box.bottom, left: box.left, right: box.right };
   }
+  // Android's WebView can leave its Copy and Share bar up after a script
+  // clears the selection (1.7.1): taking focus out of the frame ends it.
   function clearSelection() {
     const sel = doc && doc.getSelection();
     if (sel) sel.removeAllRanges();
+    if (frame && document.activeElement === frame) frame.blur();
   }
 
   // ---- Highlights (1.7.0) ----
@@ -475,10 +478,40 @@
     return n;
   }
   const marked = () => (doc ? [...doc.querySelectorAll("mark.co-mark")] : []);
-  const textAnchors = () => {
-    if (!anchors.length) findAnchors();
-    return anchors.map((el, i) => ({ el, i })).filter((a) => !a.el.matches("img"));
-  };
+  // Highlights have a list of text blocks of their own (1.7.1): the leaf
+  // blocks, plus the loose runs of text wrapLoose wraps (a post's lines
+  // between <br>s, text beside a nested list), which have no block of
+  // their own and so couldn't be highlighted in 1.7.0. Spot keeps its
+  // anchors, so places already kept don't move.
+  let spans = [];
+  function markBlocks() {
+    if (!spans.length && doc) {
+      wrapLoose();
+      spans = [...doc.body.querySelectorAll(BLOCKS + ", .co-run")].filter((el) => !el.closest(SKIP) && !el.querySelector(BLOCKS));
+    }
+    return spans;
+  }
+  const textAnchors = () => markBlocks().map((el, i) => ({ el, i }));
+
+  // The highlights a selection touches (1.7.1), and whether every word in
+  // it is highlighted already, when the button under it removes instead.
+  function selectionMarks() {
+    const sel = doc && doc.getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount) return { ids: [], all: false };
+    const r = sel.getRangeAt(0);
+    const top = r.commonAncestorContainer.nodeType === 1 ? r.commonAncestorContainer : r.commonAncestorContainer.parentNode;
+    const ids = new Set();
+    let all = true;
+    const walk = doc.createTreeWalker(top, NodeFilter.SHOW_TEXT);
+    for (let t = walk.nextNode(); t; t = walk.nextNode()) {
+      if (!r.intersectsNode(t) || t.parentElement.closest(ADDED)) continue;
+      const a = t === r.startContainer ? r.startOffset : 0, b = t === r.endContainer ? r.endOffset : t.length;
+      if (!t.data.slice(a, b).trim()) continue;
+      const mk = t.parentElement.closest("mark.co-mark");
+      if (mk) ids.add(mk.dataset.mark); else all = false;
+    }
+    return { ids: [...ids], all: all && ids.size > 0 };
+  }
 
   // The selection as a highlight to keep: { block, start, endBlock, end, text }.
   function selectionMark() {
@@ -504,8 +537,8 @@
   function textOf(m) {
     const parts = [];
     for (let i = m.block; i <= m.endBlock; i++) {
-      const el = anchors[i];
-      if (!el || el.matches("img")) continue;
+      const el = markBlocks()[i];
+      if (!el) continue;
       const t = blockText(el);
       parts.push(t.slice(i === m.block ? m.start : 0, i === m.endBlock ? m.end : t.length));
     }
@@ -513,8 +546,8 @@
   }
   // Where a kept highlight is in this copy of the clip, or null.
   function locate(m) {
-    if (!anchors.length) findAnchors();
-    if (anchors[m.block] && anchors[m.endBlock] && m.endBlock >= m.block && textOf(m) === m.text) return m;
+    const list = markBlocks();
+    if (list[m.block] && list[m.endBlock] && m.endBlock >= m.block && textOf(m) === m.text) return m;
     for (const a of textAnchors()) {
       const t = blockText(a.el);
       const flat = t.replace(/\s/g, " ");
@@ -538,8 +571,8 @@
       if (!at) continue;
       found.push(m.id);
       for (let i = at.block; i <= at.endBlock; i++) {
-        const el = anchors[i];
-        if (!el || el.matches("img")) continue;
+        const el = markBlocks()[i];
+        if (!el) continue;
         const s = i === at.block ? at.start : 0, e = i === at.endBlock ? at.end : Infinity;
         let n = 0;
         const cuts = [];
@@ -790,6 +823,7 @@
     pinch = null;
     blocks = [];
     anchors = [];
+    spans = [];
     lit = null;
     onImage = image || null;
     onTap = tap || null;
@@ -892,6 +926,7 @@
     onNext = null;
     blocks = [];
     anchors = [];
+    spans = [];
     lit = null;
   }
 
@@ -899,5 +934,5 @@
   addEventListener("resize", applyTop);
   addEventListener("offline", applyConnection);
 
-  C.reader = { open, close, position, spot, jump, setPaged, turn, get paged() { return isPaged(); }, pageInfo, headings, section, jumpTo, readable, firstShown, light, following, selectionSpot, clearSelection, selectionMark, paintMarks, toMark, applyTheme, applyConnection, srcdoc, CSP, setSpread, refit: applyTop, images, imageInfo, printedPages, printedNow, toPrinted };
+  C.reader = { open, close, position, spot, jump, setPaged, turn, get paged() { return isPaged(); }, pageInfo, headings, section, jumpTo, readable, firstShown, light, following, selectionSpot, clearSelection, selectionMark, selectionMarks, paintMarks, toMark, applyTheme, applyConnection, srcdoc, CSP, setSpread, refit: applyTop, images, imageInfo, printedPages, printedNow, toPrinted };
 })();

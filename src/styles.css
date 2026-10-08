@@ -426,6 +426,15 @@ html.native .top-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top));
   animation: spin 0.8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+/* The library while it's read (1.7.1): in the middle, and only after a
+   moment, so a quick start doesn't flash it. */
+.lib-loading {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-3);
+  min-height: 50vh; color: var(--muted); font: 400 var(--fs-label)/var(--lh-label) var(--sans);
+  animation: lib-loading-in 200ms 250ms both;
+}
+.lib-loading .spinner { width: 28px; height: 28px; margin: 0; border-width: 3px; }
+@keyframes lib-loading-in { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
   .spinner { animation: breathe 1.6s ease-in-out infinite; border-top-color: var(--line); background: var(--accent); }
   .progress.busy .progress-fill { width: 100%; animation: breathe 1.6s ease-in-out infinite; }
