@@ -1994,6 +1994,9 @@
   const RATE_MIN = 0.5, RATE_MAX = 3;
   const FOOTNOTES_KEY = "waypage.aloudFootnotes";
   const EDGES_KEY = "waypage.aloudSkipEdges";
+  // Read next by itself at the end of a clip (1.6.0), when there's a next.
+  const GO_ON_KEY = "waypage.aloudGoOn";
+  let wentOnFrom = "";
   const PIECE = 600;
 
   // `parts` is [{ text, block }]; a block can be in two parts when the
@@ -2154,6 +2157,11 @@
     $("aloudPrev").disabled = !on || b <= 0;
     $("aloudNext").disabled = !on || b >= (aloud.map[aloud.map.length - 1] ?? 0);
     if (state.open && state.open.id === aloud.key) C.reader.light(on ? b : -1);
+    if (st === "playing") wentOnFrom = "";
+    if (ended && st === "ended" && load(GO_ON_KEY, false) && wentOnFrom !== aloud.key) {
+      wentOnFrom = aloud.key;
+      setTimeout(() => { if (aloud.state === "ended" && aloud.key === wentOnFrom) readNext(); }, 800);
+    }
     if (!on && !ended) aloud.key = "";
     showAloudBar();
     if (st === "error") toast("The phone's voice stopped. Try again, or pick another voice in Aa.");
@@ -2362,11 +2370,11 @@
       // Applied when the thumb is let go: a phone's voice restarts its sentence on each change.
       onchange: (e) => { const v = Number(e.target.value); store(RATE_KEY, v); if (aloud.state !== "stopped") speech.rate(v); } });
     speed.value = rate;
-    const check = (key, text, note) => {
+    const check = (key, text, note, restart = true) => {
       const input = el("input", { class: "switch", type: "checkbox", role: "switch", checked: !!load(key, false),
         onchange: () => {
           store(key, input.checked);
-          if (aloud.state !== "stopped" && state.open && aloud.key === state.open.id) startAloud(blockAt(aloud.index));
+          if (restart && aloud.state !== "stopped" && state.open && aloud.key === state.open.id) startAloud(blockAt(aloud.index));
         } });
       return el("label", { class: "rc-row switch-row" },
         el("span", { class: "choice-text" }, el("span", { class: "rc-label" }, text), el("span", { class: "choice-note" }, note)), input);
@@ -2377,6 +2385,7 @@
         el("div", { class: "stepper" }, speed)),
       check(FOOTNOTES_KEY, "Read footnotes", "The notes at the end, as part of the clip."),
       check(EDGES_KEY, "Skip headers and footers", "Just the body: no title, captions or page heads."),
+      check(GO_ON_KEY, "Go on to the next clip", "At the end, the next chapter or the page it links to starts by itself.", false),
       note);
   }
   const rateText = (v) => (Math.round(v * 10) / 10) + "×";
@@ -4288,7 +4297,7 @@
   // after its own folder when it's in one; a clip whose file left the
   // folder leaves the library. Clips from it carry `watched` (the folder).
   // This device's own, like any clip that reads from a file: never synced.
-  // Android only for now; iOS needs a security-scoped bookmark (TODO.md).
+  // In the app on Android, and on iOS since 1.6.0 (a bookmark of the folder).
   // Since 1.4.0 any number of folders, a list under WATCHES_KEY; the one
   // folder from before moves into it.
   const WATCH_KEY = "waypage.watch";
@@ -4319,8 +4328,12 @@
     if (said !== undefined) watchStopped = false;
     if (watching) return watching;
     watching = (async () => {
+      // Every folder is listed at once (1.6.0), so a slow memory card holds
+      // up only its own files; what's found is then added one folder at a
+      // time, since adding writes the library's index.
+      const scans = list.map((w) => C.platform.files.scan(w.tree));
       const got = [];
-      for (const w of list) got.push(await lookInOne(w, said));
+      for (let i = 0; i < list.length; i++) got.push(await lookInOne(list[i], said, scans[i]));
       const added = got.reduce((n, g) => n + g.added, 0), gone = got.reduce((n, g) => n + g.gone, 0);
       const failed = got.flatMap((g) => g.failed);
       const lost = got.filter((g) => g.lost).map((g) => g.name);
@@ -4335,10 +4348,10 @@
     })();
     try { return await watching; } finally { watching = null; if (state.section === "content") renderSection(); }
   }
-  async function lookInOne(w, said) {
+  async function lookInOne(w, said, scan) {
     const out = { name: w.name, added: 0, gone: 0, joined: 0, failed: [], lost: false };
     {
-      const got = await C.platform.files.scan(w.tree);
+      const got = await scan;
       // A folder that can't be read (a memory card out, the permission
       // taken back) takes nothing away: its clips wait for it.
       if (!got.ok) {
@@ -6681,10 +6694,10 @@
   }
 
   // On mobile data (1.4.1): save or sync as always, or wait for Wi-Fi.
-  // Only the app on Android can tell the two apart; elsewhere the group
-  // stays out.
+  // Only the app can tell the two apart (on iOS since 1.6.0); in a browser
+  // the group stays out.
   function dataGroup(key, verb, anyNote, wifiNote) {
-    if (!C.platform.android || !navigator.connection) return null;
+    if (!C.platform.knowsConnection) return null;
     return choiceGroup({ key, label: "On mobile data", get: () => load(key, "any"),
       set: (v) => { store(key, v); if (v === "any") { while (wifiWaiters.length) wifiWaiters.shift()(); if (key === DATA_SYNC_KEY) syncSoon(1000); else fetchPictures(); } if (state.section) renderSection(); },
       options: [{ value: "any", label: verb, note: anyNote }, { value: "wifi", label: "Wait for Wi-Fi", note: wifiNote }] });
@@ -6805,21 +6818,22 @@
     C.platform.plugin("Files").where().then((w) => { androidSdk = (w && w.sdk) || 0; if (!state.pages.length) renderLibrary(); }).catch(() => {});
   }
   function placeGroup() {
-    if (C.platform.ios) {
-      return el("section", { class: "settings-section" },
-        el("h2", { class: "overline" }, "Where your library is"),
-        el("p", { class: "footnote" }, "In the Files app, under On My iPhone, then Waypage. Each clip is a folder there."));
-    }
     if (!C.platform.native || !C.platform.files.canPickFolder) return null;
     const place = C.store.place;
+    // On iOS the app's own storage already shows in the Files app; a folder
+    // you pick (1.6.0) can be in iCloud Drive or on a drive plugged in.
     const options = [
-      { value: "app", label: "Inside Waypage", note: "Recommended. Private to the app, and the quickest. Uninstalling Waypage deletes it." },
+      { value: "app", label: "Inside Waypage", note: C.platform.ios
+        ? "Recommended, and the quickest. It shows in the Files app under On My iPhone, then Waypage. Uninstalling Waypage deletes it."
+        : "Recommended. Private to the app, and the quickest. Uninstalling Waypage deletes it." },
     ];
     if (androidSdk >= 30 || place.kind === "documents") {
       options.push({ value: "documents", label: "Documents/Waypage", note: "You can see it in the Files app, and it stays if you uninstall Waypage. After reinstalling, the empty library offers to get it back." });
     }
     options.push({ value: "folder", label: place.kind === "folder" ? place.name || "A folder you picked" : "A folder you pick",
-      note: place.kind === "folder" ? "Pick this again to choose another folder." : "Any folder on the phone or a memory card. Saving there is a little slower." });
+      note: place.kind === "folder" ? "Pick this again to choose another folder."
+        : C.platform.ios ? "Any folder in the Files app, like one in iCloud Drive. Saving there is a little slower."
+        : "Any folder on the phone or a memory card. Saving there is a little slower." });
     const group = choiceGroup({ key: "storage-place", label: "Where your library is", get: () => place.kind, options,
       set: (v) => changePlace(v),
       footnote: moving ? moving : "Changing it moves every clip there. A library already in the new place is added to yours." });
