@@ -2,6 +2,14 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.8.1] - 2026-10-08
+
+### Fixed
+- Translate opened the Google Translate app with nothing in it. On
+  Android the words now go straight to it, and its translation shows
+  over the page. It works offline too, with the app's downloaded
+  languages. Without the app, Translate still opens the website.
+
 ## [1.8.0] - 2026-10-08
 
 ### Added

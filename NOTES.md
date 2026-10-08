@@ -3,6 +3,13 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Translate into the app (1.8.1).** Daniel: Translate opened the
+  Google Translate app with an empty box. The app takes translate.google.com
+  links but drops their `text`. native/share's Translate plugin sends the
+  words as ACTION_PROCESS_TEXT (the popup the phone's own text menu opens),
+  then ACTION_SEND, both addressed to Google Translate; with neither, the
+  web address as before. iOS still opens the web address, and if the
+  Translate app is installed there it may take it the same way: untested.
 - **Saving signed in (1.8.0).** native/share's SignIn plugin opens the
   site in a WebView (Android, a full-screen dialog) or a WKWebView on the
   default data store (iOS), and keeps nothing else: the cookies stay in

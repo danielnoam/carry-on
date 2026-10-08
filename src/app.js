@@ -1,7 +1,7 @@
 // Waypage: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "1.8.0";
+  const APP_VERSION = "1.8.1";
   window.Waypage.version = APP_VERSION;
 
   const C = window.Waypage;
@@ -2139,8 +2139,17 @@
   function lookOutside(url) {
     hideReadHere();
     C.reader.clearSelection();
-    if (!navigator.onLine) { toast("You're offline. Translate and Look up open on the web."); return; }
+    if (!navigator.onLine) { toast("You're offline. Look up opens on the web."); return; }
     C.platform.openOutside(url);
+  }
+  // Translate hands the words to the phone's translate app where it can
+  // (1.8.1): Google Translate took the web address but dropped the words.
+  async function translate(text) {
+    hideReadHere();
+    C.reader.clearSelection();
+    if (await C.platform.translateText(text)) return;
+    if (!navigator.onLine) { toast("You're offline. Translate opens on the web."); return; }
+    C.platform.openOutside(translateUrl(text));
   }
   const translateUrl = (text) => "https://translate.google.com/?sl=auto&tl=" + myLang() + "&op=translate&text=" + encodeURIComponent(text.slice(0, 1500));
   const lookUpUrl = (text) => "https://" + myLang() + ".wiktionary.org/wiki/Special:Search?go=Go&search=" + encodeURIComponent(text);
@@ -2163,17 +2172,17 @@
       const markBtn = el("button", { class: "sel-mark", type: "button", onclick: () => (markBtn.dataset.remove ? removeMarks(markBtn.dataset.remove.split(",")) : addMark()) });
       markBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICONS.mark + "</svg>";
       markBtn.append(el("span", { class: "sel-label sel-mark-label" }, "Highlight"));
-      const outBtn = (cls, label, icon, url) => {
+      const outBtn = (cls, label, icon, act) => {
         const b = el("button", { class: cls + " sel-icon", type: "button", "aria-label": label, title: label, onclick: () => {
           const s = C.reader.selectionText();
-          if (s) lookOutside(url(s.text));
+          if (s) act(s.text);
         } });
         b.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + icon + "</svg>";
         return b;
       };
       readHere = el("div", { class: "read-here", role: "toolbar", "aria-label": "Selection" }, markBtn, aloudBtn,
-        outBtn("sel-translate", "Translate", ICONS.translate, translateUrl),
-        outBtn("sel-look", "Look up", ICONS.lookUp, lookUpUrl));
+        outBtn("sel-translate", "Translate", ICONS.translate, translate),
+        outBtn("sel-look", "Look up", ICONS.lookUp, (text) => lookOutside(lookUpUrl(text))));
       $("readerView").append(readHere);
     }
     const markBtn = readHere.querySelector(".sel-mark");
