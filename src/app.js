@@ -1268,6 +1268,7 @@
     paintPicks();
     renderDownloads();
     if (state.place === "feeds") renderFeeds();
+    if (state.place === "highlights") renderHighlights();
     if (sideShown()) renderSide();
   }
 
@@ -1568,7 +1569,7 @@
   // it; a post opened from Feeds at 1280 px reads in a pane beside them.
   const DIALOGS = { batchView: "dialog", downloadsView: "panel" };
   const asDialog = (screen) => (wide.matches && DIALOGS[screen.id]) || "";
-  const asPane = (screen) => screen.id === "readerView" && pinned.matches && innerWidth >= 1280 && state.place === "feeds" && !state.folder;
+  const asPane = (screen) => screen.id === "readerView" && pinned.matches && innerWidth >= 1280 && state.place !== "library" && !state.folder;
 
   function pushScreen(screen) {
     pushes.set(screen, (pushes.get(screen) || 0) + 1);
@@ -1851,7 +1852,7 @@
   }
   function paintRail() {
     const p = state.open;
-    $("railBackLabel").textContent = state.folder || (state.place === "feeds" ? "Feeds" : "Library");
+    $("railBackLabel").textContent = state.folder || (state.place === "feeds" ? "Feeds" : state.place === "highlights" ? "Highlights" : "Library");
     const pages = railPages();
     $("readerRail").classList.toggle("paged", pages.length > 0);
     $("readerRail").setAttribute("aria-label", pages.length ? "Pages" : "Contents");
@@ -5745,7 +5746,7 @@
 
   let feeds = load(FEEDS_KEY, []);
   if (!Array.isArray(feeds)) feeds = [];
-  state.place = load(PLACE_KEY, "library") === "feeds" ? "feeds" : "library";
+  state.place = ["feeds", "highlights"].includes(load(PLACE_KEY, "library")) ? load(PLACE_KEY, "library") : "library";
   // The feed picked in the river (its url), or null for all of them.
   state.feed = null;
   state.side = false;
@@ -6022,19 +6023,24 @@
     if (state.menu && state.menu.kind === "feed") redrawMenu();
   }
 
-  // Library or Feeds under the same bar; only the title changes.
+  // Library, Feeds or Highlights under the same bar; only the title changes.
   function paintPlace() {
     const feedsOn = state.place === "feeds";
-    $("placeTitle").textContent = feedsOn ? "Feeds" : "Library";
+    const marksOn = state.place === "highlights";
+    $("placeTitle").textContent = feedsOn ? "Feeds" : marksOn ? "Highlights" : "Library";
     $("libraryView").dataset.place = state.place;
-    $("library").hidden = feedsOn;
+    $("library").hidden = feedsOn || marksOn;
     $("feeds").hidden = !feedsOn;
+    $("highlights").hidden = !marksOn;
+    $("paneNote").textContent = marksOn ? "Pick a highlight to read it here" : "Pick a post to read it here";
     // The bottom field follows a feed in Feeds, and saves a link elsewhere.
     $("saveUrl").placeholder = feedsOn ? "Paste a site or feed to follow" : "Paste a link to save";
     document.querySelector('label[for="saveUrl"]').textContent = feedsOn ? "Site or feed" : "Page link";
     $("saveForm").querySelector(".btn-primary").textContent = feedsOn ? "Follow" : "Save";
     $("severalBtn").hidden = feedsOn;
-    if (feedsOn) { if (state.query) clearSearch(); renderFeeds(); }
+    if (feedsOn || marksOn) { if (state.query) clearSearch(); }
+    if (feedsOn) renderFeeds();
+    else if (marksOn) renderHighlights();
     else renderLibrary();
   }
 
@@ -6129,6 +6135,67 @@
       const target = again && cls && (again.classList.contains(cls) ? again : again.querySelector("." + cls));
       if (target) target.focus({ preventScroll: true });
     }
+  }
+
+  // ---- Every highlight in one place (1.8.0) ----
+  // A place beside Library and Feeds: each clip's highlights under its
+  // title, the clip highlighted in last first, with a search over the
+  // words, the notes and the titles. A tap opens the clip at the highlight.
+  let marksQuery = "";
+  let marksHead = null;
+  const marksMatch = (p, m, q) => !q || [m.text, m.note || "", p.title].some((t) => t.toLowerCase().includes(q));
+  function marksShown() {
+    const q = marksQuery.trim().toLowerCase();
+    return state.pages.filter((p) => (p.marks || []).length)
+      .map((p) => ({ p, last: Math.max(...p.marks.map((m) => m.at || 0)), list: p.marks.filter((m) => marksMatch(p, m, q)) }))
+      .filter((c) => c.list.length)
+      .sort((a, b) => b.last - a.last);
+  }
+  function goToMark(p, id) {
+    if (state.open === p && !$("readerView").hidden) { C.reader.toMark(id); return; }
+    markAfterOpen = id;
+    openPage(p.id);
+  }
+  function renderHighlights() {
+    const root = $("highlights");
+    const total = state.pages.reduce((n, p) => n + (p.marks || []).length, 0);
+    if (!marksHead) {
+      const input = el("input", { type: "search", placeholder: "Search your highlights", "aria-label": "Search your highlights",
+        autocomplete: "off", spellcheck: "false", enterkeyhint: "search", dir: "auto" });
+      input.addEventListener("input", () => { marksQuery = input.value; renderHighlights(); });
+      const box = el("div", { class: "search hl-search", role: "search" }, input);
+      box.insertAdjacentHTML("afterbegin", '<svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path></svg>');
+      marksHead = el("div", { class: "hl-head" }, box,
+        el("div", { class: "hl-line" },
+          el("p", { class: "meta hl-count", role: "status" }),
+          el("button", { class: "btn-text hl-copy", type: "button", onclick: () => {
+            const text = marksShown().map((c) => C.backup.marksMarkdown({ ...c.p, marks: c.list })).join("\n");
+            copyText(text, "Highlights copied");
+          } }, "Copy all")));
+    }
+    const clips = marksShown();
+    const shown = clips.reduce((n, c) => n + c.list.length, 0);
+    marksHead.hidden = !total;
+    marksHead.querySelector(".hl-count").textContent = marksQuery.trim()
+      ? (shown === 1 ? "1 highlight" : shown + " highlights") + " found"
+      : (total === 1 ? "1 highlight" : total + " highlights") + " in " + (clips.length === 1 ? "1 clip" : clips.length + " clips");
+    marksHead.querySelector(".hl-copy").hidden = !shown;
+    const nodes = clips.map(({ p, list }) => el("section", { class: "hl-clip", "data-key": "hl:" + p.id },
+      el("button", { class: "hl-title", type: "button", onclick: () => openPage(p.id) },
+        el("span", { class: "hl-name", dir: "auto" }, p.title),
+        el("span", { class: "meta" }, p.site || "")),
+      el("ol", { class: "group marks-rows" }, ...list.map((m) => el("li", { class: "mark-item" },
+        el("button", { class: "row mark-row", type: "button", "aria-label": m.text.slice(0, 120) + ", in " + p.title, onclick: () => goToMark(p, m.id) },
+          el("span", { class: "mark-quote", dir: "auto" }, m.text),
+          m.note ? el("span", { class: "mark-note", dir: "auto" }, m.note) : null))))));
+    if (!total) {
+      nodes.push(el("div", { class: "empty" },
+        el("h2", { class: "empty-title" }, "No highlights yet"),
+        el("p", { class: "empty-text" }, "Select words in a clip and tap Highlight. Every highlight in your library gathers here, with its note.")));
+    } else if (!clips.length) nodes.push(el("p", { class: "empty-text hl-none" }, "No highlights match that."));
+    // The search field stays put, so typing in it keeps its focus.
+    if (marksHead.parentNode !== root) root.replaceChildren(marksHead, el("div", { class: "hl-list" }));
+    fill(root.querySelector(".hl-list"), ...nodes);
   }
 
   async function checkNow(f) {
@@ -6249,19 +6316,21 @@
     const count = (n, cls) => (n ? el("span", { class: cls || "side-n" }, String(n)) : null);
     const fresh = freshPosts();
     const inFeeds = state.place === "feeds";
+    const inMarks = state.place === "highlights";
+    const marked = state.pages.reduce((n, p) => n + (p.marks || []).length, 0);
     const latest = (f) => Math.max(0, ...f.items.map(postAt));
     const big = wide.matches;
-    const inLibrary = !inFeeds && state.part !== "files" && !state.folder;
+    const inLibrary = !inFeeds && !inMarks && state.part !== "files" && !state.folder;
     fill($("sidebar"),
       el("div", { class: "side-head" },
         el("p", { class: "side-title" }, "Waypage"),
-        big && !inFeeds ? el("button", { class: "icon-btn side-search", type: "button", "aria-label": "Search", title: "Search (/)",
+        big && !inFeeds && !inMarks ? el("button", { class: "icon-btn side-search", type: "button", "aria-label": "Search", title: "Search (/)",
           onclick: () => (pinned.matches ? toLibrary() : back()).then(() => { if (state.place !== "library") goPlace("library"); openSearch(); }) }, sideSvg("search")) : null),
       item(feedIcon("library"), "Library", inLibrary, count(state.pages.length, "side-count"), () => goPlace("library")),
       ...[...foldersByUse().filter(folderFav), ...foldersByUse().filter((f) => !folderFav(f))].slice(0, SIDE_MAX).map((name) =>
         item(sideCover(name), name, state.folder === name, count(freshCount(name)), () => openFromSide(name), "side-sub")),
       // Files of your own (0.31.0), their part of the library.
-      state.pages.some((p) => p.link) ? item(fileMark(), "Files", !inFeeds && state.part === "files", null, () => fromSide().then(() => {
+      state.pages.some((p) => p.link) ? item(fileMark(), "Files", !inFeeds && !inMarks && state.part === "files", null, () => fromSide().then(() => {
         if (state.place !== "library") { state.place = "library"; store(PLACE_KEY, "library"); paintPlace(); }
         if (state.part !== "files") openPart("files");
       }), "side-sub") : null,
@@ -6270,6 +6339,9 @@
         () => goPlace("feeds")),
       ...[...feeds].sort((a, b) => latest(b) - latest(a)).slice(0, SIDE_MAX).map((f) =>
         withFeed(item(feedMark(f, true), f.title, inFeeds && state.feed === f.url, count(waitingIn(f)), () => goPlace("feeds", f.url), "side-sub"), f)),
+      // Every highlight in the library (1.8.0), a place of its own.
+      el("hr", { class: "side-line" }),
+      item(sideSvg("marks"), "Highlights", inMarks, count(marked, "side-count"), () => goPlace("highlights")),
       // On a big screen the sidebar carries the rest (1.5.0): Add a feed,
       // the tags, and Settings at its foot.
       ...(big ? sideMore() : []));
@@ -6296,6 +6368,7 @@
 
   const SIDE_SVG = {
     search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
+    marks: ICONS.mark,
     settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
   };
   function sideSvg(name) {
@@ -6405,7 +6478,7 @@
 
   const typingIn = (t) => !!(t && t.closest && t.closest("input, textarea, select, [contenteditable]"));
   // The card or collection with focus, in the list on screen.
-  const listNow = () => (state.folder ? $("folderBody") : state.place === "feeds" ? $("feeds") : $("library"));
+  const listNow = () => (state.folder ? $("folderBody") : state.place === "feeds" ? $("feeds") : state.place === "highlights" ? $("highlights") : $("library"));
   const focusedNode = () => { const a = document.activeElement; return a && a.closest && listNow().contains(a) ? a.closest("[data-ids]") : null; };
   const focusedPage = () => {
     const n = focusedNode();
@@ -6484,7 +6557,10 @@
     const p = focusedPage(), node = focusedNode();
     const acts = {
       g: () => { gAt = Date.now(); },
-      "/": () => (state.folder ? toLibrary() : Promise.resolve()).then(() => (state.place === "feeds" ? goPlace("library") : null)).then(openSearch),
+      "/": () => (state.folder ? toLibrary() : Promise.resolve()).then(() => {
+        if (state.place === "highlights") { $("highlights").querySelector(".hl-search input").focus(); return; }
+        return (state.place === "feeds" ? goPlace("library") : Promise.resolve()).then(openSearch);
+      }),
       d: () => openDownloads(),
       ",": () => openSettings(),
       Escape: () => history.state && history.state.view && history.back(),
