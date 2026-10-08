@@ -513,6 +513,16 @@
     return { ids: [...ids], all: all && ids.size > 0 };
   }
 
+  // The selected words and where they are, for Translate and Look up (1.8.0).
+  function selectionText() {
+    const sel = doc && doc.getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
+    const text = words(sel.toString());
+    if (!text) return null;
+    const b = sel.getRangeAt(0).getBoundingClientRect();
+    return { text, box: { top: b.top, bottom: b.bottom, left: b.left, right: b.right } };
+  }
+
   // The selection as a highlight to keep: { block, start, endBlock, end, text }.
   function selectionMark() {
     const sel = doc && doc.getSelection();
@@ -934,5 +944,5 @@
   addEventListener("resize", applyTop);
   addEventListener("offline", applyConnection);
 
-  C.reader = { open, close, position, spot, jump, setPaged, turn, get paged() { return isPaged(); }, pageInfo, headings, section, jumpTo, readable, firstShown, light, following, selectionSpot, clearSelection, selectionMark, selectionMarks, paintMarks, toMark, applyTheme, applyConnection, srcdoc, CSP, setSpread, refit: applyTop, images, imageInfo, printedPages, printedNow, toPrinted };
+  C.reader = { open, close, position, spot, jump, setPaged, turn, get paged() { return isPaged(); }, pageInfo, headings, section, jumpTo, readable, firstShown, light, following, selectionSpot, clearSelection, selectionText, selectionMark, selectionMarks, paintMarks, toMark, applyTheme, applyConnection, srcdoc, CSP, setSpread, refit: applyTop, images, imageInfo, printedPages, printedNow, toPrinted };
 })();
