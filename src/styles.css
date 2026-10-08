@@ -1057,7 +1057,13 @@ html { -webkit-tap-highlight-color: transparent; }
   padding: 2px var(--s-2); border-radius: var(--r-full);
   background: var(--accent); color: var(--accent-ink);
   font: 600 var(--fs-meta)/var(--lh-meta) var(--sans);
+  border: 0; cursor: pointer;
 }
+/* A button now (1.7.2), above the tile's own, with a 44 px reach. */
+.tile .card-open ~ .tile-thumb .tile-new { pointer-events: auto; z-index: 1; }
+.tile-new::after { content: ""; position: absolute; inset: -12px; }
+.tile-new:active { background-image: linear-gradient(var(--press), var(--press)); }
+.tile-new:disabled { opacity: 0.6; }
 .check-new .chips { flex-wrap: nowrap; justify-content: space-between; }
 .check-note { color: var(--muted); font-size: var(--fs-meta); line-height: var(--lh-meta); }
 .check-note.accent { color: var(--accent); font-weight: 600; }

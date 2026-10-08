@@ -3061,9 +3061,15 @@
       el("button", { class: "card-open", type: "button", "aria-label": name + (fav ? ", favourite" : "") + ", collection, " + list.length + " clips, " + done + " read" + (fresh ? ", " + newCountText(fresh) + " chapters" : ""),
         onclick: () => tapPages(list.map((p) => p.id), () => openFolder(name)) }),
       pickMark(),
-      el("span", { class: "tile-thumb" + (thumb ? "" : " blank"), "aria-hidden": "true" },
+      el("span", { class: "tile-thumb" + (thumb ? "" : " blank") },
         thumb ? el("img", { src: thumb, alt: "", loading: "lazy" }) : null,
-        fresh ? el("span", { class: "tile-new" }, "+" + (fresh >= NEW_MAX ? NEW_MAX : fresh)) : null),
+        // The badge saves them (1.7.2); while picking, it picks like the tile.
+        fresh ? el("button", { class: "tile-new", type: "button", "aria-label": "Save " + newCountText(fresh) + " " + chapterWord(list, fresh) + " of " + name,
+          onclick: (e) => {
+            e.stopPropagation();
+            if (state.select) { tile.querySelector(".card-open").click(); return; }
+            saveNewChapters(name, e.currentTarget);
+          } }, "+" + (fresh >= NEW_MAX ? NEW_MAX : fresh)) : null),
       el("span", { class: "tile-name", dir: "auto" }, name),
       el("span", { class: "tile-meta" }, fav ? el("span", { class: "card-fav", role: "img", "aria-label": "Favourite" }, "★ ") : null, el("span", { class: "tile-kind" }, "Collection · "), (done === list.length ? "All read" : done + " of " + list.length + " read"), el("span", { class: "tile-size" }, " · " + formatSize(sizeOf(list)))),
       el("span", { class: "progress thin", "aria-hidden": "true" },
@@ -3228,6 +3234,21 @@
   // Chapters saving into a collection; while they are, its Save button
   // gives way to a line that opens Downloads (0.30.2).
   const savingInto = (name) => state.saving.filter((s) => !s.error && s.folder && sameTag(s.folder, name)).length;
+  // Saves a collection's new chapters, from its page or its badge in the
+  // library (1.7.2); `b` is the button pressed, held while it starts.
+  function saveNewChapters(name, b) {
+    const list = folderPages(name);
+    const fresh = freshCount(name);
+    const entry = newFor(name);
+    if (!fresh || !list.length) return;
+    if (!navigator.onLine) { toast("You're offline. Try again when you're back online."); return; }
+    if (runFor(name)) { toast("Already saving into " + name + ". It's in Downloads."); return; }
+    if (entry && entry.all) { saveAll(entry.all, name, [], undefined, true, undefined, folderSource(list)); return; }
+    const last = list[list.length - 1];
+    if (!sizeOk(last, fresh)) return;
+    if (b) b.disabled = true;
+    follow(last, fresh, false).then(() => { if (b && b.isConnected) b.disabled = false; });
+  }
   function saveNewButton(list) {
     const name = state.folder;
     const saving = savingInto(name);
@@ -3238,15 +3259,7 @@
     const fresh = freshCount(name);
     if (!fresh) return null;
     const entry = newFor(name);
-    const b = el("button", { class: "btn-quiet book-new", type: "button", onclick: () => {
-      if (!navigator.onLine) { toast("You're offline. Try again when you're back online."); return; }
-      if (runFor(name)) { toast("Already saving into " + name + ". It's in Downloads."); return; }
-      if (entry && entry.all) { saveAll(entry.all, name, [], undefined, true, undefined, folderSource(list)); return; }
-      const last = list[list.length - 1];
-      if (!sizeOk(last, fresh)) return;
-      b.disabled = true;
-      follow(last, fresh, false).then(() => { if (b.isConnected) b.disabled = false; });
-    } }, el("span", { class: "tile-icon", "aria-hidden": "true" }), "Save " + newCountText(fresh) + " " + chapterWord(list, fresh));
+    const b = el("button", { class: "btn-quiet book-new", type: "button", onclick: () => saveNewChapters(name, b) }, el("span", { class: "tile-icon", "aria-hidden": "true" }), "Save " + newCountText(fresh) + " " + chapterWord(list, fresh));
     b.firstChild.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICONS.add + "</svg>";
     return b;
   }
