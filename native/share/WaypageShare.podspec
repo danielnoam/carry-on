@@ -10,7 +10,7 @@ Pod::Spec.new do |s|
   s.homepage = 'https://github.com/danielnoam/waypage'
   s.author = 'Waypage'
   s.source = { :git => 'https://github.com/danielnoam/waypage.git' }
-  s.source_files = 'ios/Sources/**/*.swift'
+  s.source_files = 'ios/Sources/**/*.swift', 'ios/Shared/**/*.swift'
   s.ios.deployment_target = '15.0'
   s.dependency 'Capacitor'
   s.swift_version = '5.1'

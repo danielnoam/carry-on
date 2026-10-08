@@ -5,8 +5,10 @@
 // Where that is, in the app (0.33.0): the app's own storage (the default),
 // Documents/Waypage on the phone (Android 11 and later), or a folder you
 // picked, which Android lets the app reach only through its folder access
-// (the Files plugin; the WebView reads it at /_waypage_folder_/). Every
-// read and write below goes through `cur`, so that's the only difference.
+// (the Files plugin; the WebView reads it at /_waypage_folder_/). On iOS
+// (1.6.0) a picked folder is a bookmark the Files plugin opens, and the
+// WebView reads it from disk like the app's own storage. Every read and
+// write below goes through `cur`, so that's the only difference.
 //
 // In a browser there is no directory: page.html, the index and a page's
 // card picture go to IndexedDB (the index was in localStorage before
@@ -55,7 +57,12 @@
           const { uri } = await FS().getUri({ path: tmp, directory: "CACHE" });
           return (await F().folderMoveIn({ tree, path, from: uri })).size || 0;
         },
-        base: async () => location.origin + "/_waypage_folder_/",
+        async base() {
+          if (!P.ios) return location.origin + "/_waypage_folder_/";
+          const got = await F().serve({ tree });
+          if (!got || !got.path) throw new Error("Can't reach the folder");
+          return window.Capacitor.convertFileSrc("file://" + encodeURI(got.path)).replace(/\/?$/, "/");
+        },
       };
     }
     const directory = place.kind === "documents" ? "DOCUMENTS" : "DATA";

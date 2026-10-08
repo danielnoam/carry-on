@@ -18,18 +18,66 @@
 // project.pbxproj gets MARKETING_VERSION = APP_VERSION and
 // CURRENT_PROJECT_VERSION = the same number Android's versionCode is.
 //
+// 1.6.0 adds what iOS needed to catch up with Android:
+// - CFBundleDocumentTypes, with UTImportedTypeDeclarations for the two
+//   kinds iOS doesn't know (Markdown, comic book zips), so a book, PDF or
+//   note opens in Waypage from Files, Mail or another app ("Open in"); it
+//   arrives as an open-URL event (ShareTargetPlugin).
+// - CFBundleURLTypes for waypage:// (the share extension handing over a
+//   link) and waypage-widget:// (a widget's tap).
+// - The "fetch" background mode and BGTaskSchedulerPermittedIdentifiers, for
+//   feeds checked with the app closed (FeedsPlugin), whose handler the
+//   AppDelegate registers at launch, before any plugin has loaded.
+// - ALTAppGroups, the App Group the extensions share with the app
+//   (tools/ios-extensions.rb). AltStore and SideStore register it under a
+//   name of their own and rewrite this list; WPGroup reads it.
+//
 // Idempotent, and fails loudly if what it edits isn't where it expects.
 const fs = require("fs");
 const path = require("path");
 const { appVersion } = require("./build-www");
 const { versionCode } = require("./android-version");
 
+const GROUP = "group.io.github.danielnoam.waypage";
+const FEEDS_TASK = "io.github.danielnoam.waypage.feeds";
+const arr = (items) => "<array>\n" + items.map((i) => "\t\t" + i + "\n").join("") + "\t</array>";
+const str = (v) => "<string>" + v + "</string>";
+// [name, its type identifiers, rank]: Alternate leaves the phone's own
+// default app for a kind alone (Books for EPUB, Files for PDF).
+const DOCS = [
+  ["Book", ["org.idpf.epub-container"], "Alternate"],
+  ["PDF", ["com.adobe.pdf"], "Alternate"],
+  ["Comic", ["io.github.danielnoam.waypage.cbz"], "Owner"],
+  ["Note", ["net.daringfireball.markdown", "public.plain-text", "public.html"], "Alternate"],
+];
+const docType = ([name, types, rank]) => "<dict>\n"
+  + "\t\t\t<key>CFBundleTypeName</key>\n\t\t\t" + str(name) + "\n"
+  + "\t\t\t<key>CFBundleTypeRole</key>\n\t\t\t" + str("Viewer") + "\n"
+  + "\t\t\t<key>LSHandlerRank</key>\n\t\t\t" + str(rank) + "\n"
+  + "\t\t\t<key>LSItemContentTypes</key>\n\t\t\t<array>" + types.map(str).join("") + "</array>\n\t\t</dict>";
+const imported = (id, desc, conforms, exts, mimes) => "<dict>\n"
+  + "\t\t\t<key>UTTypeIdentifier</key>\n\t\t\t" + str(id) + "\n"
+  + "\t\t\t<key>UTTypeDescription</key>\n\t\t\t" + str(desc) + "\n"
+  + "\t\t\t<key>UTTypeConformsTo</key>\n\t\t\t<array>" + conforms.map(str).join("") + "</array>\n"
+  + "\t\t\t<key>UTTypeTagSpecification</key>\n\t\t\t<dict><key>public.filename-extension</key><array>" + exts.map(str).join("")
+  + "</array><key>public.mime-type</key><array>" + mimes.map(str).join("") + "</array></dict>\n\t\t</dict>";
+const scheme = (name) => "<dict>\n\t\t\t<key>CFBundleURLName</key>\n\t\t\t" + str("io.github.danielnoam." + name)
+  + "\n\t\t\t<key>CFBundleURLSchemes</key>\n\t\t\t<array>" + str(name) + "</array>\n\t\t</dict>";
+
 const PLIST = [
   ["ITSAppUsesNonExemptEncryption", "<false/>"],
-  ["UIBackgroundModes", "<array>\n\t\t<string>audio</string>\n\t</array>"],
+  ["UIBackgroundModes", arr([str("audio"), str("fetch")])],
+  ["BGTaskSchedulerPermittedIdentifiers", arr([str(FEEDS_TASK)])],
   ["NSCameraUsageDescription", "<string>Waypage uses the camera to read the sync setup code from your other device.</string>"],
   ["UIFileSharingEnabled", "<true/>"],
   ["LSSupportsOpeningDocumentsInPlace", "<true/>"],
+  ["CFBundleDocumentTypes", arr(DOCS.map(docType))],
+  ["UTImportedTypeDeclarations", arr([
+    imported("io.github.danielnoam.waypage.cbz", "Comic book", ["public.zip-archive", "public.data"], ["cbz"], ["application/vnd.comicbook+zip", "application/x-cbz"]),
+    imported("net.daringfireball.markdown", "Markdown", ["public.plain-text"], ["md", "markdown"], ["text/markdown", "text/x-markdown"]),
+  ])],
+  ["CFBundleURLTypes", arr([scheme("waypage"), scheme("waypage-widget")])],
+  ["ALTAppGroups", arr([str(GROUP)])],
 ];
 const MIN_IOS = "15.5";
 
@@ -47,6 +95,17 @@ function patchPlist(xml) {
     out = out.slice(0, end) + "\t<key>" + key + "</key>\n\t" + value + "\n" + out.slice(end);
   }
   return out;
+}
+
+// The feed check's background task has to be registered before the app
+// finishes launching (FeedsPlugin.registerBackground).
+function patchAppDelegate(src) {
+  if (src.includes("FeedsPlugin.registerBackground()")) return src;
+  const launch = /(func application\(_ application: UIApplication, didFinishLaunchingWithOptions[^{]*\{\n)/;
+  if (!launch.test(src) || !/^import Capacitor$/m.test(src)) throw new Error("AppDelegate.swift has no didFinishLaunchingWithOptions to add to");
+  return src
+    .replace(/^import Capacitor$/m, "import Capacitor\nimport WaypageShare")
+    .replace(launch, "$1        FeedsPlugin.registerBackground()\n");
 }
 
 function stampPbxproj(src, v) {
@@ -67,8 +126,10 @@ if (require.main === module) {
   const v = appVersion();
   fs.writeFileSync(plist, patchPlist(fs.readFileSync(plist, "utf8")));
   fs.writeFileSync(pbx, stampPbxproj(fs.readFileSync(pbx, "utf8"), v));
+  const delegate = path.join(app, "App", "AppDelegate.swift");
+  fs.writeFileSync(delegate, patchAppDelegate(fs.readFileSync(delegate, "utf8")));
   const podfile = path.join(app, "Podfile");
   fs.writeFileSync(podfile, raiseMinIos(fs.readFileSync(podfile, "utf8")));
   console.log("ios: Info.plist has " + PLIST.length + " Waypage key(s); version " + v + " (" + versionCode(v) + "); iOS " + MIN_IOS + " and later");
 }
-module.exports = { patchPlist, stampPbxproj, raiseMinIos, PLIST, MIN_IOS };
+module.exports = { patchPlist, stampPbxproj, raiseMinIos, patchAppDelegate, PLIST, MIN_IOS };

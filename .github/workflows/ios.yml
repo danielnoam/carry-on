@@ -1,6 +1,7 @@
 # Builds the iOS app from the same files as the web copy and the Android app,
 # and attaches it to the release the Android workflow publishes. From
-# LifeLog's ios.yml, without its widgets.
+# LifeLog's ios.yml. It carries two app extensions (1.6.0): Waypage in the
+# share sheet, and the home screen widgets.
 #
 # There's no Apple developer account behind it yet, so it can't be signed for
 # real: what it makes is an ad-hoc-signed Waypage.ipa, which AltStore or
@@ -12,7 +13,7 @@ name: iOS app
 
 on:
   push:
-    branches: [main]
+    branches: [main, "claude/**"]
     paths-ignore: ["**.md", "test/**", ".claude/**"]
   workflow_dispatch:
 
@@ -50,6 +51,14 @@ jobs:
           npx cap add ios --packagemanager CocoaPods || test -f ios/App/Podfile
           node tools/ios-project.js
 
+      # The share extension and the widgets (1.6.0): two more targets, added
+      # with CocoaPods' own xcodeproj library before pod install runs again
+      # in cap sync.
+      - name: Add the extensions
+        run: |
+          ruby -e 'require "xcodeproj"' 2>/dev/null || gem install --user-install --no-document xcodeproj
+          ruby tools/ios-extensions.rb
+
       - name: Icon and splash
         run: >-
           npx --yes @capacitor/assets@3 generate --ios
@@ -73,15 +82,19 @@ jobs:
           build 2>&1 | tail -80
 
       # An .ipa is a zip of Payload/<name>.app, signed ad hoc (no identity,
-      # just a signature) so AltStore and SideStore can re-sign it. Inside
-      # out: frameworks first, then the app. A share extension, when it
-      # comes, is signed between the two with its own entitlements.
+      # just a signature) so AltStore and SideStore can re-sign it. The
+      # signature is what carries the entitlements: unsigned, the App Group
+      # the extensions share with the app wouldn't exist. Inside out:
+      # frameworks, then the extensions, then the app.
       - name: Package
         run: |
           mkdir -p Payload
           cp -R ios/App/build/Build/Products/Release-iphoneos/App.app Payload/
           [ ! -d Payload/App.app/Frameworks ] || find Payload/App.app/Frameworks -maxdepth 1 -name "*.framework" -exec codesign --force --sign - {} \;
-          codesign --force --sign - Payload/App.app
+          codesign --force --sign - --entitlements native/share/ios/ShareExtension/WaypageShare.entitlements Payload/App.app/PlugIns/WaypageShareExtension.appex
+          codesign --force --sign - --entitlements native/share/ios/Widgets/WaypageWidgets.entitlements Payload/App.app/PlugIns/WaypageWidgets.appex
+          codesign --force --sign - --entitlements native/share/ios/App.entitlements Payload/App.app
+          codesign -d --entitlements - Payload/App.app/PlugIns/WaypageWidgets.appex 2>&1 | grep -q application-groups
           zip -qry Waypage.ipa Payload
           ls -lh Waypage.ipa
 

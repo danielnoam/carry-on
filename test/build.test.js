@@ -118,4 +118,62 @@ test("the updater downloads the asset the workflow publishes", () => {
   assert.ok(platform.includes('file = "Waypage.apk"'));
 });
 
+// The iOS project (1.6.0): what tools/ios-project.js and ios-extensions.rb
+// edit, checked against the template Capacitor writes, and the names the
+// extensions and the App Group go by kept in step across their files.
+const iosProject = require("../tools/ios-project.js");
+
+test("the AppDelegate registers the feed check at launch, once", () => {
+  // Capacitor's own template, as `npx cap add ios` writes it.
+  const tpl = path.join(ROOT, "node_modules", "@capacitor", "cli", "assets", "ios-pods-template.tar.gz");
+  const src = require("child_process").execFileSync("tar", ["-xzOf", tpl, "App/App/AppDelegate.swift"], { encoding: "utf8" });
+  const once = iosProject.patchAppDelegate(src);
+  assert.ok(/import Capacitor\nimport WaypageShare/.test(once));
+  assert.ok(/-> Bool \{\n        FeedsPlugin\.registerBackground\(\)\n/.test(once));
+  assert.strictEqual(iosProject.patchAppDelegate(once), once);
+  assert.throws(() => iosProject.patchAppDelegate("import UIKit\n"));
+});
+
+test("Info.plist gains the document types, link schemes and background check", () => {
+  const xml = '<?xml version="1.0"?>\n<plist version="1.0">\n<dict>\n</dict>\n</plist>\n';
+  const out = iosProject.patchPlist(xml);
+  for (const k of ["CFBundleDocumentTypes", "UTImportedTypeDeclarations", "CFBundleURLTypes", "BGTaskSchedulerPermittedIdentifiers", "ALTAppGroups"]) {
+    assert.ok(out.includes("<key>" + k + "</key>"), k);
+  }
+  assert.ok(out.includes("<string>waypage</string>") && out.includes("<string>waypage-widget</string>"));
+  assert.ok(/<string>audio<\/string>\s*<string>fetch<\/string>/.test(out));
+  assert.strictEqual(iosProject.patchPlist(out), out);
+});
+
+test("the feed check's task id, the App Group and the link schemes agree everywhere", () => {
+  const read = (f) => fs.readFileSync(path.join(ROOT, f), "utf8");
+  const feeds = read("native/share/ios/Sources/FeedsPlugin/FeedsPlugin.swift");
+  assert.ok(feeds.includes('"io.github.danielnoam.waypage.feeds"'));
+  assert.ok(read("tools/ios-project.js").includes('"io.github.danielnoam.waypage.feeds"'));
+  const group = "group.io.github.danielnoam.waypage";
+  assert.ok(read("native/share/ios/Shared/WaypageShared.swift").includes('"' + group + '"'));
+  for (const f of ["App.entitlements", "Widgets/WaypageWidgets.entitlements", "ShareExtension/WaypageShare.entitlements", "Widgets/Info.plist", "ShareExtension/Info.plist"]) {
+    assert.ok(read("native/share/ios/" + f).includes(group), f);
+  }
+  assert.ok(read("native/share/ios/Sources/WidgetsPlugin/WidgetsPlugin.swift").includes('"waypage-widget"'));
+  assert.ok(read("native/share/ios/Sources/ShareTargetPlugin/ShareTargetPlugin.swift").includes('"waypage"'));
+});
+
+test("the workflow adds and signs the extensions ios-extensions.rb names", () => {
+  const yml = fs.readFileSync(path.join(ROOT, ".github", "workflows", "ios.yml"), "utf8");
+  const rb = fs.readFileSync(path.join(ROOT, "tools", "ios-extensions.rb"), "utf8");
+  assert.ok(/node tools\/ios-project\.js[\s\S]*ruby tools\/ios-extensions\.rb[\s\S]*npx cap sync ios/.test(yml));
+  for (const name of ["WaypageShareExtension", "WaypageWidgets"]) {
+    assert.ok(rb.includes("name: '" + name + "'"), name);
+    assert.ok(yml.includes("Payload/App.app/PlugIns/" + name + ".appex"), name);
+  }
+  assert.ok(fs.readFileSync(path.join(ROOT, "native", "share", "WaypageShare.podspec"), "utf8").includes("ios/Shared/**/*.swift"));
+});
+
+test("no class the share extension or widgets compile is taken for a plugin", () => {
+  for (const f of ["native/share/ios/ShareExtension/ShareViewController.swift", "native/share/ios/Widgets/WaypageWidgets.swift", "native/share/ios/Shared/WaypageShared.swift"]) {
+    assert.ok(!/@objc\(/.test(fs.readFileSync(path.join(ROOT, f), "utf8")), f);
+  }
+});
+
 console.log("\n" + passed + " passed");

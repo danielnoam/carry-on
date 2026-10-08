@@ -548,8 +548,9 @@
     // Whether this device can keep reading a file after the app closes.
     get canLink() { return !!plugin("Files") || webPicker(); },
     get canPickFolder() { return !!plugin("Files"); },
-    // Whether a folder can be watched for files (1.1.0): the app on Android.
-    get canWatch() { return !!plugin("Files") && os === "android"; },
+    // Whether a folder can be watched for files (1.1.0): the app, on
+    // Android and since 1.6.0 on iOS.
+    get canWatch() { return !!plugin("Files"); },
     async pick() {
       const F = plugin("Files");
       if (F) {
@@ -636,10 +637,13 @@
       // no base64, and no walk to each piece's start, which for a file
       // read by content address meant reading the file again per piece.
       let all = null;
+      // On iOS (1.6.0) the ref is a bookmark, and info() says where the
+      // file is now that it may be read.
       const fetchWhole = async () => {
         const cap = window.Capacitor;
-        if (!cap || !cap.convertFileSrc || !/^(content|file):/.test(ref)) return null;
-        const r = await fetch(cap.convertFileSrc(ref), { cache: "no-store" });
+        const src = info.path ? "file://" + encodeURI(info.path) : /^(content|file):/.test(ref) ? ref : null;
+        if (!cap || !cap.convertFileSrc || !src) return null;
+        const r = await fetch(cap.convertFileSrc(src), { cache: "no-store" });
         if (!r.ok) return null;
         const out = new Uint8Array(await r.arrayBuffer());
         return out.length === whole || !whole ? out : null;
@@ -685,6 +689,17 @@
     return deviceName;
   })();
 
+  // iOS's answer, kept here so `metered` can stay a plain getter.
+  let iosMetered = false;
+  const connectionHeard = new Set();
+  (() => {
+    const N = os === "ios" ? plugin("Connection") : null;
+    if (!N) return;
+    const set = (m) => { const was = iosMetered; iosMetered = !!m; if (was !== iosMetered) for (const f of connectionHeard) f(); };
+    N.state().then((r) => set(r && r.metered)).catch(() => {});
+    N.addListener("change", (r) => set(r && r.metered));
+  })();
+
   window.Waypage = window.Waypage || {};
   window.Waypage.platform = {
     native,
@@ -700,10 +715,19 @@
     // CORS (a browser).
     get canFetchPages() { return !!plugin("CapacitorHttp"); },
     // Whether the connection is a metered one, mobile data (1.4.1): the
-    // WebView says on Android; a browser or an iPhone says nothing, so
-    // nothing waits there.
-    get metered() { const c = navigator.connection; return !!c && /^(cellular|wimax|bluetooth)$/.test(c.type || ""); },
-    onConnection(f) { const c = navigator.connection; if (c && c.addEventListener) c.addEventListener("change", f); },
+    // WebView says on Android, native/share's Connection plugin on iOS
+    // (1.6.0); a browser says nothing, so nothing waits there.
+    get metered() {
+      if (os === "ios") return iosMetered;
+      const c = navigator.connection;
+      return !!c && /^(cellular|wimax|bluetooth)$/.test(c.type || "");
+    },
+    get knowsConnection() { return os === "ios" ? !!plugin("Connection") : os === "android" && !!navigator.connection; },
+    onConnection(f) {
+      if (os === "ios") { connectionHeard.add(f); return; }
+      const c = navigator.connection;
+      if (c && c.addEventListener) c.addEventListener("change", f);
+    },
     fetchText,
     render,
     get canRender() { return !!plugin("PageRender"); },
