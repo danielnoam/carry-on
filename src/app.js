@@ -1103,6 +1103,11 @@
   let firstRender = true;
   let loaded = false;
   const FIRST_SCREEN = 30;
+  // After the first screen the rest come this many at a time, each in a
+  // task of its own (1.7.1): two thousand clips in one go held a slow
+  // phone's taps and scrolling up for over a second after they showed.
+  const NEXT_SCREENS = 150;
+  let drawUpTo = FIRST_SCREEN, moreTimer = 0;
   // Android's version, from the Files plugin (0.33.0): what the storage
   // places and the empty library's way back (1.1.0) offer.
   let androidSdk = 0;
@@ -1163,7 +1168,7 @@
     // The first draw of a big library shows a screen's worth of cards and
     // draws the rest right after (1.2.1): every card at once held the
     // first paint back on a phone.
-    const first = loaded && firstRender ? FIRST_SCREEN : Infinity;
+    const first = loaded && firstRender ? drawUpTo : Infinity;
     let more = false;
     const some = (list) => { if (list.length <= first) return list; more = true; return list.slice(0, first); };
     if (how === "list" && !flat) {
@@ -1255,8 +1260,8 @@
     // Clips alone, a filter) comes in with the library's fade instead, as
     // two hundred animations at once dropped it to a few frames a second.
     if (!firstRender && fresh.length <= 6) fresh.forEach((node) => M.arrive(node));
-    if (loaded) { firstRender = false; warmPdf(); }
-    if (more) setTimeout(renderLibrary, 0);
+    if (more && !moreTimer) moreTimer = setTimeout(() => { moreTimer = 0; drawUpTo += NEXT_SCREENS; renderLibrary(); }, 0);
+    else if (loaded && firstRender) { firstRender = false; warmPdf(); }
     paintPicks();
     renderDownloads();
     if (state.place === "feeds") renderFeeds();

@@ -19,6 +19,11 @@ All notable changes to Carry-on. Newest first.
 ### Changed
 - The button under a selection is now two: Highlight, and Read from
   here.
+- A big library opens smoother. After the first screen of clips, the
+  rest are drawn a hundred and fifty at a time instead of all at once,
+  so taps and scrolling answer while they come in. With two thousand
+  clips on a slowed-down phone, the longest freeze went from 0.7 seconds
+  to 0.15.
 
 ## [1.6.0] - 2026-10-08
 

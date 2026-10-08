@@ -150,6 +150,20 @@ const frameText = (p) => p.frameLocator("#readerFrame").locator("body");
     });
     await p.context().close();
 
+    await test("a library of 400 clips draws every card, in steps", async () => {
+      const q = await page(browser, 390);
+      await q.evaluate(async () => {
+        const list = [];
+        for (let i = 0; i < 400; i++) list.push({ id: "big" + String(i).padStart(4, "0"), url: "https://example.com/" + i, title: "Clip " + i, site: "example.com", savedAt: 1e12 - i, minutes: 3, mode: "links", at: 0, finished: false });
+        await window.Waypage.store.writeIndex(list);
+      });
+      await q.reload();
+      await q.locator(".page-card").first().waitFor();
+      await q.waitForFunction(() => document.querySelectorAll(".library .page-card").length >= 400, null, { timeout: 15000 });
+      assert.deepStrictEqual(q.errors, [], q.errors.join(" | "));
+      await q.context().close();
+    });
+
     for (const width of [390, 1280]) {
       for (const theme of THEMES) {
         await test("opens at " + width + " px in " + theme + " with no errors", async () => {

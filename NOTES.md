@@ -31,6 +31,18 @@ bold title and its version so a search finds it.
   signed in (an in-app browser whose cookies the save uses) is the real
   fix and is in TODO.md.
 
+- **A big library draws in steps (1.7.0).** Measured before changing
+  anything, at 6x CPU slowdown in Chromium: all the app's scripts run in
+  about 80 ms at launch, and the ones that could load later (PDF, EPUB,
+  QR, sync, backup) in under 10 ms, so loading them later was dropped as
+  not worth the risk. The cost was the library: 1.2.1 drew the first 30
+  cards and then every other card in one task, 0.7 s and 0.4 s of frozen
+  main thread with 2,000 clips. Now the rest come 150 at a time
+  (NEXT_SCREENS), each a task of its own, longest about 0.15 s at that
+  slowdown. Each step sorts the whole list again, which costs more in
+  total but none of it in one piece. `firstRender` stays true until the
+  last step, so springs and the PDF warm-up wait for it.
+
 - **The UI test (1.7.0).** test/ui.test.js drives the app in Chromium
   through Playwright: save a page from test/fixtures (same origin, so the
   browser's fetch reaches it), read it, highlight it, restart, search, a
