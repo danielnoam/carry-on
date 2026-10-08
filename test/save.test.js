@@ -164,4 +164,21 @@ test("sites with their own rules are matched by host", () => {
   assert.strictEqual(S.siteRule("not a url"), null);
 });
 
+test("a paywalled article is told from a whole one (1.7.0)", () => {
+  const teaser = "At two in the morning the departures hall is almost empty. ".repeat(6);
+  const whole = "Baggage belts run and fuel trucks circle the aprons. ".repeat(120);
+  const locked = '<script type="application/ld+json">{"isAccessibleForFree": false}</script>';
+  assert.strictEqual(S.cutShort(locked, teaser), true);
+  assert.strictEqual(S.cutShort('{"isAccessibleForFree":"False"}', teaser), true);
+  assert.strictEqual(S.cutShort('<meta property="article:content_tier" content="locked">', teaser), true);
+  // Sites that show search engines the whole text still mark it locked.
+  assert.strictEqual(S.cutShort(locked, whole), false);
+  assert.strictEqual(S.cutShort("<p></p>", teaser + "Subscribe to continue reading."), true);
+  assert.strictEqual(S.cutShort("<p></p>", teaser + "Create a free account to keep reading."), true);
+  assert.strictEqual(S.cutShort("<p></p>", teaser), false);
+  assert.strictEqual(S.cutShort('{"isAccessibleForFree": true}', teaser), false);
+  // An ask to subscribe at the end of a long article is a newsletter box.
+  assert.strictEqual(S.cutShort("<p></p>", whole + "Subscribe to our newsletter."), false);
+});
+
 console.log("\n" + passed + " passed");

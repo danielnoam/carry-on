@@ -28,11 +28,11 @@
   // Fields that come with the page's text, so the copy saved last wins
   // them all together.
   const CONTENT = ["url", "title", "site", "byline", "licence", "savedAt", "minutes", "lang", "dir", "mode", "images",
-    "comic", "next", "prev", "requested", "series", "source", "file"];
+    "comic", "next", "prev", "requested", "series", "source", "file", "cut"];
   // Every field an index entry can carry through a backup or sync
   // (backup.cleanMeta); anything else on a page stays on its device.
   const SYNCED = new Set(["id", "url", "title", "site", "byline", "licence", "savedAt", "minutes", "lang", "dir", "mode", "images",
-    "at", "finished", "readAt", "readOn", "spot", "comic", "next", "prev", "requested", "tags", "folder", "folderAt", "source", "series", "fav", "favAt", "folderFav", "folderFavAt", "file"]);
+    "at", "finished", "readAt", "readOn", "spot", "comic", "next", "prev", "requested", "tags", "folder", "folderAt", "source", "series", "fav", "favAt", "folderFav", "folderFavAt", "file", "marks", "cut"]);
   // Where the reader is, which goes with whichever device read last.
   const READING = ["at", "finished", "readAt", "readOn", "spot"];
 
@@ -119,6 +119,19 @@
     return out;
   }
 
+  // Highlights (1.7.0), by id like tags: what either added stays, what
+  // either removed goes, and one changed on both keeps the later change.
+  function mergeMarks(b, l, r) {
+    const B = new Set((b || []).map((m) => m.id)), L = new Map((l || []).map((m) => [m.id, m])), R = new Map((r || []).map((m) => [m.id, m]));
+    const out = [];
+    for (const [id, m] of L) {
+      if (R.has(id)) out.push((R.get(id).at || 0) > (m.at || 0) ? R.get(id) : m);
+      else if (!B.has(id)) out.push(m);
+    }
+    for (const [id, m] of R) if (!L.has(id) && !B.has(id)) out.push(m);
+    return out.sort((x, y) => x.block - y.block || x.start - y.start);
+  }
+
   // One page changed on both sides since the base.
   function mergeEntry(b, l, r) {
     b = b || {};
@@ -132,9 +145,10 @@
       else if (k === "readOn") out[k] = readFrom[k];
       else if (READING.includes(k)) out[k] = same(l[k], r[k]) ? l[k] : same(l[k], b[k]) ? r[k] : same(r[k], b[k]) ? l[k] : readFrom[k];
       else if (k === "tags") out[k] = mergeTags(b.tags, l.tags, r.tags);
+      else if (k === "marks") out[k] = mergeMarks(b.marks, l.marks, r.marks);
       else out[k] = pick(k);
     }
-    for (const k of Object.keys(out)) if (out[k] === undefined || (k === "tags" && !out[k].length)) delete out[k];
+    for (const k of Object.keys(out)) if (out[k] === undefined || ((k === "tags" || k === "marks") && !out[k].length)) delete out[k];
     // A favourite's time goes with the mark.
     if (!out.fav) delete out.favAt;
     if (!out.folderFav) delete out.folderFavAt;
@@ -157,6 +171,8 @@
       const [win, lose] = (p.savedAt || 0) > (kept[i].savedAt || 0) ? [{ ...p }, kept[i]] : [{ ...kept[i] }, p];
       const tags = mergeTags([], win.tags, lose.tags);
       if (tags.length) win.tags = tags;
+      const marks = mergeMarks([], win.marks, lose.marks);
+      if (marks.length) win.marks = marks;
       if (lose.fav && !win.fav) { win.fav = true; win.favAt = lose.favAt; }
       if ((lose.readAt || 0) > (win.readAt || 0)) for (const k of READING) { if (lose[k] === undefined) delete win[k]; else win[k] = lose[k]; }
       if (!win.folder && lose.folder) {
@@ -754,7 +770,7 @@
   }
 
   C.sync = {
-    merge, mergeTags, mergeFeeds, oneCopyEach, outgoing, incoming, connect, disconnect, run, SyncError, KEY_URL, tokenIn, setupLink,
+    merge, mergeTags, mergeMarks, mergeFeeds, oneCopyEach, outgoing, incoming, connect, disconnect, run, SyncError, KEY_URL, tokenIn, setupLink,
     share, clean, same, urlKey, sameUrl, peek, poll,
     get on() { return !!cfg; },
     get account() { return cfg ? cfg.owner + "/" + cfg.repo : ""; },

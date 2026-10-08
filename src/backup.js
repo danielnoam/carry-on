@@ -43,6 +43,7 @@
     if (typeof m.spot === "string" && /^\d{1,6}\/\d{1,2}$/.test(m.spot)) out.spot = m.spot;
     if (typeof m.imageBytes === "number" && m.imageBytes >= 0) out.imageBytes = num(m.imageBytes);
     if (m.comic === true) out.comic = true;
+    if (m.cut === true) out.cut = true;
     if (m.fav === true) { out.fav = true; out.favAt = num(m.favAt) || out.savedAt; }
     if (typeof m.next === "string") out.next = httpUrl(m.next);
     if (typeof m.prev === "string") out.prev = httpUrl(m.prev);
@@ -56,6 +57,27 @@
     if (folder && httpUrl(m.source)) out.source = httpUrl(m.source);
     if (text(m.series, 200)) out.series = text(m.series, 200);
     if (file) out.file = file;
+    const marks = cleanMarks(m.marks);
+    if (marks.length) out.marks = marks;
+    return out;
+  }
+
+  // Highlights (1.7.0): where each is in the clip's text blocks, its words
+  // and its note.
+  function cleanMarks(list) {
+    if (!Array.isArray(list)) return [];
+    const ids = new Set();
+    const out = [];
+    for (const m of list.slice(0, 2000)) {
+      if (!m || typeof m !== "object") continue;
+      const id = text(m.id, 40), words = text(m.text, 4000).replace(/\s+/g, " ").trim();
+      const block = Math.floor(num(m.block)), endBlock = Math.floor(num(m.endBlock));
+      if (!id || ids.has(id) || !words || block < 0 || endBlock < block) continue;
+      ids.add(id);
+      const o = { id, block, start: Math.max(0, Math.floor(num(m.start))), endBlock, end: Math.max(0, Math.floor(num(m.end))), text: words, at: num(m.at) || Date.now() };
+      if (text(m.note, 4000).trim()) o.note = text(m.note, 4000).trim();
+      out.push(o);
+    }
     return out;
   }
 
@@ -450,8 +472,18 @@
     head.push("[" + mdEscape(p.site || p.url) + "](" + webUrl(p.url) + ")");
     const licence = doc.querySelector(".co-licence");
     const foot = licence ? "---\n\n" + mdInline(licence).trim() : "";
-    const text = [...head, ...out, foot].filter(Boolean).join("\n\n").replace(/\n{3,}/g, "\n\n") + "\n";
+    const marks = (p.marks || []).length ? "## Highlights\n\n" + marksBody(p) : "";
+    const text = [...head, ...out, marks, foot].filter(Boolean).join("\n\n").replace(/\n{3,}/g, "\n\n") + "\n";
     return { name: pageSlug(p.title) + ".md", text };
+  }
+
+  // A clip's highlights as Markdown (1.7.0): each a quote, its note under it.
+  function marksBody(p) {
+    return (p.marks || []).map((m) => "> " + mdEscape(m.text) + (m.note ? "\n\n" + m.note.split("\n").map((l) => l.trim()).join("\n") : "")).join("\n\n");
+  }
+  function marksMarkdown(p) {
+    const link = p.file ? "" : "[" + mdEscape(p.site || p.url) + "](" + webUrl(p.url) + ")";
+    return ["# " + mdEscape(p.title), link, marksBody(p)].filter(Boolean).join("\n\n") + "\n";
   }
 
   // A folder as one file (0.26.0): its pages in order, each with its own
@@ -522,5 +554,5 @@
     return meta;
   }
 
-  C.backup = { cleanMeta, sameFile, cleanFeed, crc32, zipWriter, zipEntries, zipRead, exportLibrary, restoreLibrary, exportPage, exportPages, exportMarkdown, exportMarkdownAll, importPage, imageType, mdBlocks };
+  C.backup = { cleanMeta, cleanMarks, marksMarkdown, sameFile, cleanFeed, crc32, zipWriter, zipEntries, zipRead, exportLibrary, restoreLibrary, exportPage, exportPages, exportMarkdown, exportMarkdownAll, importPage, imageType, mdBlocks };
 })();

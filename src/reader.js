@@ -8,7 +8,7 @@
   const C = window.Waypage;
 
   const CSP = "default-src 'none'; img-src 'self' https: data: blob:; style-src 'self'; font-src 'self'; base-uri 'self'; form-action 'none'";
-  const TOKENS = ["bg", "surface", "ink", "muted", "accent", "line", "preview", "video", "on-video", "scrim",
+  const TOKENS = ["bg", "surface", "ink", "muted", "accent", "line", "preview", "mark", "video", "on-video", "scrim",
     "serif", "sans", "measure", "s-1", "s-2", "s-3", "s-4", "s-5", "s-6", "s-7", "r-sm", "r-md", "r-full",
     "fs-title", "lh-title", "fs-heading", "lh-heading", "fs-body", "lh-body", "fs-label", "lh-label", "fs-meta", "lh-meta",
     "reader-fs", "reader-lh", "reader-font", "reader-pad", "reader-measure"];
@@ -22,7 +22,7 @@
   const isPaged = () => paged && !comic && !!doc;
   // The "Next" link this file adds at the end of a page in a folder; only
   // that element (not a look-alike in the page) moves on.
-  let nextLink = null, onNext = null, onImage = null, onTap = null;
+  let nextLink = null, onNext = null, onImage = null, onTap = null, onMark = null;
   // The page's h2 and h3 headings, found once it's shown.
   let heads = [];
   // A page saved with full images already has them: nothing to swap in.
@@ -167,6 +167,8 @@
       return;
     }
     const a = e.target.closest && e.target.closest("a[href]");
+    const mk = !a && e.target.closest && e.target.closest("mark.co-mark");
+    if (mk && onMark && doc.getSelection().isCollapsed) { onMark(mk.dataset.mark); return; }
     if (!a) {
       const sel = doc.getSelection();
       if ((sel && !sel.isCollapsed) || (e.target.closest && e.target.closest("button, summary, input, label"))) return;
@@ -444,6 +446,132 @@
     if (sel) sel.removeAllRanges();
   }
 
+  // ---- Highlights (1.7.0) ----
+  // A highlight is kept by the text blocks it starts and ends in (spot's
+  // anchors, the same at any width or type size), where in each block's
+  // text, and its words: a clip saved again whose blocks moved finds it
+  // by its words instead. A block's text leaves out what this file adds
+  // (the "Image loads when you're online" placeholders), so it's the same
+  // online and off.
+  const ADDED = ".co-placeholder, .co-full";
+  function textNodes(el) {
+    const out = [];
+    const walk = doc.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let t = walk.nextNode(); t; t = walk.nextNode()) if (!t.parentElement.closest(ADDED)) out.push(t);
+    return out;
+  }
+  const blockText = (el) => textNodes(el).map((t) => t.data).join("");
+  const words = (s) => s.replace(/\s+/g, " ").trim();
+  // How far into a block's text a range boundary is.
+  function offsetIn(el, node, off) {
+    const at = doc.createRange();
+    at.setStart(node, off);
+    let n = 0;
+    for (const t of textNodes(el)) {
+      if (t === node) return n + off;
+      if (at.comparePoint(t, 0) >= 0) return n;
+      n += t.length;
+    }
+    return n;
+  }
+  const marked = () => (doc ? [...doc.querySelectorAll("mark.co-mark")] : []);
+  const textAnchors = () => {
+    if (!anchors.length) findAnchors();
+    return anchors.map((el, i) => ({ el, i })).filter((a) => !a.el.matches("img"));
+  };
+
+  // The selection as a highlight to keep: { block, start, endBlock, end, text }.
+  function selectionMark() {
+    const sel = doc && doc.getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount || !words(sel.toString())) return null;
+    const r = sel.getRangeAt(0);
+    const hit = textAnchors().filter((a) => r.intersectsNode(a.el) && blockText(a.el).trim());
+    if (!hit.length) return null;
+    const first = hit[0], last = hit[hit.length - 1];
+    let start = first.el.contains(r.startContainer) ? offsetIn(first.el, r.startContainer, r.startOffset) : 0;
+    let end = last.el.contains(r.endContainer) ? offsetIn(last.el, r.endContainer, r.endOffset) : blockText(last.el).length;
+    // Out to whole words, as a pen would go.
+    const word = /[\p{L}\p{N}'’-]/u;
+    const a = blockText(first.el), z = blockText(last.el);
+    while (start > 0 && word.test(a[start - 1]) && word.test(a[start] || "")) start--;
+    while (end < z.length && end > 0 && word.test(z[end]) && word.test(z[end - 1])) end++;
+    const m = { block: first.i, start, endBlock: last.i, end };
+    m.text = textOf(m);
+    const box = r.getBoundingClientRect();
+    m.box = { top: box.top, bottom: box.bottom, left: box.left, right: box.right };
+    return m.text ? m : null;
+  }
+  function textOf(m) {
+    const parts = [];
+    for (let i = m.block; i <= m.endBlock; i++) {
+      const el = anchors[i];
+      if (!el || el.matches("img")) continue;
+      const t = blockText(el);
+      parts.push(t.slice(i === m.block ? m.start : 0, i === m.endBlock ? m.end : t.length));
+    }
+    return words(parts.join(" "));
+  }
+  // Where a kept highlight is in this copy of the clip, or null.
+  function locate(m) {
+    if (!anchors.length) findAnchors();
+    if (anchors[m.block] && anchors[m.endBlock] && m.endBlock >= m.block && textOf(m) === m.text) return m;
+    for (const a of textAnchors()) {
+      const t = blockText(a.el);
+      const flat = t.replace(/\s/g, " ");
+      const at = flat.indexOf(m.text);
+      if (at >= 0 && !/\s\s/.test(t.slice(at, at + m.text.length))) return { block: a.i, start: at, endBlock: a.i, end: at + m.text.length };
+    }
+    return null;
+  }
+  function unpaint() {
+    const parents = new Set();
+    for (const mk of marked()) { parents.add(mk.parentNode); mk.replaceWith(...mk.childNodes); }
+    for (const p of parents) p.normalize();
+  }
+  // Paints the clip's highlights; returns the ids it found a place for.
+  function paintMarks(list) {
+    if (!doc) return [];
+    unpaint();
+    const found = [];
+    for (const m of list || []) {
+      const at = locate(m);
+      if (!at) continue;
+      found.push(m.id);
+      for (let i = at.block; i <= at.endBlock; i++) {
+        const el = anchors[i];
+        if (!el || el.matches("img")) continue;
+        const s = i === at.block ? at.start : 0, e = i === at.endBlock ? at.end : Infinity;
+        let n = 0;
+        const cuts = [];
+        for (const t of textNodes(el)) {
+          const a = Math.max(s, n), b = Math.min(e, n + t.length);
+          if (b > a && t.data.slice(a - n, b - n).trim()) cuts.push([t, a - n, b - n]);
+          n += t.length;
+        }
+        for (const [t, a, b] of cuts) {
+          let piece = t;
+          if (a > 0) piece = piece.splitText(a);
+          if (b - a < piece.length) piece.splitText(b - a);
+          const mk = doc.createElement("mark");
+          mk.className = "co-mark" + (m.note ? " co-noted" : "");
+          mk.dataset.mark = m.id;
+          piece.before(mk);
+          mk.append(piece);
+        }
+      }
+    }
+    return found;
+  }
+  // Scrolls (or turns) to a highlight; false when it isn't in the page.
+  function toMark(id) {
+    const mk = marked().find((x) => x.dataset.mark === id);
+    if (!mk || !frame) return false;
+    if (isPaged()) { goPage(pageOf(mk), true); return true; }
+    const w = frame.contentWindow;
+    w.scrollTo(0, Math.max(0, mk.getBoundingClientRect().top + w.scrollY - (topSpace ? topSpace() : 0) - 48));
+    return true;
+  }
+
   // Whether the page is scrolling itself to follow the reading, which
   // shouldn't put the bars away.
   const following = () => Date.now() < followUntil;
@@ -653,7 +781,7 @@
   // `next` ({ over, title, go }) adds a link to the next page at the end;
   // `top` () gives the height the bar covers; onImage(info) opens a tapped
   // image.
-  function open(iframe, html, meta, { at = 0, spot: spotAt = "", onPosition, onScroll, next, top, onImage: image, onTap: tap, onSelect, pages: asPages, bottom, onKey } = {}) {
+  function open(iframe, html, meta, { at = 0, spot: spotAt = "", onPosition, onScroll, next, top, onImage: image, onTap: tap, onMark: mark, onSelect, pages: asPages, bottom, onKey } = {}) {
     frame = iframe;
     turning = null;
     paged = !!asPages;
@@ -661,9 +789,11 @@
     zoom = 1;
     pinch = null;
     blocks = [];
+    anchors = [];
     lit = null;
     onImage = image || null;
     onTap = tap || null;
+    onMark = mark || null;
     heads = [];
     topSpace = top || null;
     bottomSpace = bottom || null;
@@ -756,6 +886,7 @@
     bottomSpace = null;
     onImage = null;
     onTap = null;
+    onMark = null;
     heads = [];
     nextLink = null;
     onNext = null;
@@ -768,5 +899,5 @@
   addEventListener("resize", applyTop);
   addEventListener("offline", applyConnection);
 
-  C.reader = { open, close, position, spot, jump, setPaged, turn, get paged() { return isPaged(); }, pageInfo, headings, section, jumpTo, readable, firstShown, light, following, selectionSpot, clearSelection, applyTheme, applyConnection, srcdoc, CSP, setSpread, refit: applyTop, images, imageInfo, printedPages, printedNow, toPrinted };
+  C.reader = { open, close, position, spot, jump, setPaged, turn, get paged() { return isPaged(); }, pageInfo, headings, section, jumpTo, readable, firstShown, light, following, selectionSpot, clearSelection, selectionMark, paintMarks, toMark, applyTheme, applyConnection, srcdoc, CSP, setSpread, refit: applyTop, images, imageInfo, printedPages, printedNow, toPrinted };
 })();

@@ -65,6 +65,15 @@ on a phone yet. Left:
 
 ---
 
+## Saving pages you're signed in to (after 1.7.0)
+
+1.7.0 says when a paywalled article saved as only its start. The fix is
+saving it signed in: an in-app browser (a WebView screen, Android first)
+where you sign in to a site once, whose cookies CapacitorHttp and
+PageRender then send, so a subscriber's article saves whole. Native code
+on both phones, and a privacy note: those cookies stay on the device and
+go to that site only.
+
 ## Waiting on a decision, not on a release slot
 
 - **Saving any site in a browser: a server, later (Daniel, 4 Oct

@@ -1069,6 +1069,20 @@
     return { doc, docTitle, headline: (own && own.title) || headline, next, prev, article, series: (own && own.series) || "" };
   }
 
+  // A page cut short for subscribers or signed-in readers (1.7.0). Waypage
+  // fetches with no one signed in, so a paywalled article comes as its
+  // first paragraphs. Told by the site saying the article isn't free
+  // (schema.org's isAccessibleForFree, set for search engines, or a
+  // content tier of locked or metered) with the text short, or by short
+  // text that ends asking you to subscribe or sign in.
+  const LOCKED = /"isAccessibleForFree"\s*:\s*"?false"?|<meta[^>]+content_tier[^>]+content=["']?(?:locked|metered)/i;
+  const ASKS = /\b(subscribe|subscription|subscribers?|sign in|log in|create (?:a )?(?:free )?account|become a member|members?[- ]only|to keep reading|to continue reading|unlock this)\b/i;
+  function cutShort(html, text) {
+    const t = (text || "").replace(/\s+/g, " ").trim();
+    if (LOCKED.test(html || "") && t.length < 5000) return true;
+    return t.length < 2500 && ASKS.test(t.slice(-300));
+  }
+
   async function fromAnyPage(url, onDrawing, comic, asPage) {
     const site = siteRule(url);
     const res = await get(site && site.fetch ? site.fetch(url) : url);
@@ -1082,6 +1096,7 @@
       if (own && own.links.length) throw new ContentsPage(own);
     }
     let got = readArticle(res.text, finalUrl, comic, site, asPage);
+    let html = res.text;
     // Pages that build themselves with scripts, or wait behind a browser
     // check, get drawn in a hidden WebView on Android and read again. The
     // saved copy is the same script-free HTML as any other page's.
@@ -1090,6 +1105,7 @@
       const drawn = await C.platform.render(finalUrl);
       if (drawn) {
         finalUrl = drawn.url;
+        html = drawn.text;
         got = readArticle(drawn.text, finalUrl, comic, siteRule(finalUrl), asPage);
       }
     }
@@ -1127,7 +1143,7 @@
       body, base: finalUrl, licence: null,
       lang: (doc.documentElement.getAttribute("lang") || article.lang || "").trim(),
       dir: article.dir === "rtl" || textDir(doc, article.textContent) === "rtl" ? "rtl" : "",
-      next, prev, icon: siteIcon(doc, finalUrl),
+      next, prev, icon: siteIcon(doc, finalUrl), cut: cutShort(html, article.textContent),
     };
   }
 
@@ -1453,7 +1469,19 @@
     const doc = out.implementation.createHTMLDocument(meta.title);
     if (meta.lang) doc.documentElement.lang = meta.lang;
     if (meta.dir) doc.documentElement.dir = meta.dir;
-    doc.body.append(head, root, foot);
+    doc.body.append(head, root);
+    // Where a paywalled article stops, so the end of the teaser doesn't
+    // read as the end of the story (1.7.0).
+    if (meta.cut) {
+      const cut = out.createElement("aside");
+      cut.className = "co-cut";
+      const more = out.createElement("a");
+      more.href = meta.url;
+      more.textContent = "Read the rest on " + meta.site;
+      cut.append("This may be only the start. The site keeps the rest for subscribers or signed-in readers, and Waypage saves pages signed out. ", more);
+      doc.body.append(cut);
+    }
+    doc.body.append(foot);
     return "<!doctype html>\n" + doc.documentElement.outerHTML;
   }
 
@@ -1504,6 +1532,7 @@
       next: got.next || "", prev: got.prev || "",
     };
     if (got.series) meta.series = got.series;
+    if (got.cut) meta.cut = true;
     if (got.comic) Object.assign(meta, { comic: true, minutes: Math.max(1, Math.round(media.length / 10)) });
     if (onProgress) onProgress({ stage: "images", done: 0, total: media.length });
     const res = await saveImages(id, media, mode, (done, total) => onProgress && onProgress({ stage: "images", done, total }), got.url);
@@ -1676,7 +1705,7 @@
 
   C.save = {
     pageSource, preview,
-    save, SaveError, ContentsPage, findChapters, pageImage, siteIcon, keepCover, siteRule, removeHidden, scriptJson, chapterNumber, pickChapters, comicGroup, isPanel, retryMissing, saveFullImages, setPictures, findNext, creditLine, cleanSaved, savedPageHtml, newId, textDir, isNextText, isPrevText, plainText,
+    save, SaveError, ContentsPage, cutShort, findChapters, pageImage, siteIcon, keepCover, siteRule, removeHidden, scriptJson, chapterNumber, pickChapters, comicGroup, isPanel, retryMissing, saveFullImages, setPictures, findNext, creditLine, cleanSaved, savedPageHtml, newId, textDir, isNextText, isPrevText, plainText,
     wikipediaPage, wikimediaThumb, parseSrcset, pickWidth, youtubeId, vimeoId, extOf, isTrackingPixel, readingMinutes, siteName,
   };
 })();

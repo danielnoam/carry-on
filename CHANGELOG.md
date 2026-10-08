@@ -2,6 +2,24 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.7.0] - 2026-10-08
+
+### Added
+- Highlights. Select words in a clip and tap Highlight. Tap a highlight
+  to add a note, copy it or remove it. "Highlights" in a clip's menu
+  lists them all, and a tap on one goes to it. Highlights sync to your
+  other devices, go into backups, and come out in a clip's Markdown
+  export and with "Copy all".
+- "Highlighted" in the library's Show menu.
+- A paywalled article now says when it's only the start. Waypage saves
+  pages signed out, so a subscriber's article can come as its first few
+  paragraphs. Its card says "Only the start", and the clip ends with a
+  link to read the rest on the site.
+
+### Changed
+- The button under a selection is now two: Highlight, and Read from
+  here.
+
 ## [1.6.0] - 2026-10-08
 
 The iPhone release: what Android had and iOS didn't. Built without an

@@ -3,6 +3,44 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Highlights (1.7.0).** Kept on the clip's index entry as `marks`
+  ({ id, block, start, endBlock, end, text, note, at }), so sync, backups
+  and restore carry them with no file of their own. `block` is one of the
+  reader's anchors (the leaf text blocks spot uses since 1.3.0), and the
+  offsets count that block's text without what reader.js adds (the
+  offline image placeholders), so a highlight lands in the same place
+  online and off, at any width, in Pages or scrolling. A clip saved again
+  whose blocks moved finds a highlight by its words inside one block;
+  one it can't find stays in the list as "Not found in this copy", never
+  silently dropped. A selection is widened to whole words. A new
+  highlight over old ones replaces them and keeps their notes. Sync
+  merges them by id like tags; one edited on both devices keeps the later
+  `at`. Painted as `<mark class="co-mark">` inside the sandboxed frame
+  (no scripts there; the app reaches in, as for Read aloud). --mark is a
+  token in every theme, checked by contrast.test.js against ink and
+  accent.
+
+- **Only the start (1.7.0).** Saving fetches signed out, so a paywalled
+  article is its teaser. `save.cutShort` flags it when the site marks the
+  article as not free (schema.org's isAccessibleForFree, which sites set
+  for search engines, or a locked or metered content tier) and the text
+  is under 5,000 characters, or when short text (under 2,500) ends asking
+  you to subscribe or sign in. Sites that give search engines the whole
+  text still mark it locked, hence the length check. The flag is `cut` on
+  the entry and an aside at the end of the saved page. Saving the page
+  signed in (an in-app browser whose cookies the save uses) is the real
+  fix and is in TODO.md.
+
+- **The UI test (1.7.0).** test/ui.test.js drives the app in Chromium
+  through Playwright: save a page from test/fixtures (same origin, so the
+  browser's fetch reaches it), read it, highlight it, restart, search, a
+  paywalled page, then every theme at 390 and 1280 px with no errors and
+  no sideways scroll. Playwright isn't a dependency: the test finds it
+  (or PLAYWRIGHT_MODULE) and skips with a note where it isn't installed.
+  Console errors from Playwright reaching into the sandboxed frame
+  ("Blocked script execution in about:srcdoc") and the test site's
+  missing favicon are ignored; everything else fails it.
+
 - **The iOS release (1.6.0).** Android's native pieces, redone in Swift
   in native/share/ios with the same plugin names and calls, so the
   JavaScript barely knows which phone it's on: Files (a picked file or
