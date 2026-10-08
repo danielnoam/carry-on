@@ -3,6 +3,40 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **The iOS release (1.6.0).** Android's native pieces, redone in Swift
+  in native/share/ios with the same plugin names and calls, so the
+  JavaScript barely knows which phone it's on: Files (a picked file or
+  folder is a bookmark, the `ref` "bm:<base64url>", a file in a watched
+  folder "bm:<folder>/<path>"; access is started once and held, so the
+  WebView reads the file straight from disk through convertFileSrc, info()
+  and serve() handing back its path), ShareTarget (open-URL events: a file
+  from "Open in", copied like Android's, with a bookmark as `link` when
+  iOS opened it in place; a link from the share extension), PageRender
+  (a hidden WKWebView with its own throwaway data store and no pictures),
+  Connection (NWPathMonitor; `metered` is cellular or iOS's "expensive"),
+  Feeds (a BGAppRefreshTask running FeedCheck, a port of FeedCheckJob.java;
+  its handler must be registered before launch ends, so
+  tools/ios-project.js adds a line to the AppDelegate) and Widgets.
+  The two app extensions follow LifeLog's widgets (0.217.0):
+  tools/ios-extensions.rb adds them to the generated project with the
+  xcodeproj gem, the .ipa is ad-hoc signed with entitlements so the App
+  Group exists, and WPGroup reads AltStore's renamed group from
+  ALTAppGroups. Shared/WaypageShared.swift is compiled into the app's pod
+  and both extensions. Things iOS forced:
+  - *The share extension opens the app through the responder chain.* iOS
+    gives a share extension no way to open its app, so the link is also
+    left in the App Group and taken the next time the app comes to the
+    front. It calls UIApplication's open through the Objective-C runtime,
+    since an extension may not name it; an App Store review may question
+    that.
+  - *No Safari preprocessing file.* The TODO had it as iOS's only way to
+    script-built pages; PageRender draws those in the app, as on Android.
+  - *Cold-start events.* Capacitor 8's scene delegate posts the launch URL
+    once plugins have loaded, which can be after the page asked, so the
+    plugins' events are sent with retainUntilConsumed.
+  Watched folders are now listed all at once (scan() in parallel) and
+  added one folder at a time, since adding writes the index.
+
 - **Big screens finished (1.5.1).** The rail beside a book of pictures
   (a scan, a PDF read from its file, a comic) lists its pages instead of
   headings, chosen by railPages(): a page is any `.co-comic > img`. A PDF
