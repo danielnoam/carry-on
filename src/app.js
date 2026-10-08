@@ -488,10 +488,40 @@
     return b;
   }
 
-  // A paywalled article (1.7.0) says so as it lands, with the way to the rest.
+  // A paywalled article (1.7.0) says so as it lands, with the way to the
+  // rest: in the app, signing in to the site (1.8.0).
   function savedToast(meta) {
-    if (meta.cut) toast("Saved, but the site kept the rest for subscribers.", "Open it", () => C.platform.openOutside(meta.url));
+    if (meta.cut && C.platform.signIn.available) {
+      toast(C.platform.signIn.for(meta.url) ? "Saved, but only the start, even signed in." : "Saved, but the site kept the rest for subscribers.",
+        "Sign in", () => signInFor(meta));
+    } else if (meta.cut) toast("Saved, but the site kept the rest for subscribers.", "Open it", () => C.platform.openOutside(meta.url));
     else toast(meta.missing ? "Saved. Some previews are missing." : "Saved for offline reading");
+  }
+
+  // Saving signed in (1.8.0): the site opens in a browser inside Waypage,
+  // and once it's closed the clip saves again with the site's cookies,
+  // taking the old copy's place, highlights and all.
+  async function signInFor(p) {
+    if (!navigator.onLine) { toast("You're offline. Sign in when you're back online."); return; }
+    if (!(await C.platform.signIn.open(p.url).catch(() => false))) { toast("Couldn't open the site."); return; }
+    const now = state.pages.find((x) => x.id === p.id);
+    if (now && /^https?:/.test(now.url || "")) saveClipAgain(now);
+  }
+  async function saveClipAgain(p) {
+    if (state.saving.some((s) => s.again === p)) return;
+    const job = { ...newJob(p.url, p.folder), key: "again:" + p.id, again: p, mode: p.mode, kind: p.comic ? "comic" : "article" };
+    state.saving.unshift(job);
+    renderLibrary();
+    toast("Saving it again…");
+    const meta = await runJob(job);
+    if (!meta) { toast("Couldn't save it again. It's in Downloads to try once more."); return; }
+    if (meta.cut) toast("Still only the start. The site may want a subscription, or a different sign-in.", "Sign in", () => signInFor(meta));
+    else toast("Saved again, the whole article this time.");
+    // Open in the reader, it shows the new copy in the old one's place.
+    if (state.open === p) {
+      const html = await C.store.readPage(meta.id).catch(() => null);
+      if (html && state.open === p) { history.replaceState(readerState(meta), ""); show(meta, html); }
+    }
   }
 
   // Saves a failed page again where it was headed: its collection, its
@@ -1487,7 +1517,7 @@
       if (old) {
         // Saved again: the new copy takes the old one's place, keeping its
         // collection, tags and read position.
-        for (const k of ["requested", "folder", "folderAt", "folderFav", "folderFavAt", "source", "tags", "at", "finished", "readAt", "readOn", "fav", "favAt"]) if (old[k] !== undefined) meta[k] = old[k];
+        for (const k of ["requested", "folder", "folderAt", "folderFav", "folderFavAt", "source", "tags", "at", "finished", "readAt", "readOn", "fav", "favAt", "marks"]) if (old[k] !== undefined) meta[k] = old[k];
         const i = state.pages.indexOf(old);
         if (i < 0) await C.store.removePage(meta.id);
         else {
@@ -3777,6 +3807,11 @@
           el("button", { class: "row", type: "button", onclick: () => { markFocus = null; marking = true; draw(); } },
             el("span", { class: "row-label" }, "Highlights"),
             el("span", { class: "row-value" }, String((p.marks || []).length)))),
+        // Only the start of a paywalled article (1.8.0): sign in for the rest.
+        p.cut && !p.file && !p.preview && C.platform.signIn.available ? el("div", { class: "group" },
+          el("button", { class: "row", type: "button", onclick: () => back().then(() => signInFor(p)) },
+            el("span", { class: "row-label accent" }, (C.platform.signIn.for(p.url) ? "Sign in again to " : "Sign in to ") + C.platform.signIn.host(p.url)),
+            el("span", { class: "row-value" }, "Only the start"))) : null,
         tagsRow(p, draw),
         folderRow(p, draw),
         p.file ? null : picturesRow(p, draw),
@@ -4686,6 +4721,44 @@
   // Watched folders in Settings, Content (1.4.1; a list since 1.4.0): a row per
   // folder with how many files came from it and Stop watching at its end,
   // then Look now and Watch a folder.
+  // Sites signed in to (1.8.0), on this device only: each can be signed
+  // out of, and another signed in to by its address.
+  function signedGroup() {
+    if (!C.platform.signIn.available) return null;
+    const list = C.platform.signIn.sites();
+    const rows = list.map((s) => el("div", { class: "row watch-row" },
+      el("span", { class: "row-label", dir: "auto" }, s.host),
+      el("span", { class: "row-value" }, "Signed in " + whenText(s.at)),
+      el("button", { class: "row-x", type: "button", "aria-label": "Sign out of " + s.host, title: "Sign out", onclick: async () => {
+        if (!confirm("Sign out of " + s.host + "? Waypage forgets its cookies on " + HERE + ".")) return;
+        await C.platform.signIn.signOut(s.host);
+        toast("Signed out of " + s.host);
+        renderSection();
+      } }, el("span", { class: "visually-hidden" }, "Sign out"), svgX())));
+    const field = el("input", { class: "tag-input sign-in-field", type: "url", placeholder: "nytimes.com", "aria-label": "Site to sign in to",
+      inputmode: "url", enterkeyhint: "go", autocapitalize: "off", autocomplete: "off", spellcheck: "false", hidden: "" });
+    field.addEventListener("keydown", async (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      const typed = field.value.trim();
+      const url = /^https?:\/\//i.test(typed) ? typed : "https://" + typed;
+      if (!C.platform.signIn.host(url) || !C.platform.signIn.host(url).includes(".")) { toast("That doesn't look like a site's address."); return; }
+      if (!navigator.onLine) { toast("You're offline. Sign in when you're back online."); return; }
+      field.value = "";
+      await C.platform.signIn.open(url).catch(() => {});
+      renderSection();
+    });
+    rows.push(el("button", { class: "row", type: "button", onclick: () => { field.hidden = false; field.focus(); } },
+      el("span", { class: "row-label accent" }, list.length ? "Sign in to another site" : "Sign in to a site")));
+    return el("section", { class: "settings-section", id: "signedSection" },
+      el("h2", { class: "overline" }, "Signed in"),
+      el("div", { class: "group" }, ...rows),
+      field,
+      el("p", { class: "footnote" }, list.length
+        ? "Waypage saves from these sites as you, so a subscriber's article saves whole. Sign-ins stay on " + HERE + " and don't sync."
+        : "Subscribe to a site? Sign in to it here, and its articles save whole instead of only their start. Sign-ins stay on " + HERE + " and don't sync."));
+  }
+
   function watchGroup() {
     if (!C.platform.files.canWatch) return null;
     const list = watches();
@@ -7283,7 +7356,7 @@
       choiceGroup({ key: LAYOUT_KEY, label: "Library layout", get: layout, set: (v) => { store(LAYOUT_KEY, v); renderLibrary(); }, options: LAYOUTS }),
       libraryGroup()],
       value: () => themeName(state.theme) },
-    saving: { title: "Saving", build: () => [choiceGroup(SETTINGS[1]), dataGroup(DATA_SAVE_KEY, "Save", "Pages and pictures come down on any connection.", "Saves wait in Downloads until you're on Wi-Fi; feeds, new chapters and missing pictures check then too.")],
+    saving: { title: "Saving", build: () => [choiceGroup(SETTINGS[1]), dataGroup(DATA_SAVE_KEY, "Save", "Pages and pictures come down on any connection.", "Saves wait in Downloads until you're on Wi-Fi; feeds, new chapters and missing pictures check then too."), signedGroup()],
       value: () => SETTINGS[1].options.find((o) => o.value === SETTINGS[1].get()).label },
     sync: { title: "Sync", build: syncSections, value: () => (C.sync.on ? (C.sync.last.error ? "Stopped" : "On") : "Off") },
     storage: { title: "Storage and backup", build: () => [storageGroup(), placeGroup(), browserStorageGroup(), backupGroup()], value: () => formatSize(totalBytes()) },

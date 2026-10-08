@@ -771,6 +771,8 @@ html.native .reader::before {
   background: var(--bg); color: var(--ink); font: inherit;
 }
 .tag-input:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
+.sign-in-field { display: block; width: 100%; margin-top: var(--s-2); }
+.sign-in-field[hidden] { display: none; }
 .sheet-row {
   min-height: var(--tap); padding: 0 var(--s-3);
   display: flex; align-items: center;
