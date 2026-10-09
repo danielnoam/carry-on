@@ -3,6 +3,29 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Highlight widget (1.9.0).** updateWidgets() hands the native side
+  the latest 100 highlights (text up to 500 characters, note up to 200);
+  the widget picks `marks[day % n]`, so it changes at midnight without the
+  app running. Android: HighlightWidget with updatePeriodMillis of 3 hours
+  as the fallback; iOS: a timeline of the next 7 midnights. A tap opens
+  `waypage-widget://mark/<id>?mark=<n>`. Not yet run on a phone.
+- **Importing (1.9.0).** src/imports.js only reads the list; each link is
+  then saved like a pasted one through saveAll, whose tags argument can be
+  a function giving each link its own tags and finished state. Fetched
+  fresh from the web, not from the other app: Pocket's export has only
+  links. Oldest first,
+  so the newest lands on top. HTML is only taken as an import when its
+  title says Pocket, Instapaper or bookmarks, so opening an ordinary
+  .html file still opens it as a file.
+- **Error log (1.9.0).** platform.js keeps the last 60 errors in
+  `waypage.log` (this device only, never synced), repeats merged with a
+  count. Addresses lose their query and hash, and token, key, password and
+  secret values are cut, before anything is stored. Report a problem shows
+  the whole report in the box before it's sent; nothing leaves on its own.
+- **Make room (1.9.0).** Drops pictures with the same setPictures(p,
+  "links") as a clip's "Keep" choice, only for finished web clips with
+  pictures, so nothing is lost that the web can't give back. The preview
+  thumbnail stays for the card.
 - **Translate into the app (1.8.1).** Daniel: Translate opened the
   Google Translate app with an empty box. The app takes translate.google.com
   links but drops their `text`. native/share's Translate plugin sends the

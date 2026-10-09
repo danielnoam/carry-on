@@ -6,6 +6,8 @@
 // is none it says so and passes, since the app has no dependencies and
 // this is a check for a machine that has it, not a requirement.
 const assert = require("assert");
+const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
 
@@ -32,6 +34,7 @@ async function test(name, fn) {
 const PORT = 5300 + Math.floor(Math.random() * 500);
 const ROOT = "http://localhost:" + PORT + "/";
 const ARTICLE = ROOT + "test/fixtures/article.html";
+const PICTURES = ROOT + "test/fixtures/pictures.html";
 const THEMES = ["paper", "sepia", "night"];
 
 function startServer() {
@@ -57,6 +60,15 @@ async function page(browser, width, theme) {
   await p.goto(ROOT);
   await p.waitForSelector("#saveUrl");
   return p;
+}
+// Waits until fn (run in the page) is true. waitForFunction doesn't wait
+// for a promise it is handed.
+async function until(p, fn, arg, ms = 10000) {
+  const t0 = Date.now();
+  while (!(await p.evaluate(fn, arg))) {
+    if (Date.now() - t0 > ms) throw new Error("timed out: " + String(fn).slice(0, 80));
+    await p.waitForTimeout(200);
+  }
 }
 const frameText = (p) => p.frameLocator("#readerFrame").locator("body");
 
@@ -247,8 +259,69 @@ const frameText = (p) => p.frameLocator("#readerFrame").locator("body");
       await pip.waitFor();
       assert.strictEqual(await pip.getAttribute("aria-label"), "Save 1 new clip of Series A");
       await pip.click();
-      await q.waitForFunction(() => window.Waypage.store.readIndex().then((l) => l.length === 3), null, { timeout: 10000 });
+      await until(q, async () => (await window.Waypage.store.readIndex()).length === 3);
       assert.ok(await q.evaluate(() => document.getElementById("readerView").hidden), "the collection or reader opened");
+      assert.deepStrictEqual(q.errors, [], q.errors.join(" | "));
+      await q.context().close();
+    });
+
+    await test("Report a problem lists a failed save and opens an issue without the address's query", async () => {
+      const q = await page(browser, 390);
+      await q.evaluate(() => { window.__opened = []; window.Waypage.platform.openOutside = (u) => window.__opened.push(u); });
+      await q.fill("#saveUrl", ROOT + "test/fixtures/nothing-here.html?token=secret"); await q.press("#saveUrl", "Enter");
+      await until(q, () => window.Waypage.platform.log.list().length > 0);
+      await q.click("#settingsBtn");
+      await q.locator(".nav-row", { hasText: "Report a problem" }).click();
+      await q.locator(".report-log").waitFor();
+      const log = await q.locator(".report-log").innerText();
+      assert.ok(/localhost/.test(log), "the failed save isn't listed: " + log);
+      await q.fill(".report-field", "Saving fails");
+      await q.locator(".row", { hasText: "Open an issue" }).click();
+      const url = await q.evaluate(() => window.__opened[0] || "");
+      assert.ok(url.startsWith("https://github.com/danielnoam/waypage/issues/new?"), url);
+      const body = decodeURIComponent(url);
+      assert.ok(/Saving fails/.test(body) && /Waypage \d/.test(body), "the report says what and which version");
+      assert.ok(!/secret/.test(body), "the token was left in");
+      const errs = q.errors.filter((e) => !/nothing-here/.test(e));
+      assert.deepStrictEqual(errs, [], errs.join(" | "));
+      await q.context().close();
+    });
+
+    await test("a Pocket export imports with its tags, archived clips finished", async () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "waypage-"));
+      const file = path.join(dir, "ril_export.html");
+      fs.writeFileSync(file, '<!DOCTYPE html><html><head><title>Pocket Export</title></head><body><h1>Unread</h1><ul><li><a href="' + ARTICLE + '" time_added="1700000100" tags="travel,air">The Long Haul Flight</a></li></ul><h1>Read Archive</h1><ul><li><a href="' + PICTURES + '" time_added="1700000000" tags="">Clouds</a></li></ul></body></html>');
+      const q = await page(browser, 390);
+      await q.click("#settingsBtn");
+      await q.locator(".nav-row", { hasText: "Storage" }).click();
+      await q.locator("#backupSection input[type=file]").setInputFiles(file);
+      await q.locator(".import-sheet").waitFor();
+      await q.locator(".import-sheet .seg-item", { hasText: "All" }).click();
+      await q.locator(".import-go").click();
+      await until(q, async () => (await window.Waypage.store.readIndex()).length === 2, null, 20000);
+      const got = await q.evaluate(async () => (await window.Waypage.store.readIndex()).map((x) => [x.url, x.tags || [], !!x.finished]));
+      const art = got.find((x) => x[0] === ARTICLE), pic = got.find((x) => x[0] === PICTURES);
+      assert.deepStrictEqual(art && art[1], ["travel", "air"]);
+      assert.strictEqual(art[2], false);
+      assert.strictEqual(pic && pic[2], true, "the archived one is finished");
+      assert.deepStrictEqual(q.errors, [], q.errors.join(" | "));
+      await q.context().close();
+      fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    await test("Storage offers to make room from finished clips with pictures", async () => {
+      const q = await page(browser, 390);
+      await q.evaluate(async (url) => {
+        await window.Waypage.store.writeIndex([{ id: "room1", url, title: "Clouds From Above", site: "localhost", savedAt: 1000, minutes: 1, mode: "previews", images: 1, imageBytes: 30000, bytes: 33000, finished: true }]);
+      }, PICTURES);
+      await q.reload();
+      await q.click("#settingsBtn");
+      await q.locator(".nav-row", { hasText: "Storage" }).click();
+      const go = q.locator(".room-go");
+      await go.waitFor();
+      assert.strictEqual(await go.isDisabled(), false);
+      assert.ok(/1 clip you've finished/.test(await go.innerText()));
+      assert.strictEqual(await q.locator(".room-big .row").count(), 1);
       assert.deepStrictEqual(q.errors, [], q.errors.join(" | "));
       await q.context().close();
     });

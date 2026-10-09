@@ -2,6 +2,27 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.9.0] - 2026-10-09
+
+### Added
+- A highlight a day, on the home screen. Add the Waypage "Highlight"
+  widget (Android and iOS): it shows one of your highlights, with its
+  note and the clip it's from, a different one each day. Tap it to open
+  the clip right at it.
+- Import from Pocket, Instapaper, Omnivore or Raindrop. Settings, Storage
+  and backup, Import: pick the export file (Pocket's CSV or HTML,
+  Instapaper's CSV or HTML, Omnivore's zip, Raindrop's CSV, or any list of
+  links). Choose To read or All, and Waypage saves them, keeping their
+  tags, with the ones you'd archived already marked finished. A browser's
+  bookmarks file works too.
+- Report a problem, in Settings. Say what went wrong, then send it, open
+  it as an issue on GitHub, or copy it. It adds the version, the phone and
+  the last errors Waypage noted, with web addresses cut to their site and
+  page, and you see all of it before it goes.
+- Make room, in Settings, Storage and backup: keep only the text of the
+  clips you've finished, dropping their saved pictures (they show again
+  when you're online), and see your five biggest clips to open or delete.
+
 ## [1.8.1] - 2026-10-08
 
 ### Fixed
