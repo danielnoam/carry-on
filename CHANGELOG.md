@@ -2,6 +2,24 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.11.1] - 2026-10-09
+
+### Changed
+- Opening a clip or a collection from its card is smooth now, even while
+  the page is still being laid out. The card blends into the screen as
+  it grows, and back into the card as Back shrinks it, so it lands on
+  the card as it looks now.
+- In scroll mode the next chapter comes up from the bottom. It turns
+  sideways only in Pages.
+- The Look up button under a selection is gone. Translate stays, and the
+  phone's own menu still offers its lookups.
+
+### Fixed
+- The first long press on a word in a clip no longer drops the
+  selection, so Highlight, Read from here and Copy show the first time.
+- Back to the library no longer shows the card change a moment after
+  the clip has shrunk into it.
+
 ## [1.11.0] - 2026-10-09
 
 ### Changed
