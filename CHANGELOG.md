@@ -2,6 +2,28 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.11.0] - 2026-10-09
+
+### Changed
+- All of Waypage moves in a new way, and nothing fades. A clip or a
+  collection grows out of the card, tile or Continue panel you tapped and
+  shrinks back into it. Settings slides in from the right, Downloads and
+  dialogs grow from their button, menus grow from where you pressed.
+- Collections › and Clips › move the cards you see to their new places
+  while the other sections leave past the top and bottom of the screen.
+  Adding or removing clips slides the list.
+- Sheets drag down to close, pages follow your finger in Pages, and the
+  library drifts beside the sidebar as you drag it.
+- On a computer the motion is quicker and never overshoots, and buttons
+  don't dip when pressed.
+- Toasts and bars come in from their edge, the brightness slider slides
+  away past the left edge, checkmarks grow in, and the picture viewer
+  shrinks back into its picture.
+
+### Fixed
+- Dragging a picture down in the viewer now lightens the background as
+  it should.
+
 ## [1.10.2] - 2026-10-09
 
 ### Changed

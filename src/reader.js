@@ -645,24 +645,29 @@
     const x = rtl() ? w - r.right : r.left;
     return Math.max(0, Math.min(pages() - 1, Math.floor((x + Math.abs(frame.contentWindow.scrollX) + 1) / w)));
   }
-  // A turn is a short ease-out of its own: the WebView's smooth scroll
-  // takes most of a second for a screen's width.
+  // A turn runs on a spring of its own (1.11.0; an ease-out before): the
+  // WebView's smooth scroll takes most of a second for a screen's width.
+  // Critically damped, so the next page never overshoots into the one
+  // after; quicker on a desktop. A flick hands it its speed (v, px/ms).
   let turning = null;
-  function goPage(n, now) {
+  function goPage(n, now, v = 0) {
     const w = frame.contentWindow;
     const to = Math.max(0, Math.min(pages() - 1, n));
     const x = to * width() * (rtl() ? -1 : 1);
     if (turning) w.cancelAnimationFrame(turning.raf);
     turning = null;
     if (now || matchMedia("(prefers-reduced-motion: reduce)").matches) { w.scrollTo(x, 0); return; }
-    const from = w.scrollX, t0 = w.performance.now(), ms = 220;
+    const k = matchMedia("(min-width: 1024px) and (pointer: fine)").matches ? 1000 : 800, c = 2 * Math.sqrt(k);
+    let at = w.scrollX, speed = v * 1000, last = w.performance.now();
     const me = { to };
     const step = (t) => {
       if (turning !== me) return;
-      const k = Math.min(1, (t - t0) / ms), e = 1 - Math.pow(1 - k, 3);
-      w.scrollTo(from + (x - from) * e, 0);
-      if (k < 1) me.raf = w.requestAnimationFrame(step);
-      else turning = null;
+      let dt = Math.min(0.05, (t - last) / 1000);
+      last = t;
+      for (; dt > 0; dt -= 1 / 240) { const h = Math.min(dt, 1 / 240); speed += (-k * (at - x) - c * speed) * h; at += speed * h; }
+      if (Math.abs(at - x) < 2 && Math.abs(speed) < 60) { w.scrollTo(x, 0); turning = null; return; }
+      w.scrollTo(at, 0);
+      me.raf = w.requestAnimationFrame(step);
     };
     me.raf = w.requestAnimationFrame(step);
     turning = me;
@@ -817,17 +822,45 @@
 
   // Turns pages with a swipe and the arrow keys. The page can't scroll on
   // its own (overflow hidden), so a sideways swipe is all a page turn.
+  // Since 1.11.0 the page follows the finger as it's dragged; let go past
+  // a quarter of the screen, or with a flick, and it turns, carrying the
+  // flick's speed; otherwise it springs back. At the first page and the
+  // last it gives a little and comes back.
   function pagedInput() {
     let start = null;
+    const w = () => frame.contentWindow;
     doc.addEventListener("touchstart", (e) => {
-      start = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null;
+      start = e.touches.length === 1 && isPaged() ? { x: e.touches[0].clientX, y: e.touches[0].clientY, on: false, n: page(), last: [{ x: e.touches[0].clientX, t: e.timeStamp }] } : null;
+    }, { passive: true });
+    doc.addEventListener("touchmove", (e) => {
+      if (!start || e.touches.length !== 1) return;
+      const t = e.touches[0], dx = t.clientX - start.x, dy = t.clientY - start.y;
+      if (!start.on) {
+        if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { start = null; return; }
+        if (Math.abs(dx) < 10) return;
+        start.on = true;
+        if (turning) { w().cancelAnimationFrame(turning.raf); turning = null; }
+      }
+      const fwd = (dx < 0) !== rtl(), next = start.n + (fwd ? 1 : -1);
+      const give = next < 0 || next >= pages() ? 0.2 : 1;
+      w().scrollTo(start.n * width() * (rtl() ? -1 : 1) - dx * give, 0);
+      start.last.push({ x: t.clientX, t: e.timeStamp });
+      if (start.last.length > 5) start.last.shift();
     }, { passive: true });
     doc.addEventListener("touchend", (e) => {
-      if (!start || !isPaged()) return;
+      if (!start || !isPaged()) { start = null; return; }
       const t = e.changedTouches[0], dx = t.clientX - start.x, dy = t.clientY - start.y;
+      const s = start;
       start = null;
-      if (Math.abs(dx) < 48 || Math.abs(dy) > Math.abs(dx)) return;
-      turn((dx < 0) !== rtl() ? 1 : -1);
+      if (!s.on) {
+        if (Math.abs(dx) < 48 || Math.abs(dy) > Math.abs(dx)) return;
+        turn((dx < 0) !== rtl() ? 1 : -1);
+        return;
+      }
+      const a = s.last[0], b = s.last[s.last.length - 1], v = (b.x - a.x) / Math.max(1, b.t - a.t);
+      const far = Math.abs(dx) > width() / 4 || (Math.abs(v) > 0.3 && Math.abs(dx) > 24 && Math.sign(v) === Math.sign(dx));
+      const d = far ? ((dx < 0) !== rtl() ? 1 : -1) : 0;
+      goPage(s.n + d, false, d ? -v : 0);
     }, { passive: true });
     doc.addEventListener("keydown", (e) => {
       if (!isPaged() || e.altKey || e.ctrlKey || e.metaKey) return;
