@@ -618,8 +618,10 @@
   // a content:// address in the app, a stored handle in a browser (Chrome
   // and Edge on a computer; Firefox and Safari have no such picker).
   const FILE_MIMES = ["application/epub+zip", "text/markdown", "text/x-markdown", "text/plain", "text/html",
-    "application/pdf", "application/vnd.comicbook+zip", "application/x-cbz", "application/zip"];
-  const FILE_EXTS = [".epub", ".md", ".markdown", ".txt", ".html", ".htm", ".pdf", ".cbz"];
+    "application/pdf", "application/vnd.comicbook+zip", "application/x-cbz", "application/zip",
+    // Another app's export to import (1.9.0).
+    "text/csv", "text/comma-separated-values", "application/json"];
+  const FILE_EXTS = [".epub", ".md", ".markdown", ".txt", ".html", ".htm", ".pdf", ".cbz", ".csv", ".json", ".zip"];
   const PIECE = 4 << 20;
   const KEEP = 64 << 20;
 
