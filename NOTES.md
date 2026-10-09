@@ -3,6 +3,24 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Sync picks up where it stopped (1.13.0).** Daniel: closing or
+  updating the app mid-sync restarted it from zero, and it was slow. A
+  run sends every page's text, then library.json; cut off before the
+  last write, GitHub's library named none of them and the next run sent
+  them all again, each now a 422 and a second try because the sha was
+  unknown. Sent pages now go in `waypage.syncSent` (id: at, sha, packs)
+  as each lands and count as sent until library.json is written. Coming
+  down was worse: the base was written before the downloads and
+  `waypage.syncWaiting` after, so a run cut off in between left the new
+  pages in the base but not on the device, and the next merge read that
+  as deleted here and deleted them on every device (reproduced on 1.12.1
+  with a reload mid-download: every clip got a tombstone). The waiting
+  list is now written first, the texts are read four ahead, and every
+  10 pages or 4 s what came down goes into the library (`settleSome`,
+  the same rule as the end of a run). The picture queue is kept in
+  `waypage.syncPictures`. Test: e2e syncresume.js (reload mid-send and
+  mid-download). The bar's sync button is `#syncBtn`, painted by
+  paintSync() from paintDownloads().
 - **Soft zoom instead of the grow (1.12.1).** Daniel: the grow still
   stuttered on the phone and, even smooth, did not look good. Two causes.
   The 1.11.1 host scaled a window up and the screen back down inside it,

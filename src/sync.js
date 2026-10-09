@@ -17,6 +17,7 @@
   const CFG_KEY = "waypage.sync";        // { owner, repo, branch, token, sha, at, links, paused }
   const BASE_KEY = "waypage.syncBase";   // the library.json last written or read
   const WAIT_KEY = "waypage.syncWaiting"; // ids whose text hasn't come down yet
+  const SENT_KEY = "waypage.syncSent";   // pages sent before library.json was (1.13.0)
   const REPO = "waypage-data";
   const OLD_REPO = "carryon-data"; // Carry-on's name for it, before 1.0.0
   const LOCAL = /^images\//;
@@ -414,6 +415,7 @@
       keep(CFG_KEY, cfg);
       keep(BASE_KEY, null);
       keep(WAIT_KEY, null);
+      keep(SENT_KEY, null);
       return cfg.owner + "/" + cfg.repo;
     } catch (e) {
       cfg = was;
@@ -425,6 +427,7 @@
     keep(CFG_KEY, null);
     keep(BASE_KEY, null);
     keep(WAIT_KEY, null);
+    keep(SENT_KEY, null);
   }
 
   // ---- A page's text going up and coming down ----
@@ -597,7 +600,10 @@
     const feedsBefore = getFeeds ? getFeeds().map(feedShare) : null;
     const snapshot = new Map(before.map((p) => [p.id, JSON.stringify(p)]));
     await breathe();
-    const uploaded = {};
+    // Pages a run sent before it was cut off (the app closed or updated)
+    // count as sent: library.json goes up only once they all have, so
+    // without this every one went again from the first (1.13.0).
+    const uploaded = load(SENT_KEY, {});
     const waiting = load(WAIT_KEY, []);
     // Links only (0.30.3): this device sends no text and takes none; pages
     // new to it are saved again from their links, here.
@@ -636,6 +642,7 @@
         for (const [k, s] of ((was && was.packs) || []).entries()) if (k >= packs.length) await remove("pages/" + p.id + "/pack-" + k, s).catch(() => {});
         merged.files[p.id] = uploaded[p.id] = { at: p.savedAt, sha };
         if (packShas.length) merged.files[p.id].packs = packShas;
+        keep(SENT_KEY, uploaded);
         up++;
       }
       // Text of deleted pages goes too.
@@ -645,24 +652,17 @@
         for (const [k, s] of (f.packs || []).entries()) await remove("pages/" + id + "/pack-" + k, s).catch(() => {});
       }
       await breathe();
-      if (remote && await sameOff(merged, remoteDoc)) break;
+      if (remote && await sameOff(merged, remoteDoc)) { keep(SENT_KEY, null); break; }
       halt();
       try {
         await write("library.json", JSON.stringify(merged), remote && remote.sha, "Library: " + merged.pages.length + " pages");
+        keep(SENT_KEY, null);
         break;
       } catch (e) {
         // Another device wrote first: merge with what it wrote, and again.
         if ((e.status !== 409 && e.status !== 422) || tries >= 3) throw e;
       }
     }
-    // Written only when it changed (1.2.0): a library of hundreds is a
-    // few hundred kilobytes, and localStorage writes on the main thread.
-    await breathe();
-    const mergedText = JSON.stringify(merged);
-    let baseText = null;
-    try { baseText = localStorage.getItem(BASE_KEY); } catch (e) { baseText = null; }
-    if (mergedText !== baseText) { try { localStorage.setItem(BASE_KEY, mergedText); } catch (e) { /* not kept */ } }
-
     // This device catches up: new pages' text comes down; deleted ones go.
     // `decided` is what each page becomes (null: removed).
     const decided = new Map();
@@ -685,15 +685,59 @@
       }
     }
     for (const id of Object.keys(merged.deleted)) if (at.has(id)) decided.set(id, null);
+    // Every page still to come down is waiting before the base says it is
+    // in the library: a run cut off between the two took them for pages
+    // deleted here, and the next deleted them everywhere (1.13.0).
+    const coming = () => stillWaiting.concat(want.filter((w) => !w.have && !decided.has(w.m.id)).map((w) => w.m.id));
+    keep(WAIT_KEY, coming());
+    // Written only when it changed (1.2.0): a library of hundreds is a
+    // few hundred kilobytes, and localStorage writes on the main thread.
+    await breathe();
+    const mergedText = JSON.stringify(merged);
+    let baseText = null;
+    try { baseText = localStorage.getItem(BASE_KEY); } catch (e) { baseText = null; }
+    if (mergedText !== baseText) { try { localStorage.setItem(BASE_KEY, mergedText); } catch (e) { /* not kept */ } }
+
+    // What came down so far goes into the library every few pages, so a
+    // run cut off part way keeps them (1.13.0).
+    const settleSome = async (some, final) => {
+      const live = getPages();
+      const out = [];
+      for (const p of live) {
+        const d = some.get(p.id);
+        if (!snapshot.has(p.id) || !some.has(p.id)) out.push(p);
+        else if (snapshot.get(p.id) !== JSON.stringify(p)) {
+          if (d && d.savedAt !== p.savedAt) { const both = { ...p }; for (const k of CONTENT.concat(DEVICE)) { if (d[k] === undefined) delete both[k]; else both[k] = d[k]; } out.push(both); }
+          else out.push(p);
+        } else if (d) out.push(d);
+      }
+      for (const [id, d] of some) if (d && !live.some((p) => p.id === id)) out.push(d);
+      out.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+      if (!final) { await setPages(out); return []; }
+      const kept = new Set(out.map((p) => p.id));
+      const gone = [...some].filter(([id, d]) => d === null && !kept.has(id)).map(([id]) => id);
+      return { out, gone };
+    };
     let down = 0;
     const downloads = [];
+    // Texts are asked for a few at a time (1.13.0); each one is still
+    // written and put in its place one after another.
+    const AHEAD = 4;
+    const asked = new Map();
+    const textOf = (i) => {
+      if (i >= want.length) return null;
+      if (!asked.has(i)) asked.set(i, readText("pages/" + want[i].m.id + ".html").catch(() => null));
+      return asked.get(i);
+    };
+    let fresh = new Map(), lastSettle = Date.now();
     for (const [i, { m, have }] of want.entries()) {
       // Paused while bringing pages in: the ones in are kept, the rest
       // come next time (they're still new to this device then).
       if (cfg && cfg.paused) { for (const r of want.slice(i)) if (!r.have) stillWaiting.push(r.m.id); break; }
       if (onProgress) onProgress({ stage: "down", done: i, total: want.length });
-      let html = null;
-      try { html = await readText("pages/" + m.id + ".html"); } catch (e) { html = null; }
+      for (let k = i; k < i + AHEAD; k++) textOf(k);
+      const html = await textOf(i);
+      asked.delete(i);
       if (!html) { if (!have) stillWaiting.push(m.id); continue; }
       if (have) await C.store.removePage(m.id);
       const got = await incoming(html, m);
@@ -701,26 +745,20 @@
       if (m.file && m.imageBytes != null) meta.imageBytes = m.imageBytes;
       meta.bytes = await C.store.writePage(m.id, got.html, meta);
       decided.set(m.id, meta);
+      fresh.set(m.id, meta);
       if (got.missing) downloads.push(meta);
       down++;
+      if (fresh.size >= 10 || (fresh.size && Date.now() - lastSettle > 4000)) {
+        await settleSome(fresh, false);
+        keep(WAIT_KEY, coming());
+        fresh = new Map();
+        lastSettle = Date.now();
+      }
     }
     await breathe();
     // Settled at once, with nothing awaited, so a change made while this
     // sync ran is kept (and sent next time) rather than written over.
-    const live = getPages();
-    const out = [];
-    for (const p of live) {
-      const d = decided.get(p.id);
-      if (!snapshot.has(p.id) || !decided.has(p.id)) out.push(p);
-      else if (snapshot.get(p.id) !== JSON.stringify(p)) {
-        if (d && d.savedAt !== p.savedAt) { const both = { ...p }; for (const k of CONTENT.concat(DEVICE)) { if (d[k] === undefined) delete both[k]; else both[k] = d[k]; } out.push(both); }
-        else out.push(p);
-      } else if (d) out.push(d);
-    }
-    for (const [id, d] of decided) if (d && !live.some((p) => p.id === id)) out.push(d);
-    const kept = new Set(out.map((p) => p.id));
-    const gone = [...decided].filter(([id, d]) => d === null && !kept.has(id)).map(([id]) => id);
-    out.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+    const { out, gone } = await settleSome(decided, true);
     keep(WAIT_KEY, stillWaiting.length ? stillWaiting : null);
     // Feeds the same way: one changed here while this ran keeps this
     // device's version, which goes up next time.

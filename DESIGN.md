@@ -146,7 +146,8 @@ and the page shows above it.
 - **Library (Now, 0.27.7):** a bar that stays while the list scrolls
   under it: the title, then Search (a magnifier, which opens the field
   under the bar and focuses it; `--line` behind it while open, 0.27.10),
-  Downloads (an arrow into a tray, 0.27.9) and Settings (a gear), 44 px
+  Sync (a cloud, only with sync on, 1.13.0), Downloads (an arrow into
+  a tray, 0.27.9) and Settings (a gear), 44 px
   icons; a hairline under the bar once the list is under it. Above
   the bar `--s-5` scrolls away (on the phone, the safe area instead).
   Under it, scrolling away: the count, search (only once opened, and
@@ -378,6 +379,13 @@ and the page shows above it.
   page waits. Its label says "Downloads, 40% done". Reduced motion: the
   ring and dot change without easing. The library itself shows only
   saved pages.
+- **Sync button (1.13.0):** a cloud before Downloads, there only while
+  sync is on, wearing the same ring and dot. The ring fills while a run
+  can count its clips and is a turning quarter arc while it can't
+  (checking GitHub, getting pictures); the dot is the last run's error;
+  paused or waiting for Wi-Fi the cloud is `--muted`. Its label is the
+  status ("Sync: synced 2 min ago"), and it opens Settings, Sync.
+  Reduced motion: the arc breathes instead of turning.
 - **Saving card (Now):** a 12 px ring turning (accent arc on the line
   colour) before the status, a bar that sweeps while the page downloads
   and fills as images land, and "Getting the page · 12 s" once it passes

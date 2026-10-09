@@ -8,8 +8,8 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="src/fonts.css?v=1.12.1">
-  <link rel="stylesheet" href="src/styles.css?v=1.12.1">
+  <link rel="stylesheet" href="src/fonts.css?v=1.13.0">
+  <link rel="stylesheet" href="src/styles.css?v=1.13.0">
 </head>
 <body>
   <div class="app" id="libraryView">
@@ -21,6 +21,11 @@
       <div class="top-actions">
         <button class="icon-btn" id="searchBtn" type="button" aria-label="Search" aria-expanded="false" aria-controls="searchBox" hidden>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
+        </button>
+        <button class="icon-btn dl-btn sync-btn" id="syncBtn" type="button" aria-label="Sync" hidden>
+          <svg class="dl-ring" width="40" height="40" viewBox="0 0 40 40" aria-hidden="true"><circle class="dl-ring-track" cx="20" cy="20" r="17"></circle><circle class="dl-ring-fill" cx="20" cy="20" r="17" pathLength="100"></circle></svg>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.5 19h9.5a4 4 0 0 0 .7-7.94A5.5 5.5 0 0 0 7 10.2 4.4 4.4 0 0 0 7.5 19z"></path></svg>
+          <span class="dl-dot" aria-hidden="true"></span>
         </button>
         <button class="icon-btn dl-btn" id="downloadsBtn" type="button" aria-label="Downloads" title="Downloads (D)">
           <svg class="dl-ring" width="40" height="40" viewBox="0 0 40 40" aria-hidden="true"><circle class="dl-ring-track" cx="20" cy="20" r="17"></circle><circle class="dl-ring-fill" cx="20" cy="20" r="17" pathLength="100"></circle></svg>
@@ -274,20 +279,20 @@
   </div>
   <div class="toast" id="toast" role="status" hidden></div>
 
-  <script src="src/platform.js?v=1.12.1"></script>
-  <script src="src/motion.js?v=1.12.1"></script>
-  <script src="src/vendor/Readability.js?v=1.12.1"></script>
-  <script src="src/store.js?v=1.12.1"></script>
-  <script src="src/save.js?v=1.12.1"></script>
-  <script src="src/feeds.js?v=1.12.1"></script>
-  <script src="src/backup.js?v=1.12.1"></script>
-  <script src="src/imports.js?v=1.12.1"></script>
-  <script src="src/sync.js?v=1.12.1"></script>
-  <script src="src/qr.js?v=1.12.1"></script>
-  <script src="src/epub.js?v=1.12.1"></script>
-  <script src="src/files.js?v=1.12.1"></script>
-  <script src="src/pdf.js?v=1.12.1"></script>
-  <script src="src/reader.js?v=1.12.1"></script>
-  <script src="src/app.js?v=1.12.1"></script>
+  <script src="src/platform.js?v=1.13.0"></script>
+  <script src="src/motion.js?v=1.13.0"></script>
+  <script src="src/vendor/Readability.js?v=1.13.0"></script>
+  <script src="src/store.js?v=1.13.0"></script>
+  <script src="src/save.js?v=1.13.0"></script>
+  <script src="src/feeds.js?v=1.13.0"></script>
+  <script src="src/backup.js?v=1.13.0"></script>
+  <script src="src/imports.js?v=1.13.0"></script>
+  <script src="src/sync.js?v=1.13.0"></script>
+  <script src="src/qr.js?v=1.13.0"></script>
+  <script src="src/epub.js?v=1.13.0"></script>
+  <script src="src/files.js?v=1.13.0"></script>
+  <script src="src/pdf.js?v=1.13.0"></script>
+  <script src="src/reader.js?v=1.13.0"></script>
+  <script src="src/app.js?v=1.13.0"></script>
 </body>
 </html>
