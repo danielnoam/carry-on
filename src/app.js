@@ -1547,6 +1547,7 @@
       job.error = e instanceof C.save.SaveError ? e.message : "Couldn't save this clip. Try again.";
       if (e instanceof C.save.ContentsPage) job.contents = e.contents;
       if (!(e instanceof C.save.SaveError)) console.error(e);
+      else C.platform.log.note("save", (job.site || "") + ": " + job.error);
       renderLibraryLater();
       return null;
     }
@@ -7283,6 +7284,56 @@
     if (state.settings) renderSettings();
   }
 
+  // ---- Report a problem (1.9.0) ----
+  // What happened in the person's words, with the version, the phone and
+  // the log platform.js keeps, all shown before it goes anywhere: to the
+  // share sheet, an issue on GitHub, or the clipboard.
+  const REPORT_REPO = "https://github.com/danielnoam/waypage";
+  let reportDraft = "";
+  const logTime = (at) => new Date(at).toISOString().replace("T", " ").slice(0, 16);
+  async function reportText() {
+    const lines = C.platform.log.list().map((x) => logTime(x.at) + " " + x.kind + (x.n ? " ×" + x.n : "") + ": " + x.msg);
+    return [
+      reportDraft.trim() || "(Nothing written)",
+      "",
+      "Waypage " + APP_VERSION + (C.platform.build && C.platform.build.builtAt ? " (built " + String(C.platform.build.builtAt).slice(0, 10) + ")" : "") + ", " + (C.platform.native ? C.platform.os + " app" : "browser"),
+      await C.platform.deviceLine(),
+      countLine(state.pages.length) + ", theme " + state.theme + ", sync " + (C.sync.on ? "on" : "off"),
+      "",
+      lines.length ? "Log:\n" + lines.join("\n") : "Log: empty",
+    ].join("\n");
+  }
+  function reportGroup() {
+    const list = C.platform.log.list();
+    const field = el("textarea", { class: "mark-note-field report-field", rows: "4", placeholder: "What happened, and what were you doing?", "aria-label": "What happened", dir: "auto" });
+    field.value = reportDraft;
+    field.addEventListener("input", () => { reportDraft = field.value; });
+    const send = async () => {
+      const text = await reportText();
+      try { if (await C.platform.shareText("Waypage problem report", text)) return; } catch (e) { /* below */ }
+      copyText(text, "Report copied. Paste it into a message.");
+    };
+    const issue = async () => {
+      const text = await reportText();
+      const title = (reportDraft.trim().split("\n")[0] || "Problem report").slice(0, 80);
+      // A link longer than this can be refused, so the log is cut from the start.
+      const body = text.length > 6000 ? text.slice(0, 1500) + "\n…\n" + text.slice(-4400) : text;
+      C.platform.openOutside(REPORT_REPO + "/issues/new?title=" + encodeURIComponent(title) + "&body=" + encodeURIComponent("```\n" + body + "\n```"));
+    };
+    return el("section", { class: "settings-section report" },
+      field,
+      el("div", { class: "group" },
+        el("button", { class: "row", type: "button", onclick: send }, el("span", { class: "row-label accent" }, "Send the report")),
+        el("button", { class: "row", type: "button", onclick: issue }, el("span", { class: "row-label accent" }, "Open an issue on GitHub")),
+        el("button", { class: "row", type: "button", onclick: async () => copyText(await reportText(), "Report copied") }, el("span", { class: "row-label accent" }, "Copy the report"))),
+      el("p", { class: "footnote" }, "Nothing leaves " + HERE + " unless you send it. The report holds what you wrote, Waypage's version, the phone's model and system, and the notes below, with addresses cut to their pages."),
+      el("h2", { class: "overline" }, list.length ? "What went wrong lately" : "Nothing went wrong lately"),
+      list.length ? el("ol", { class: "group report-log" }, ...list.slice().reverse().slice(0, 30).map((x) => el("li", { class: "report-line" },
+        el("span", { class: "meta" }, logTime(x.at) + " · " + x.kind + (x.n ? " ×" + x.n : "")),
+        el("span", { class: "report-msg", dir: "auto" }, x.msg)))) : null,
+      list.length ? el("button", { class: "btn-text report-clear", type: "button", onclick: () => { C.platform.log.clear(); renderSection(); renderSettings(); } }, "Clear these") : null);
+  }
+
   function aboutGroup() {
     const list = el("div", { class: "group" });
     const releases = C.platform.releasesUrl() || "https://github.com/danielnoam/waypage/releases/latest";
@@ -7372,6 +7423,7 @@
     // Watched folders, a page of their own (1.4.1, Android).
     content: { title: "Content", build: () => [watchGroup()], value: () => { const n = watches().length; return n ? n + (n === 1 ? " folder" : " folders") : "No watched folders"; } },
     updates: { title: "About", build: () => [updatesGroup(), aboutGroup()], value: () => (updateOut() ? upd.latest + " is out" : APP_VERSION) },
+    report: { title: "Report a problem", build: () => [reportGroup()], value: () => { const n = C.platform.log.list().length; return n ? n + (n === 1 ? " note" : " notes") : ""; } },
   };
 
   function renderSettings() {
@@ -7393,7 +7445,7 @@
             el("button", { class: "btn-small", type: "button", onclick: () => openSection("updates") }, "View"))) : null,
         el("div", { class: "group" }, row("appearance"), row("saving")),
         el("div", { class: "group" }, row("storage"), ...(C.platform.files.canWatch ? [row("content")] : []), row("sync")),
-        el("div", { class: "group" }, row("updates"))));
+        el("div", { class: "group" }, row("updates"), row("report"))));
   }
 
   function renderSection() {
