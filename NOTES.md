@@ -3,6 +3,20 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Soft zoom instead of the grow (1.12.1).** Daniel: the grow still
+  stuttered on the phone and, even smooth, did not look good. Two causes.
+  The 1.11.1 host scaled a window up and the screen back down inside it,
+  so the phone drew the page at up to ~7× its size. And a card (cover,
+  title) and the page it opens share nothing, so any card-to-page morph
+  shows a stretched card or two screens at once halfway; a GPU-only zoom
+  with a blending card copy was built and dropped for that reason.
+  `M.grow`/`M.shrink` now scale the screen 0.92 to 1 toward the tapped
+  card with a short opacity change (30% of the spring opening, 45% back).
+  Daniel was offered Soft zoom, Slide or keep the grow on a card.
+- **Voice menu in Settings (1.12.1).** `.group` has `overflow: hidden`
+  for its rounded corners, which cut off a dropdown that opens upward.
+  `dropdown()` puts `menu-open` on the group while its menu is up, and
+  `.group.menu-open` lets it overflow.
 - **Settings sorted (1.12.0).** Daniel approved the layout in the
   artifact "Waypage Settings Layout". Appearance had grown to hold the
   theme, all the reading type and the library's layout, and Content was

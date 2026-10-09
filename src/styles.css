@@ -961,17 +961,9 @@ html { -webkit-tap-highlight-color: transparent; }
 /* The shadow of a panel growing into a screen (motion.js grow, 1.11.0):
    the screen shows through a clip the panel's size, and this draws the
    panel's edge and shadow around it. */
-/* A screen growing out of a card (1.11.1): its host is a window onto it,
-   scaled from the card's box to the screen's by motion.js. */
-.grow-host { display: contents; }
-.grow-host.growing {
-  display: block; position: fixed; left: 0; top: 0; overflow: hidden;
-  transform-origin: 0 0; pointer-events: none; will-change: transform;
-  box-shadow: 0 0 0 1px var(--line), 0 16px 48px var(--shadow);
-}
-.grow-host.growing > .screen { pointer-events: auto; will-change: transform; }
-.grow-host.growing > .screen[hidden] { display: none; }
-.grow-face { position: fixed; margin: 0; box-sizing: border-box; pointer-events: none; z-index: 1; will-change: transform, opacity; }
+/* A screen zooming out of a card (1.12.1), with a copy of the card over
+   it that blends away. */
+.screen.zooming { will-change: transform, opacity; }
 
 /* Animations off in Settings (1.12.0): nothing eases from one state to
    the next. Spinners keep turning; they say something is happening. */
@@ -1314,6 +1306,10 @@ html { -webkit-tap-highlight-color: transparent; }
 .show-wrap.on .dropdown-btn { color: var(--accent); font-weight: 600; }
 .dropdown.start .dropdown-menu { right: auto; left: 0; }
 .dropdown-menu.up { top: auto; bottom: calc(100% + var(--s-1)); }
+/* A group clips its rounded corners; while one of its menus is open the
+   menu has to show past them (1.12.1: the Voice menu in Settings opened
+   up into the group above and was cut off). */
+.group.menu-open { overflow: visible; }
 .dropdown-menu {
   max-height: min(60vh, 26rem); overflow-y: auto; overscroll-behavior: contain;
   scroll-margin: calc(var(--s-9) + var(--s-2)) 0 calc(var(--s-9) + var(--s-5));
