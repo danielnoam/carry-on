@@ -939,6 +939,9 @@
         }
         heads = [...doc.body.querySelectorAll("h2, h3")].filter((h) => clean(h));
         doc.addEventListener("click", onClick);
+        // Loose text is wrapped now, not on the first selection (1.11.1):
+        // wrapping the words being selected dropped that selection.
+        wrapLoose();
         comic = !!doc.querySelector(".co-comic");
         if (isPaged()) doc.documentElement.classList.add("co-paged");
         pagedInput();

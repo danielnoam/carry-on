@@ -961,11 +961,17 @@ html { -webkit-tap-highlight-color: transparent; }
 /* The shadow of a panel growing into a screen (motion.js grow, 1.11.0):
    the screen shows through a clip the panel's size, and this draws the
    panel's edge and shadow around it. */
-.grow-shade {
-  position: fixed; pointer-events: none;
+/* A screen growing out of a card (1.11.1): its host is a window onto it,
+   scaled from the card's box to the screen's by motion.js. */
+.grow-host { display: contents; }
+.grow-host.growing {
+  display: block; position: fixed; left: 0; top: 0; overflow: hidden;
+  transform-origin: 0 0; pointer-events: none; will-change: transform;
   box-shadow: 0 0 0 1px var(--line), 0 16px 48px var(--shadow);
 }
-.grow-shade[hidden] { display: none; }
+.grow-host.growing > .screen { pointer-events: auto; will-change: transform; }
+.grow-host.growing > .screen[hidden] { display: none; }
+.grow-face { position: fixed; margin: 0; box-sizing: border-box; pointer-events: none; z-index: 1; will-change: transform, opacity; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 1ms !important; animation-duration: 1ms !important; }

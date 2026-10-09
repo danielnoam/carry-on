@@ -115,8 +115,10 @@ and the page shows above it.
 - Grow from what was tapped, shrink back into it. A clip or collection
   opened from its card, tile or Continue panel: a shaded panel the size
   of the card grows to fill the window and the screen is clipped inside
-  it (clip-path, so text is never scaled). Back shrinks it into the card.
-  The reader's title is inside its frame, so it doesn't morph.
+  it (a scaled host with the screen scaled back, so text is never
+  scaled and only transforms move, 1.11.1). A copy of the card blends
+  away as it grows; Back shrinks it into the card as it is now, and the
+  card blends back in as it lands. The one fade with motion on.
 - Screens with no card behind them (Settings, a pane) come in from the
   right; on touch the screen under them drifts 25% left. Downloads and
   dialogs grow from their button. Menus and popovers grow from their
@@ -132,7 +134,9 @@ and the page shows above it.
 - Toasts and bars come in from their nearest edge and leave the same
   way. The brightness slider slides past the left edge. Checkmarks grow.
 - The picture viewer grows from the picture and shrinks back into it.
-- Only `transform`, `clip-path` and the panel's box move. `inert` on the
+- Only `transform` and `opacity` move on screens; small menus use a
+  clip-path. In scroll mode the next chapter comes up from the bottom,
+  in Pages it turns sideways. `inert` on the
   library waits until the spring has all but landed (0.30.8).
 
 ## 5. Components

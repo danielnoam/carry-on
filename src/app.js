@@ -1,7 +1,7 @@
 // Waypage: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "1.11.0";
+  const APP_VERSION = "1.11.1";
   window.Waypage.version = APP_VERSION;
 
   const C = window.Waypage;
@@ -1666,8 +1666,29 @@
   document.addEventListener("click", (e) => {
     const t = e.target.closest && e.target.closest(".card-open, .folder-go, .post-open");
     const panel = t && (t.classList.contains("folder-go") ? t : t.closest(".card, .tile, .post"));
-    tapped = panel ? { rect: panel.getBoundingClientRect(), radius: parseFloat(getComputedStyle(panel).borderTopLeftRadius) || 0, at: Date.now() } : null;
+    tapped = panel ? { rect: panel.getBoundingClientRect(), radius: parseFloat(getComputedStyle(panel).borderTopLeftRadius) || 0, at: Date.now(), panel, key: panelKey(panel) } : null;
   }, true);
+  // The same panel after the library is drawn again (1.11.1), so Back
+  // shrinks into where it is now and as it looks now.
+  function panelKey(n) {
+    const q = (a, v) => "[" + a + '="' + CSS.escape(v) + '"]';
+    const sec = n.closest("#library > [data-key]");
+    const pre = sec && sec !== n ? q("data-key", sec.dataset.key) + " " : "";
+    if (n.dataset.ids) return pre + "." + n.classList[0] + q("data-ids", n.dataset.ids);
+    if (n.dataset.name) return ".tile" + q("data-name", n.dataset.name);
+    if (n.dataset.key) return q("data-key", n.dataset.key);
+    if (n.classList.contains("folder-go")) return ".folder-go";
+    return n.id ? "#" + CSS.escape(n.id) : "";
+  }
+  function panelNow(from, under) {
+    let n = from.panel;
+    if ((!n || !n.isConnected) && from.key && under) n = under.querySelector(from.key);
+    if (!n || !n.isConnected || !n.offsetParent) return null;
+    const r = n.getBoundingClientRect();
+    return r.bottom > 0 && r.top < innerHeight && r.width ? { rect: r, panel: n } : null;
+  }
+  M.host($("readerView"));
+  M.host($("folderView"));
   function zoomFrom(screen) {
     const t = tapped;
     tapped = null;
@@ -1720,7 +1741,7 @@
     showAloudBar();
     const from = zoomFrom(screen);
     if (from) zoomed.set(screen, from); else zoomed.delete(screen);
-    const moved = from ? M.grow(screen, from.rect, from.radius) : M.push(screen, under);
+    const moved = from ? M.grow(screen, from.rect, from.radius, from.panel) : M.push(screen, under);
     // The screen underneath goes inert once this one covers it: in a big
     // library that restyles every card, which held the push's first frame
     // back by a tenth of a second on a phone (0.30.4).
@@ -1753,8 +1774,10 @@
     screen.dataset.leaving = "1";
     const from = zoomed.get(screen);
     zoomed.delete(screen);
-    // Back shrinks it into the panel it grew from, where that panel is now.
-    const moved = from ? M.shrink(screen, from.rect, from.radius) : M.pop(screen, under);
+    // Back shrinks it into the panel it grew from, where that panel is now,
+    // hidden in the same frame it lands so the panel shows at once.
+    const to = from && panelNow(from, under);
+    const moved = to ? M.shrink(screen, to.rect, from.radius, to.panel, hide) : M.pop(screen, under);
     afterSettle(() => { if (pushes.get(screen) === n) under.inert = false; });
     return moved.then(hide).then(() => showAloudBar());
   }
@@ -2180,8 +2203,9 @@
     if (positionTimer) savePositions();
     history.replaceState(readerState(p), "");
     const frame = $("readerFrame");
-    if (turn) await M.pageOut(frame);
-    try { await show(p, html); } finally { if (turn) await M.pageIn(frame); }
+    const side = C.reader.paged;
+    if (turn) await M.pageOut(frame, side);
+    try { await show(p, html); } finally { if (turn) await M.pageIn(frame, side); }
     frame.focus();
   }
 
@@ -2224,14 +2248,16 @@
     brightClose();
     state.open = null;
     showAloudBar();
-    // The library redraws (where you got to) once the reader is away, not
-    // before it moves: in a big library that held Back up (0.30.4).
+    // The library redraws (where you got to) before the reader shrinks
+    // into its card (1.11.1), so the card it lands on is already the new
+    // one; after it, the card changed a frame late. Only what changed is
+    // drawn again, so a big library no longer holds Back up (0.30.4).
+    renderLibrary();
+    if (state.folder) renderFolder();
     popScreen($("readerView")).then(() => {
       if (state.open) return;
       C.reader.close();
       C.files.closeHeld();
-      renderLibrary();
-      if (state.folder) renderFolder();
     });
   }
 
@@ -2333,17 +2359,10 @@
   }
 
   // Under a selection while one is up: Highlight (1.7.0), Read from here
-  // when the phone can read aloud, and Translate and Look up (1.8.0), which
-  // open the words on the web.
+  // when the phone can read aloud, and Translate (1.8.0). Look up, which
+  // searched Wiktionary, went in 1.11.1: the phone's own menu has it.
   let readHere = null, quietUntil = 0;
-  const LOOK_UP_WORDS = 3;
   const myLang = () => (navigator.language || "en").split("-")[0].toLowerCase().replace(/^iw$/, "he");
-  function lookOutside(url) {
-    hideReadHere();
-    C.reader.clearSelection();
-    if (!navigator.onLine) { toast("You're offline. Look up opens on the web."); return; }
-    C.platform.openOutside(url);
-  }
   // Translate hands the words to the phone's translate app where it can
   // (1.8.1): Google Translate took the web address but dropped the words.
   async function translate(text) {
@@ -2354,7 +2373,6 @@
     C.platform.openOutside(translateUrl(text));
   }
   const translateUrl = (text) => "https://translate.google.com/?sl=auto&tl=" + myLang() + "&op=translate&text=" + encodeURIComponent(text.slice(0, 1500));
-  const lookUpUrl = (text) => "https://" + myLang() + ".wiktionary.org/wiki/Special:Search?go=Go&search=" + encodeURIComponent(text);
   function showReadHere() {
     const p = state.open;
     const mark = p && !p.preview && !state.sheet && Date.now() > quietUntil ? C.reader.selectionMark() : null;
@@ -2383,8 +2401,7 @@
         return b;
       };
       readHere = el("div", { class: "read-here", role: "toolbar", "aria-label": "Selection" }, markBtn, aloudBtn,
-        outBtn("sel-translate", "Translate", ICONS.translate, translate),
-        outBtn("sel-look", "Look up", ICONS.lookUp, (text) => lookOutside(lookUpUrl(text))));
+        outBtn("sel-translate", "Translate", ICONS.translate, translate));
       $("readerView").append(readHere);
     }
     const markBtn = readHere.querySelector(".sel-mark");
@@ -2396,8 +2413,6 @@
     markBtn.setAttribute("aria-label", on.all ? "Remove highlight" : "Highlight");
     readHere.querySelector(".sel-aloud").hidden = !spot;
     readHere.querySelector(".sel-translate").hidden = !picked;
-    // A dictionary is for a word or a short phrase.
-    readHere.querySelector(".sel-look").hidden = !picked || picked.text.split(/\s+/).length > LOOK_UP_WORDS;
     const frame = $("readerFrame").getBoundingClientRect();
     const h = 44, room = frame.bottom - 72;
     const bar = $("readerView").classList.contains("bar-away") ? 0 : $("readerView").querySelector(".reader-bar").offsetHeight;
@@ -4033,7 +4048,6 @@
     star: '<path d="M12 3.5l2.6 5.3 5.9.9-4.25 4.1 1 5.85L12 16.9l-5.25 2.75 1-5.85L3.5 9.7l5.9-.9z"/>',
     mark: '<path d="M14.5 4.5l5 5L11 18H6v-5z"/><path d="M4 21h16"/>',
     translate: '<path d="M4 5h9M8.5 3v2M11 5c-1 4-3.5 7-7 8.5M6.5 8.5c1.2 2 3 3.5 5 4.5"/><path d="M13 21l4-9 4 9M14.5 18h5"/>',
-    lookUp: '<path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5z"/><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19"/><circle cx="11.5" cy="9.5" r="2.5"/><path d="M13.5 11.5l2 2"/>',
   };
   function svgIcon(name, size) {
     const box = el("span", { class: "svg-icon", "aria-hidden": "true" });

@@ -3,6 +3,24 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Grow on the GPU (1.11.1).** Daniel: the grow looked frame by frame
+  and the card changed a frame after the shrink landed. The grow animated
+  left/top/width/height and a clip-path, all main-thread, while the
+  reader laid its page out (a 300-500 ms task on a 6x slowed CPU). Now
+  each grown screen sits in a `.grow-host` (motion.host, wrapped at
+  start-up because moving an iframe later reloads it): the host is scaled
+  to the panel's box with `overflow: hidden` and the screen is scaled the
+  other way, both as dense linear keyframes from the spring, so text keeps
+  its size and only transforms move. The corner radius is a separate
+  main-thread animation; if the main thread stalls only the corners lag.
+  A copy of the card (`.grow-face`) rides the corner and blends out over
+  the first 35% of the grow and in over the last 40% of the shrink
+  (Daniel picked this over a cut or a slide-down). closeReader draws the
+  library before the shrink, and the shrink finds the card again by its
+  section and ids, then hides the screen in the same frame it lands.
+- **The first selection dropped (1.11.1).** selectionSpot ran
+  readable() on the first selection, which ran wrapLoose(), which wraps
+  loose text in spans: the words being selected. It runs at load now.
 - **Motion rework (1.11.0).** Daniel approved the motion designs
   (artifact "Waypage Motion"). motion.js has two spring tiers, touch and
   desktop (`deskQ`), and no fades. Open from a card is `grow`: a

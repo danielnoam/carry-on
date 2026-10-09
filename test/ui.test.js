@@ -160,7 +160,7 @@ const frameText = (p) => p.frameLocator("#readerFrame").locator("body");
       await p.locator("#sidebar").waitFor({ state: "hidden" });
     });
 
-    await test("Translate and Look up open the selected words on the web", async () => {
+    await test("Translate opens the selected words on the web, and there is no Look up (1.11.1)", async () => {
       await p.evaluate(() => { window.__opened = []; window.Waypage.platform.openOutside = (u) => window.__opened.push(u); });
       await p.locator(".page-card", { hasText: "The Long Haul Flight" }).first().click();
       await frameText(p).getByText("oceanic track").waitFor();
@@ -173,9 +173,10 @@ const frameText = (p) => p.frameLocator("#readerFrame").locator("body");
         sel.removeAllRanges();
         sel.addRange(r);
       });
-      await p.locator(".read-here .sel-look:not([hidden])").click();
+      await p.locator(".read-here .sel-translate:not([hidden])").click();
       const opened = await p.evaluate(() => window.__opened);
-      assert.ok(/wiktionary\.org\/.*search=oceanic$/.test(opened[0] || ""), "opened " + opened);
+      assert.ok(/translate\.google\.com\/.*text=oceanic$/.test(opened[0] || ""), "opened " + opened);
+      assert.strictEqual(await p.locator(".read-here .sel-look").count(), 0);
       await p.goBack();
       await p.locator("#readerView").waitFor({ state: "hidden" });
     });
