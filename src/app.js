@@ -2244,6 +2244,7 @@
     await C.store.writeIndex(state.pages);
     paintMarks(p);
     renderLibrary();
+    updateWidgets();
   }
   async function addMark() {
     const p = state.open;
@@ -6078,6 +6079,10 @@
           ...state.pages.filter((x) => x.fav).sort((a, b) => (b.favAt || 0) - (a.favAt || 0))
             .map((x) => ({ id: x.id, title: x.title, meta: clipMeta(x) })),
         ].slice(0, 4),
+        // A highlight a day (1.9.0): the latest hundred, latest first; the
+        // widget picks the one for the day.
+        marks: state.pages.flatMap((x) => (x.marks || []).map((m) => ({ id: x.id, mark: m.id, text: m.text.slice(0, 500), note: (m.note || "").slice(0, 200), title: x.title, at: m.at || 0 })))
+          .sort((a, b) => b.at - a.at).slice(0, 100).map(({ at, ...m }) => m),
         collections: allFolders().sort((a, b) => a.localeCompare(b)).map((name) => {
           const list = folderPages(name);
           const i = list.findIndex((x) => !x.finished);
@@ -6102,6 +6107,7 @@
     if (!got || !got.kind) return;
     await toLibrary();
     if (got.kind === "page" && state.pages.some((p) => p.id === got.id)) { openPage(got.id); return; }
+    if (got.kind === "mark" && state.pages.some((p) => p.id === got.id)) { markAfterOpen = got.mark || null; openPage(got.id); return; }
     if (got.kind === "post" && got.url) {
       await goPlace("feeds");
       const f = feeds.find((x) => x.items.some((it) => it.url === got.url));

@@ -1,5 +1,5 @@
-// Waypage's home screen widgets on iOS (1.6.0): Keep reading, Feeds and
-// Favourites, Android's set (0.29.0, 0.29.2) drawn from the same data, which
+// Waypage's home screen widgets on iOS (1.6.0): Keep reading, Feeds,
+// Favourites and (1.9.0) a highlight a day, Android's set (0.29.0, 0.29.2) drawn from the same data, which
 // the app writes to the App Group (WidgetsPlugin, WPStore.widgets). A tap
 // opens the app on what was tapped through a waypage-widget:// link, read
 // by WidgetsPlugin. Android's collection widget isn't here yet: picking the
@@ -190,11 +190,70 @@ struct FavouritesWidget: Widget {
     }
 }
 
+// ---- A highlight a day (1.9.0) ----
+// The app's highlights, latest first; each day shows the one for its date,
+// so the timeline holds a week of midnights and asks again after them.
+struct MarkProvider: TimelineProvider {
+    func placeholder(in context: Context) -> WPEntry { WPEntry(date: Date(), data: [:], waiting: 0) }
+    func getSnapshot(in context: Context, completion: @escaping (WPEntry) -> Void) {
+        completion(WPEntry(date: Date(), data: WPStore.widgets(), waiting: 0))
+    }
+    func getTimeline(in context: Context, completion: @escaping (Timeline<WPEntry>) -> Void) {
+        let data = WPStore.widgets()
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        var entries = [WPEntry(date: Date(), data: data, waiting: 0)]
+        for d in 1...7 {
+            if let at = cal.date(byAdding: .day, value: d, to: today) { entries.append(WPEntry(date: at, data: data, waiting: 0)) }
+        }
+        completion(Timeline(entries: entries, policy: .atEnd))
+    }
+}
+
+private func dayNumber(_ date: Date) -> Int {
+    let local = date.timeIntervalSince1970 + Double(TimeZone.current.secondsFromGMT(for: date))
+    return Int(floor(local / 86400))
+}
+
+struct HighlightView: View {
+    @Environment(\.widgetFamily) var family
+    let entry: WPEntry
+    var body: some View {
+        let list = (entry.data["marks"] as? [[String: Any]]) ?? []
+        let m: [String: Any]? = list.isEmpty ? nil : list[((dayNumber(entry.date) % list.count) + list.count) % list.count]
+        let note = str(m, "note")
+        VStack(alignment: .leading, spacing: 6) {
+            Head(text: "A highlight")
+            if m == nil {
+                Note(text: "Select words in a clip and tap Highlight. One of your highlights shows here each day.")
+            } else {
+                Text("\u{201C}" + str(m, "text") + "\u{201D}")
+                    .font(.system(size: family == .systemSmall ? 14 : 15, design: .serif)).foregroundStyle(ink)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                if !note.isEmpty { Text(note).font(.system(size: 12).italic()).foregroundStyle(muted).lineLimit(2) }
+                Text(str(m, "title")).font(.system(size: 12, weight: .semibold)).foregroundStyle(accent).lineLimit(1)
+            }
+        }
+        .widgetURL(m == nil ? link("waypage-widget://library") : query("waypage-widget://mark/" + (str(m, "id").addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(CharacterSet(charactersIn: "/"))) ?? ""), "mark", str(m, "mark")))
+        .containerBackground(for: .widget) { bg }
+    }
+}
+
+struct HighlightWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "WaypageHighlight", provider: MarkProvider()) { HighlightView(entry: $0) }
+            .configurationDisplayName("A highlight")
+            .description("One of your highlights, a different one each day.")
+            .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+    }
+}
+
 @main
 struct WaypageWidgets: WidgetBundle {
     var body: some Widget {
         ReadingWidget()
         FeedsWidget()
         FavouritesWidget()
+        HighlightWidget()
     }
 }

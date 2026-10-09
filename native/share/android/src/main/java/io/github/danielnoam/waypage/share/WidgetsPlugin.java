@@ -14,7 +14,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
  *   update({ reading: { id, title, meta, at } | null,
  *            feeds: { following, fresh, posts: [{ title, site, url }] } })
  *   renamed({ from, to })   a collection widget follows a renamed collection
- *   take()    { kind: "page" | "post" | "feeds" | "library" | "favourites" | "collection", id, url, name } once,
+ *   take()    { kind: "page" | "mark" | "post" | "feeds" | "library" | "favourites" | "collection", id, mark, url, name } once,
  *             what a widget's tap asked to open, or {}
  *
  * and an "open" event when a tap brings the running app back.
@@ -41,7 +41,8 @@ public class WidgetsPlugin extends Plugin {
         JSObject out = new JSObject();
         String kind = u.getHost() == null ? "" : u.getHost();
         out.put("kind", kind);
-        if (kind.equals("page") && u.getLastPathSegment() != null) out.put("id", u.getLastPathSegment());
+        if ((kind.equals("page") || kind.equals("mark")) && u.getLastPathSegment() != null) out.put("id", u.getLastPathSegment());
+        if (kind.equals("mark")) out.put("mark", u.getQueryParameter("mark"));
         if (kind.equals("post")) out.put("url", u.getQueryParameter("url"));
         if (kind.equals("collection")) out.put("name", u.getQueryParameter("name"));
         pending = out;
