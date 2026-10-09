@@ -31,6 +31,48 @@
     }
   } catch (e) { /* storage blocked: nothing to copy */ }
 
+  // What went wrong lately (1.9.0), for Report a problem: errors nothing
+  // caught, console errors, and saves that failed, the last LOG_KEEP of
+  // them in localStorage. Addresses keep their page but lose their query,
+  // where sign-in tokens and tracking live. Nothing leaves the phone
+  // unless the person sends a report.
+  const LOG_KEY = "waypage.log";
+  const LOG_KEEP = 60;
+  const cleanText = (t) => String(t == null ? "" : t)
+    .replace(/(https?:\/\/[^\s?#"'<>)]+)[?#][^\s"'<>)]*/g, "$1")
+    .replace(/(token|key|password|secret)=[^\s&]+/gi, "$1=…")
+    .slice(0, 600);
+  function logList() {
+    try { const v = JSON.parse(localStorage.getItem(LOG_KEY)); return Array.isArray(v) ? v : []; } catch (e) { return []; }
+  }
+  let logging = false;
+  function note(kind, text) {
+    if (logging) return;
+    logging = true;
+    try {
+      const list = logList();
+      const msg = cleanText(text);
+      const last = list[list.length - 1];
+      // The same error over and over is one line with a count.
+      if (last && last.kind === kind && last.msg === msg) { last.n = (last.n || 1) + 1; last.at = Date.now(); }
+      else list.push({ at: Date.now(), kind, msg });
+      localStorage.setItem(LOG_KEY, JSON.stringify(list.slice(-LOG_KEEP)));
+    } catch (e) { /* storage full or blocked: not kept */ }
+    logging = false;
+  }
+  const errorText = (e) => (e && (e.stack || e.message)) ? String(e.stack || e.message).split("\n").slice(0, 4).join(" | ") : String(e);
+  addEventListener("error", (e) => {
+    if (e.error || e.message) note("error", (e.message || errorText(e.error)) + (e.filename ? " @ " + e.filename.split("/").pop() + ":" + e.lineno : ""));
+  });
+  addEventListener("unhandledrejection", (e) => note("error", errorText(e.reason)));
+  const consoleError = console.error.bind(console);
+  console.error = (...args) => { note("console", args.map((a) => (a instanceof Error ? errorText(a) : typeof a === "string" ? a : (() => { try { return JSON.stringify(a); } catch (x) { return String(a); } })())).join(" ")); consoleError(...args); };
+  const log = {
+    note,
+    list: logList,
+    clear() { try { localStorage.removeItem(LOG_KEY); } catch (e) { /* none */ } },
+  };
+
   let build = null;
   const ready = native
     ? fetch("app-build.json", { cache: "no-store" })
@@ -461,6 +503,24 @@
   }
   const shareFile = (uri, name) => share({ title: name, files: [uri], dialogTitle: "Save or send " + name });
   const shareLink = (title, url) => share({ title, url, dialogTitle: "Share " + title });
+  // Plain text to the share sheet (1.9.0), for Report a problem.
+  async function shareText(title, text) {
+    const SH = plugin("Share");
+    try {
+      if (SH) await SH.share({ title, text, dialogTitle: title });
+      else if (navigator.share) await navigator.share({ title, text });
+      else return false;
+    } catch (e) {
+      if (!/cancel|abort/i.test(String(e && (e.name + " " + e.message) || e))) throw e;
+    }
+    return true;
+  }
+  // The phone, for a report: its model and system, where the app can tell.
+  async function deviceLine() {
+    const D = native ? plugin("Device") : null;
+    if (D) { try { const i = await D.getInfo(); return [i.manufacturer, i.model, i.operatingSystem, i.osVersion].filter(Boolean).join(" "); } catch (e) { /* below */ } }
+    return navigator.userAgent.replace(/^Mozilla\/5\.0 /, "").slice(0, 160);
+  }
 
   // A file handed to a browser's downloads (the web copy has no share sheet
   // for files).
@@ -795,6 +855,9 @@
     get canSaveFiles() { return !!plugin("FileSave"); },
     shareFile,
     shareLink,
+    shareText,
+    deviceLine,
+    log,
     printHtml,
     speech,
     downloads,
