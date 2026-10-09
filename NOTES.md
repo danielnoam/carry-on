@@ -3,6 +3,18 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Motion rework (1.11.0).** Daniel approved the motion designs
+  (artifact "Waypage Motion"). motion.js has two spring tiers, touch and
+  desktop (`deskQ`), and no fades. Open from a card is `grow`: a
+  `.grow-shade` div animates its box from the card to the window while
+  the screen's clip-path inset follows it; the demo's title and picture
+  morph is left out because the reader's title lives in its iframe and
+  it opens at your place, not the top. Collections ›/Clips › use libSnap
+  and libFlip (FLIP keyed by tile name, card ids and section heading).
+  The sidebar's drift is an inline transform on the library because
+  run() cancels its animations when they land. The viewer's drag dim
+  never showed (its `::before` covered the background); it is `--dim`
+  now.
 - **Saves try twice (1.10.1).** Daniel: a new link often failed until
   Retry. No error text came with it, so the likely causes are all
   covered: SaveError's `again` marks a network failure or timeout, a 5xx

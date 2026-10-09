@@ -1,142 +1,248 @@
-// Waypage: motion (DESIGN.md §4). Springs, sampled into CSS linear()
-// curves since there's no animation library: stiffness 400, damping 32 for
-// screens, sheets and cards; 600 and 40 for small controls. Under
-// prefers-reduced-motion every one of them becomes a 120 ms fade. Nothing
-// here ever animates the text of a page being read, and nothing waits on an
-// animation to accept input.
+// Waypage: motion (DESIGN.md §4, reworked in 1.11.0). Springs, sampled
+// into CSS linear() curves since there's no animation library. On touch:
+// stiffness 400, damping 32 for screens, sheets and cards; 600 and 40 for
+// small controls. On a desktop (1024 px and up, a mouse or trackpad) the
+// same shapes run critically damped, quicker and without overshoot.
+// Nothing fades: what comes grows out of what was tapped or in from an
+// edge, and leaves the same way. Under prefers-reduced-motion every one
+// becomes a 120 ms fade. Nothing animates the text of a page being read,
+// and nothing waits on an animation to accept input.
 (function () {
-  const SPRINGS = {
-    sheet: { ms: 520, curve: "linear(0, 0.081, 0.246, 0.429, 0.596, 0.733, 0.837, 0.91, 0.958, 0.987, 1.003, 1.011, 1.013, 1.012, 1.01, 1.008, 1.006, 1.004, 1.002, 1.001, 1.001, 1, 1, 1, 1)" },
-    control: { ms: 443, curve: "linear(0, 0.087, 0.259, 0.446, 0.614, 0.747, 0.846, 0.92, 0.962, 0.987, 1.001, 1.007, 1.009, 1.009, 1.007, 1.006, 1.004, 1.003, 1.002, 1.001, 1, 1, 1, 1, 1)" },
-  };
+  // A spring from rest at 0 to 1, sampled every frame into linear().
+  function sample(k, c) {
+    let x = 0, v = 0, t = 0;
+    const pts = [0];
+    while (t < 2) {
+      for (let i = 0; i < 4; i++) { const a = -k * (x - 1) - c * v; v += a / 240; x += v / 240; }
+      t += 1 / 60;
+      pts.push(+x.toFixed(4));
+      if (Math.abs(1 - x) < 0.002 && Math.abs(v) < 0.02) break;
+    }
+    pts[pts.length - 1] = 1;
+    return { ms: Math.round(t * 1000), curve: "linear(" + pts.join(", ") + ")" };
+  }
+  const TOUCH = { sheet: sample(400, 32), control: sample(600, 40) };
+  const DESK = { sheet: sample(700, 2 * Math.sqrt(700)), control: sample(1000, 2 * Math.sqrt(1000)) };
   // Older WebViews without linear(): the nearest cubic-bezier, no overshoot.
   const FALLBACK = "cubic-bezier(0.2, 0.9, 0.3, 1)";
   const hasLinear = !!(window.CSS && CSS.supports && CSS.supports("transition-timing-function", "linear(0, 1)"));
-  const reduced = () => !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const hasClip = !!(window.CSS && CSS.supports && CSS.supports("clip-path", "inset(1px round 2px)"));
+  const mq = (q) => (window.matchMedia ? matchMedia(q) : { matches: false, addEventListener() {} });
+  const reducedQ = mq("(prefers-reduced-motion: reduce)");
+  const deskQ = mq("(min-width: 1024px) and (pointer: fine)");
+  const reduced = () => !!reducedQ.matches;
+  const desk = () => !!deskQ.matches;
 
   function timing(kind) {
     if (reduced()) return { duration: 120, easing: "linear" };
-    const s = SPRINGS[kind] || SPRINGS.sheet;
+    const s = (desk() ? DESK : TOUCH)[kind] || (desk() ? DESK : TOUCH).sheet;
     return { duration: s.ms, easing: hasLinear ? s.curve : FALLBACK };
   }
 
-  // Opacity never rides the spring (0.30.8). A spring's curve is most of
-  // the way there in its first fifth, so a fade on it was over in a few
-  // frames and read as a cut. Fades run on their own clock with a plain
-  // ease, beside the movement, as iOS and Material time theirs.
-  const FADE_IN = "cubic-bezier(0.2, 0, 0.2, 1)";
-
-  // frames move (transform only, on the spring); fade is [from, to, ms,
-  // delay]; under reduced motion only the 120 ms fade runs.
   // How many animations are running, so work that can wait (a library
   // redraw as a page lands) waits for them (1.2.0).
   let moving = 0;
   const busy = () => moving > 0;
-  function run(el, frames, kind, fade) {
-    if (!el || !el.animate) return Promise.resolve();
+  // frames move on the spring; under reduced motion only a 120 ms fade
+  // runs, in when `show` is true, out when false, none when null.
+  function run(els, kind, show) {
+    const list = els.filter((x) => x && x[0] && x[0].animate);
+    if (!list.length) return Promise.resolve();
     const done = [];
-    // No fades beside movement (Daniel, 1.10.1: they didn't help): things
-    // move on the spring and are there or not. A fade is reduced motion's
-    // answer only.
     if (reduced()) {
-      if (fade) done.push(el.animate([{ opacity: fade[0] }, { opacity: fade[1] }], { duration: 120, easing: "linear", fill: "both" }));
-    } else if (frames) done.push(el.animate(frames, { ...timing(kind), fill: "both" }));
+      if (show != null) done.push(list[0][0].animate([{ opacity: show ? 0 : 1 }, { opacity: show ? 1 : 0 }], { duration: 120, easing: "linear", fill: "both" }));
+    } else list.forEach(([el, frames]) => done.push(el.animate(frames, { ...timing(kind), fill: "both" })));
     moving++;
     return Promise.all(done.map((a) => a.finished)).then(() => done.forEach((a) => a.cancel()), () => {}).finally(() => { moving--; });
   }
-  const shift = () => Math.round(Math.min(72, innerWidth * 0.18)) + "px";
+  const one = (el, frames, kind, show) => run([[el, frames]], kind, show);
+  const back = (f) => f.slice().reverse();
+  const box = (el) => el.getBoundingClientRect();
 
-  // A screen pushed over the library (Settings, Downloads) and popped off:
-  // a short slide from the right as it fades in, Material's shared axis.
-  function pushIn(el) {
-    return run(el, [{ transform: "translateX(" + shift() + ")" }, { transform: "none" }], "sheet", [0, 1, 220]);
+  // A screen pushed over another (Settings, Downloads, a feed post): in
+  // from the right edge. On touch the screen under it drifts a quarter
+  // to the left, as on iOS; on a desktop it stays put.
+  const DRIFT = "translateX(-25%)";
+  function push(el, under) {
+    const f = [{ transform: "translateX(100%)" }, { transform: "none" }];
+    return run([[el, f], !desk() && under && [under, [{ transform: "none" }, { transform: DRIFT }]]], "sheet", true);
   }
-  function popOut(el) {
-    return run(el, [{ transform: "none" }, { transform: "translateX(" + shift() + ")" }], "control", [1, 0, 180]);
+  function pop(el, under, from = 0) {
+    const f = [{ transform: "translateX(" + from + "px)" }, { transform: "translateX(100%)" }];
+    return run([[el, f], !desk() && under && [under, [{ transform: DRIFT }, { transform: "none" }]]], "sheet", false);
   }
-  // A sheet from the bottom edge (the reader's Aa).
+
+  // A clip or collection opened from its card, or the reader from a
+  // Continue button (1.11.0): the panel tapped grows until it fills the
+  // screen. The screen is already laid out and shows through the panel
+  // as it grows (a clip-path), so its text is never scaled; a shadow
+  // under it, the size of the panel, is what you see growing. Back
+  // shrinks it into the panel again.
+  let shade = null;
+  function shadeFor(el) {
+    if (!shade) { shade = document.createElement("div"); shade.className = "grow-shade"; shade.setAttribute("aria-hidden", "true"); }
+    shade.style.zIndex = getComputedStyle(el).zIndex;
+    el.before(shade);
+    return shade;
+  }
+  function frameOf(r, T, rad) {
+    return {
+      clip: "inset(" + (r.top - T.top) + "px " + (T.right - r.right) + "px " + (T.bottom - r.bottom) + "px " + (r.left - T.left) + "px round " + rad + "px)",
+      box: { left: r.left + "px", top: r.top + "px", width: r.width + "px", height: r.height + "px", borderRadius: rad + "px" },
+    };
+  }
+  function grows(el, r, rad, open) {
+    if (!r || !r.width || !hasClip) return open ? push(el) : pop(el);
+    const T = box(el);
+    const small = frameOf(r, T, rad), big = frameOf(T, T, 0);
+    const s = shadeFor(el);
+    s.hidden = false;
+    const clip = [{ clipPath: small.clip }, { clipPath: big.clip }], size = [small.box, big.box];
+    return run([[el, open ? clip : back(clip)], [s, open ? size : back(size)]], "sheet", open).finally(() => { s.hidden = true; });
+  }
+  const grow = (el, r, rad = 16) => grows(el, r, rad, true);
+  const shrink = (el, r, rad = 16) => grows(el, r, rad, false);
+
+  // A sheet from the bottom edge (the reader's Aa, the phone's menus);
+  // closing goes on from where a drag left it.
   function rise(el) {
-    return run(el, [{ transform: "translateY(100%)" }, { transform: "translateY(0)" }], "sheet", reduced() ? [0, 1] : null);
+    return one(el, [{ transform: "translateY(100%)" }, { transform: "none" }], "sheet", true);
   }
-  function sink(el) {
-    return run(el, [{ transform: "translateY(0)" }, { transform: "translateY(100%)" }], "sheet", reduced() ? [1, 0] : null);
+  function sink(el, from = 0) {
+    return one(el, [{ transform: "translateY(" + from + "px)" }, { transform: "translateY(100%)" }], "sheet", false);
   }
-  // The sidebar, from the left edge (0.28.0); closing goes on from where
-  // a drag left it (0.30.5), and a short drag springs back.
-  function slideIn(el) {
-    return run(el, [{ transform: "translateX(-100%)" }, { transform: "translateX(0)" }], "sheet", reduced() ? [0, 1] : null);
+  function settle(el, from) {
+    return one(el, [{ transform: "translateY(" + from + "px)" }, { transform: "none" }], "control", null);
   }
-  function slideOut(el, from = 0) {
-    return run(el, [{ transform: "translateX(" + from + "px)" }, { transform: "translateX(-100%)" }], from ? "control" : "sheet", reduced() ? [1, 0] : null);
-  }
-  function slideBack(el, from) {
-    return run(el, [{ transform: "translateX(" + from + "px)" }, { transform: "translateX(0)" }], "control", null);
-  }
-  // The reader turning to the next page (0.30.3): the page read lifts away
-  // and stays hidden until the next one comes up from the bottom.
-  function pageOut(el) {
-    return run(el, [{ transform: "none" }, { transform: "translateY(-6%)" }], "control", [1, 0, 160])
-      .then(() => { el.style.opacity = "0"; });
-  }
-  function pageIn(el) {
+  // The dimming behind a sheet, the sidebar or a dialog: it darkens with
+  // the thing it's under, on the same spring, from where a drag left it.
+  function dim(el, show, from) {
+    if (!el) return Promise.resolve();
+    const left = el.style.opacity;
     el.style.opacity = "";
-    return run(el, [{ transform: "translateY(28%)" }, { transform: "none" }], "sheet", [0, 1, 240]);
+    const a = from != null ? from : left !== "" ? parseFloat(left) : show ? 0 : 1;
+    return one(el, [{ opacity: a }, { opacity: show ? 1 : 0 }], "sheet", show);
   }
-  // A clip or collection opened from its card (0.30.3, back in 0.30.8):
-  // the screen grows out of the card to fill the window, fading in as it
-  // grows, and shrinks back into the card on Back, fading as it lands.
-  // Transform and opacity only, so the GPU runs it (0.30.4).
-  function zoomFrom(r) {
-    const w = innerWidth, h = innerHeight;
-    if (!r || !r.width || !w) return null;
-    const s = Math.max(0.3, r.width / w);
-    const x = r.left + r.width / 2 - (w * s) / 2, y = r.top + r.height / 2 - (h * s) / 2;
-    return "translate(" + x + "px, " + y + "px) scale(" + s + ")";
+
+  // The sidebar, from the left edge (0.28.0); closing goes on from where
+  // a drag left it (0.30.5), and a short drag springs back. On touch the
+  // library under it drifts right a little (1.11.0).
+  const sideDrift = (side) => "translateX(" + Math.round(side.offsetWidth * 0.2) + "px)";
+  function slideIn(el, under) {
+    return run([[el, [{ transform: "translateX(-100%)" }, { transform: "none" }]], under && [under, [{ transform: "none" }, { transform: sideDrift(el) }]]], "sheet", true);
   }
-  function zoomIn(el, r) {
-    const small = zoomFrom(r);
-    if (!small) return pushIn(el);
-    el.style.transformOrigin = "0 0";
-    return run(el, [{ transform: small }, { transform: "none" }], "sheet", [0, 1, 240])
-      .then(() => { el.style.transformOrigin = ""; });
+  function slideOut(el, from = 0, under) {
+    const k = el.offsetWidth ? 1 + from / el.offsetWidth : 1;
+    return run([[el, [{ transform: "translateX(" + from + "px)" }, { transform: "translateX(-100%)" }]],
+      under && [under, [{ transform: "translateX(" + Math.round(el.offsetWidth * 0.2 * k) + "px)" }, { transform: "none" }]]], from ? "control" : "sheet", false);
   }
-  function zoomOut(el, r) {
-    const small = zoomFrom(r);
-    if (!small) return popOut(el);
-    el.style.transformOrigin = "0 0";
-    return run(el, [{ transform: "none" }, { transform: small }], "sheet", [1, 0, 220, 120])
-      .then(() => { el.style.transformOrigin = ""; });
+  function slideBack(el, from, under) {
+    const k = el.offsetWidth ? 1 + from / el.offsetWidth : 1;
+    return run([[el, [{ transform: "translateX(" + from + "px)" }, { transform: "none" }]],
+      under && [under, [{ transform: "translateX(" + Math.round(el.offsetWidth * 0.2 * k) + "px)" }, { transform: sideDrift(el) }]]], "control", null);
   }
-  // Something arriving in a list or a bar: a card, the update bar, a toast.
-  function arrive(el, from = 12) {
-    return run(el, [{ transform: "translateY(" + from + "px) scale(0.98)" }, { transform: "none" }], "sheet", [0, 1, 200]);
+
+  // A menu or popover grows out of the button that opened it, from that
+  // button's corner, and shrinks back into it (1.11.0).
+  function popFrames(el, anchor) {
+    const P = box(el), B = anchor;
+    if (!B || !B.width || !P.width || !hasClip) return [{ transform: "scale(0.6)", transformOrigin: "50% 0" }, { transform: "none", transformOrigin: "50% 0" }];
+    const w = Math.min(B.width, P.width), h = Math.min(B.height, P.height);
+    const left = Math.max(0, Math.min(P.width - w, B.left - P.left));
+    const below = B.top < P.top + P.height / 2;
+    const top = below ? 0 : P.height - h;
+    const dy = below ? B.top - P.top : B.bottom - P.bottom;
+    const r = parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0;
+    return [
+      { clipPath: "inset(" + top + "px " + (P.width - left - w) + "px " + (P.height - top - h) + "px " + left + "px round " + Math.min(r, h / 2) + "px)", transform: "translateY(" + dy + "px)" },
+      { clipPath: "inset(0px 0px 0px 0px round " + r + "px)", transform: "none" },
+    ];
   }
-  function leave(el) {
-    return run(el, [{ transform: "none" }, { transform: "scale(0.96)" }], "control", [1, 0, 160]);
+  const popFrom = (el, anchor) => one(el, popFrames(el, anchor), "control", true);
+  const popInto = (el, anchor) => one(el, back(popFrames(el, anchor)), "control", false);
+
+  // Bars and toasts come in past the screen's edge they sit nearest and
+  // leave the same way.
+  function past(el, edge) {
+    const r = box(el);
+    if (edge === "top") return "translateY(" + -Math.ceil(r.bottom + 8) + "px)";
+    if (edge === "left") return "translateX(" + -Math.ceil(r.right + 8) + "px)";
+    if (edge === "right") return "translateX(" + Math.ceil(innerWidth - r.left + 8) + "px)";
+    return "translateY(" + Math.ceil(innerHeight - r.top + 8) + "px)";
   }
-  // Collections or Clips opening alone, and back (0.30.8): the library
-  // fades through, Material's fade through. What was there fades out at
-  // once, the new part is drawn while nothing shows, then fades in as it
-  // grows from just under full size.
-  function through(el, change) {
-    if (!el || !el.animate) { change(); return Promise.resolve(); }
-    return run(el, null, "control", [1, 0, reduced() ? 60 : 90]).then(() => {
-      el.style.opacity = "0";
-      change();
-      el.style.opacity = "";
-      return run(el, [{ transform: "scale(0.96)" }, { transform: "none" }], "sheet", [0, 1, 210]);
-    });
+  const edgeIn = (el, edge = "bottom") => one(el, [{ transform: past(el, edge) }, { transform: "none" }], "sheet", true);
+  const edgeOut = (el, edge = "bottom") => one(el, [{ transform: "none" }, { transform: past(el, edge) }], "sheet", false);
+
+  // Something new in a list grows from nothing where it lands; something
+  // removed shrinks to nothing (1.11.0). Its neighbours slide (flip).
+  const appear = (el) => one(el, [{ transform: "scale(0)" }, { transform: "none" }], "sheet", true);
+  const vanish = (el) => one(el, [{ transform: "none" }, { transform: "scale(0)" }], "control", false);
+
+  // Where things are now, then each one that moved slides from there to
+  // where it is after a change: the library's sections as Collections or
+  // Clips opens on its own, cards making room or closing a gap.
+  function measure(els) {
+    const m = new Map();
+    for (const el of els) { const r = box(el); if (r.width || r.height) m.set(el, r); }
+    return m;
+  }
+  function flip(before, enter) {
+    const runs = [];
+    for (const [el, r] of before) {
+      if (!el.isConnected) continue;
+      const a = box(el), dx = r.left - a.left, dy = r.top - a.top;
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
+      if ((a.bottom < 0 && r.bottom < 0) || (a.top > innerHeight && r.top > innerHeight)) continue;
+      runs.push([el, [{ transform: "translate(" + dx + "px, " + dy + "px)" }, { transform: "none" }]]);
+    }
+    for (const [el, frames] of enter || []) runs.push([el, frames]);
+    return run(runs, "sheet", null);
+  }
+  // What leaves in a flip: a copy of it, fixed where it was, goes past
+  // the top or bottom edge (or the left one) and is removed.
+  function ghostOut(el, r, edge, layer) {
+    const g = el.cloneNode(true);
+    g.removeAttribute("id");
+    g.setAttribute("aria-hidden", "true");
+    g.inert = true;
+    Object.assign(g.style, { position: "fixed", left: r.left + "px", top: r.top + "px", width: r.width + "px", height: r.height + "px", margin: "0", pointerEvents: "none", zIndex: "1", boxSizing: "border-box" });
+    (layer || document.body).appendChild(g);
+    const to = edge === "top" ? "translateY(" + -Math.ceil(r.bottom + 8) + "px)" : edge === "left" ? "translateX(" + -Math.ceil(r.right + 8) + "px)" : "translateY(" + Math.ceil(innerHeight - r.top + 8) + "px)";
+    return one(g, [{ transform: "none" }, { transform: to }], "sheet", false).finally(() => g.remove());
+  }
+  function fromPast(r, edge) {
+    if (edge === "top") return "translateY(" + -Math.ceil(r.bottom + 8) + "px)";
+    if (edge === "left") return "translateX(" + -Math.ceil(r.right + 8) + "px)";
+    return "translateY(" + Math.ceil(innerHeight - r.top + 8) + "px)";
+  }
+
+  // The reader going on to the next page of a collection (0.30.3, sideways
+  // since 1.11.0): the page read leaves past the left edge and the next
+  // comes in from the right, as pages turn.
+  function pageOut(el, dir = 1) {
+    return one(el, [{ transform: "none" }, { transform: "translateX(" + (dir > 0 ? -100 : 100) + "%)" }], "control", false)
+      .then(() => { el.style.visibility = "hidden"; });
+  }
+  function pageIn(el, dir = 1) {
+    el.style.visibility = "";
+    return one(el, [{ transform: "translateX(" + (dir > 0 ? 100 : -100) + "%)" }, { transform: "none" }], "sheet", true);
   }
 
   // The spring as CSS custom properties, for transitions styles.css owns
-  // (button presses, the progress bar, the theme cross-fade).
-  const root = document.documentElement.style;
-  root.setProperty("--spring-sheet", hasLinear ? SPRINGS.sheet.curve : FALLBACK);
-  root.setProperty("--spring-sheet-ms", SPRINGS.sheet.ms + "ms");
-  root.setProperty("--spring-control", hasLinear ? SPRINGS.control.curve : FALLBACK);
-  root.setProperty("--spring-control-ms", SPRINGS.control.ms + "ms");
-  root.setProperty("--fade-in", FADE_IN);
+  // (button presses, the progress bar, switches); they follow the tier.
+  function paintVars() {
+    const set = desk() ? DESK : TOUCH, root = document.documentElement.style;
+    root.setProperty("--spring-sheet", hasLinear ? set.sheet.curve : FALLBACK);
+    root.setProperty("--spring-sheet-ms", set.sheet.ms + "ms");
+    root.setProperty("--spring-control", hasLinear ? set.control.curve : FALLBACK);
+    root.setProperty("--spring-control-ms", set.control.ms + "ms");
+  }
+  paintVars();
+  deskQ.addEventListener("change", paintVars);
 
   window.Waypage = window.Waypage || {};
-  window.Waypage.motion = { busy, timing, pushIn, popOut, rise, sink, slideIn, slideOut, slideBack, pageOut, pageIn, zoomIn, zoomOut, arrive, leave, through, reduced, FADE_IN };
+  window.Waypage.motion = {
+    busy, timing, reduced, desk, push, pop, grow, shrink, rise, sink, settle, dim, slideIn, slideOut, slideBack,
+    popFrom, popInto, edgeIn, edgeOut, appear, vanish, measure, flip, ghostOut, fromPast, pageOut, pageIn, sideDrift,
+  };
 })();

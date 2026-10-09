@@ -101,40 +101,39 @@ and the page shows above it.
 - Depth comes from `--line` borders and grounds, not shadows. One soft
   shadow is allowed on sheets that float over content (Target).
 
-## 4. Motion (Target)
+## 4. Motion (Now, 1.11.0, `src/motion.js`)
 
-- Springs, not durations: stiffness 400, damping 32 for sheets and cards;
-  stiffness 600, damping 40 for small controls. Motion's plain-JS
-  `animate()` if a library is ever added; CSS `linear()` spring curves
-  until then.
-- Nothing animates text the reader is reading.
-- `prefers-reduced-motion: reduce`: springs become a 120 ms opacity fade.
-  Fades are only that answer: with motion on, nothing fades in or out on
-  its own (1.10.1).
-- Only `transform` and `opacity` move, so the GPU runs every animation.
-  Focus can follow an animation's first frame; `inert` on the library
-  (which restyles every card) waits until the spring has all but landed,
-  300 ms (0.30.8).
-- Movement springs; opacity never does (0.30.8). A spring is most of the
-  way there in its first fifth, so a fade on it reads as a cut. Fades run
-  beside the movement on their own clock: fading in 200–240 ms on
-  `cubic-bezier(0.2, 0, 0.2, 1)` (`--fade-in`), fading out 160–220 ms
-  on `cubic-bezier(0.4, 0, 1, 1)`.
-- Screens come in from 72 px (or 18% of a narrow window) to the right as
-  they fade in, and leave the same way, Material's shared axis. A clip or
-  collection opened from its card grows out of the card to fill the
-  window as it fades in, and on Back shrinks into the card, fading once
-  it is nearly there (0.30.3, back in 0.30.8 after a 0.86 scale-up from
-  the card's centre in 0.30.5 read worse).
-- Collections or Clips opening alone, and back, fade through: the
-  library fades out in 90 ms, the new part is drawn while nothing shows,
-  then fades in as it grows from 0.96 (0.30.8). The view transition
-  before it (0.30.6) held the screen still while it took its pictures and
-  laid out every frame on the main thread.
-- The sidebar follows a drag to the left; past a third of its width or
-  a flick it closes from there, short of that it springs back (0.30.5).
-- The reader's page turn: the page read lifts 6% and fades (control
-  spring), the next comes up from 28% below (sheet spring) (0.30.3).
+- Springs, not durations, sampled into CSS `linear()`. Two tiers:
+  - Touch (phone and tablet): stiffness 400, damping 32 for sheets,
+    screens and cards; stiffness 600, damping 40 for small controls.
+  - Desktop (`(min-width: 1024px) and (pointer: fine)`): critically
+    damped, stiffness 700 and 1000, so nothing overshoots, and no press
+    dip on buttons.
+- Nothing fades. Things grow, shrink, slide or leave past an edge. The
+  only fade is the reduced-motion answer: a 120 ms opacity change, or no
+  animation at all for something going away.
+- Grow from what was tapped, shrink back into it. A clip or collection
+  opened from its card, tile or Continue panel: a shaded panel the size
+  of the card grows to fill the window and the screen is clipped inside
+  it (clip-path, so text is never scaled). Back shrinks it into the card.
+  The reader's title is inside its frame, so it doesn't morph.
+- Screens with no card behind them (Settings, a pane) come in from the
+  right; on touch the screen under them drifts 25% left. Downloads and
+  dialogs grow from their button. Menus and popovers grow from their
+  button, ⋯ or the point pressed.
+- Collections › and Clips ›: the cards and tiles that stay move to their
+  new places (FLIP); the sections that go leave past the top or bottom
+  edge, new ones come in from there. Adding or removing a few clips
+  slides the list, and the card grows in or shrinks away.
+- Touch follows the finger. Sheets drag down to close (past a third or a
+  flick), the sidebar drags left with the library drifting beside it,
+  and in Pages the page follows the finger and springs to the next or
+  back.
+- Toasts and bars come in from their nearest edge and leave the same
+  way. The brightness slider slides past the left edge. Checkmarks grow.
+- The picture viewer grows from the picture and shrinks back into it.
+- Only `transform`, `clip-path` and the panel's box move. `inert` on the
+  library waits until the spring has all but landed (0.30.8).
 
 ## 5. Components
 

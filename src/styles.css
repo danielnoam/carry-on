@@ -495,12 +495,13 @@ html.native .screen-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top
 .choice-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 .choice-label { font-weight: 500; }
 .choice-note { font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--muted); }
+/* The check grows in from nothing and shrinks away (1.11.0). */
 .choice-check {
   display: inline-flex; color: var(--accent);
-  opacity: 0; transform: scale(0.6);
+  transform: scale(0);
   transition: transform var(--spring-control-ms, 300ms) var(--spring-control, ease-out);
 }
-.choice input:checked ~ .choice-check { opacity: 1; transform: none; }
+.choice input:checked ~ .choice-check { transform: none; }
 .row-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-value { flex-shrink: 0; color: var(--muted); font-size: var(--fs-meta); }
 /* A row with a Stop (×) at its end: the watched folders (1.4.0). */
@@ -643,7 +644,7 @@ html.native .reader::before {
   display: flex; flex-direction: column;
   color: var(--on-video);
 }
-.viewer::before { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--viewer); }
+.viewer::before { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--viewer); opacity: var(--dim, 1); }
 .viewer[hidden] { display: none; }
 .viewer-stage {
   flex: 1; min-height: 0; position: relative; overflow: hidden;
@@ -682,7 +683,7 @@ html.native .reader::before {
 }
 .read-section { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .read-left span:last-child { flex-shrink: 0; }
-.reader.bar-away .read-left { transform: translateY(100%); opacity: 0; }
+.reader.bar-away .read-left { transform: translateY(100%); }
 /* Brightness while reading (1.10.0): a slider on the left of the text,
    shown with the bars and while the left edge is swiped. */
 .bright {
@@ -697,8 +698,9 @@ html.native .reader::before {
   color: var(--muted);
 }
 .bright[hidden] { display: none; }
+/* Away, it's past the screen's left edge (1.11.0), and slides back in. */
 .reader.bar-away:not(.brightening) .bright,
-.reader:has(.sheet:not([hidden])) .bright { opacity: 0; transform: translate(-12px, -50%); pointer-events: none; }
+.reader:has(.sheet:not([hidden])) .bright { transform: translate(calc(-100% - var(--frame-left, 0px) - var(--s-4) - 16px), -50%); pointer-events: none; }
 .bright-track {
   position: relative; width: 44px; height: min(40vh, 280px);
   border-radius: var(--r-md); overflow: hidden;
@@ -949,12 +951,21 @@ html { -webkit-tap-highlight-color: transparent; }
 :is(.card, .tile, .tile-btn, .btn-primary, .btn-small, .btn-quiet, .icon-btn, .step-btn, .chip, .sheet-row,
 .select-act, .btn-text, .dropdown-btn):active:not(:disabled) { transform: scale(0.97); }
 .card.saving:active { transform: none; background-image: none; }
-@media (prefers-reduced-motion: reduce) {
+/* A mouse click gets the tint and no dip (1.11.0): the dip is for a
+   finger, which covers what it presses. */
+@media (prefers-reduced-motion: reduce), (hover: hover) and (pointer: fine) {
   :is(.card, .tile, .tile-btn, .btn-primary, .btn-small, .btn-quiet, .icon-btn, .step-btn, .chip, .sheet-row,
   .select-act, .btn-text, .dropdown-btn):active { transform: none; }
 }
 
-::view-transition-old(root), ::view-transition-new(root) { animation-duration: 260ms; }
+/* The shadow of a panel growing into a screen (motion.js grow, 1.11.0):
+   the screen shows through a clip the panel's size, and this draws the
+   panel's edge and shadow around it. */
+.grow-shade {
+  position: fixed; pointer-events: none;
+  box-shadow: 0 0 0 1px var(--line), 0 16px 48px var(--shadow);
+}
+.grow-shade[hidden] { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 1ms !important; animation-duration: 1ms !important; }

@@ -1,7 +1,7 @@
 // Waypage: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "1.10.2";
+  const APP_VERSION = "1.11.0";
   window.Waypage.version = APP_VERSION;
 
   const C = window.Waypage;
@@ -79,10 +79,10 @@
     if (act) t.replaceChildren(el("span", {}, text), el("button", { class: "toast-act", type: "button", onclick: () => { t.hidden = true; onAct(); } }, act));
     else t.textContent = text;
     t.hidden = false;
-    if (wasHidden) M.arrive(t, 16);
+    if (wasHidden) M.edgeIn(t);
     clearTimeout(toastTimer);
     const shown = text;
-    toastTimer = setTimeout(() => { M.leave(t).then(() => { if (t.textContent === shown || (act && t.firstChild && t.firstChild.textContent === shown)) t.hidden = true; }); }, act ? 8000 : 3200);
+    toastTimer = setTimeout(() => { M.edgeOut(t).then(() => { if (t.textContent === shown || (act && t.firstChild && t.firstChild.textContent === shown)) t.hidden = true; }); }, act ? 8000 : 3200);
   }
 
   // ---- Theme ----
@@ -111,13 +111,12 @@
     if (C.reader) C.reader.applyTheme();
   }
 
-  // A cross-fade between the old and new colours where the WebView can
-  // (View Transitions), an instant switch where it can't.
+  // A new theme is there at once (1.11.0): the cross-fade it had was a
+  // fade, and nothing fades now.
   function setTheme(choice) {
     state.theme = choice;
     store(THEME_KEY, choice);
-    if (document.startViewTransition && !M.reduced()) document.startViewTransition(() => paintTheme(choice));
-    else paintTheme(choice);
+    paintTheme(choice);
   }
 
   const state = {
@@ -589,7 +588,7 @@
     root.replaceChildren(...nodes);
     for (const s of going) updateSavingCard(s);
     for (const r of runs) updateRunCard(r);
-    if (state.downloads) fresh.forEach((node) => M.arrive(node));
+    if (state.downloads) fresh.forEach((node) => M.appear(node));
     paintDownloads();
   }
 
@@ -1002,7 +1001,7 @@
       m.style.pointerEvents = "none";
       btn.setAttribute("aria-expanded", "false");
       document.removeEventListener("pointerdown", outside, true);
-      M.leave(m).then(() => m.remove());
+      M.popInto(m, btn.getBoundingClientRect()).then(() => m.remove());
       if (focus) btn.focus();
     }
     // In a sheet or other scrolling box (0.34.1), a menu fits inside it:
@@ -1043,8 +1042,8 @@
       });
       wrap.append(menu);
       btn.setAttribute("aria-expanded", "true");
-      const up = fit(menu);
-      M.arrive(menu, up ? 6 : -6);
+      fit(menu);
+      M.popFrom(menu, btn.getBoundingClientRect());
       document.addEventListener("pointerdown", outside, true);
       (items.find((b) => b.getAttribute("aria-selected") === "true") || items[0]).focus({ preventScroll: true });
     }
@@ -1065,16 +1064,63 @@
     if (!fromHistory) history.pushState({ view: "part", part }, "");
     changePart(part);
   }
-  // Collections or Clips opening alone, and back: the library fades
-  // through (0.30.8). The view transition before it froze the screen to
-  // take its pictures, then laid the page out again every frame.
-  let parting = 0;
+  // Collections or Clips opening alone, and back (1.11.0): the section
+  // grows into the whole view. What stays (the collections, the clips)
+  // slides from where it was to where it lands; what goes leaves past the
+  // top or bottom edge, whichever side of the section it was on, and
+  // what's new comes in from that side.
+  let flipping = false;
   function changePart(part) {
-    const n = ++parting;
-    M.through($("library"), () => {
-      if (n !== parting) return;
-      state.part = part; renderLibrary(); if (part) scrollTo(0, 0);
-    });
+    const before = libSnap();
+    flipping = true;
+    try { state.part = part; renderLibrary(); if (part) scrollTo(0, 0); } finally { flipping = false; }
+    libFlip(before);
+  }
+  // The cards, tiles and section heads on screen now, by what they show.
+  function libSnap() {
+    const m = new Map();
+    if ($("libraryView").inert || $("libraryView").hidden) return m;
+    const all = $("library").querySelectorAll(".card, .tile, .section-head");
+    for (let i = 0; i < all.length && m.size < 120; i++) {
+      const n = all[i], id = n.dataset.name ? "f:" + n.dataset.name : n.dataset.ids ? "p:" + n.dataset.ids : "h:" + n.textContent;
+      if (m.has(id)) continue;
+      const r = n.getBoundingClientRect();
+      if (!r.width || r.bottom < 0 || r.top > innerHeight) continue;
+      m.set(id, { n, r });
+    }
+    return m;
+  }
+  // small: a card or two arrived or left, which grow in and shrink away
+  // where they are; otherwise they come and go past the screen's edges.
+  function libFlip(before, small) {
+    if (!before.size || M.reduced()) return;
+    const after = libSnap(), moved = new Map(), enter = [];
+    let y = null;
+    for (const [id, a] of after) {
+      const b = before.get(id);
+      if (b) { moved.set(a.n, b.r); if (y == null) y = a.r.top; }
+    }
+    if (y == null) y = innerHeight / 2;
+    for (const [id, a] of after) {
+      if (before.has(id)) continue;
+      if (small) M.appear(a.n);
+      else enter.push([a.n, [{ transform: M.fromPast(a.r, a.r.top < y ? "top" : "bottom") }, { transform: "none" }]]);
+    }
+    M.flip(moved, enter);
+    for (const [id, b] of before) {
+      if (after.has(id)) continue;
+      if (small) { const g = ghost(b.n, b.r); M.vanish(g).finally(() => g.remove()); }
+      else M.ghostOut(b.n, b.r, b.r.top < y ? "top" : "bottom");
+    }
+  }
+  function ghost(n, r) {
+    const g = n.cloneNode(true);
+    g.removeAttribute("id");
+    g.setAttribute("aria-hidden", "true");
+    g.inert = true;
+    Object.assign(g.style, { position: "fixed", left: r.left + "px", top: r.top + "px", width: r.width + "px", height: r.height + "px", margin: "0", pointerEvents: "none", zIndex: "1", boxSizing: "border-box" });
+    document.body.appendChild(g);
+    return g;
   }
 
   // The page to carry on with: the one read last that isn't finished.
@@ -1151,6 +1197,7 @@
   // places and the empty library's way back (1.1.0) offer.
   let androidSdk = 0;
   function renderLibrary() {
+    const before = flipping || firstRender ? null : libSnap();
     const root = $("library");
     const old = new Map([...root.querySelectorAll(":scope > [data-key]")].map((n) => [n.dataset.key, n]));
     const n = state.pages.length;
@@ -1298,10 +1345,11 @@
     const wanted = new Set(nodes);
     for (const c of [...root.children]) if (!wanted.has(c)) c.remove();
     nodes.forEach((node, i) => { if (root.children[i] !== node) root.insertBefore(node, root.children[i] || null); });
-    // A card or two arriving springs in; a whole new list (Collections or
-    // Clips alone, a filter) comes in with the library's fade instead, as
-    // two hundred animations at once dropped it to a few frames a second.
-    if (!firstRender && fresh.length <= 6) fresh.forEach((node) => M.arrive(node));
+    // A card or two arriving grows in and the cards around it slide to
+    // make room (1.11.0); a whole new list (a filter, a search) is just
+    // drawn, as two hundred animations at once dropped it to a few frames
+    // a second.
+    if (before && fresh.length <= 6 && old.size - (nodes.length - fresh.length) <= 6) libFlip(before, true);
     if (more && !moreTimer) moreTimer = setTimeout(() => { moreTimer = 0; drawUpTo += NEXT_SCREENS; renderLibrary(); }, 0);
     else if (loaded && firstRender) { firstRender = false; warmPdf(); }
     paintPicks();
@@ -1610,20 +1658,21 @@
   // leave the screen underneath inert, taking no taps.
   const pushes = new WeakMap();
 
-  // The card just tapped in the library, so the screen it opens grows out
-  // of it. Opening a page reads its file first, hence the second's grace.
+  // The panel just tapped (a card, a collection, Continue reading, a
+  // collection's Continue button), so the screen it opens grows out of
+  // it. Opening a page reads its file first, hence the second's grace.
   let tapped = null;
   const zoomed = new WeakMap();
   document.addEventListener("click", (e) => {
-    const open = e.target.closest && e.target.closest(".card-open");
-    const card = open && open.closest(".card, .tile");
-    tapped = card ? { rect: card.getBoundingClientRect(), at: Date.now() } : null;
+    const t = e.target.closest && e.target.closest(".card-open, .folder-go, .post-open");
+    const panel = t && (t.classList.contains("folder-go") ? t : t.closest(".card, .tile, .post"));
+    tapped = panel ? { rect: panel.getBoundingClientRect(), radius: parseFloat(getComputedStyle(panel).borderTopLeftRadius) || 0, at: Date.now() } : null;
   }, true);
   function zoomFrom(screen) {
     const t = tapped;
     tapped = null;
     if (!t || Date.now() - t.at > 1500 || (screen.id !== "readerView" && screen.id !== "folderView")) return null;
-    return t.rect;
+    return t;
   }
 
   // On a big screen (1.5.0) Save with options opens as a dialog and
@@ -1631,6 +1680,9 @@
   // it; a post opened from Feeds at 1280 px reads in a pane beside them.
   const DIALOGS = { batchView: "dialog", downloadsView: "panel" };
   const asDialog = (screen) => (wide.matches && DIALOGS[screen.id]) || "";
+  // The button a dialog or panel grows out of (1.11.0).
+  const ANCHORS = { batchView: "severalBtn", downloadsView: "downloadsBtn" };
+  const anchorOf = (screen) => { const b = ANCHORS[screen.id] && $(ANCHORS[screen.id]); return b && b.offsetParent ? b : null; };
   const asPane = (screen) => screen.id === "readerView" && pinned.matches && innerWidth >= 1280 && state.place !== "library" && !state.folder;
 
   function pushScreen(screen) {
@@ -1638,7 +1690,7 @@
     if (screen.id === "sectionView" && wide.matches) {
       screen.dataset.beside = "1";
       screen.hidden = false;
-      return M.arrive(screen, 0);
+      return M.push(screen);
     }
     delete screen.dataset.beside;
     const dialog = asDialog(screen);
@@ -1650,13 +1702,15 @@
         const c = $("screenCatch");
         c.classList.toggle("clear", dialog === "panel");
         c.hidden = false;
-        M.arrive(c, 0);
+        M.dim(c, true);
         const n = pushes.get(screen);
         afterSettle(() => { if (pushes.get(screen) === n && !screen.hidden && !screen.dataset.leaving) below(screen).inert = true; });
       } else screen.dataset.pane = "1";
       screen.hidden = false;
       showAloudBar();
-      return again ? Promise.resolve() : M.arrive(screen, dialog === "panel" ? -8 : dialog ? 16 : 0);
+      if (again) return Promise.resolve();
+      const from = dialog && anchorOf(screen);
+      return dialog ? M.popFrom(screen, from && from.getBoundingClientRect()) : M.push(screen);
     }
     delete screen.dataset.dialog;
     delete screen.dataset.pane;
@@ -1666,7 +1720,7 @@
     showAloudBar();
     const from = zoomFrom(screen);
     if (from) zoomed.set(screen, from); else zoomed.delete(screen);
-    const moved = from ? M.zoomIn(screen, from) : M.pushIn(screen);
+    const moved = from ? M.grow(screen, from.rect, from.radius) : M.push(screen, under);
     // The screen underneath goes inert once this one covers it: in a big
     // library that restyles every card, which held the push's first frame
     // back by a tenth of a second on a phone (0.30.4).
@@ -1684,21 +1738,23 @@
   function popScreen(screen) {
     const n = pushes.get(screen);
     const hide = () => { if (pushes.get(screen) === n) screen.hidden = true; };
-    if (screen.dataset.beside) return M.leave(screen).then(hide);
+    if (screen.dataset.beside) return M.pop(screen).then(hide);
     if (screen.dataset.dialog || screen.dataset.pane) {
       screen.dataset.leaving = "1";
       if (screen.dataset.dialog) {
         const c = $("screenCatch"), under = below(screen);
-        M.leave(c).then(() => { if (screen.dataset.leaving) c.hidden = true; });
+        M.dim(c, false).then(() => { if (screen.dataset.leaving) c.hidden = true; });
         afterSettle(() => { if (pushes.get(screen) === n) under.inert = false; });
       }
-      return M.leave(screen).then(hide).then(() => showAloudBar());
+      const to = screen.dataset.dialog && anchorOf(screen);
+      return (screen.dataset.dialog ? M.popInto(screen, to && to.getBoundingClientRect()) : M.pop(screen)).then(hide).then(() => showAloudBar());
     }
     const under = below(screen);
     screen.dataset.leaving = "1";
     const from = zoomed.get(screen);
     zoomed.delete(screen);
-    const moved = from ? M.zoomOut(screen, from) : M.popOut(screen);
+    // Back shrinks it into the panel it grew from, where that panel is now.
+    const moved = from ? M.shrink(screen, from.rect, from.radius) : M.pop(screen, under);
     afterSettle(() => { if (pushes.get(screen) === n) under.inert = false; });
     return moved.then(hide).then(() => showAloudBar());
   }
@@ -2579,7 +2635,7 @@
       if (!bar.hidden && !bar.dataset.leaving) {
         bar.dataset.leaving = "1";
         document.body.classList.remove("aloud-bar-up", "aloud-docked");
-        M.leave(bar).then(() => { if (bar.dataset.leaving) { bar.hidden = true; delete bar.dataset.leaving; } });
+        M.edgeOut(bar, nearEdge(bar)).then(() => { if (bar.dataset.leaving) { bar.hidden = true; delete bar.dataset.leaving; } });
       }
       return;
     }
@@ -2591,8 +2647,16 @@
     $("aloudBarPlay").setAttribute("aria-label", aloud.state === "paused" ? "Play" : "Pause");
     $("aloudBarNext").hidden = !ended;
     document.body.classList.add("aloud-bar-up");
-    if (bar.hidden || bar.dataset.leaving) { delete bar.dataset.leaving; bar.hidden = false; M.arrive(bar, 16); }
+    const coming = bar.hidden || bar.dataset.leaving;
+    if (coming) { delete bar.dataset.leaving; bar.hidden = false; }
     placeAloudBar();
+    if (coming) M.edgeIn(bar, nearEdge(bar));
+  }
+
+  // Which edge of the screen a floating bar is nearer, to come and go by.
+  function nearEdge(el) {
+    const r = el.getBoundingClientRect();
+    return r.top + r.height / 2 < innerHeight / 2 ? "top" : "bottom";
   }
 
   // Where the bar sits (1.4.1): a compact card you can drag anywhere. It
@@ -2956,7 +3020,7 @@
       sheet.style.top = at.bottom - box.top + 4 + "px";
       sheet.style.left = left ? Math.max(8, at.left - box.left) + "px" : "";
       sheet.style.right = left ? "" : Math.max(8, box.right - at.right) + "px";
-      M.arrive(sheet, -8);
+      M.popFrom(sheet, at);
     } else {
       delete sheet.dataset.pop;
       sheet.style.top = sheet.style.left = sheet.style.right = "";
@@ -2975,8 +3039,56 @@
     $("sheetCatch").hidden = true;
     const sheet = $("readingSheet");
     if (now) { sheet.hidden = true; return; }
-    (sheet.dataset.pop ? M.leave(sheet) : M.sink(sheet)).then(() => { if (!state.sheet) sheet.hidden = true; });
+    (sheet.dataset.pop ? M.popInto(sheet, button.getBoundingClientRect()) : M.sink(sheet, sheetDrop(sheet))).then(() => { if (!state.sheet) sheet.hidden = true; delete sheet.dataset.drop; });
     afterStart(() => button.focus({ preventScroll: true }));
+  }
+
+  // A sheet from the bottom drags down to close (1.11.0, touch only): it
+  // follows the finger, the dimming behind it follows the sheet, and let
+  // go past a third of its height, or with a flick, it goes; otherwise it
+  // springs back. A drag that starts in a list scrolled down scrolls it.
+  const sheetDrop = (sheet) => +(sheet.dataset.drop || 0);
+  function dragToClose(sheet, catcher, canDrag, close) {
+    let d = null;
+    sheet.addEventListener("touchstart", (e) => {
+      d = null;
+      if (e.touches.length !== 1 || !canDrag() || M.reduced()) return;
+      if (e.target.closest("input, textarea, select, [role=slider], .dropdown-menu")) return;
+      let scroller = null;
+      for (let n = e.target; n && n !== sheet; n = n.parentElement) if (n.scrollHeight > n.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(n).overflowY)) { scroller = n; break; }
+      const t = e.touches[0];
+      d = { x: t.clientX, y: t.clientY, on: false, dy: 0, scroller, last: [{ y: t.clientY, t: e.timeStamp }] };
+    }, { passive: true });
+    sheet.addEventListener("touchmove", (e) => {
+      if (!d) return;
+      const t = e.touches[0], dy = t.clientY - d.y, dx = t.clientX - d.x;
+      if (!d.on) {
+        if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) { d = null; return; }
+        if (dy < 8) { if (dy < -8) d = null; return; }
+        if (d.scroller && d.scroller.scrollTop > 0) { d = null; return; }
+        d.on = true;
+        d.h = sheet.offsetHeight;
+        sheet.getAnimations().forEach((a) => a.cancel());
+      }
+      e.preventDefault();
+      d.dy = Math.max(0, dy);
+      sheet.style.transform = "translateY(" + d.dy + "px)";
+      if (catcher) catcher.style.opacity = String(Math.max(0, 1 - d.dy / d.h));
+      d.last.push({ y: t.clientY, t: e.timeStamp });
+      if (d.last.length > 5) d.last.shift();
+    }, { passive: false });
+    const end = () => {
+      if (!d || !d.on) { d = null; return; }
+      const a = d.last[0], b = d.last[d.last.length - 1], v = (b.y - a.y) / Math.max(1, b.t - a.t);
+      const dy = d.dy;
+      d = null;
+      sheet.style.transform = "";
+      if (dy > sheet.offsetHeight / 3 || v > 0.5) { sheet.dataset.drop = dy; close(); return; }
+      M.settle(sheet, dy);
+      if (catcher) M.dim(catcher, true);
+    };
+    sheet.addEventListener("touchend", end);
+    sheet.addEventListener("touchcancel", end);
   }
 
   // ---- Image viewer ----
@@ -2998,19 +3110,26 @@
     viewer.hidden = false;
     $("readerView").classList.remove("bar-away");
     afterStart(() => { if (state.image) $("viewerClose").focus({ preventScroll: true }); });
+    V.from = info.rect;
     const grow = () => {
-      if (M.reduced() || !info.rect.width) return M.arrive(viewer, 0);
-      const r = img.getBoundingClientRect();
-      if (!r.width) return M.arrive(viewer, 0);
-      const k = info.rect.width / r.width;
-      const dx = info.rect.left + info.rect.width / 2 - (r.left + r.width / 2);
-      const dy = info.rect.top + info.rect.height / 2 - (r.top + r.height / 2);
+      const small = imageSpot(info.rect);
+      if (M.reduced() || !small) return M.appear(viewer);
+      // The backdrop darkens with the picture's growing, on its spring.
       const t = M.timing("sheet");
-      // Its backdrop fades: opacity on a pseudo-element, which the GPU runs.
-      viewer.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 240, easing: M.FADE_IN, pseudoElement: "::before" });
-      img.animate([{ transform: "translate(" + dx + "px," + dy + "px) scale(" + k + ")" }, { transform: "none" }], t);
+      viewer.animate([{ opacity: 0 }, { opacity: 1 }], { ...t, pseudoElement: "::before" });
+      img.animate([{ transform: small }, { transform: "none" }], t);
     };
     if (img.complete && img.naturalWidth) grow(); else img.addEventListener("load", grow, { once: true });
+  }
+
+  // Where the viewer's picture would sit to cover the one in the page.
+  function imageSpot(rect) {
+    const r = $("viewerImg").getBoundingClientRect();
+    if (!rect || !rect.width || !r.width) return null;
+    const k = rect.width / r.width;
+    const dx = rect.left + rect.width / 2 - (r.left + r.width / 2);
+    const dy = rect.top + rect.height / 2 - (r.top + r.height / 2);
+    return "translate(" + dx + "px," + dy + "px) scale(" + k + ")";
   }
 
   function viewImage(info) {
@@ -3036,7 +3155,7 @@
     if (to < 0 || to >= V.list.length) return;
     V.at = to;
     viewImage(C.reader.imageInfo(V.list[to]));
-    M.arrive($("viewerImg"), 0);
+    M.edgeIn($("viewerImg"), d > 0 ? "right" : "left");
   }
   function zoomStep(d) {
     const r = $("viewerStage").getBoundingClientRect();
@@ -3047,8 +3166,19 @@
   function closeImage() {
     if (!state.image) return;
     state.image = false;
-    const viewer = $("imageViewer");
-    M.leave(viewer).then(() => {
+    const viewer = $("imageViewer"), img = $("viewerImg");
+    // It shrinks back into the picture in the page, from wherever a drag
+    // or a zoom left it (1.11.0).
+    const now = V.list && V.at >= 0 && V.list[V.at] && V.list[V.at].isConnected ? C.reader.imageInfo(V.list[V.at]).rect : V.from;
+    const small = M.reduced() ? null : (img.style.transform = "", imageSpot(now));
+    const at = "translate(" + V.x + "px," + (V.y + V.drag) + "px) scale(" + V.s + ")";
+    const gone = small
+      ? Promise.all([img.animate([{ transform: at }, { transform: small }], { ...M.timing("sheet"), fill: "forwards" }).finished,
+        viewer.animate([{ opacity: viewer.style.getPropertyValue("--dim") || 1 }, { opacity: 0 }], { ...M.timing("sheet"), pseudoElement: "::before", fill: "forwards" }).finished]).catch(() => {})
+      : M.vanish(viewer);
+    gone.then(() => {
+      img.getAnimations().forEach((a) => a.cancel());
+      viewer.getAnimations({ subtree: true }).forEach((a) => a.cancel());
       if (state.image) return;
       viewer.hidden = true;
       $("viewerImg").removeAttribute("src");
@@ -3063,7 +3193,8 @@
     img.style.transform = "translate(" + V.x + "px," + (V.y + V.drag) + "px) scale(" + V.s + ")";
     $("imageViewer").classList.toggle("zoomed", V.s > 1);
     const fade = V.s === 1 ? Math.max(0.3, 1 - Math.abs(V.drag) / 400) : 1;
-    $("imageViewer").style.backgroundColor = fade < 1 ? "rgb(11 13 16 / " + fade + ")" : "";
+    // The backdrop lightens as a drag down takes the picture away.
+    if (fade < 1) $("imageViewer").style.setProperty("--dim", fade); else $("imageViewer").style.removeProperty("--dim");
   }
   function resetView(settle) {
     V.s = 1; V.x = 0; V.y = 0; V.drag = 0;
@@ -3295,7 +3426,7 @@
     const thumb = cover || (withThumb ? thumbUrl(withThumb) : null);
     const fresh = freshCount(name);
     const fav = list.some((p) => p.folderFav);
-    const tile = el("div", { class: "tile", role: "listitem", "data-ids": list.map((p) => p.id).join(",") },
+    const tile = el("div", { class: "tile", role: "listitem", "data-ids": list.map((p) => p.id).join(","), "data-name": name },
       el("button", { class: "card-open", type: "button", "aria-label": name + (fav ? ", favourite" : "") + ", collection, " + list.length + " clips, " + done + " read" + (fresh ? ", " + newCountText(fresh) + " chapters" : ""),
         onclick: () => tapPages(list.map((p) => p.id), () => openFolder(name)) }),
       pickMark(),
@@ -3703,7 +3834,7 @@
     pop.style.right = Math.max(8, innerWidth - at.right) + "px";
     $("folderView").append(pop);
     more.setAttribute("aria-expanded", "true");
-    M.arrive(pop, -8);
+    M.popFrom(pop, at);
     const items = () => [...pop.querySelectorAll(".pop-item:not(:disabled)")];
     items()[0].focus();
     pop.addEventListener("keydown", (e) => {
@@ -3729,7 +3860,7 @@
     pop.removeAttribute("id");
     pop.style.pointerEvents = "none";
     $("folderMore").setAttribute("aria-expanded", "false");
-    M.leave(pop).then(() => pop.remove());
+    M.popInto(pop, $("folderMore").getBoundingClientRect()).then(() => pop.remove());
     if (!away) $("folderMore").focus();
   }
 
@@ -4117,8 +4248,8 @@
     if (!fromHistory) history.pushState({ view: "select", folder: state.folder || undefined }, "");
     $("selectHead").hidden = false;
     $("selectBar").hidden = false;
-    M.arrive($("selectHead"), -8);
-    M.arrive($("selectBar"), 16);
+    M.edgeIn($("selectHead"), "top");
+    M.edgeIn($("selectBar"), "bottom");
     if (state.folder) renderFolder(); else renderLibrary();
     paintPicks();
     $("selectCancel").focus({ preventScroll: true });
@@ -4127,8 +4258,7 @@
   function endSelect() {
     if (!state.select) return;
     state.select = null;
-    $("selectHead").hidden = true;
-    $("selectBar").hidden = true;
+    for (const [id, edge] of [["selectHead", "top"], ["selectBar", "bottom"]]) M.edgeOut($(id), edge).then(() => { if (!state.select) $(id).hidden = true; });
     renderLibrary();
     if (state.folder) renderFolder();
   }
@@ -4227,6 +4357,7 @@
     importList: { label: "Import", build: () => importSheet() },
   };
   let menuUnder = [];
+  let menuFrom = null;
 
   function openMenu(kind, page) {
     if (state.menu || !MENUS[kind]) return;
@@ -4237,10 +4368,13 @@
     $("menuSheet").setAttribute("aria-label", MENUS[kind].label);
     $("menuCatch").hidden = false;
     $("menuSheet").hidden = false;
-    M.arrive($("menuCatch"), 0);
-    // From 700 px a sheet is a dialog in the middle (1.5.0).
+    M.dim($("menuCatch"), true);
+    // From 700 px a sheet is a dialog in the middle (1.5.0), grown out of
+    // the button that asked for it (1.11.0).
     $("menuSheet").dataset.kind = kind;
-    if (wide.matches) M.arrive($("menuSheet"), 16); else M.rise($("menuSheet"));
+    const asker = document.activeElement && document.activeElement.closest && document.activeElement.closest("button");
+    menuFrom = asker && asker.offsetParent && !$("menuSheet").contains(asker) ? asker.getBoundingClientRect() : null;
+    if (wide.matches) M.popFrom($("menuSheet"), menuFrom); else M.rise($("menuSheet"));
     const open = state.menu;
     afterSettle(() => {
       if (state.menu !== open) return;
@@ -4262,8 +4396,8 @@
     const was = menuUnder;
     menuUnder = [];
     const sheet = $("menuSheet"), catcher = $("menuCatch");
-    M.leave(catcher).then(() => { if (!state.menu) catcher.hidden = true; });
-    (wide.matches ? M.leave(sheet) : M.sink(sheet)).then(() => { if (!state.menu) sheet.hidden = true; });
+    M.dim(catcher, false).then(() => { if (!state.menu) catcher.hidden = true; });
+    (wide.matches ? M.popInto(sheet, menuFrom) : M.sink(sheet, sheetDrop(sheet))).then(() => { if (!state.menu) sheet.hidden = true; delete sheet.dataset.drop; });
     afterSettle(() => was.forEach((n) => { n.inert = false; }));
   }
 
@@ -4420,7 +4554,10 @@
     pop.style.top = Math.max(8, Math.min(y, innerHeight - h - 8)) + "px";
     node.classList.add("menu-on");
     clipMenuFor = node;
-    M.arrive(pop, -8);
+    // It grows from the point it was asked for: the ⋯ button, or where the
+    // card was pressed or right-clicked.
+    pop.from = { left: x, top: y, right: x + 1, bottom: y + 1, width: 1, height: 1 };
+    M.popFrom(pop, pop.from);
     const items = () => [...pop.querySelectorAll(".pop-item:not(:disabled)")];
     items()[0].focus({ preventScroll: true });
     pop.addEventListener("keydown", (e) => {
@@ -4451,7 +4588,7 @@
     if (!pop) return;
     pop.removeAttribute("id");
     pop.style.pointerEvents = "none";
-    M.leave(pop).then(() => pop.remove());
+    M.popInto(pop, pop.from).then(() => pop.remove());
     if (!away && node) { const b = node.querySelector("button"); if (b) b.focus({ preventScroll: true }); }
   }
 
@@ -6735,8 +6872,11 @@
     side.style.pointerEvents = "";
     $("sideCatch").hidden = false;
     side.hidden = false;
-    M.arrive($("sideCatch"), 0);
-    M.slideIn(side);
+    // The library drifts right a little under it, and stays there while
+    // it's open (1.11.0).
+    const lib = $("libraryView");
+    M.dim($("sideCatch"), true);
+    M.slideIn(side, M.reduced() ? null : lib).then(() => { if (state.side && !pinned.matches && !M.reduced()) lib.style.transform = M.sideDrift(side); });
     afterSettle(() => {
       if (!state.side) return;
       $("libraryView").inert = true;
@@ -6755,6 +6895,7 @@
       catcher.hidden = true;
       side.style.pointerEvents = "";
       $("libraryView").inert = false;
+      $("libraryView").style.transform = "";
       return;
     }
     const had = side.contains(document.activeElement);
@@ -6762,8 +6903,10 @@
     side.style.pointerEvents = "none";
     const from = sideDragged;
     sideDragged = 0;
-    M.leave(catcher).then(() => { if (!state.side) catcher.hidden = true; });
-    M.slideOut(side, from).then(() => { if (!state.side) side.hidden = true; });
+    const lib = $("libraryView");
+    lib.style.transform = "";
+    M.dim(catcher, false).then(() => { if (!state.side) catcher.hidden = true; });
+    M.slideOut(side, from, M.reduced() ? null : lib).then(() => { if (!state.side) side.hidden = true; });
     afterSettle(() => {
       if (state.side) return;
       $("libraryView").inert = false;
@@ -6952,16 +7095,16 @@
       && !state.open && !state.menu && !state.settings && !state.batch;
     const shown = (e) => filey(e) ? !state.menu : linky(e);
     let depth = 0;
-    const hide = () => { depth = 0; if (!zone.hidden && !zone.dataset.leaving) { zone.dataset.leaving = "1"; M.leave(zone).then(() => { if (zone.dataset.leaving) { zone.hidden = true; delete zone.dataset.leaving; } }); } };
+    // The zone is there while something is held over the window and gone
+    // when it leaves, with no motion: a mouse wants it at once (1.11.0).
+    const hide = () => { depth = 0; zone.hidden = true; };
     document.addEventListener("dragenter", (e) => {
       if (!shown(e)) return;
       depth++;
-      if (zone.hidden || zone.dataset.leaving) {
+      if (zone.hidden) {
         $("dropTitle").textContent = filey(e) ? "Drop to open" : state.place === "feeds" ? "Drop to follow" : "Drop to save";
         $("dropNote").textContent = filey(e) ? FILE_KINDS_LINE : state.place === "feeds" ? "Followed like an added feed" : "Saved for reading offline, like a pasted link";
-        delete zone.dataset.leaving;
         zone.hidden = false;
-        M.arrive(zone, 0);
       }
     });
     document.addEventListener("dragover", (e) => { if (linky(e)) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; } });
@@ -7046,6 +7189,7 @@
       drag.dx = dx;
       side.style.transform = "translateX(" + dx + "px)";
       catcher.style.opacity = String(Math.max(0, 1 + dx / drag.w));
+      if (!M.reduced()) $("libraryView").style.transform = "translateX(" + Math.round(drag.w * 0.2 * (1 + dx / drag.w)) + "px)";
     };
     const up = () => {
       const d = drag;
@@ -7053,9 +7197,13 @@
       if (!d || !d.on) return;
       sideDragEnd = performance.now();
       side.style.transform = "";
-      catcher.style.opacity = "";
+      const lib = $("libraryView");
       if (d.dx < -d.w / 3 || d.v < -0.5) { sideDragged = d.dx; history.back(); }
-      else M.slideBack(side, d.dx);
+      else {
+        M.dim(catcher, true);
+        M.slideBack(side, d.dx, M.reduced() ? null : lib);
+        if (!M.reduced()) lib.style.transform = M.sideDrift(side);
+      }
     };
     for (const n of [side, catcher]) {
       n.addEventListener("pointerdown", down);
@@ -7934,6 +8082,8 @@
   $("readerMarks").addEventListener("click", () => { if (state.sheet !== "marks") markFocus = null; toggleSheet("marks"); });
   $("readerContents").addEventListener("click", () => toggleSheet("contents"));
   $("sheetCatch").addEventListener("click", () => history.back());
+  dragToClose($("readingSheet"), null, () => !!state.sheet && !$("readingSheet").dataset.pop, () => history.back());
+  dragToClose($("menuSheet"), $("menuCatch"), () => !!state.menu && !wide.matches, () => history.back());
   addEventListener("keydown", onKeys);
   addEventListener("popstate", (e) => route(e.state));
   addEventListener("online", () => { showOffline(); renderLibrary(); });
@@ -8163,11 +8313,11 @@
     $("updateClose").onclick = () => {
       barDismissed = key;
       if (fresh) justUpdated = false;
-      bar.hidden = true;
+      M.edgeOut(bar).then(() => { if (barDismissed === key) bar.hidden = true; });
     };
     if (bar.hidden) {
       bar.hidden = false;
-      M.arrive(bar);
+      M.edgeIn(bar);
     }
   }
 
