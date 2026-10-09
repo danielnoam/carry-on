@@ -903,7 +903,13 @@
 
   // ---- Fetching ----
 
-  class SaveError extends Error {}
+  // `again`: worth one more try at once (1.10.1). A first save often
+  // failed where Retry then worked: the connection still waking as the app
+  // comes up from a share, or a page's first drawing timing out while the
+  // drawing WebView starts.
+  class SaveError extends Error {
+    constructor(message, again) { super(message); this.again = !!again; }
+  }
 
   // Thrown for a contents page instead of saving it: `contents` holds its
   // title and chapter links, for Save several.
@@ -919,14 +925,14 @@
     try {
       res = await C.platform.fetchText(url, { headers });
     } catch (e) {
-      if (/time(d)?\s?out/i.test((e && e.message) || "")) throw new SaveError("The site didn't answer. Try again, or later on a better connection.");
+      if (/time(d)?\s?out/i.test((e && e.message) || "")) throw new SaveError("The site didn't answer. Try again, or later on a better connection.", true);
       throw new SaveError(C.platform.canFetchPages
         ? "Couldn't reach this page. Check the link, or try again when you're online."
-        : "This browser can't reach that site directly. Save it in Waypage on your phone, then bring it here with a backup.");
+        : "This browser can't reach that site directly. Save it in Waypage on your phone, then bring it here with a backup.", C.platform.canFetchPages);
     }
     if (res.status === 429) throw new SaveError("The site asked to slow down. Try again in a few minutes.");
     if (res.status === 404 || res.status === 410) throw new SaveError("That page doesn't exist any more. Check the link.");
-    if (res.status >= 400) throw new SaveError("The site answered with an error (" + res.status + "). Try again later.");
+    if (res.status >= 400) throw new SaveError("The site answered with an error (" + res.status + "). Try again later.", res.status >= 500 || res.status === 403);
     return res;
   }
 
@@ -1109,13 +1115,13 @@
         got = readArticle(drawn.text, finalUrl, comic, siteRule(finalUrl), asPage);
       }
     }
-    if (got && got.check) throw new SaveError("The site asked for a browser check, so Waypage can't save it yet.");
+    if (got && got.check) throw new SaveError("The site asked for a browser check, so Waypage can't save it yet.", true);
     if (got && got.contents) throw new ContentsPage(got.contents);
     if (!got && comic) throw new SaveError("Waypage couldn't find the pictures on this page.");
     if (!got) {
       throw new SaveError(C.platform.canRender
         ? "Waypage couldn't find the article on this page, even after letting it draw itself."
-        : "This page builds itself with JavaScript, which Waypage can't save yet.");
+        : "This page builds itself with JavaScript, which Waypage can't save yet.", C.platform.canRender);
     }
     if (got.panels) {
       const { doc, docTitle, headline, next, prev, panels, series, byline } = got;

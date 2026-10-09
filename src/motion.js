@@ -25,7 +25,6 @@
   // frames and read as a cut. Fades run on their own clock with a plain
   // ease, beside the movement, as iOS and Material time theirs.
   const FADE_IN = "cubic-bezier(0.2, 0, 0.2, 1)";
-  const FADE_OUT = "cubic-bezier(0.4, 0, 1, 1)";
 
   // frames move (transform only, on the spring); fade is [from, to, ms,
   // delay]; under reduced motion only the 120 ms fade runs.
@@ -36,13 +35,12 @@
   function run(el, frames, kind, fade) {
     if (!el || !el.animate) return Promise.resolve();
     const done = [];
+    // No fades beside movement (Daniel, 1.10.1: they didn't help): things
+    // move on the spring and are there or not. A fade is reduced motion's
+    // answer only.
     if (reduced()) {
       if (fade) done.push(el.animate([{ opacity: fade[0] }, { opacity: fade[1] }], { duration: 120, easing: "linear", fill: "both" }));
-    } else {
-      if (frames) done.push(el.animate(frames, { ...timing(kind), fill: "both" }));
-      if (fade) done.push(el.animate([{ opacity: fade[0] }, { opacity: fade[1] }],
-        { duration: fade[2], delay: fade[3] || 0, easing: fade[1] > fade[0] ? FADE_IN : FADE_OUT, fill: "both" }));
-    }
+    } else if (frames) done.push(el.animate(frames, { ...timing(kind), fill: "both" }));
     moving++;
     return Promise.all(done.map((a) => a.finished)).then(() => done.forEach((a) => a.cancel()), () => {}).finally(() => { moving--; });
   }

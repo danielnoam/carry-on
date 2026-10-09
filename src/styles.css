@@ -431,7 +431,7 @@ html.native .top-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top));
 .lib-loading {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-3);
   min-height: 50vh; color: var(--muted); font: 400 var(--fs-label)/var(--lh-label) var(--sans);
-  animation: lib-loading-in 200ms 250ms both;
+  animation: lib-loading-in 0s 250ms both;
 }
 .lib-loading .spinner { width: 28px; height: 28px; margin: 0; border-width: 3px; }
 @keyframes lib-loading-in { from { opacity: 0; } }
@@ -498,7 +498,7 @@ html.native .screen-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top
 .choice-check {
   display: inline-flex; color: var(--accent);
   opacity: 0; transform: scale(0.6);
-  transition: opacity 180ms var(--fade-in, ease-out), transform var(--spring-control-ms, 300ms) var(--spring-control, ease-out);
+  transition: transform var(--spring-control-ms, 300ms) var(--spring-control, ease-out);
 }
 .choice input:checked ~ .choice-check { opacity: 1; transform: none; }
 .row-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -678,7 +678,7 @@ html.native .reader::before {
   padding: var(--s-2) calc(var(--gutter) + var(--s-2)) calc(var(--s-2) + env(safe-area-inset-bottom));
   background: var(--bar); color: var(--muted);
   font-size: var(--fs-meta); line-height: var(--lh-meta); font-variant-numeric: tabular-nums;
-  transition: transform var(--spring-control-ms, 300ms) var(--spring-control, ease-out), opacity 120ms linear;
+  transition: transform var(--spring-control-ms, 300ms) var(--spring-control, ease-out);
 }
 .read-section { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .read-left span:last-child { flex-shrink: 0; }
@@ -687,17 +687,18 @@ html.native .reader::before {
    shown with the bars and while the left edge is swiped. */
 .bright {
   position: absolute; z-index: 3; top: 50%;
-  left: calc(var(--frame-left, 0px) + var(--s-2));
+  left: calc(var(--frame-left, 0px) + var(--s-4));
   display: flex; flex-direction: column; align-items: center; gap: var(--s-1);
   padding: var(--s-2) var(--s-1) var(--s-1);
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg);
   box-shadow: 0 8px 24px var(--shadow);
   transform: translateY(-50%);
-  transition: opacity var(--spring-control-ms, 300ms) var(--spring-control, ease-out), transform var(--spring-control-ms, 300ms) var(--spring-control, ease-out);
+  transition: transform var(--spring-control-ms, 300ms) var(--spring-control, ease-out);
   color: var(--muted);
 }
 .bright[hidden] { display: none; }
-.reader.bar-away:not(.brightening) .bright { opacity: 0; transform: translate(-12px, -50%); pointer-events: none; }
+.reader.bar-away:not(.brightening) .bright,
+.reader:has(.sheet:not([hidden])) .bright { opacity: 0; transform: translate(-12px, -50%); pointer-events: none; }
 .bright-track {
   position: relative; width: 44px; height: min(40vh, 280px);
   border-radius: var(--r-md); overflow: hidden;
@@ -709,10 +710,13 @@ html.native .reader::before {
   position: absolute; inset: 0; background: var(--accent);
   transform-origin: bottom; transform: scaleY(0.5);
 }
-.reader.brightening .bright { color: var(--ink); }
+.bright { opacity: 0.55; }
+.reader.brightening .bright,
+.bright:focus-within { opacity: 1; color: var(--ink); }
 @media (prefers-reduced-motion: reduce) {
-  .bright { transition: opacity 120ms linear; }
-  .reader.bar-away:not(.brightening) .bright { transform: translateY(-50%); }
+  .bright { transition: none; }
+  .reader.bar-away:not(.brightening) .bright,
+  .reader:has(.sheet:not([hidden])) .bright { transform: translateY(-50%); }
 }
 .read-progress { height: 5px; background: var(--line); }
 .read-progress span {
@@ -1099,6 +1103,11 @@ html { -webkit-tap-highlight-color: transparent; }
 .tile-new::after { content: ""; position: absolute; inset: -12px; }
 .tile-new:active { background-image: linear-gradient(var(--press), var(--press)); }
 .tile-new:disabled { opacity: 0.6; }
+/* Its chapters saving (1.10.1): the badge pulses until they're in.
+   Reduced motion: it stays still; Downloads shows the progress. */
+.tile-new.saving, .tile-new.saving:disabled { opacity: 1; animation: badge-pulse 1.1s var(--spring-control, ease-in-out) infinite; }
+@keyframes badge-pulse { 0%, 100% { transform: scale(1); } 40% { transform: scale(1.18); } }
+@media (prefers-reduced-motion: reduce) { .tile-new.saving { animation: none; } }
 .check-new .chips { flex-wrap: nowrap; justify-content: space-between; }
 .check-note { color: var(--muted); font-size: var(--fs-meta); line-height: var(--lh-meta); }
 .check-note.accent { color: var(--accent); font-weight: 600; }
@@ -1366,7 +1375,7 @@ html { -webkit-tap-highlight-color: transparent; }
 .dl-ring {
   position: absolute; inset: 0; margin: auto;
   transform: rotate(-90deg); fill: none; stroke-width: 2.5;
-  opacity: 0; transition: opacity 200ms linear;
+  opacity: 0;
 }
 .dl-ring-track { stroke: var(--line); }
 .dl-ring-fill {
@@ -1427,9 +1436,8 @@ html { -webkit-tap-highlight-color: transparent; }
 #folderView .screen-bar > * { grid-row: 1; }
 #folderView .screen-bar { border-bottom-color: transparent; transition: border-color 120ms linear; }
 #folderView .screen-bar.titled { border-bottom-color: var(--line); }
-#folderTitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: opacity 180ms var(--fade-in, ease-out); }
+#folderTitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #folderView .screen-bar:not(.titled) #folderTitle { opacity: 0; }
-@media (prefers-reduced-motion: reduce) { #folderTitle { transition: none; } }
 
 .book-head { display: flex; align-items: flex-end; gap: var(--s-4); margin-bottom: var(--s-5); }
 .book-cover {

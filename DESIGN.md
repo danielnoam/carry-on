@@ -109,6 +109,8 @@ and the page shows above it.
   until then.
 - Nothing animates text the reader is reading.
 - `prefers-reduced-motion: reduce`: springs become a 120 ms opacity fade.
+  Fades are only that answer: with motion on, nothing fades in or out on
+  its own (1.10.1).
 - Only `transform` and `opacity` move, so the GPU runs every animation.
   Focus can follow an animation's first frame; `inert` on the library
   (which restyles every card) waits until the spring has all but landed,
@@ -285,9 +287,11 @@ and the page shows above it.
   `--r-lg` and the card shadow: a sun icon in `--muted` above a 44 px wide
   track (`--bar`, `--r-md`, at most 280 px or 40% of the height) filled
   from the bottom in `--accent`. It shows with the reader's bars and
-  while the left edge is swiped, sliding in 12 px with a fade on the
-  control spring (reduced motion: a 120 ms fade only), and leaves 700 ms
-  after the swipe ends. It's a `role="slider"` with arrow keys; dragging
+  while the left edge is swiped (never while a sheet is open), 16 px in
+  from the text's edge, sliding in 12 px on the control spring with no
+  fade (reduced motion: it just appears), and leaves 700 ms after the
+  swipe ends. With only the bars it sits at 55% opacity; swiping,
+  dragging or focus bring it to full (1.10.1). It's a `role="slider"` with arrow keys; dragging
   anywhere on the track sets the level. The switch "Brightness on the
   left edge" sits in the Aa sheet's Layout tab and in Settings, Reading
   type.

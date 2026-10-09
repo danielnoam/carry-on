@@ -3,6 +3,23 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Saves try twice (1.10.1).** Daniel: a new link often failed until
+  Retry. No error text came with it, so the likely causes are all
+  covered: SaveError's `again` marks a network failure or timeout, a 5xx
+  or 403, a browser check, and a page that didn't draw in PageRender
+  (whose WebView is cold on a first save); runJob's saveOnce tries those
+  once more after 1.5 s, and notes it in the log for Report a problem.
+- **Continue reading and a collection's next (1.10.1).** notePosition
+  stamped readAt on any change of the fraction, and pictures loading or
+  a relayout change it with no reading, so a clip left open (here, or in
+  a browser through sync) became Continue reading. Now only a new spot
+  (paragraph), or a move of 1% where there's no spot, counts. A
+  collection's next was its first unfinished clip, so one skipped
+  chapter (59) held it while reading went on to 144; folderNextIndex
+  takes the clip read last, or the first unfinished one after it.
+- **No fades (1.10.1).** Daniel asked to drop them: motion.run plays
+  only the movement unless reduced motion is on, where the 120 ms fade
+  stays the answer. CSS opacity transitions went too.
 - **Collection widget, button first (1.10.1).** The button sat at the
   bottom under four 44 dp rows; a RemoteViews LinearLayout clips what
   doesn't fit, so at the default 3-cell height the button was the part

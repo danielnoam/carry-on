@@ -1079,6 +1079,15 @@
 
   // The page to carry on with: the one read last that isn't finished.
   function continuePage() {
+    // The clip read last, finished just now (1.10.1): in a collection, the
+    // next one in it to read, rather than whatever other clip was read
+    // before it. Otherwise the clip read last that isn't finished.
+    const last = state.pages.reduce((a, p) => ((p.readAt || 0) > ((a && a.readAt) || 0) ? p : a), null);
+    if (last && last.finished && last.folder) {
+      const list = folderPages(last.folder);
+      const i = folderNextIndex(list);
+      if (i >= 0) return list[i];
+    }
     const going = state.pages.filter((p) => !p.finished && p.at > 0.02);
     return going.sort((a, b) => (b.readAt || 0) - (a.readAt || 0))[0] || null;
   }
@@ -1502,10 +1511,28 @@
 
   // Saves one queued link; resolves to its meta, or null when it failed
   // (the card then says why and offers Try again).
+  // A save that fails in a way a second try often fixes goes again once,
+  // after a moment, before it shows as failed (1.10.1).
+  async function saveOnce(job, opts) {
+    try {
+      return await C.save.save(job.url, opts);
+    } catch (e) {
+      if (!(e instanceof C.save.SaveError) || !e.again || job.triedAgain) throw e;
+      job.triedAgain = true;
+      C.platform.log.note("save", (job.site || "") + ": " + e.message + " (trying again)");
+      job.drawing = false;
+      job.done = 0;
+      updateSavingCard(job);
+      await new Promise((go) => setTimeout(go, 1500));
+      return C.save.save(job.url, opts);
+    }
+  }
+
   async function runJob(job) {
     job.started = Date.now();
+    job.triedAgain = false;
     try {
-      const meta = await C.save.save(job.url, {
+      const meta = await saveOnce(job, {
         mode: job.mode || load(IMAGES_KEY, "previews"),
         kind: job.kind || "article",
         asPage: !!job.asPage,
@@ -1874,7 +1901,7 @@
     brightSet = false;
   }
   const brightEdge = {
-    on: brightOn,
+    on: () => brightOn() && !state.sheet,
     start() {
       clearTimeout(brightTimer);
       brightFrom = bright;
@@ -2108,7 +2135,11 @@
   let positionTimer = null;
   function notePosition(p, f, s) {
     const at = Math.round(f * 1000) / 1000;
-    const moved = at !== (p.at || 0) || (s || "") !== (p.spot || "");
+    // Read just now only when the place really moved (1.10.1): pictures
+    // coming in or the text laid out again shift the fraction a little
+    // with no reading, and that made another clip Continue reading (on
+    // this device, or on another one through sync).
+    const moved = s && p.spot ? s !== p.spot : Math.abs(at - (p.at || 0)) >= 0.01;
     p.at = at;
     // An empty spot (Pages, with no block starting on this page) clears
     // the old one, so the fraction decides the place.
@@ -3218,8 +3249,23 @@
   const folderName = (name) => allFolders().find((n) => sameTag(n, cleanTag(name))) || cleanTag(name);
 
   // The page to carry on with: the first one not finished, else the first.
+  // The clip to go on with in a collection: the one read last, or the
+  // first unfinished one after it (1.10.1). The first unfinished one in
+  // the whole list sent a reader at chapter 144 back to a chapter 59 they
+  // had skipped. Nothing read yet: the first unfinished one.
+  function folderNextIndex(list) {
+    let last = -1;
+    list.forEach((p, i) => { if ((p.finished || (p.at || 0) > 0.02) && (p.readAt || 0) > ((list[last] && list[last].readAt) || 0)) last = i; });
+    if (last >= 0) {
+      if (!list[last].finished) return last;
+      const after = list.findIndex((p, i) => i > last && !p.finished);
+      if (after >= 0) return after;
+    }
+    return list.findIndex((p) => !p.finished);
+  }
   function folderNext(list) {
-    return list.find((p) => !p.finished) || list[0];
+    const i = folderNextIndex(list);
+    return i < 0 ? list[0] : list[i];
   }
 
   async function setFolder(p, name) {
@@ -3256,10 +3302,13 @@
       el("span", { class: "tile-thumb" + (thumb ? "" : " blank") },
         thumb ? el("img", { src: thumb, alt: "", loading: "lazy" }) : null,
         // The badge saves them (1.7.2); while picking, it picks like the tile.
-        fresh ? el("button", { class: "tile-new", type: "button", "aria-label": "Save " + newCountText(fresh) + " " + chapterWord(list, fresh) + " of " + name,
+        fresh ? el("button", { class: "tile-new" + (savingInto(name) ? " saving" : ""), type: "button", "aria-label": (savingInto(name) ? "Saving new chapters of " : "Save " + newCountText(fresh) + " " + chapterWord(list, fresh) + " of ") + name,
           onclick: (e) => {
             e.stopPropagation();
             if (state.select) { tile.querySelector(".card-open").click(); return; }
+            // Saving already: the badge pulses (1.10.1), and a tap shows them.
+            if (savingInto(name)) { openDownloads(); return; }
+            e.currentTarget.classList.add("saving");
             saveNewChapters(name, e.currentTarget);
           } }, "+" + (fresh >= NEW_MAX ? NEW_MAX : fresh)) : null),
       el("span", { class: "tile-name", dir: "auto" }, name),
@@ -6196,7 +6245,7 @@
           .sort((a, b) => b.at - a.at).slice(0, 100).map(({ at, ...m }) => m),
         collections: allFolders().sort((a, b) => a.localeCompare(b)).map((name) => {
           const list = folderPages(name);
-          const i = list.findIndex((x) => !x.finished);
+          const i = folderNextIndex(list);
           // The clip the button opens comes first, then the ones after it
           // (1.10.1); no sites, just how much is left.
           const from = i < 0 ? 0 : i;

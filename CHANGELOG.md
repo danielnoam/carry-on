@@ -4,7 +4,28 @@ All notable changes to Carry-on. Newest first.
 
 ## [1.10.1] - 2026-10-09
 
+### Fixed
+- A new save that failed the first time and worked on Retry now tries
+  again by itself, once, before it shows as failed: the connection waking
+  as Waypage comes up from a share, a site's server error, or a page
+  whose first drawing timed out.
+- Continue reading no longer jumps to another clip on its own. A clip
+  counts as just read only when your place in it really moves, not when
+  its pictures load or its text is laid out again; and when you finish a
+  clip in a collection, Continue goes to the next one in it.
+- A collection goes on from the chapter you read last, not from the
+  first one you skipped (chapter 59 when you were at 144). Its Continue
+  button, the Collection widget and Continue reading all follow that.
+- The brightness slider no longer shows over the reader's settings, hides
+  while a sheet is open, and sits a little further in from the edge.
+
 ### Changed
+- The brightness slider stays dimmed when it only shows with the bars,
+  and goes full strength while you swipe or drag it.
+- No more fades: screens, sheets, cards and toasts move without fading
+  in or out. With reduced motion on, a short fade is still the answer.
+- The new-chapters badge on a collection pulses while its chapters save,
+  and a tap on it then opens Downloads.
 - The Collection widget leads with what to read: the next clip, then the
   Continue button right under it (Start or Read again when that fits),
   then the clips after it. On a short widget the button was cut off at
