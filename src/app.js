@@ -7285,6 +7285,61 @@
 
   const remeasured = () => { if (state.section === "storage") renderSection(); };
 
+  // ---- Making room (1.9.0) ----
+  // Clips you've finished keep their text and lose their saved pictures,
+  // which show from the web again when you're online: usually most of a
+  // clip's size. Then the biggest clips, to open and delete.
+  let makingRoom = false;
+  const roomFor = () => state.pages.filter((p) => p.finished && !p.link && !p.file && p.images && p.mode !== "links" && /^https?:/.test(p.url || ""));
+  function roomGroup() {
+    const list = roomFor();
+    const known = list.reduce((n, p) => n + (p.imageBytes || 0), 0);
+    if (list.some((p) => p.imageBytes == null)) measureSizes(list, remeasured);
+    const big = [...state.pages].sort((a, b) => (b.bytes || 0) - (a.bytes || 0)).filter((p) => (p.bytes || 0) > 0).slice(0, 5);
+    if (!list.length && !big.length) return [];
+    const go = el("button", { class: "row room-go", type: "button", ...(list.length && !makingRoom ? {} : { disabled: "" }), onclick: () => dropPictures(list, go) },
+      el("span", { class: "choice-text" },
+        el("span", { class: "choice-label" + (list.length ? " accent" : "") }, makingRoom ? "Making room…" : "Keep only the text of finished clips"),
+        el("span", { class: "choice-note" }, list.length
+          ? countLine(list.length) + " you've finished" + (known ? ", their pictures about " + formatSize(known) : "") + ". The pictures show again when you're online."
+          : "Nothing to drop: the clips you've finished have no saved pictures.")),
+      known ? el("span", { class: "row-value" }, formatSize(known)) : null);
+    return [el("section", { class: "settings-section room" },
+      el("h2", { class: "overline" }, "Make room"),
+      el("div", { class: "group" }, go)),
+      big.length ? el("section", { class: "settings-section room-big" },
+      el("h2", { class: "overline" }, "Biggest clips"),
+      el("div", { class: "group" }, ...big.map((p) => el("button", { class: "row", type: "button", onclick: () => toLibrary().then(() => openMenu("page", p)) },
+        el("span", { class: "choice-text" },
+          el("span", { class: "row-label", dir: "auto" }, p.title),
+          el("span", { class: "choice-note" }, [p.site, p.finished ? "Finished" : readingLine(p)].filter(Boolean).join(" · "))),
+        el("span", { class: "row-value" }, formatSize(p.bytes || 0))))),
+      el("p", { class: "footnote" }, "Tap one to delete it, or change what it keeps.")) : null];
+  }
+  async function dropPictures(list, btn) {
+    if (makingRoom) return;
+    makingRoom = true;
+    const label = btn.querySelector(".choice-label");
+    btn.disabled = true;
+    let freed = 0, done = 0;
+    for (const p of list) {
+      label.textContent = "Making room, " + (++done) + " of " + list.length;
+      let res = null;
+      try { res = await C.save.setPictures(p, "links"); } catch (e) { res = null; }
+      if (!res) continue;
+      freed -= res.bytes;
+      Object.assign(p, { mode: "links", missing: res.missing, thumb: res.thumb, bytes: Math.max(0, (p.bytes || 0) + res.bytes) });
+      if (p.imageBytes != null) p.imageBytes = Math.max(0, p.imageBytes + res.bytes);
+    }
+    await C.store.writeIndex(state.pages);
+    makingRoom = false;
+    texts.clear();
+    await loadThumbs();
+    renderLibrary();
+    toast(freed > 0 ? "Made " + formatSize(freed) + " of room." : "Done. Their pictures show when you're online.");
+    if (state.section === "storage") renderSection();
+  }
+
   // Where the library lives (0.33.0): the app's own storage, the phone's
   // Documents folder, or a folder you pick. Choosing another moves
   // everything there. Android only: on iOS the app's own storage already
@@ -7485,7 +7540,7 @@
     saving: { title: "Saving", build: () => [choiceGroup(SETTINGS[1]), dataGroup(DATA_SAVE_KEY, "Save", "Pages and pictures come down on any connection.", "Saves wait in Downloads until you're on Wi-Fi; feeds, new chapters and missing pictures check then too."), signedGroup()],
       value: () => SETTINGS[1].options.find((o) => o.value === SETTINGS[1].get()).label },
     sync: { title: "Sync", build: syncSections, value: () => (C.sync.on ? (C.sync.last.error ? "Stopped" : "On") : "Off") },
-    storage: { title: "Storage and backup", build: () => [storageGroup(), placeGroup(), browserStorageGroup(), backupGroup()], value: () => formatSize(totalBytes()) },
+    storage: { title: "Storage and backup", build: () => [storageGroup(), ...roomGroup(), placeGroup(), browserStorageGroup(), backupGroup()], value: () => formatSize(totalBytes()) },
     // Watched folders, a page of their own (1.4.1, Android).
     content: { title: "Content", build: () => [watchGroup()], value: () => { const n = watches().length; return n ? n + (n === 1 ? " folder" : " folders") : "No watched folders"; } },
     updates: { title: "About", build: () => [updatesGroup(), aboutGroup()], value: () => (updateOut() ? upd.latest + " is out" : APP_VERSION) },
