@@ -2,6 +2,21 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.12.1] - 2026-10-09
+
+### Fixed
+- The voice menu under Read aloud in Settings opened cut off; it shows
+  whole now.
+- Settings no longer says "Reads while this clip is open" when no clip
+  is open.
+
+### Changed
+- Opening a clip or collection from the library no longer grows the
+  card into the page. The page settles in from slightly small over the
+  card you tapped, and Back sends it back the same way. It moves only
+  what the phone's graphics chip can move on its own, so it should not
+  stutter.
+
 ## [1.12.0] - 2026-10-09
 
 ### Added

@@ -79,73 +79,38 @@
     return run([[el, f], !desk() && under && [under, [{ transform: DRIFT }, { transform: "none" }]]], "sheet", false);
   }
 
-  // A clip or collection opened from its card, or the reader from a
-  // Continue button (1.11.0): the panel tapped grows until it fills the
-  // screen, and Back shrinks it into the panel again. Since 1.11.1 it
-  // moves only transforms, so it runs on the GPU and stays smooth while
-  // the page is laid out: the screen sits in a host (wrapped at start-up,
-  // before it holds a page) that is scaled to the panel's box and clips
-  // it, while the screen is scaled back the other way, so its text keeps
-  // its size. A copy of the panel rides its corner and blends away as it
-  // grows, and back in as it lands, so the panel turns into the screen.
-  function host(el) {
-    if (el.parentElement && el.parentElement.classList.contains("grow-host")) return;
-    const h = document.createElement("div");
-    h.className = "grow-host";
-    el.before(h);
-    h.appendChild(el);
-  }
+  // Opening a clip or collection: the screen settles in from slightly
+  // small, centred on the card that was tapped, as it fades up; Back runs
+  // it the other way over the library. The card itself never stretches
+  // into the page: a cover and an article share nothing to morph between,
+  // so any morph (1.11.x, and a card-copy blend tried for 1.12.1) showed a
+  // stretched card or two screens at once halfway through. Only transform
+  // and opacity move, at no more than full size, so the GPU does it all.
   const growing = new WeakMap();
-  function faceOf(panel, r, T) {
-    const f = panel.cloneNode(true);
-    f.removeAttribute("id");
-    f.querySelectorAll("[id]").forEach((n) => n.removeAttribute("id"));
-    f.setAttribute("aria-hidden", "true");
-    f.inert = true;
-    f.classList.add("grow-face");
-    Object.assign(f.style, { left: T.left + "px", top: T.top + "px", width: r.width + "px", height: r.height + "px" });
-    return f;
-  }
+  const SETTLE = 0.92;
   function grows(el, r, rad, open, panel, end) {
-    const h = el.parentElement;
-    if (!r || !r.width || !h || !h.classList.contains("grow-host")) return (open ? push(el) : pop(el)).then(() => { if (end) end(); });
+    if (!r || !r.width) return (open ? push(el) : pop(el)).then(() => { if (end) end(); });
     if (reduced()) return run([[el, []]], "sheet", open, end);
     const was = growing.get(el);
-    if (was) { was.anims.forEach((a) => a.cancel()); if (was.face) was.face.remove(); }
-    const T = box(el), W = innerWidth, H = innerHeight;
-    const A = open ? r : T, B = open ? T : r, ra = open ? rad : 0, rb = open ? 0 : rad;
-    const spring = (desk() ? DESK : TOUCH).sheet, n = spring.pts.length - 1;
-    const outer = [], inner = [], round = [];
-    spring.pts.forEach((p, i) => {
-      const offset = i / n, mix = (k) => A[k] + (B[k] - A[k]) * p;
-      const sx = Math.max(mix("width") / W, 0.001), sy = Math.max(mix("height") / H, 0.001), rv = Math.max(0, ra + (rb - ra) * p);
-      outer.push({ offset, transform: "translate(" + mix("left") + "px, " + mix("top") + "px) scale(" + sx + ", " + sy + ")" });
-      inner.push({ offset, transform: "scale(" + 1 / sx + ", " + 1 / sy + ") translate(" + -T.left + "px, " + -T.top + "px)" });
-      round.push({ offset, borderRadius: rv / sx + "px / " + rv / sy + "px" });
-    });
-    Object.assign(h.style, { zIndex: getComputedStyle(el).zIndex, width: W + "px", height: H + "px" });
-    el.style.transformOrigin = -T.left + "px " + -T.top + "px";
-    h.classList.add("growing");
-    const t = { duration: spring.ms, easing: "linear", fill: "both" };
-    const anims = [h.animate(outer, t), h.animate(round, t), el.animate(inner, t)];
-    let face = null;
-    if (panel && panel.isConnected) {
-      face = faceOf(panel, r, T);
-      face.style.transformOrigin = el.style.transformOrigin;
-      face.style.zIndex = (parseInt(h.style.zIndex, 10) || 0) + 1;
-      h.appendChild(face);
-      anims.push(face.animate(inner, t), face.animate(open ? [{ opacity: 1 }, { opacity: 0, offset: 0.35 }, { opacity: 0 }] : [{ opacity: 0 }, { opacity: 0, offset: 0.6 }, { opacity: 1 }], t));
-    }
-    const me = { anims, face };
+    if (was) was.anims.forEach((a) => a.cancel());
+    const T = box(el);
+    const k = 1 - SETTLE;
+    const dx = (r.left + r.width / 2 - (T.left + T.width / 2)) * k, dy = (r.top + r.height / 2 - (T.top + T.height / 2)) * k;
+    const small = "translate(" + dx + "px, " + dy + "px) scale(" + SETTLE + ")";
+    const t = { ...timing("sheet"), fill: "both" };
+    const blend = { duration: t.duration * (open ? 0.3 : 0.45), easing: "ease-out", fill: "both" };
+    el.classList.add("zooming");
+    const anims = [
+      el.animate(open ? [{ transform: small }, { transform: "none" }] : [{ transform: "none" }, { transform: small }], open ? t : { ...t, duration: blend.duration }),
+      el.animate(open ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 1 }, { opacity: 0 }], blend),
+    ];
+    const me = { anims };
     growing.set(el, me);
     moving++;
     return Promise.all(anims.map((a) => a.finished)).then(() => {
       if (end) end();
       anims.forEach((a) => a.cancel());
-      if (face) face.remove();
-      h.classList.remove("growing");
-      h.style.zIndex = h.style.width = h.style.height = "";
-      el.style.transformOrigin = "";
+      el.classList.remove("zooming");
     }, () => {}).finally(() => { moving--; if (growing.get(el) === me) growing.delete(el); });
   }
   const grow = (el, r, rad = 16, panel) => grows(el, r, rad, true, panel);
@@ -292,7 +257,7 @@
 
   window.Waypage = window.Waypage || {};
   window.Waypage.motion = {
-    busy, timing, reduced, still, setStill, desk, host, push, pop, grow, shrink, rise, sink, settle, dim, slideIn, slideOut, slideBack,
+    busy, timing, reduced, still, setStill, desk, push, pop, grow, shrink, rise, sink, settle, dim, slideIn, slideOut, slideBack,
     popFrom, popInto, edgeIn, edgeOut, appear, vanish, measure, flip, ghostOut, fromPast, pageOut, pageIn, sideDrift,
   };
 })();

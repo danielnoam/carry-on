@@ -1,7 +1,7 @@
 // Waypage: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "1.12.0";
+  const APP_VERSION = "1.12.1";
   window.Waypage.version = APP_VERSION;
 
   const C = window.Waypage;
@@ -1003,8 +1003,9 @@
       menu = null;
       m.style.pointerEvents = "none";
       btn.setAttribute("aria-expanded", "false");
+      const g = wrap.closest(".group");
       document.removeEventListener("pointerdown", outside, true);
-      M.popInto(m, btn.getBoundingClientRect()).then(() => m.remove());
+      M.popInto(m, btn.getBoundingClientRect()).then(() => { m.remove(); if (g && !menu) g.classList.remove("menu-open"); });
       if (focus) btn.focus();
     }
     // In a sheet or other scrolling box (0.34.1), a menu fits inside it:
@@ -1045,6 +1046,8 @@
       });
       wrap.append(menu);
       btn.setAttribute("aria-expanded", "true");
+      const g = wrap.closest(".group");
+      if (g) g.classList.add("menu-open");
       fit(menu);
       M.popFrom(menu, btn.getBoundingClientRect());
       document.addEventListener("pointerdown", outside, true);
@@ -1690,8 +1693,6 @@
     const r = n.getBoundingClientRect();
     return r.bottom > 0 && r.top < innerHeight && r.width ? { rect: r, panel: n } : null;
   }
-  M.host($("readerView"));
-  M.host($("folderView"));
   function zoomFrom(screen) {
     const t = tapped;
     tapped = null;
@@ -2826,12 +2827,14 @@
     const lang = primary(langOf(p));
     const name = (() => { try { return new Intl.DisplayNames([navigator.language || "en"], { type: "language" }).of(lang); } catch (e) { return lang; } })();
     const voiceRow = el("div", { class: "rc-row" }, el("span", { class: "rc-label" }, "Voice"), el("span", { class: "meta" }, "Looking…"));
-    const note = el("p", { class: "footnote aloud-note" }, speech.background ? "Keeps reading with the screen off. Pause it from the lock screen." : "Reads while this clip is open.");
+    const note = el("p", { class: "footnote aloud-note" }, speech.background ? "Keeps reading with the screen off. Pause it from the lock screen." : p ? "Reads while this clip is open." : "");
+    note.hidden = !note.textContent;
     speech.voices().then((all) => {
       const mine = all.filter((v) => primary(v.lang) === lang);
       if (!mine.length) {
         voiceRow.lastChild.replaceWith(el("span", { class: "meta" }, "Phone's default"));
         note.textContent = "No " + name + " voice on this phone. Add one in its text-to-speech settings, then come back.";
+        note.hidden = false;
         return;
       }
       const saved = voiceFor(p);

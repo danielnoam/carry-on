@@ -112,13 +112,13 @@ and the page shows above it.
 - Nothing fades. Things grow, shrink, slide or leave past an edge. The
   only fade is the reduced-motion answer: a 120 ms opacity change, or no
   animation at all for something going away.
-- Grow from what was tapped, shrink back into it. A clip or collection
-  opened from its card, tile or Continue panel: a shaded panel the size
-  of the card grows to fill the window and the screen is clipped inside
-  it (a scaled host with the screen scaled back, so text is never
-  scaled and only transforms move, 1.11.1). A copy of the card blends
-  away as it grows; Back shrinks it into the card as it is now, and the
-  card blends back in as it lands. The one fade with motion on.
+- Open from what was tapped, close back to it. A clip or collection
+  opened from its card, tile or Continue panel settles in from 92% size,
+  centred on that card, fading up over the first third; Back shrinks it
+  toward the card as it fades over the library (1.12.1). The card never
+  morphs into the page: a cover and an article share nothing to morph
+  between, and the 1.11.x grow always looked stretched or doubled
+  halfway. Only transform and opacity move. The one fade with motion on.
 - Screens with no card behind them (Settings, a pane) come in from the
   right; on touch the screen under them drifts 25% left. Downloads and
   dialogs grow from their button. Menus and popovers grow from their
