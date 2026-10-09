@@ -30,7 +30,14 @@
   const mq = (q) => (window.matchMedia ? matchMedia(q) : { matches: false, addEventListener() {} });
   const reducedQ = mq("(prefers-reduced-motion: reduce)");
   const deskQ = mq("(min-width: 1024px) and (pointer: fine)");
-  const reduced = () => !!reducedQ.matches;
+  // Animations can be turned off in Settings (1.12.0): then nothing moves
+  // at all, not even the reduced-motion fades.
+  const still = () => document.documentElement.dataset.motion === "off";
+  const reduced = () => !!reducedQ.matches || still();
+  function setStill(on) {
+    if (on) document.documentElement.dataset.motion = "off";
+    else delete document.documentElement.dataset.motion;
+  }
   const desk = () => !!deskQ.matches;
 
   function timing(kind) {
@@ -47,7 +54,7 @@
   // runs, in when `show` is true, out when false, none when null.
   function run(els, kind, show, end) {
     const list = els.filter((x) => x && x[0] && x[0].animate);
-    if (!list.length) return Promise.resolve();
+    if (!list.length || still()) { if (end) end(); return Promise.resolve(); }
     const done = [];
     if (reduced()) {
       if (show != null) done.push(list[0][0].animate([{ opacity: show ? 0 : 1 }, { opacity: show ? 1 : 0 }], { duration: 120, easing: "linear", fill: "both" }));
@@ -285,7 +292,7 @@
 
   window.Waypage = window.Waypage || {};
   window.Waypage.motion = {
-    busy, timing, reduced, desk, host, push, pop, grow, shrink, rise, sink, settle, dim, slideIn, slideOut, slideBack,
+    busy, timing, reduced, still, setStill, desk, host, push, pop, grow, shrink, rise, sink, settle, dim, slideIn, slideOut, slideBack,
     popFrom, popInto, edgeIn, edgeOut, appear, vanish, measure, flip, ghostOut, fromPast, pageOut, pageIn, sideDrift,
   };
 })();

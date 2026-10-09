@@ -187,7 +187,7 @@
       try { id = decodeURIComponent(id); } catch (err) { /* as is */ }
       const target = doc.getElementById(id);
       if (target && isPaged()) goPage(pageOf(target));
-      else if (target) target.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+      else if (target) target.scrollIntoView({ block: "start", behavior: C.motion.reduced() ? "auto" : "smooth" });
       return;
     }
     if (/^(https?|mailto):/.test(a.href)) C.platform.openOutside(a.href);
@@ -419,7 +419,7 @@
     const edge = (topSpace ? topSpace() : 0) + 8;
     if (r.top < edge || r.bottom > w.innerHeight - 48) {
       followUntil = Date.now() + 1000;
-      w.scrollTo({ top: r.top + w.scrollY - edge - 16, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+      w.scrollTo({ top: r.top + w.scrollY - edge - 16, behavior: C.motion.reduced() ? "auto" : "smooth" });
     }
   }
 
@@ -656,7 +656,7 @@
     const x = to * width() * (rtl() ? -1 : 1);
     if (turning) w.cancelAnimationFrame(turning.raf);
     turning = null;
-    if (now || matchMedia("(prefers-reduced-motion: reduce)").matches) { w.scrollTo(x, 0); return; }
+    if (now || C.motion.reduced()) { w.scrollTo(x, 0); return; }
     const k = matchMedia("(min-width: 1024px) and (pointer: fine)").matches ? 1000 : 800, c = 2 * Math.sqrt(k);
     let at = w.scrollX, speed = v * 1000, last = w.performance.now();
     const me = { to };
