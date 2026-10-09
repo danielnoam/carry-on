@@ -20,6 +20,13 @@ bold title and its version so a search finds it.
 - **No fades (1.10.1).** Daniel asked to drop them: motion.run plays
   only the movement unless reduced motion is on, where the 120 ms fade
   stays the answer. CSS opacity transitions went too.
+- **Collection widget, button at the foot (1.10.2).** Daniel wanted the
+  button at the bottom and only the next clip, no list. The root is now a
+  FrameLayout with the button on `layout_gravity="bottom"`, so a short
+  widget overlaps the clip's meta line instead of dropping the button
+  (a LinearLayout would cut it). w_fav1-3 stay in the layout, hidden,
+  because Widgets.java hides every FAVS id and a missing id breaks the
+  whole widget.
 - **Collection widget, button first (1.10.1).** The button sat at the
   bottom under four 44 dp rows; a RemoteViews LinearLayout clips what
   doesn't fit, so at the default 3-cell height the button was the part

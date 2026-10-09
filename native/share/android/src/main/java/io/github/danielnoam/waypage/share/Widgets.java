@@ -258,7 +258,8 @@ final class Widgets {
             v.setOnClickPendingIntent(R.id.w_go, open(ctx, 200000 + id, Uri.parse("waypage-widget://page/" + Uri.encode(next))));
         }
         JSONArray clips = c.optJSONArray("clips");
-        int n = clips == null ? 0 : Math.min(clips.length(), FAVS.length);
+        // Only the clip to read next, over the button (1.10.2).
+        int n = clips == null ? 0 : Math.min(clips.length(), 1);
         v.setViewVisibility(R.id.w_empty, n == 0 ? View.VISIBLE : View.GONE);
         v.setTextViewText(R.id.w_empty, "Nothing in it yet.");
         for (int i = 0; i < n; i++) {
