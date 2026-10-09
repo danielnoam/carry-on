@@ -1,7 +1,7 @@
 // Waypage: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "1.9.0";
+  const APP_VERSION = "1.10.0";
   window.Waypage.version = APP_VERSION;
 
   const C = window.Waypage;
@@ -1811,8 +1811,10 @@
       top: () => $("readerView").querySelector(".reader-bar").offsetHeight,
       bottom: () => $("readFoot").offsetHeight,
       onKey: onKeys,
+      onEdge: brightEdge,
     }).then(() => {
       lostMarks = new Set();
+      brightOpen();
       paintMarks(p);
       $("readerContents").hidden = C.reader.headings().length < 2;
       fitRail();
@@ -1821,6 +1823,113 @@
       setAloud(aloud.state, aloud.index);
       if (aloudAuto) { aloudAuto = false; startAloud(0); }
     });
+  }
+
+  // ---- Brightness while reading (1.10.0) ----
+  // A swipe up or down along the left edge of the text sets the screen's
+  // brightness, with a slider on the left while it moves; the slider also
+  // shows with the bars, to drag. The level is kept for the next clip and
+  // let go when the reader closes. In the app only (the Brightness plugin):
+  // a browser can't change the screen. Off in Settings or the Aa sheet.
+  const BRIGHT_KEY = "waypage.brightness";
+  const BRIGHT_SWIPE_KEY = "waypage.brightSwipe";
+  const brightOn = () => C.platform.brightness.available && load(BRIGHT_SWIPE_KEY, true) !== false;
+  let bright = 0.5, brightFrom = 0.5, brightSet = false, brightQueued = false, brightTimer = 0;
+  function paintBright() {
+    const pct = Math.round(bright * 100);
+    $("brightFill").style.transform = "scaleY(" + bright + ")";
+    $("brightTrack").setAttribute("aria-valuenow", pct);
+    $("brightTrack").setAttribute("aria-valuetext", pct + "%");
+  }
+  function setBright(v) {
+    bright = clamp(v, 0.01, 1);
+    brightSet = true;
+    paintBright();
+    if (brightQueued) return;
+    brightQueued = true;
+    requestAnimationFrame(() => { brightQueued = false; C.platform.brightness.set(bright).catch(() => {}); });
+  }
+  function placeBright() {
+    const f = $("readerFrame").getBoundingClientRect();
+    $("bright").style.setProperty("--frame-left", Math.max(0, f.left - $("readerView").getBoundingClientRect().left) + "px");
+  }
+  async function brightOpen() {
+    $("bright").hidden = !brightOn();
+    if (!brightOn()) return;
+    placeBright();
+    const kept = Number(load(BRIGHT_KEY, 0));
+    if (kept > 0) {
+      bright = clamp(kept, 0.01, 1);
+      brightSet = true;
+      C.platform.brightness.set(bright).catch(() => {});
+    } else {
+      try { bright = clamp(Number((await C.platform.brightness.get()).level) || 0.5, 0.01, 1); } catch (e) { bright = 0.5; }
+    }
+    paintBright();
+  }
+  function brightClose() {
+    clearTimeout(brightTimer);
+    $("readerView").classList.remove("brightening");
+    if (brightSet) C.platform.brightness.set(null).catch(() => {});
+    brightSet = false;
+  }
+  const brightEdge = {
+    on: brightOn,
+    start() {
+      clearTimeout(brightTimer);
+      brightFrom = bright;
+      $("readerView").classList.add("brightening");
+    },
+    move: (d) => setBright(brightFrom + d),
+    end() {
+      store(BRIGHT_KEY, bright);
+      brightTimer = setTimeout(() => $("readerView").classList.remove("brightening"), 700);
+    },
+  };
+  (() => {
+    const track = $("brightTrack");
+    let dragging = false;
+    const at = (y) => { const r = track.getBoundingClientRect(); return 1 - (y - r.top) / r.height; };
+    track.addEventListener("pointerdown", (e) => {
+      if (e.button) return;
+      e.preventDefault();
+      dragging = true;
+      clearTimeout(brightTimer);
+      $("readerView").classList.add("brightening");
+      setBright(at(e.clientY));
+    });
+    addEventListener("pointermove", (e) => { if (dragging) setBright(at(e.clientY)); });
+    const up = () => {
+      if (!dragging) return;
+      dragging = false;
+      store(BRIGHT_KEY, bright);
+      brightTimer = setTimeout(() => $("readerView").classList.remove("brightening"), 700);
+    };
+    addEventListener("pointerup", up);
+    addEventListener("pointercancel", up);
+    track.addEventListener("keydown", (e) => {
+      const step = { ArrowUp: 0.05, ArrowRight: 0.05, ArrowDown: -0.05, ArrowLeft: -0.05, PageUp: 0.2, PageDown: -0.2 }[e.key];
+      const to = e.key === "Home" ? 0.01 : e.key === "End" ? 1 : step != null ? bright + step : null;
+      if (to == null) return;
+      e.preventDefault();
+      setBright(to);
+      store(BRIGHT_KEY, bright);
+    });
+    addEventListener("resize", () => { if (state.open && !$("bright").hidden) placeBright(); });
+  })();
+  function brightSwitch() {
+    if (!C.platform.brightness.available) return null;
+    return el("label", { class: "rc-row switch-row" },
+      el("span", { class: "choice-text" }, el("span", { class: "rc-label" }, "Brightness on the left edge"),
+        el("span", { class: "choice-note" }, "Swipe up or down along the left side while reading")),
+      el("input", { class: "switch", type: "checkbox", role: "switch", "data-pref": "brightSwipe", checked: brightOn(),
+        onchange: (e) => {
+          store(BRIGHT_SWIPE_KEY, e.target.checked);
+          document.querySelectorAll('input[data-pref="brightSwipe"]').forEach((i) => { i.checked = e.target.checked; });
+          if (!state.open) return;
+          if (e.target.checked) brightOpen();
+          else { brightClose(); $("bright").hidden = true; }
+        } }));
   }
 
   // A tap on the text brings the bar back, or hides it for reading.
@@ -2025,6 +2134,7 @@
     if (state.image) { state.image = false; $("imageViewer").hidden = true; $("viewerImg").removeAttribute("src"); }
     // Reading aloud goes on (1.4.0): the bar along the bottom carries it.
     hideReadHere();
+    brightClose();
     state.open = null;
     showAloudBar();
     // The library redraws (where you got to) once the reader is away, not
@@ -2690,6 +2800,7 @@
       row("Margins", seg(id + "-margins", "Margins", [
         { value: "narrow", label: "Narrow" }, { value: "normal", label: "Normal" }, { value: "wide", label: "Wide" },
       ], r.margins, (v) => setReading({ margins: v }))),
+      brightSwitch(),
       // Big screens (1.5.0): two pages side by side, and the contents
       // beside the text.
       wide.matches ? stack("Pages on a wide window", seg(id + "-spread", "Pages on a wide window", [
@@ -4428,7 +4539,7 @@
   // (0.31.0): a backup is restored, a clip sent as a file comes back, and
   // a book, a note, a page or a comic becomes a clip of its own. `open`
   // opens it once it's in.
-  const FILE_ACCEPT = ".epub,.md,.markdown,.txt,.html,.htm,.cbz,.pdf,.csv,.json,.zip,application/epub+zip,application/pdf,text/markdown,text/plain,text/html,text/csv,application/json,application/zip";
+  const FILE_ACCEPT = ".epub,.md,.markdown,.txt,.html,.htm,.eml,.cbz,.pdf,.csv,.json,.zip,application/epub+zip,application/pdf,text/markdown,text/plain,text/html,message/rfc822,text/csv,application/json,application/zip";
   // The system's picker where there is one (it also grants a lasting
   // permission, for a clip that reads from the file); the browser's own
   // otherwise.
@@ -4552,7 +4663,7 @@
   // other way this time (a copy of one read from where it is, or back).
   const hasFile = (name, size, link) => state.pages.some((p) => p.file && p.file.name === name && p.file.size === size && !p.link === !link);
   const fileLike = (name, size, link) => state.pages.find((p) => p.file && p.file.name === name && p.file.size === size && !p.link === !link);
-  const FILE_KINDS_LINE = "EPUB, PDF, Markdown, text, HTML and CBZ comic files";
+  const FILE_KINDS_LINE = "EPUB, PDF, Markdown, text, HTML, email (.eml) and CBZ comic files";
   async function openFile(file, btn, open, ref) {
     if (!file) return;
     const label = btn ? btn.querySelector(".row-label") : null;
@@ -4653,7 +4764,7 @@
   // folder from before moves into it.
   const WATCH_KEY = "waypage.watch";
   const WATCHES_KEY = "waypage.watches";
-  const WATCH_EXTS = /\.(epub|pdf|cbz|md|markdown|txt|html?|xhtml)$/i;
+  const WATCH_EXTS = /\.(epub|pdf|cbz|md|markdown|txt|html?|xhtml|eml)$/i;
   let watching = null;
   function watches() {
     let list = load(WATCHES_KEY, null);
@@ -5439,7 +5550,7 @@
     const fromFile = preset || from ? null : el("section", { class: "settings-section batch-file" }, el("h2", { class: "overline" }, "File"),
       el("div", { class: "group" }, el("button", { class: "row", type: "button", onclick: () => pickFile(() => back()) },
         el("span", { class: "row-label accent" }, "Open a file"))),
-      el("p", { class: "meta" }, "An EPUB book, a Markdown or text note, an HTML page or a CBZ comic. It stays " + ON_HERE + "."));
+      el("p", { class: "meta" }, "An EPUB book, a Markdown or text note, an HTML page, an email (.eml) or a CBZ comic. It stays " + ON_HERE + "."));
     const form = el("form", { class: "batch-form" }, asPage, fromFile,
       el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Links"), area, count, finder, skipRow),
       el("section", { class: "settings-section" }, el("h2", { class: "overline" }, "Save as"),
@@ -7813,11 +7924,43 @@
       return;
     }
     if (!got || !got.text) return;
+    if (sharedWords(got.text)) { await toLibrary(); saveText(got.text, got.subject); return; }
     if (linksFrom(got.text).length > 1) { await toLibrary(); openBatch(got.text); return; }
     const url = linkFrom(got.text);
     if (!url) { toast("That share had no link in it."); return; }
     await toLibrary();
     savePage(url);
+  }
+
+  // Text shared on its own (1.10.0), say an email's words selected in Gmail,
+  // which has no way to share a whole message: a clip of its own, titled
+  // by the share's subject or its first line. Text with no link in it, or
+  // a link with a long passage around it (a link with a line or two about
+  // it is still the link, saved as before).
+  function sharedWords(text) {
+    const t = String(text).trim();
+    const links = linksFrom(t);
+    if (!links.length) return !linkFrom(t) && /\S/.test(t);
+    let rest = t;
+    for (const u of links) rest = rest.split(u).join(" ");
+    return (rest.match(/\S+/g) || []).length >= 60;
+  }
+  async function saveText(text, subject) {
+    const t = String(text).replace(/\r\n?/g, "\n").trim();
+    const first = (t.replace(/https?:\/\/\S+/gi, " ").split("\n").find((l) => l.trim()) || "").replace(/\s+/g, " ").trim() || "Shared text";
+    const title = (subject && subject.trim() !== t ? subject.trim() : "") || (first.length > 80 ? first.slice(0, 80).replace(/\s+\S*$/, "") + "…" : first);
+    try {
+      const meta = await C.files.bring(new File([t], "Shared text.txt", { type: "text/plain" }), "txt", { title });
+      state.pages.unshift(meta);
+      await C.store.writeIndex(state.pages);
+      await loadThumbs();
+      C.store.keepStored();
+      renderLibrary();
+      toast("Saved “" + meta.title + "”", "Open", () => openPage(meta.id));
+    } catch (e) {
+      if (!(e instanceof C.files.FileError)) console.error(e);
+      toast("Couldn't keep that text. Free some space and try again.");
+    }
   }
 
   paintPlace();

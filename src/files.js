@@ -17,12 +17,12 @@
   const S = () => C.store;
   const B = () => C.backup;
 
-  const KINDS = { epub: "EPUB", md: "Markdown", txt: "Text", html: "HTML", cbz: "Comic", pdf: "PDF" };
+  const KINDS = { epub: "EPUB", md: "Markdown", txt: "Text", html: "HTML", cbz: "Comic", pdf: "PDF", eml: "Email" };
   // Kinds whose pictures can be left in the file and read as they're needed.
   const LINKABLE = new Set(["epub", "cbz", "pdf"]);
   // Kinds that can be a clip reading from its file: all of them.
   const canLink = (kind) => !!KINDS[kind];
-  const EXTS = { epub: "epub", md: "md", markdown: "md", txt: "txt", text: "txt", html: "html", htm: "html", xhtml: "html", cbz: "cbz" };
+  const EXTS = { epub: "epub", md: "md", markdown: "md", txt: "txt", text: "txt", html: "html", htm: "html", xhtml: "html", cbz: "cbz", eml: "eml" };
   const PICTURE = /\.(jpe?g|png|gif|webp)$/i;
   const MIME_EXT = { "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp" };
 
@@ -69,6 +69,7 @@
       if ([...entries.keys()].some((n) => PICTURE.test(n))) return "cbz";
       return "zip";
     }
+    if (ext === "eml" || file.type === "message/rfc822" || (!ext && looksLikeMail(decode(head)))) return "eml";
     if (ext === "html" || /^\s*<(!doctype|html|head|body|meta)/i.test(decode(head))) {
       const text = await file.text();
       return /<meta\s+name="(waypage|carry-on)-page"/i.test(text) ? "clip" : "html";
@@ -284,6 +285,113 @@
       } catch (e) { /* the whole body, then */ }
     }
     return { body, title: title.replace(/\s+/g, " ").trim() || baseName(name), lang: doc.documentElement.getAttribute("lang") || "" };
+  }
+
+  // ---- Email (1.10.0) ----
+  // A saved message (.eml, as Apple Mail, Outlook or Gmail on a computer
+  // download it): its HTML part, or its text, with the pictures it carries
+  // inside (cid: addresses) kept like an EPUB's. Its subject is the title,
+  // its sender the byline. The HTML goes through fromHtml and cleanSaved
+  // like any page: mail is as untrusted as the web.
+
+  const looksLikeMail = (s) => /^[A-Za-z-]+:[^\n]*\n/.test(s) && /^from:/im.test(s) && /^(subject|date|mime-version|message-id|received):/im.test(s);
+  const latin1 = (bytes) => { let s = ""; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return s; };
+  const binBytes = (s) => Uint8Array.from(s, (c) => c.charCodeAt(0) & 0xff);
+  function inCharset(bin, charset) {
+    const bytes = binBytes(bin);
+    try { return new TextDecoder((charset || "utf-8").trim(), { fatal: !charset }).decode(bytes); } catch (e) { /* below */ }
+    try { return new TextDecoder("windows-1252").decode(bytes); } catch (e) { return bin; }
+  }
+  function unQuoted(s) {
+    return s.replace(/=\r?\n/g, "").replace(/=([0-9A-Fa-f]{2})/g, (m, h) => String.fromCharCode(parseInt(h, 16)));
+  }
+  // A header's words: raw 8-bit as UTF-8 when it is, and =?charset?B|Q?…?= words.
+  function headerWords(v) {
+    return inCharset(v || "").replace(/\?=\s+=\?/g, "?==?").replace(/=\?([^?]+)\?([bq])\?([^?]*)\?=/gi, (m, cs, enc, t) => {
+      try {
+        const bin = enc.toLowerCase() === "b" ? atob(t.replace(/[^A-Za-z0-9+/=]/g, "")) : unQuoted(t.replace(/_/g, " "));
+        return inCharset(bin, cs.replace(/\*.*$/, ""));
+      } catch (e) { return m; }
+    }).replace(/\s+/g, " ").trim();
+  }
+  function mimePart(bin) {
+    const cut = bin.search(/\r?\n\r?\n/);
+    const head = (cut < 0 ? bin : bin.slice(0, cut)).replace(/\r?\n[ \t]+/g, " ");
+    const body = cut < 0 ? "" : bin.slice(cut).replace(/^\r?\n\r?\n/, "");
+    const headers = {};
+    for (const line of head.split(/\r?\n/)) {
+      const m = line.match(/^([^:\s]+):\s*(.*)$/);
+      if (m && !(m[1].toLowerCase() in headers)) headers[m[1].toLowerCase()] = m[2];
+    }
+    return { headers, body };
+  }
+  function param(v, name) {
+    const m = String(v || "").match(new RegExp(";\\s*" + name + "\\*?=\\s*(\"([^\"]*)\"|[^;\\s]*)", "i"));
+    if (!m) return "";
+    const got = m[2] != null ? m[2] : m[1];
+    const ext = got.match(/^([^']*)'[^']*'(.*)$/);
+    if (ext) { try { return decodeURIComponent(ext[2]); } catch (e) { return ext[2]; } }
+    return got;
+  }
+  function partBytes(part) {
+    const cte = (part.headers["content-transfer-encoding"] || "").trim().toLowerCase();
+    if (cte === "base64") { try { return atob(part.body.replace(/[^A-Za-z0-9+/=]/g, "")); } catch (e) { return ""; } }
+    if (cte === "quoted-printable") return unQuoted(part.body);
+    return part.body;
+  }
+  function walkMail(part, got, depth) {
+    if (depth > 12) return;
+    const ct = part.headers["content-type"] || "text/plain";
+    const type = ct.split(";")[0].trim().toLowerCase();
+    const attached = /^\s*attachment/i.test(part.headers["content-disposition"] || "");
+    if (type.startsWith("multipart/")) {
+      const b = param(ct, "boundary");
+      if (!b) return;
+      const esc = b.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const pieces = part.body.split(new RegExp("(?:^|\\r?\\n)--" + esc + "(?:--)?[ \\t]*(?=\\r?\\n|$)"));
+      for (const piece of pieces.slice(1)) {
+        if (!piece.trim()) continue;
+        walkMail(mimePart(piece.replace(/^\r?\n/, "")), got, depth + 1);
+      }
+      return;
+    }
+    if (type === "message/rfc822") {
+      const inner = mimePart(partBytes(part));
+      walkMail(inner, got, depth + 1);
+      return;
+    }
+    if (/^image\//.test(type)) {
+      const id = (part.headers["content-id"] || "").replace(/^\s*<|>\s*$/g, "").trim();
+      const where = (part.headers["content-location"] || "").trim();
+      if (id || where) got.images.set(id || where, binBytes(partBytes(part)));
+      return;
+    }
+    if (attached) return;
+    if (type === "text/html" && got.html == null) got.html = inCharset(partBytes(part), param(ct, "charset"));
+    else if (type === "text/plain" && got.text == null) got.text = inCharset(partBytes(part), param(ct, "charset"));
+  }
+  function fromEmail(bytes, name) {
+    const top = mimePart(latin1(bytes));
+    const got = { html: null, text: null, images: new Map() };
+    walkMail(top, got, 0);
+    const subject = headerWords(top.headers.subject);
+    const from = headerWords(top.headers.from);
+    const sender = (from.match(/^\s*"?([^"<]*?)"?\s*</) || [])[1] || from.replace(/[<>]/g, "");
+    const when = Date.parse((top.headers.date || "").replace(/\s*\([^)]*\)\s*$/, ""));
+    if (got.html == null && got.text == null) throw new FileError("There's nothing to read in this email.");
+    const pics = pictures();
+    const doc = new DOMParser().parseFromString(got.html != null ? got.html : plain(got.text), "text/html");
+    for (const img of doc.querySelectorAll("img[src]")) {
+      const src = img.getAttribute("src");
+      const key = /^cid:/i.test(src) ? decodeURIComponent(src.slice(4)) : src;
+      const b = got.images.get(key);
+      const token = b && b.length && pics.add(b);
+      if (token) img.setAttribute("src", token);
+      else if (/^cid:/i.test(src)) img.remove();
+    }
+    const page = fromHtml("<!doctype html><title></title>" + doc.body.outerHTML, name);
+    const meta = [sender, isFinite(when) ? new Date(when).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" }) : ""].filter(Boolean).join(", ");
+    return { body: page.body, title: subject || page.title, byline: meta, lang: page.lang, pics };
   }
 
   // ---- CBZ ----
@@ -631,8 +739,10 @@
     if (kind === "pdf") return fromPdf(file, out, onProgress, pics);
     if (kind === "epub") got = await fromEpub(file, out);
     else {
-      const text = decode(new Uint8Array(await file.arrayBuffer()));
-      if (kind === "html") got = fromHtml(text, file.name);
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const text = kind === "eml" ? "" : decode(bytes);
+      if (kind === "eml") got = fromEmail(bytes, file.name);
+      else if (kind === "html") got = fromHtml(text, file.name);
       else {
         const body = new DOMParser().parseFromString(kind === "md" ? markdown(text) : plain(text), "text/html").body;
         const h = kind === "md" && body.querySelector("h1");
@@ -667,7 +777,7 @@
   // permission on the file (platform.files) when the clip is to read from
   // it; its pictures then stay in the file. Resolves to the clip's index
   // entry, or { already } when `has(name, size)` says it's here.
-  async function bring(file, kind, { has, onProgress, link = null } = {}) {
+  async function bring(file, kind, { has, onProgress, link = null, title = "" } = {}) {
     if (!KINDS[kind]) throw new FileError("Waypage can't open this kind of file.");
     if (has && has(file.name, file.size)) return { already: true };
     if (!file.size) throw new FileError("Waypage got nothing from " + file.name + ". If it's in a cloud folder, make it available offline and try again.");
@@ -686,7 +796,7 @@
     const { root } = got;
     const words = root.textContent;
     const meta = {
-      id, url: "", title: (got.title || baseName(file.name)).slice(0, 300), site: KINDS[kind], byline: (got.byline || "").slice(0, 200), licence: null,
+      id, url: "", title: (title || got.title || baseName(file.name)).slice(0, 300), site: KINDS[kind], byline: (got.byline || "").slice(0, 200), licence: null,
       savedAt: Date.now(), minutes: kind === "cbz" ? Math.max(1, Math.round(pics.n / 10)) : C.save.readingMinutes(words),
       lang: (got.lang || "").slice(0, 20), dir: got.dir || C.save.textDir(out, words), mode: "full", next: "", prev: "", at: 0, finished: false,
       images: root.querySelectorAll("img").length, missing: 0, imageBytes: pics.bytes,

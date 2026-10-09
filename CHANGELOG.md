@@ -2,6 +2,24 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.10.0] - 2026-10-09
+
+### Added
+- Save words from an email. Gmail can't share a whole message, so
+  select its text, tap Share and pick Waypage: it becomes a clip of its
+  own, titled by the subject (or its first line). Any text shared with
+  no link in it is kept this way, and so is a long passage with a link
+  inside; a link with a line or two about it is still saved as the page.
+- Email files open as clips. An .eml file (Download message in Gmail on a
+  computer, Save As in Apple Mail or Outlook) opens like any other file:
+  the email's own layout and the pictures inside it, with the subject as
+  the title and the sender and date under it. Attachments are left out.
+- Brightness while reading, in the app. Swipe up or down along the left
+  side of the text to make the screen brighter or dimmer; a slider shows
+  on the left while you swipe, and with the reader's bars, to drag. Your
+  level is kept for the next clip, and the phone's own comes back when you
+  leave the reader. Turn it off in the reader's Aa settings, under Layout.
+
 ## [1.9.0] - 2026-10-09
 
 ### Added

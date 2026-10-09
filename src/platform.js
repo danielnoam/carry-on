@@ -617,11 +617,11 @@
   // grants a lasting permission. `ref` is what that permission is held by:
   // a content:// address in the app, a stored handle in a browser (Chrome
   // and Edge on a computer; Firefox and Safari have no such picker).
-  const FILE_MIMES = ["application/epub+zip", "text/markdown", "text/x-markdown", "text/plain", "text/html",
+  const FILE_MIMES = ["application/epub+zip", "text/markdown", "text/x-markdown", "text/plain", "text/html", "message/rfc822",
     "application/pdf", "application/vnd.comicbook+zip", "application/x-cbz", "application/zip",
     // Another app's export to import (1.9.0).
     "text/csv", "text/comma-separated-values", "application/json"];
-  const FILE_EXTS = [".epub", ".md", ".markdown", ".txt", ".html", ".htm", ".pdf", ".cbz", ".csv", ".json", ".zip"];
+  const FILE_EXTS = [".epub", ".md", ".markdown", ".txt", ".html", ".htm", ".eml", ".pdf", ".cbz", ".csv", ".json", ".zip"];
   const PIECE = 4 << 20;
   const KEEP = 64 << 20;
 
@@ -837,6 +837,12 @@
       if (os === "ios") return iosMetered;
       const c = navigator.connection;
       return !!c && /^(cellular|wimax|bluetooth)$/.test(c.type || "");
+    },
+    // The reader's brightness (1.10.0), native/share's Brightness plugin.
+    brightness: {
+      get available() { return !!plugin("Brightness"); },
+      get: () => plugin("Brightness").get(),
+      set: (level) => plugin("Brightness").set(level == null ? {} : { level }),
     },
     get knowsConnection() { return os === "ios" ? !!plugin("Connection") : os === "android" && !!navigator.connection; },
     onConnection(f) {

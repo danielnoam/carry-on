@@ -8,8 +8,8 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="src/fonts.css?v=1.9.0">
-  <link rel="stylesheet" href="src/styles.css?v=1.9.0">
+  <link rel="stylesheet" href="src/fonts.css?v=1.10.0">
+  <link rel="stylesheet" href="src/styles.css?v=1.10.0">
 </head>
 <body>
   <div class="app" id="libraryView">
@@ -108,6 +108,12 @@
       </div>
     </header>
     <iframe class="reader-frame" id="readerFrame" sandbox="allow-same-origin" title="Saved clip"></iframe>
+    <div class="bright" id="bright" hidden>
+      <svg class="bright-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+      <div class="bright-track" id="brightTrack" role="slider" tabindex="0" aria-label="Brightness" aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50" aria-valuetext="50%">
+        <div class="bright-fill" id="brightFill"></div>
+      </div>
+    </div>
     <div class="read-foot" id="readFoot">
       <div class="read-left">
         <span class="read-section" id="readSection" dir="auto" aria-hidden="true"></span>
@@ -268,20 +274,20 @@
   </div>
   <div class="toast" id="toast" role="status" hidden></div>
 
-  <script src="src/platform.js?v=1.9.0"></script>
-  <script src="src/motion.js?v=1.9.0"></script>
-  <script src="src/vendor/Readability.js?v=1.9.0"></script>
-  <script src="src/store.js?v=1.9.0"></script>
-  <script src="src/save.js?v=1.9.0"></script>
-  <script src="src/feeds.js?v=1.9.0"></script>
-  <script src="src/backup.js?v=1.9.0"></script>
-  <script src="src/imports.js?v=1.9.0"></script>
-  <script src="src/sync.js?v=1.9.0"></script>
-  <script src="src/qr.js?v=1.9.0"></script>
-  <script src="src/epub.js?v=1.9.0"></script>
-  <script src="src/files.js?v=1.9.0"></script>
-  <script src="src/pdf.js?v=1.9.0"></script>
-  <script src="src/reader.js?v=1.9.0"></script>
-  <script src="src/app.js?v=1.9.0"></script>
+  <script src="src/platform.js?v=1.10.0"></script>
+  <script src="src/motion.js?v=1.10.0"></script>
+  <script src="src/vendor/Readability.js?v=1.10.0"></script>
+  <script src="src/store.js?v=1.10.0"></script>
+  <script src="src/save.js?v=1.10.0"></script>
+  <script src="src/feeds.js?v=1.10.0"></script>
+  <script src="src/backup.js?v=1.10.0"></script>
+  <script src="src/imports.js?v=1.10.0"></script>
+  <script src="src/sync.js?v=1.10.0"></script>
+  <script src="src/qr.js?v=1.10.0"></script>
+  <script src="src/epub.js?v=1.10.0"></script>
+  <script src="src/files.js?v=1.10.0"></script>
+  <script src="src/pdf.js?v=1.10.0"></script>
+  <script src="src/reader.js?v=1.10.0"></script>
+  <script src="src/app.js?v=1.10.0"></script>
 </body>
 </html>
