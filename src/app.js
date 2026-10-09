@@ -1409,11 +1409,14 @@
   // Several links saved one after another, in order, optionally into a
   // folder (so its pages follow the order of the links). A link already
   // saved isn't saved again; it just joins the folder at its place.
+  // `tags` is a list for every link, or (an import, 1.9.0) a function
+  // giving each link its own { tags, finished }.
   async function saveAll(all, folder, tags = [], mode, skipSaved, kind, source) {
     const name = folder ? folderName(folder) : null;
+    const per = typeof tags === "function" ? tags : () => ({ tags });
     const places = skipSaved && name ? placesBetween(all, name) : new Map();
     const urls = skipSaved ? all.filter((u) => !savedAs(u)) : all;
-    const jobs = urls.filter((u) => !savingAs(u)).map((u) => ({ ...newJob(u, name), tags, mode, kind, source: name ? source : undefined }));
+    const jobs = urls.filter((u) => !savingAs(u)).map((u) => ({ ...newJob(u, name), tags: [], ...per(u), mode, kind, source: name ? source : undefined }));
     state.saving = state.saving.filter((s) => !(s.error && jobs.some((j) => sameUrl(j.url, s.url))));
     const fresh = jobs.filter((j) => !savedAs(j.url));
     fresh.forEach((j) => { if (places.has(j.url)) j.folderAt = places.get(j.url); });
@@ -1430,8 +1433,8 @@
       if (existing) {
         had++;
         if (name) { joinFav(existing, name); existing.folder = name; existing.folderAt = Date.now(); if (source) existing.source = source; }
-        if (tags.length) existing.tags = withTags(existing.tags, tags);
-        if (name || tags.length) { await C.store.writeIndex(state.pages); renderLibrary(); if (state.folder) renderFolder(); }
+        if (job.tags.length) existing.tags = withTags(existing.tags, job.tags);
+        if (name || job.tags.length) { await C.store.writeIndex(state.pages); renderLibrary(); if (state.folder) renderFolder(); }
         continue;
       }
       if (saved + failed) await new Promise((done) => setTimeout(done, PACE_MS));
@@ -1536,6 +1539,7 @@
         meta.requested = job.url;
         if (job.folder) { meta.folder = folderName(job.folder); meta.folderAt = job.folderAt || Date.now(); if (job.source) meta.source = job.source; }
         if (job.tags && job.tags.length) meta.tags = withTags([], job.tags);
+        if (job.finished) meta.finished = true;
         state.pages.unshift(meta);
         await indexSoon();
       }
@@ -4059,6 +4063,7 @@
     feed: { label: "Feed", build: feedSheet },
     export: { label: "Export", build: () => exportControls(state.menu.page, () => history.back()) },
     keys: { label: "Keyboard shortcuts", build: keysSheet },
+    importList: { label: "Import", build: () => importSheet() },
   };
   let menuUnder = [];
 
@@ -4422,7 +4427,7 @@
   // (0.31.0): a backup is restored, a clip sent as a file comes back, and
   // a book, a note, a page or a comic becomes a clip of its own. `open`
   // opens it once it's in.
-  const FILE_ACCEPT = ".epub,.md,.markdown,.txt,.html,.htm,.cbz,.pdf,application/epub+zip,application/pdf,text/markdown,text/plain,text/html";
+  const FILE_ACCEPT = ".epub,.md,.markdown,.txt,.html,.htm,.cbz,.pdf,.csv,.json,.zip,application/epub+zip,application/pdf,text/markdown,text/plain,text/html,text/csv,application/json,application/zip";
   // The system's picker where there is one (it also grants a lasting
   // permission, for a clip that reads from the file); the browser's own
   // otherwise.
@@ -4452,6 +4457,46 @@
       openFile(f, null, true);
     });
     input.click();
+  }
+
+  // ---- Import (1.9.0) ----
+  // Pocket's, Instapaper's or Omnivore's export (src/imports.js), saved as
+  // one run like a list of links: their tags kept, the ones read there
+  // marked read here, oldest first so the newest ends up on top. Links
+  // already saved only get the tags.
+  let importing = null;
+  function importSheet() {
+    const x = importing;
+    if (!x) return el("div");
+    const fresh = x.items.filter((it) => !savedAs(it.url));
+    const unread = fresh.filter((it) => !it.read);
+    let which = unread.length ? "unread" : "all";
+    const n = () => (which === "unread" ? unread : fresh).length;
+    const go = el("button", { class: "btn-primary import-go", type: "button" });
+    const note = el("p", { class: "footnote" });
+    const paint = () => {
+      go.textContent = n() ? "Save " + countLine(n()) : "Nothing new to save";
+      go.disabled = !n();
+      note.textContent = n() ? "They save one after another, in Downloads, about " + Math.max(1, Math.round(n() * 3 / 60)) + " min" + (n() > 40 ? "; Waypage needs to stay open" : "") + ". Their tags come along" + (which === "all" && fresh.length > unread.length ? ", and the ones you read there are marked read" : "") + "." : "Everything in it is already in your library.";
+    };
+    go.addEventListener("click", () => {
+      const list = which === "unread" ? unread : fresh;
+      const by = new Map(list.map((it) => [it.url, it]));
+      importing = null;
+      back().then(() => saveAll(list.map((it) => it.url), null, (u) => ({ tags: (by.get(u) || {}).tags || [], finished: !!(by.get(u) || {}).read }), undefined, true));
+    });
+    paint();
+    const from = x.source === "a list" ? "a list of links" : x.source === "bookmarks" ? "your bookmarks" : x.source;
+    return el("div", { class: "page-controls import-sheet" },
+      el("div", { class: "menu-head" },
+        el("p", { class: "menu-title" }, "Import from " + from),
+        el("p", { class: "meta" }, [x.items.length === 1 ? "1 link" : x.items.length + " links", x.items.length - fresh.length ? (x.items.length - fresh.length) + " already here" : ""].filter(Boolean).join(" · "))),
+      fresh.length > unread.length && unread.length ? seg("import-which", "Which", [
+        { value: "unread", label: "To read · " + unread.length },
+        { value: "all", label: "All · " + fresh.length },
+      ], which, (v) => { which = v; paint(); }) : null,
+      note,
+      go);
   }
 
   // Keep a copy, or read from the file where it is? Asked for every file
@@ -4514,6 +4559,15 @@
     if (btn) btn.disabled = true;
     say("Opening…");
     try {
+      // Another read-later app's export (1.9.0): its links, to save.
+      const exported = await C.imports.read(file).catch(() => null);
+      if (exported) {
+        if (ref) C.platform.files.release(ref);
+        if (btn) { btn.disabled = false; say("Restore or open a file"); }
+        importing = exported;
+        openMenu("importList");
+        return;
+      }
       const kind = await C.files.kindOf(file);
       // Already here from the watched folder (1.1.3), copy or not.
       const inFolder = C.files.KINDS[kind] && state.pages.find((p) => p.watched && p.file && p.file.name === file.name && p.file.size === file.size);
@@ -4836,7 +4890,13 @@
         el("button", { class: "row", type: "button", onclick: (e) => backUp(e.currentTarget) },
           el("span", { class: "row-label accent" }, "Back up the library")),
         open, input),
-      el("p", { class: "footnote" }, "One file with every clip, its pictures, tags, collections and where you were, and the feeds you follow. " + (C.platform.native ? "Keep it off the phone" : "Keep it somewhere other than this browser") + ". Restoring keeps whichever copy of a clip was saved last. A clip sent as a file opens here too."));
+      el("p", { class: "footnote" }, "One file with every clip, its pictures, tags, collections and where you were, and the feeds you follow. " + (C.platform.native ? "Keep it off the phone" : "Keep it somewhere other than this browser") + ". Restoring keeps whichever copy of a clip was saved last. A clip sent as a file opens here too."),
+      el("h2", { class: "overline" }, "Import"),
+      el("div", { class: "group" },
+        el("button", { class: "row", type: "button", onclick: (e) => (C.platform.files.canLink ? pickFile() : input.click()) },
+          el("span", { class: "choice-text" },
+            el("span", { class: "choice-label accent" }, "Import from Pocket, Instapaper or Omnivore"),
+            el("span", { class: "choice-note" }, "Pick the file the app exported: a CSV, an HTML page, or Omnivore's zip. Raindrop's CSV and a browser's bookmarks work too.")))));
   }
 
   // ---- Sync (0.30.0) ----
