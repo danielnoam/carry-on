@@ -280,6 +280,17 @@ and the page shows above it.
   an × that stops watching it (its files stay as files); then the
   accent row "Watch another folder"; the footnote says folders become
   collections and deleted files leave.
+- **Brightness slider (Now, 1.10.0, app only):** a card on the left of
+  the text, vertically centered, `--surface` with a `--line` border,
+  `--r-lg` and the card shadow: a sun icon in `--muted` above a 44 px wide
+  track (`--bar`, `--r-md`, at most 280 px or 40% of the height) filled
+  from the bottom in `--accent`. It shows with the reader's bars and
+  while the left edge is swiped, sliding in 12 px with a fade on the
+  control spring (reduced motion: a 120 ms fade only), and leaves 700 ms
+  after the swipe ends. It's a `role="slider"` with arrow keys; dragging
+  anywhere on the track sets the level. The switch "Brightness on the
+  left edge" sits in the Aa sheet's Layout tab and in Settings, Reading
+  type.
 - **On mobile data (Now, 1.4.1, Android):** a choice group in Saving
   ("Save" / "Wait for Wi-Fi") and in Sync ("Sync" / "Wait for Wi-Fi"),
   each option with a note on what waits. A save made while waiting is a

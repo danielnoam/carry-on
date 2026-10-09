@@ -49,6 +49,7 @@ const DOCS = [
   ["PDF", ["com.adobe.pdf"], "Alternate"],
   ["Comic", ["io.github.danielnoam.waypage.cbz"], "Owner"],
   ["Note", ["net.daringfireball.markdown", "public.plain-text", "public.html"], "Alternate"],
+  ["Email", ["com.apple.mail.email"], "Alternate"],
 ];
 const docType = ([name, types, rank]) => "<dict>\n"
   + "\t\t\t<key>CFBundleTypeName</key>\n\t\t\t" + str(name) + "\n"

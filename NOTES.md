@@ -3,6 +3,31 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Brightness while reading (1.10.0).** native/share's Brightness
+  plugin: Android sets the window's screenBrightness (dropped by Android
+  when you leave the app, and reset to BRIGHTNESS_OVERRIDE_NONE when the
+  reader closes); iOS sets UIScreen.brightness, which is the whole
+  phone's and outlives the app, so the plugin keeps the level from before
+  and puts it back on willResignActive and when the reader lets go, and
+  sets the reader's again on didBecomeActive. The swipe is caught in the
+  sandboxed frame's document (same origin, no scripts in it): a touch
+  starting in the left 18% (at least 56 px) that moves up or down more
+  than 10 px before 14 px sideways; from its start the page's own scroll
+  is prevented there, the cost of the gesture. App only: a browser can't
+  change the screen, and a dimming layer would pretend to.
+- **Saving from email (1.10.0).** Gmail on Android and iOS shares a
+  link or selected text, never a whole message, and a forwarding address
+  needs a server (ruled out in PROPOSAL.md). So the fast path is text:
+  saveShared keeps a share as a clip when it has no link in it, or when
+  60 words or more surround its links; otherwise it's the link, as
+  before. The clip is a copied "txt" file clip (files.bring with a
+  title), so it syncs and lives in Clips. An .eml file is the full route:
+  files.js reads the MIME tree itself (no dependency), takes the first
+  text/html part (or text/plain), swaps cid: pictures for their bytes
+  like an EPUB's, skips attachments, and sends the HTML through fromHtml
+  and cleanSaved like any page. A file with no extension is sniffed as
+  mail when it starts with headers including From and one of Subject,
+  Date, MIME-Version, Message-ID or Received.
 - **Highlight widget (1.9.0).** updateWidgets() hands the native side
   the latest 100 highlights (text up to 500 characters, note up to 200);
   the widget picks `marks[day % n]`, so it changes at midnight without the

@@ -33,6 +33,15 @@ native code.
 
 - **Moving a big library is file by file over the bridge:** fine for
   hundreds of megabytes; a native copy would be quicker for gigabytes.
+- **Saving from email (1.10.0, Daniel, 9 Oct):** shared text becomes a
+  clip, and .eml files open. Open: try both on a phone, Gmail's Share
+  on selected text especially; on iOS a long passage goes through the
+  waypage:// address, so check a long email arrives whole. Attachments
+  in an .eml are left out (a PDF one could become its own clip).
+- **Brightness while reading (1.10.0, Daniel, 9 Oct):** try on both
+  phones, iOS especially (the level from before should come back when
+  you leave Waypage). Open: a way back to the phone's own level without
+  turning the swipe off.
 
 ## iOS, after 1.6.0
 

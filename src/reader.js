@@ -780,6 +780,41 @@
     }, { passive: false });
   }
 
+  // Brightness from the left edge (1.10.0): a touch that starts in the
+  // left part of the page and goes up or down is the brightness, not a
+  // scroll. onEdge: { start(), move(d) with d the change, -1 to 1, end() }.
+  let onEdge = null;
+  function edgeInput() {
+    let e0 = null;
+    doc.addEventListener("touchstart", (e) => {
+      e0 = null;
+      if (!onEdge || !onEdge.on() || e.touches.length !== 1 || pinch) return;
+      const t = e.touches[0], w = frame.contentWindow;
+      if (t.clientX > Math.max(56, w.innerWidth * 0.18)) return;
+      e0 = { x: t.clientX, y: t.clientY, on: false, h: w.innerHeight };
+    }, { passive: true });
+    doc.addEventListener("touchmove", (e) => {
+      if (!e0) return;
+      if (e.touches.length !== 1) { if (e0.on) onEdge.end(); e0 = null; return; }
+      const t = e.touches[0], dx = t.clientX - e0.x, dy = t.clientY - e0.y;
+      if (!e0.on) {
+        if (Math.abs(dx) > 14 && Math.abs(dx) > Math.abs(dy)) { e0 = null; return; }
+        if (e.cancelable) e.preventDefault();
+        if (Math.abs(dy) < 10) return;
+        e0.on = true;
+        e0.y = t.clientY;
+        if (tapTimer) { clearTimeout(tapTimer); tapTimer = 0; }
+        onEdge.start();
+        return;
+      }
+      if (e.cancelable) e.preventDefault();
+      onEdge.move(-(t.clientY - e0.y) / (e0.h * 0.6));
+    }, { passive: false });
+    const end = () => { if (e0 && e0.on) onEdge.end(); e0 = null; };
+    doc.addEventListener("touchend", end);
+    doc.addEventListener("touchcancel", end);
+  }
+
   // Turns pages with a swipe and the arrow keys. The page can't scroll on
   // its own (overflow hidden), so a sideways swipe is all a page turn.
   function pagedInput() {
@@ -824,7 +859,7 @@
   // `next` ({ over, title, go }) adds a link to the next page at the end;
   // `top` () gives the height the bar covers; onImage(info) opens a tapped
   // image.
-  function open(iframe, html, meta, { at = 0, spot: spotAt = "", onPosition, onScroll, next, top, onImage: image, onTap: tap, onMark: mark, onSelect, pages: asPages, bottom, onKey } = {}) {
+  function open(iframe, html, meta, { at = 0, spot: spotAt = "", onPosition, onScroll, next, top, onImage: image, onTap: tap, onMark: mark, onSelect, pages: asPages, bottom, onKey, onEdge: edge } = {}) {
     frame = iframe;
     turning = null;
     paged = !!asPages;
@@ -838,6 +873,7 @@
     onImage = image || null;
     onTap = tap || null;
     onMark = mark || null;
+    onEdge = edge || null;
     heads = [];
     topSpace = top || null;
     bottomSpace = bottom || null;
@@ -874,6 +910,7 @@
         if (isPaged()) doc.documentElement.classList.add("co-paged");
         pagedInput();
         zoomInput();
+        edgeInput();
         // Keys pressed in the page that it doesn't use itself go to the
         // app's shortcuts (1.5.0).
         if (onKey) doc.addEventListener("keydown", (e) => { if (!e.defaultPrevented) onKey(e); });
