@@ -2,6 +2,15 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.10.1] - 2026-10-09
+
+### Changed
+- The Collection widget leads with what to read: the next clip, then the
+  Continue button right under it (Start or Read again when that fits),
+  then the clips after it. On a short widget the button was cut off at
+  the bottom, leaving only a list. Clips there show how much is left,
+  without their site.
+
 ## [1.10.0] - 2026-10-09
 
 ### Added

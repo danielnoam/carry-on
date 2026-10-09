@@ -660,11 +660,14 @@ and the page shows above it.
   page's width; Ctrl and the wheel do the same on a desktop. A single
   tap still shows or hides the bar.
 - **Collection widget (0.35.0, Android):** its own card (1.2.1) with the
-  collection's name and "2 of 9 read" as its head over its next four
-  clips to read, and along the bottom (1.2.3) a full-width pill button
-  in `--accent`, 40 dp tall, "Start" before anything in it was opened,
-  "Continue" while reading, "Read again" when all of it is read, that
-  opens the next clip. The picker's
+  collection's name and "2 of 9 read" as its head, then the clip to read
+  next (its title in serif over two lines, "12 min left" under it), then
+  (1.10.1, first under that clip rather than along the bottom, so a short
+  widget never cuts it off) a full-width pill button in `--accent`, 40 dp
+  tall, "Start" before anything in it was opened, "Continue" while
+  reading, "Read again" when all of it is read, that opens that clip;
+  then the clips after it, as many as fit, each with how much is left and
+  no site. The picker's
   preview shows the card with two sample chapters. Placing it opens a dialog in the widget's colours,
   "Show which collection?", one 48 dp row per collection (name in serif,
   how much is read under it). A widget whose collection is gone says

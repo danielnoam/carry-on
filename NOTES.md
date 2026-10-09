@@ -3,6 +3,12 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Collection widget, button first (1.10.1).** The button sat at the
+  bottom under four 44 dp rows; a RemoteViews LinearLayout clips what
+  doesn't fit, so at the default 3-cell height the button was the part
+  cut off (Daniel saw only clips). Now the next clip, then the button,
+  then the rest: the rows are what gets clipped. The clip list starts at
+  the clip the button opens (the first one again for Read again).
 - **Brightness while reading (1.10.0).** native/share's Brightness
   plugin: Android sets the window's screenBrightness (dropped by Android
   when you leave the app, and reset to BRIGHTNESS_OVERRIDE_NONE when the

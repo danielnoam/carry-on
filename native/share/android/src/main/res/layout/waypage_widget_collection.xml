@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One collection (0.35.0; its own layout in 1.2.1): its name, the next
-     clips to read, and along the bottom (1.2.3) a Start, Continue or Read
-     again button that opens its next clip.
+<!-- One collection (0.35.0; its own layout in 1.2.1): its name, the clip
+     to read next with a Start, Continue or Read again button under it
+     (1.10.1: the button came first, so a short widget no longer cuts it
+     off), then the clips after it as far as there's room.
      The texts here are what the widget picker's preview shows; the app's
      data replaces every one of them (Widgets.collection). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -44,7 +45,7 @@
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:fontFamily="serif"
-            android:maxLines="1"
+            android:maxLines="2"
             android:text="@string/waypage_w_collection_eg1"
             android:textColor="@color/waypage_w_ink"
             android:textSize="15sp"
@@ -59,6 +60,23 @@
             android:textColor="@color/waypage_w_muted"
             android:textSize="12sp" />
     </LinearLayout>
+    <TextView
+        android:id="@+id/w_go"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:layout_marginBottom="6dp"
+        android:background="@drawable/waypage_widget_pill"
+        android:gravity="center"
+        android:minHeight="40dp"
+        android:paddingLeft="14dp"
+        android:paddingRight="14dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:text="@string/waypage_w_start"
+        android:textColor="@color/waypage_w_bg"
+        android:textSize="13sp"
+        android:textStyle="bold" />
     <LinearLayout
         android:id="@+id/w_fav1"
         android:layout_width="match_parent"
@@ -151,20 +169,4 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1" />
-    <TextView
-        android:id="@+id/w_go"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:background="@drawable/waypage_widget_pill"
-        android:gravity="center"
-        android:minHeight="40dp"
-        android:paddingLeft="14dp"
-        android:paddingRight="14dp"
-        android:paddingTop="8dp"
-        android:paddingBottom="8dp"
-        android:text="@string/waypage_w_start"
-        android:textColor="@color/waypage_w_bg"
-        android:textSize="13sp"
-        android:textStyle="bold" />
 </LinearLayout>

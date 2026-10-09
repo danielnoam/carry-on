@@ -1,7 +1,7 @@
 // Waypage: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "1.10.0";
+  const APP_VERSION = "1.10.1";
   window.Waypage.version = APP_VERSION;
 
   const C = window.Waypage;
@@ -6197,13 +6197,15 @@
         collections: allFolders().sort((a, b) => a.localeCompare(b)).map((name) => {
           const list = folderPages(name);
           const i = list.findIndex((x) => !x.finished);
-          const from = i < 0 ? Math.max(0, list.length - 4) : i;
+          // The clip the button opens comes first, then the ones after it
+          // (1.10.1); no sites, just how much is left.
+          const from = i < 0 ? 0 : i;
           // Its button (1.2.1): Start before anything in it was opened,
           // Continue while reading, Read again when all of it is read.
           const next = i < 0 ? list[0] : list[i];
           const started = list.some((x) => x.readAt || x.finished || (x.at || 0) > 0.02);
           return { name, meta: readCount(list), next: next ? next.id : "", button: !next ? "" : i < 0 ? "Read again" : started ? "Continue" : "Start",
-            clips: list.slice(from, from + 4).map((x) => ({ id: x.id, title: x.title, meta: clipMeta(x) })) };
+            clips: list.slice(from, from + 4).map((x) => ({ id: x.id, title: x.title, meta: readingLine(x) })) };
         }),
       });
     }, 800);
