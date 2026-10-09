@@ -44,7 +44,8 @@ public class WidgetsPlugin: CAPPlugin, CAPBridgedPlugin {
         lastHandled = url
         let q = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
         var out: [String: Any] = ["kind": kind]
-        if kind == "page", let id = url.pathComponents.last, id != "/" { out["id"] = id }
+        if kind == "page" || kind == "mark", let id = url.pathComponents.last, id != "/" { out["id"] = id }
+        if kind == "mark" { out["mark"] = q.first { $0.name == "mark" }?.value ?? "" }
         if kind == "post" { out["url"] = q.first { $0.name == "url" }?.value ?? "" }
         if kind == "collection" { out["name"] = q.first { $0.name == "name" }?.value ?? "" }
         pending = out

@@ -18,6 +18,8 @@
     <string name="waypage_w_favourites_about">Your favourite collections and clips, one tap away.</string>
     <string name="waypage_w_collection">Collection</string>
     <string name="waypage_w_collection_about">One collection\'s next clips to read, and a button to its next one.</string>
+    <string name="waypage_w_highlight">A highlight</string>
+    <string name="waypage_w_highlight_about">One of your highlights, a different one each day.</string>
     <string name="waypage_w_start">Start</string>
     <string name="waypage_w_collection_eg1">Chapter one</string>
     <string name="waypage_w_collection_eg2">Chapter two</string>

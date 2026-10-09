@@ -57,6 +57,8 @@ final class Widgets {
         int[] favs = m.getAppWidgetIds(new ComponentName(ctx, FavouritesWidget.class));
         if (favs.length > 0) m.updateAppWidget(favs, favourites(ctx));
         for (int id : m.getAppWidgetIds(new ComponentName(ctx, CollectionWidget.class))) m.updateAppWidget(id, collection(ctx, id));
+        int[] marks = m.getAppWidgetIds(new ComponentName(ctx, HighlightWidget.class));
+        if (marks.length > 0) m.updateAppWidget(marks, highlight(ctx));
     }
 
     // `what` goes in the intent's address so each tap is its own
@@ -143,6 +145,36 @@ final class Widgets {
                 : Uri.parse("waypage-widget://page/" + Uri.encode(p.optString("id", "")));
             v.setOnClickPendingIntent(FAVS[i], open(ctx, 31 + i, what));
         }
+        return v;
+    }
+
+    // ---- A highlight a day (1.9.0) ----
+    // The app hands over its highlights, latest first; the widget shows the
+    // one for today's date, so it changes each day with the app closed (it
+    // redraws every few hours). A tap opens the clip at the highlight.
+    static RemoteViews highlight(Context ctx) {
+        RemoteViews v = new RemoteViews(ctx.getPackageName(), R.layout.waypage_widget_highlight);
+        JSONArray list = data(ctx).optJSONArray("marks");
+        int n = list == null ? 0 : list.length();
+        if (n == 0) {
+            v.setTextViewText(R.id.w_quote, "Select words in a clip and tap Highlight. One of your highlights shows here each day.");
+            v.setViewVisibility(R.id.w_note, View.GONE);
+            v.setViewVisibility(R.id.w_meta, View.GONE);
+            v.setOnClickPendingIntent(R.id.w_root, open(ctx, 40, Uri.parse("waypage-widget://library")));
+            return v;
+        }
+        long day = (System.currentTimeMillis() + java.util.TimeZone.getDefault().getOffset(System.currentTimeMillis())) / 86400000L;
+        JSONObject m = list.optJSONObject((int) (day % n));
+        if (m == null) m = new JSONObject();
+        v.setTextViewText(R.id.w_quote, "\u201C" + m.optString("text", "") + "\u201D");
+        String note = m.optString("note", "");
+        v.setViewVisibility(R.id.w_note, note.isEmpty() ? View.GONE : View.VISIBLE);
+        v.setTextViewText(R.id.w_note, note);
+        v.setViewVisibility(R.id.w_meta, View.VISIBLE);
+        v.setTextViewText(R.id.w_meta, m.optString("title", ""));
+        Uri what = Uri.parse("waypage-widget://mark/" + Uri.encode(m.optString("id", ""))).buildUpon()
+            .appendQueryParameter("mark", m.optString("mark", "")).build();
+        v.setOnClickPendingIntent(R.id.w_root, open(ctx, 41, what));
         return v;
     }
 
