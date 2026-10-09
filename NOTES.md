@@ -3,6 +3,20 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Settings sorted (1.12.0).** Daniel approved the layout in the
+  artifact "Waypage Settings Layout". Appearance had grown to hold the
+  theme, all the reading type and the library's layout, and Content was
+  a page with one row. SECTIONS now has appearance, reading, library,
+  saving (with watchGroup and the new importGroup), sync, storage,
+  updates, report. The Auto boxes are `#autoSection`, hidden unless the
+  theme is Auto; Theme's set toggles it in place so focus stays. The
+  Animations switch (`waypage.animations`, default on) sets
+  `data-motion="off"` on the root through motion.setStill: run() then
+  resolves at once, reduced() is true (so code that skips the library
+  drift or the viewer's grow skips them too), reader.js scrolls and turns
+  instantly, and styles.css drops every transition and the press dip.
+  aloudControls works with no clip open now: the voice is for the
+  phone's language.
 - **Grow on the GPU (1.11.1).** Daniel: the grow looked frame by frame
   and the card changed a frame after the shrink landed. The grow animated
   left/top/width/height and a clip-path, all main-thread, while the

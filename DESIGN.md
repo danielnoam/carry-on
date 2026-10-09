@@ -134,6 +134,8 @@ and the page shows above it.
 - Toasts and bars come in from their nearest edge and leave the same
   way. The brightness slider slides past the left edge. Checkmarks grow.
 - The picture viewer grows from the picture and shrinks back into it.
+- Settings, Appearance, Animations off (1.12.0): nothing moves or
+  eases, not even the reduced-motion fades; spinners still turn.
 - Only `transform` and `opacity` move on screens; small menus use a
   clip-path. In scroll mode the next chapter comes up from the bottom,
   in Pages it turns sideways. `inert` on the

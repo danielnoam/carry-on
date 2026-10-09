@@ -2,6 +2,24 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.12.0] - 2026-10-09
+
+### Added
+- An Animations switch in Settings, Appearance. Off, screens, menus and
+  pages change at once with nothing moving, for a slower phone or if you
+  would rather things just change.
+- Read aloud's voice, speed and switches are in Settings, Reading, as
+  well as in the reader's Aa sheet.
+
+### Changed
+- Settings are sorted by what you came to change: Appearance (theme and
+  animations), Reading (type, page, brightness swipe, read aloud) and
+  Library (layout, Continue reading, new chapters); then Saving, Sync
+  and Storage; then About and Report a problem.
+- Saving now holds everything that brings clips in, including watched
+  folders (the Content page is gone) and Import (it was under Storage).
+- The two Auto theme boxes show only while the theme is Auto.
+
 ## [1.11.1] - 2026-10-09
 
 ### Changed

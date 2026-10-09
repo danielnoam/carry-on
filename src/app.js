@@ -1,7 +1,7 @@
 // Waypage: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "1.11.1";
+  const APP_VERSION = "1.12.0";
   window.Waypage.version = APP_VERSION;
 
   const C = window.Waypage;
@@ -31,8 +31,10 @@
   const SEEN_KEY = "waypage.seenVersion";
   const SORT_KEY = "waypage.sort";
   const CONTINUE_KEY = "waypage.continue";
+  // Settings, Appearance, Animations (1.12.0): false turns every animation off.
+  const MOTION_KEY = "waypage.animations";
   const LAYOUT_KEY = "waypage.layout";
-  // The library's three looks (0.28.0); Settings, Appearance picks one.
+  // The library's three looks (0.28.0); Settings, Library picks one.
   const LAYOUTS = [
     { value: "shelf", label: "Shelf", note: "Collections as a row of covers, clips listed under them" },
     { value: "list", label: "One list", note: "Collections and clips together, grouped by date or site" },
@@ -71,6 +73,7 @@
   function store(key, value) {
     try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* not kept */ }
   }
+  M.setStill(load(MOTION_KEY, true) === false);
 
   let toastTimer = null;
   function toast(text, act, onAct) {
@@ -901,7 +904,7 @@
   function openSearch() {
     searchOpen = true;
     paintSearch();
-    window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    window.scrollTo({ top: 0, behavior: M.reduced() ? "auto" : "smooth" });
     $("librarySearch").focus({ preventScroll: true });
   }
   function closeSearch() {
@@ -2315,7 +2318,7 @@
     return { items, map, first };
   }
 
-  const langOf = (p) => (p.lang || navigator.language || "en").toLowerCase().replace(/^iw\b/, "he");
+  const langOf = (p) => ((p && p.lang) || navigator.language || "en").toLowerCase().replace(/^iw\b/, "he");
   const primary = (lang) => String(lang || "").toLowerCase().split(/[-_]/)[0].replace(/^iw$/, "he");
   const voiceFor = (p) => load(VOICE_KEY, {})[primary(langOf(p))] || "";
 
@@ -5008,7 +5011,7 @@
       if (added || gone || got.some((g) => g.joined)) { renderLibrary(); updateWidgets(); }
       return { added, gone };
     })();
-    try { return await watching; } finally { watching = null; if (state.section === "content") renderSection(); }
+    try { return await watching; } finally { watching = null; if (state.section === "saving") renderSection(); }
   }
   async function lookInOne(w, said, scan) {
     const out = { name: w.name, added: 0, gone: 0, joined: 0, failed: [], lost: false };
@@ -5170,7 +5173,7 @@
       if (had.lost) { delete had.lost; saveWatch(had); }
       else toast("Already watching " + got.name + ".");
     } else store(WATCHES_KEY, [...list, { tree: got.ref, name: got.name }]);
-    if (state.section === "content") renderSection();
+    if (state.section === "saving") renderSection();
     await lookInFolder(true, { tree: got.ref });
   }
   // A file removed from Waypage that's still in its watched folder isn't
@@ -5187,7 +5190,7 @@
     for (const p of state.pages) if (p.watched === w.tree) delete p.watched;
     await C.store.writeIndex(state.pages);
     store(WATCHES_KEY, watches().filter((x) => x.tree !== w.tree));
-    if (state.section === "content") renderSection();
+    if (state.section === "saving") renderSection();
     toast("Stopped watching " + w.name + ". Its files stay in your library.");
   }
 
@@ -5202,13 +5205,19 @@
         el("button", { class: "row", type: "button", onclick: (e) => backUp(e.currentTarget) },
           el("span", { class: "row-label accent" }, "Back up the library")),
         open, input),
-      el("p", { class: "footnote" }, "One file with every clip, its pictures, tags, collections and where you were, and the feeds you follow. " + (C.platform.native ? "Keep it off the phone" : "Keep it somewhere other than this browser") + ". Restoring keeps whichever copy of a clip was saved last. A clip sent as a file opens here too."),
-      el("h2", { class: "overline" }, "Import"),
-      el("div", { class: "group" },
-        el("button", { class: "row", type: "button", onclick: (e) => (C.platform.files.canLink ? pickFile() : input.click()) },
+      el("p", { class: "footnote" }, "One file with every clip, its pictures, tags, collections and where you were, and the feeds you follow. " + (C.platform.native ? "Keep it off the phone" : "Keep it somewhere other than this browser") + ". Restoring keeps whichever copy of a clip was saved last. A clip sent as a file opens here too."));
+  }
+  // Import, in Saving since 1.12.0 (it was under Backup): the same picker.
+  function importGroup() {
+    const input = el("input", { type: "file", class: "visually-hidden", tabindex: "-1", "aria-hidden": "true" });
+    const open = el("button", { class: "row", type: "button", onclick: () => (C.platform.files.canLink ? pickFile() : input.click()) },
           el("span", { class: "choice-text" },
             el("span", { class: "choice-label accent" }, "Import from Pocket, Instapaper or Omnivore"),
-            el("span", { class: "choice-note" }, "Pick the file the app exported: a CSV, an HTML page, or Omnivore's zip. Raindrop's CSV and a browser's bookmarks work too.")))));
+            el("span", { class: "choice-note" }, "Pick the file the app exported: a CSV, an HTML page, or Omnivore's zip. Raindrop's CSV and a browser's bookmarks work too.")));
+    input.addEventListener("change", () => { const f = input.files[0]; input.value = ""; openFile(f, open); });
+    return el("section", { class: "settings-section", id: "importSection" },
+      el("h2", { class: "overline" }, "Import"),
+      el("div", { class: "group" }, open, input));
   }
 
   // ---- Sync (0.30.0) ----
@@ -5344,7 +5353,7 @@
   // off, the three steps to a first device and a way in for the next one;
   // on, the state and a code that sets up another device.
   function syncSections() {
-    return C.sync.on ? [syncState(), dataGroup(DATA_SYNC_KEY, "Sync", "Syncs on any connection.", "Syncs when you're on Wi-Fi. Changes wait until then."), syncWhat(), syncShare(), syncLeave()] : [syncSteps(), syncJoin()];
+    return C.sync.on ? [syncState(), syncWhat(), dataGroup(DATA_SYNC_KEY, "Sync", "Syncs on any connection.", "Syncs when you're on Wi-Fi. Changes wait until then."), syncShare(), syncLeave()] : [syncSteps(), syncJoin()];
   }
   async function connectSync(text, btn) {
     if (btn) { btn.disabled = true; btn.textContent = "Connecting…"; }
@@ -7444,7 +7453,8 @@
       key: THEME_KEY,
       label: "Theme",
       get: () => state.theme,
-      set: setTheme,
+      // The Auto boxes show only while Auto is picked (1.12.0).
+      set: (v) => { setTheme(v); const a = $("autoSection"); if (a) a.hidden = v !== "system"; },
       options: [
         { value: "system", label: "Auto", note: "Your light and dark themes, following your phone", swatch: autoSwatch(), auto: true },
         ...THEMES.map((t) => ({ value: t.value, label: t.label, note: t.note, swatch: [t.value] })),
@@ -7507,20 +7517,44 @@
   function autoGroup() {
     const a = autoThemes();
     const row = (text, control) => el("div", { class: "rc-row stack" }, el("span", { class: "rc-label" }, text), control);
-    return el("section", { class: "settings-section" },
-      el("h2", { class: "overline" }, "Auto"),
+    const box = el("section", { class: "settings-section", id: "autoSection" },
+      el("h2", { class: "overline" }, "Auto uses"),
       el("div", { class: "group" },
         el("div", { class: "rc-list" },
           row("When your phone is light", seg("auto-light", "Light theme for Auto", themeOptions(THEMES.filter((t) => !t.dark), true), a.light,
             (v) => setAutoTheme({ light: v }), "themes grid five")),
           row("When your phone is dark", seg("auto-dark", "Dark theme for Auto", themeOptions(THEMES.filter((t) => t.dark), true), a.dark,
-            (v) => setAutoTheme({ dark: v }), "themes grid")))),
-      el("p", { class: "footnote" }, "Used when the theme is Auto."));
+            (v) => setAutoTheme({ dark: v }), "themes grid")))));
+    box.hidden = state.theme !== "system";
+    return box;
+  }
+
+  // Animations (1.12.0): off, nothing moves at all, for a slow phone or
+  // for anyone who'd rather things just change.
+  function motionGroup() {
+    return el("section", { class: "settings-section" },
+      el("h2", { class: "overline" }, "Motion"),
+      el("div", { class: "group" },
+        el("label", { class: "row" },
+          el("span", { class: "choice-text" },
+            el("span", { class: "choice-label" }, "Animations"),
+            el("span", { class: "choice-note" }, "Off: screens, menus and pages change at once, with no movement")),
+          el("input", { class: "switch", type: "checkbox", role: "switch", checked: !M.still(),
+            onchange: (e) => { store(MOTION_KEY, e.target.checked); M.setStill(!e.target.checked); } }))),
+      el("p", { class: "footnote" }, "Your phone's Reduce motion setting is followed either way."));
+  }
+
+  // Read aloud's settings in Settings too (1.12.0), the same as the Aa
+  // sheet's tab; the voice is for the phone's language here.
+  function aloudGroup() {
+    if (!speech.available) return null;
+    return el("section", { class: "settings-section" },
+      el("h2", { class: "overline" }, "Read aloud"),
+      el("div", { class: "group" }, el("div", { class: "rc-list" }, aloudControls())));
   }
 
   function readingGroup() {
     return el("section", { class: "settings-section" },
-      el("h2", { class: "overline" }, "Reading type"),
       el("div", { class: "group" },
         el("p", { class: "reading-sample" }, "The page is the product. Everything else gets out of its way."),
         readingControls(false)),
@@ -7531,7 +7565,7 @@
     const input = el("input", { class: "switch", type: "checkbox", role: "switch", checked: load(CONTINUE_KEY, true),
       onchange: (e) => { store(CONTINUE_KEY, e.target.checked); renderLibrary(); } });
     return el("section", { class: "settings-section" },
-      el("h2", { class: "overline" }, "Library"),
+      el("h2", { class: "overline" }, "Keeping up"),
       el("div", { class: "group" },
         el("label", { class: "row" },
           el("span", { class: "choice-text" },
@@ -7856,17 +7890,21 @@
 
   // Settings is a short menu; each entry is a screen of its own.
   const updateOut = () => ["available", "downloading", "ready"].includes(upd.phase) && upd.latest;
+  // Settings sorted by what you came to change (1.12.0): how it looks,
+  // how you read, the library; then saving, sync and storage; then About.
   const SECTIONS = {
-    appearance: { title: "Appearance", build: () => [choiceGroup(SETTINGS[0]), autoGroup(), readingGroup(),
-      choiceGroup({ key: LAYOUT_KEY, label: "Library layout", get: layout, set: (v) => { store(LAYOUT_KEY, v); renderLibrary(); }, options: LAYOUTS }),
-      libraryGroup()],
+    appearance: { title: "Appearance", build: () => [choiceGroup(SETTINGS[0]), autoGroup(), motionGroup()],
       value: () => themeName(state.theme) },
-    saving: { title: "Saving", build: () => [choiceGroup(SETTINGS[1]), dataGroup(DATA_SAVE_KEY, "Save", "Pages and pictures come down on any connection.", "Saves wait in Downloads until you're on Wi-Fi; feeds, new chapters and missing pictures check then too."), signedGroup()],
+    reading: { title: "Reading", build: () => [readingGroup(), aloudGroup()],
+      value: () => { const r = readingPrefs(); return (FONTS.find((f) => f.value === r.font) || FONTS[0]).label + " · " + r.size + " px"; } },
+    library: { title: "Library", build: () => [
+      choiceGroup({ key: LAYOUT_KEY, label: "Layout", get: layout, set: (v) => { store(LAYOUT_KEY, v); renderLibrary(); }, options: LAYOUTS }),
+      libraryGroup()],
+      value: () => (LAYOUTS.find((l) => l.value === layout()) || LAYOUTS[0]).label },
+    saving: { title: "Saving", build: () => [choiceGroup(SETTINGS[1]), dataGroup(DATA_SAVE_KEY, "Save", "Pages and pictures come down on any connection.", "Saves wait in Downloads until you're on Wi-Fi; feeds, new chapters and missing pictures check then too."), signedGroup(), watchGroup(), importGroup()],
       value: () => SETTINGS[1].options.find((o) => o.value === SETTINGS[1].get()).label },
     sync: { title: "Sync", build: syncSections, value: () => (C.sync.on ? (C.sync.last.error ? "Stopped" : "On") : "Off") },
-    storage: { title: "Storage and backup", build: () => [storageGroup(), ...roomGroup(), placeGroup(), browserStorageGroup(), backupGroup()], value: () => formatSize(totalBytes()) },
-    // Watched folders, a page of their own (1.4.1, Android).
-    content: { title: "Content", build: () => [watchGroup()], value: () => { const n = watches().length; return n ? n + (n === 1 ? " folder" : " folders") : "No watched folders"; } },
+    storage: { title: "Storage", build: () => [storageGroup(), ...roomGroup(), placeGroup(), backupGroup(), browserStorageGroup()], value: () => formatSize(totalBytes()) },
     updates: { title: "About", build: () => [updatesGroup(), aboutGroup()], value: () => (updateOut() ? upd.latest + " is out" : APP_VERSION) },
     report: { title: "Report a problem", build: () => [reportGroup()], value: () => { const n = C.platform.log.list().length; return n ? n + (n === 1 ? " note" : " notes") : ""; } },
   };
@@ -7888,8 +7926,8 @@
           el("div", { class: "row update-row out" },
             el("span", { class: "row-label accent" }, "Waypage " + upd.latest + " is out"),
             el("button", { class: "btn-small", type: "button", onclick: () => openSection("updates") }, "View"))) : null,
-        el("div", { class: "group" }, row("appearance"), row("saving")),
-        el("div", { class: "group" }, row("storage"), ...(C.platform.files.canWatch ? [row("content")] : []), row("sync")),
+        el("div", { class: "group" }, row("appearance"), row("reading"), row("library")),
+        el("div", { class: "group" }, row("saving"), row("sync"), row("storage")),
         el("div", { class: "group" }, row("updates"), row("report"))));
   }
 
