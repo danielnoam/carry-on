@@ -1409,8 +1409,16 @@ html { -webkit-tap-highlight-color: transparent; }
   transform: scale(0); transition: transform var(--spring-control-ms, 300ms) var(--spring-control, ease-out);
 }
 .dl-btn.failed .dl-dot { transform: scale(1); }
+/* 1.13.0: Sync's button wears the same ring and dot. With nothing to
+   count yet the ring is a quarter arc that turns; held (paused, or
+   waiting for Wi-Fi) the cloud is muted. */
+.sync-btn.looking .dl-ring-fill { transition: none; }
+.sync-btn.looking .dl-ring { animation: sync-turn 1s linear infinite; }
+@keyframes sync-turn { from { transform: rotate(-90deg); } to { transform: rotate(270deg); } }
+.sync-btn.held { color: var(--muted); }
 @media (prefers-reduced-motion: reduce) {
   .dl-ring, .dl-ring-fill, .dl-dot { transition: none; }
+  .sync-btn.looking .dl-ring { animation: breathe 1.6s ease-in-out infinite; }
 }
 
 /* The screen: the same cards as the library, one column. */

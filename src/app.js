@@ -1,7 +1,7 @@
 // Waypage: the shell. Version, theme, the library, saving, the reader and
 // Settings, and the screens moving between them.
 (function () {
-  const APP_VERSION = "1.12.1";
+  const APP_VERSION = "1.13.0";
   window.Waypage.version = APP_VERSION;
 
   const C = window.Waypage;
@@ -634,6 +634,7 @@
   // the same.
   let toldNative = "";
   function paintDownloads() {
+    paintSync();
     const active = [...runs];
     const singles = state.saving.filter((s) => !s.error && !(s.run && !s.run.done));
     let units = 0, got = 0;
@@ -5228,7 +5229,11 @@
   // launch, coming back to the app, a few seconds after any change, and
   // every few minutes while open. Pages that came down get their pictures
   // here, one page at a time, like Retry.
-  let syncTimer = null, syncQueue = [], fetchingPictures = false;
+  // Pages whose pictures are still to come are kept (1.13.0), so closing
+  // the app doesn't forget them.
+  const PICTURES_KEY = "waypage.syncPictures";
+  let syncTimer = null, syncQueue = load(PICTURES_KEY, null) || [], fetchingPictures = false;
+  const keepQueue = () => store(PICTURES_KEY, syncQueue.length ? [...new Set(syncQueue)] : null);
   const SYNCED_KEEP = ["savedAt", "title", "requested", "tags", "folder", "folderAt", "source", "series", "fav", "favAt", "folderFav", "folderFavAt", "at", "finished", "readAt", "readOn", "spot", "marks"];
   // While a run of saves is on, sync waits longer (1.2.0): each sync is a
   // merge of the whole library, and one after every page landing was a
@@ -5281,7 +5286,7 @@
     }
     if (state.section === "sync") renderSection();
     paintDownloads();
-    if (res && res.downloads.length) { syncQueue.push(...res.downloads.map((p) => p.id)); fetchPictures(); }
+    if (res && res.downloads.length) { syncQueue.push(...res.downloads.map((p) => p.id)); keepQueue(); fetchPictures(); }
     if (res && res.fromLinks.length) saveFromLinks(res.fromLinks);
     if (res && !quiet && !C.sync.paused) toast(res.up + res.down + res.removed ? "Synced: " + [res.up ? res.up + " sent" : "", res.down ? res.down + " came in" : "", res.removed ? res.removed + " removed" : ""].filter(Boolean).join(", ") + "." : "Already in step.");
     return res;
@@ -5324,19 +5329,22 @@
     if (!C.platform.native || !navigator.onLine || load(HEALED_KEY, false)) return;
     store(HEALED_KEY, true);
     syncQueue.push(...state.pages.filter((p) => p.missing && p.mode !== "links").map((p) => p.id));
+    keepQueue();
     fetchPictures();
   }
   async function fetchPictures() {
-    if (fetchingPictures || !C.platform.native || waitsForWifi(DATA_SAVE_KEY)) return;
+    if (fetchingPictures || !syncQueue.length || !C.platform.native || waitsForWifi(DATA_SAVE_KEY)) return;
     fetchingPictures = true;
     try {
       while (syncQueue.length && navigator.onLine && !C.sync.paused) {
         paintDownloads();
         const p = state.pages.find((x) => x.id === syncQueue[0]);
-        syncQueue.shift();
-        if (!p || !p.missing) continue;
+        if (!p || !p.missing) { syncQueue.shift(); keepQueue(); continue; }
         let res = null;
         try { res = await C.save.retryMissing(p); } catch (e) { res = null; }
+        // Off the list once it's done, so one cut off is tried again.
+        syncQueue.shift();
+        keepQueue();
         if (res && res.got) {
           Object.assign(p, { missing: res.missing, thumb: res.thumb, bytes: (p.bytes || 0) + res.bytes });
           await C.store.writeIndexOnly(state.pages);
@@ -5431,6 +5439,35 @@
     if (left) return { title: "Syncing your library", text: "Getting pictures for " + countLine(left), done: 0, total: 0 };
     return null;
   }
+  // The bar's sync button (1.13.0): there while sync is on, so its state
+  // is a look away rather than in Settings. A ring while it runs (filling
+  // when it can count), a dot when the last run failed, dimmed while
+  // paused or waiting for Wi-Fi. It opens Settings, Sync.
+  let syncPainted = "";
+  function paintSync() {
+    const btn = $("syncBtn");
+    if (!btn) return;
+    const on = C.sync.on;
+    const running = on && (C.sync.running || !!syncNote());
+    const now = syncProgress();
+    const part = C.sync.running ? now.part : null;
+    const held = on && !running && (C.sync.paused || waitsForWifi(DATA_SYNC_KEY));
+    const failed = on && !running && !held && !!C.sync.last.error;
+    const label = !on ? "Sync" : running ? (C.sync.running ? "Sync: " + now.text : "Sync: " + syncNote().text)
+      : C.sync.paused ? "Sync: paused" : held ? "Sync: waiting for Wi-Fi"
+      : failed ? "Sync: " + C.sync.last.error : C.sync.last.at ? "Sync: synced " + whenText(C.sync.last.at) : "Sync: not synced yet";
+    const said = [on, running, part, held, failed, label].join("|");
+    if (said === syncPainted) return;
+    syncPainted = said;
+    btn.hidden = !on;
+    btn.classList.toggle("busy", running);
+    btn.classList.toggle("looking", running && part == null);
+    btn.classList.toggle("held", held);
+    btn.classList.toggle("failed", failed);
+    btn.querySelector(".dl-ring-fill").style.strokeDashoffset = String(!running ? 100 : part != null ? 100 - part * 100 : 75);
+    btn.setAttribute("aria-label", label);
+    btn.title = label;
+  }
   function syncAfter() {
     const saving = state.saving.filter((s) => s.synced && !s.error).length;
     const failed = state.saving.filter((s) => s.synced && s.error).length;
@@ -5477,6 +5514,7 @@
     if (!confirm("Disconnect from GitHub? Your clips stay on this " + (C.platform.native ? "phone" : "browser") + " and on GitHub. To sync again you'll need a setup code or a token.")) return;
     for (const r of runs) if (r.sync) stopRun(r);
     syncQueue = [];
+    keepQueue();
     C.sync.disconnect();
     renderSection();
     paintDownloads();
@@ -8045,6 +8083,7 @@
   pullToCheck($("libraryView"));
   $("sideCatch").addEventListener("click", () => history.back());
   $("downloadsBtn").addEventListener("click", () => openDownloads());
+  $("syncBtn").addEventListener("click", () => { if (state.settings) openSection("sync"); else openSettings(false, "sync"); });
   $("downloadsBack").addEventListener("click", () => history.back());
   $("screenCatch").addEventListener("click", () => history.back());
   $("readKeys").addEventListener("click", () => openMenu("keys"));
@@ -8250,6 +8289,8 @@
     setTimeout(healPictures, 4000);
     addEventListener("hashchange", takeSetupLink);
     setTimeout(() => syncNow(), 2000);
+    setTimeout(fetchPictures, 3000);
+    paintSync();
     watchSoon(2500);
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) { flushIndex(); if (positionTimer) savePositions(); updateWidgets(); if (syncTimer) syncNow(); return; }

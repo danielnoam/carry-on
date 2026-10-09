@@ -2,6 +2,27 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.13.0] - 2026-10-09
+
+### Added
+- A sync button in the bar, beside Downloads, while sync is on. A ring
+  shows a sync running, a dot shows it went wrong, and it's dimmed while
+  paused or waiting for Wi-Fi. Tap it for Settings, Sync.
+
+### Fixed
+- A sync cut off part way, by closing or updating the app, no longer
+  starts again from the first clip: clips already sent stay sent, and
+  clips already brought in stay in.
+- A sync cut off while bringing clips in could take them for clips you
+  deleted, and delete them on every device at the next sync. They now
+  wait their turn instead.
+- Pictures still to come for synced clips are fetched after the app is
+  closed and opened again, instead of forgotten.
+
+### Changed
+- Sync brings clips in four at a time and puts them in the library as
+  they arrive, rather than all at the end.
+
 ## [1.12.1] - 2026-10-09
 
 ### Fixed
