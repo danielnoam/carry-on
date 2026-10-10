@@ -21,26 +21,45 @@ Decisions every release keeps:
 
 ---
 
-## Next (Daniel, 10 Oct 2026)
+## Next: four releases, in this order (Daniel, 10 Oct 2026)
 
-Daniel tried everything that was untested on his phones (10 Oct).
+Daniel tried everything that was untested on his phones, and asked for
+all of these, grouped into releases that fit together.
+
+### 1.14.0: app.js in parts
+
+Nothing new to see; every release after it is easier to check.
 
 - **Split src/app.js.** 8,500 lines in one file. Into a few plain script
   files loaded in order (library, reader, sheets, settings, highlights),
   each an IIFE on `window.Waypage` like the rest: still no build step.
   Nothing changes for the reader; the tests must pass unchanged.
-- **Save highlights from Settings.** Every highlight in the library as
-  one file, from Settings: Markdown grouped by clip (title, link, each
-  highlight and its note), the same shape as the clip's Copy all.
+
+### 1.15.0: reading
+
+The reader, on a plane.
+
+- **Brightness:** a way back to the phone's own level without turning
+  the swipe off.
 - **Footnotes in a sheet.** A tap on a note mark ([1], a Wikipedia
   reference) opens that note in a small sheet over the page instead of
   jumping to the list at the end (reader.js, the `#` links). Any jump
   that stays in the page leaves a way back to where you were.
-- **The archived copy when a page is gone.** A save that fails because
-  the page is missing or refuses (404, 410, 403) offers the Wayback
-  Machine's copy (archive.org's availability API, then the snapshot,
-  saved like any page, with its archive date and the original link). A
-  clip whose original is gone gets the same from its ⋯ menu.
+- **Find in this clip.** Search words inside the open clip from the
+  reader's bar or ⋯: matches marked in the frame, a count, next and
+  previous, the reader moving to each (in pages, the page it's on).
+  Done in the app's document against the frame's text, since the frame
+  runs no script.
+- **Links inside a clip (Daniel, 10 Oct).** A tap on a link to another
+  page opens a small sheet, Open and Save for later, instead of going
+  straight to the browser (reader.js, `openOutside`). Save for later
+  offline waits and saves when the phone is back online, like any save
+  that failed; the toast says so. A link already saved opens that clip.
+
+### 1.16.0: getting around
+
+The sidebar, the app icon and your highlights.
+
 - **Favourites in the sidebar (Daniel, 10 Oct).** Under Library, the
   favourite collections and then the favourite clips, in place of the
   three collections used last (renderSide, SIDE_MAX). A tap opens the
@@ -49,11 +68,23 @@ Daniel tried everything that was untested on his phones (10 Oct).
   Collections, Clips and Files, each opening its part of the library
   (openPart "collections", "pages", "files"); Files only when there are
   files.
-- **Links inside a clip (Daniel, 10 Oct).** A tap on a link to another
-  page opens a small sheet, Open and Save for later, instead of going
-  straight to the browser (reader.js, `openOutside`). Save for later
-  offline waits and saves when the phone is back online, like any save
-  that failed; the toast says so. A link already saved opens that clip.
+- **App icon shortcuts.** A long press on the icon: Continue reading,
+  Search, and Save the copied link. Android through static shortcuts in
+  the manifest, iOS through Quick Actions; each opens a waypage:// address
+  the app already takes, like a widget's tap.
+- **Save highlights from Settings.** Every highlight in the library as
+  one file, from Settings: Markdown grouped by clip (title, link, each
+  highlight and its note), the same shape as the clip's Copy all.
+
+### 1.17.0: saving and sync
+
+When a page is gone, and a big library's first sync.
+
+- **The archived copy when a page is gone.** A save that fails because
+  the page is missing or refuses (404, 410, 403) offers the Wayback
+  Machine's copy (archive.org's availability API, then the snapshot,
+  saved like any page, with its archive date and the original link). A
+  clip whose original is gone gets the same from its ⋯ menu.
 - **A faster first sync.** Sending is one Contents PUT per clip and per
   picture pack, one after another, each its own commit. Send in batches
   of about 50 clips through the Git Data API instead: the clips' text
@@ -63,22 +94,11 @@ Daniel tried everything that was untested on his phones (10 Oct).
   blobs kept. `waypage.syncSent` moves on per batch, so a cut-off sync
   resumes from the last batch. Time a first sync on a phone before and
   after; pictures stay bound by GitHub's ~80 writes a minute.
-- **Find in this clip.** Search words inside the open clip from the
-  reader's bar or ⋯: matches marked in the frame, a count, next and
-  previous, the reader moving to each (in pages, the page it's on).
-  Done in the app's document against the frame's text, since the frame
-  runs no script.
-- **App icon shortcuts.** A long press on the icon: Continue reading,
-  Search, and Save the copied link. Android through static shortcuts in
-  the manifest, iOS through Quick Actions; each opens a waypage:// address
-  the app already takes, like a widget's tap.
 
 ---
 
 ## Smaller, open
 
-- **Brightness:** a way back to the phone's own level without turning
-  the swipe off.
 - **Moving a big library** is file by file over the bridge: fine for
   hundreds of megabytes; a native copy would be quicker for gigabytes.
 - **A collection widget on iOS.** Android's asks which collection; on iOS
