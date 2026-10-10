@@ -31,3 +31,5 @@ stops being true.
   (NOTES.md, 1.2.0 and 1.2.1). A focus trap would have to keep every card
   out of the reading order by hand. Worth another look only if a phone
   shows a stall when a screen opens.
+- **A PDF attached to an email as its own clip (Daniel, 10 Oct 2026).**
+  Not needed: an .eml opens as its text, attachments left out.

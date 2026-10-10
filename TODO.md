@@ -21,6 +21,20 @@ Decisions every release keeps:
 
 ---
 
+## Next (Daniel, 10 Oct 2026)
+
+Daniel tried the untested list on his phones; the stores wait.
+
+- **Split src/app.js.** 8,500 lines in one file. Into a few plain script
+  files loaded in order (library, reader, sheets, settings, highlights),
+  each an IIFE on `window.Waypage` like the rest: still no build step.
+  Nothing changes for the reader; the tests must pass unchanged.
+- **Save highlights from Settings.** Every highlight in the library as
+  one file, from Settings: Markdown grouped by clip (title, link, each
+  highlight and its note), the same shape as the clip's Copy all.
+
+---
+
 ## Files: your own files, and where Waypage keeps everything (Daniel, 6 Oct 2026)
 
 Decided: PDFs through pdf.js, locked down; three places for files, the
@@ -36,8 +50,7 @@ native code.
 - **Saving from email (1.10.0, Daniel, 9 Oct):** shared text becomes a
   clip, and .eml files open. Open: try both on a phone, Gmail's Share
   on selected text especially; on iOS a long passage goes through the
-  waypage:// address, so check a long email arrives whole. Attachments
-  in an .eml are left out (a PDF one could become its own clip).
+  waypage:// address, so check a long email arrives whole.
 - **Brightness while reading (1.10.0, Daniel, 9 Oct):** try on both
   phones, iOS especially (the level from before should come back when
   you leave Waypage). Open: a way back to the phone's own level without
