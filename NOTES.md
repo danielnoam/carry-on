@@ -3,6 +3,27 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **The 1.14.0 reader and app.js split (1.14.0).** app.js (8,500 lines)
+  is now seven classic scripts loaded in order (app, app-reader,
+  app-library, app-saving, app-places, app-settings, app-start) sharing
+  one global scope, not an IIFE each as TODO first said: an IIFE per file
+  would have meant exporting hundreds of names between them for no gain.
+  The rule is that code run at load uses only what an earlier file, or
+  the same one, declared; MENUS builders are arrows for that reason.
+  `moveTo` became `moveInFolder` since a global one shadows
+  window.moveTo. Find runs in the app's document against the frame's
+  text (the frame runs no script): text nodes joined with an index map,
+  each match wrapped in `mark.co-find`, cleared on close. Footnotes are
+  links whose mark sits in `sup`, `.reference` and the like, or whose
+  target is in a notes list; the sheet drops back links and any `#` link
+  (Readability strips their classes, so the class alone missed them).
+  App icon shortcuts reuse the widget plumbing: Android static shortcuts
+  send the widget intent with waypage-widget://reading|search|paste, iOS
+  Quick Actions go through SceneDelegate (Capacitor's template is
+  scene-based now) to WidgetsPlugin.shortcut, posted after the first view
+  at launch. Save the copied link reads the clipboard natively; Android
+  10+ gives it only to the focused app, so it tries twice and then
+  focuses the save field. iOS asks "Allow Paste?" unless told always.
 - **Sync picks up where it stopped (1.13.0).** Daniel: closing or
   updating the app mid-sync restarted it from zero, and it was slow. A
   run sends every page's text, then library.json; cut off before the

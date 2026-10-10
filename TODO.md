@@ -21,51 +21,10 @@ Decisions every release keeps:
 
 ---
 
-## Next: two releases, in this order (Daniel, 10 Oct 2026)
+## Next: 1.15.0 (Daniel, 10 Oct 2026)
 
 Daniel tried everything that was untested on his phones, and asked for
-all of these, grouped into releases that fit together.
-
-### 1.14.0: the reader and getting around
-
-The split first, so the rest is built on it; then the reader on a plane,
-the sidebar, the app icon and your highlights.
-
-- **Split src/app.js.** 8,500 lines in one file. Into a few plain script
-  files loaded in order (library, reader, sheets, settings, highlights),
-  each an IIFE on `window.Waypage` like the rest: still no build step.
-  Nothing changes for the reader; the tests must pass unchanged.
-- **Brightness:** a way back to the phone's own level without turning
-  the swipe off.
-- **Footnotes in a sheet.** A tap on a note mark ([1], a Wikipedia
-  reference) opens that note in a small sheet over the page instead of
-  jumping to the list at the end (reader.js, the `#` links). Any jump
-  that stays in the page leaves a way back to where you were.
-- **Find in this clip.** Search words inside the open clip from the
-  reader's bar or ⋯: matches marked in the frame, a count, next and
-  previous, the reader moving to each (in pages, the page it's on).
-  Done in the app's document against the frame's text, since the frame
-  runs no script.
-- **Links inside a clip (Daniel, 10 Oct).** A tap on a link to another
-  page opens a small sheet, Open and Save for later, instead of going
-  straight to the browser (reader.js, `openOutside`). Save for later
-  offline waits and saves when the phone is back online, like any save
-  that failed; the toast says so. A link already saved opens that clip.
-- **Favourites in the sidebar (Daniel, 10 Oct).** Under Library, the
-  favourite collections and then the favourite clips, in place of the
-  three collections used last (renderSide, SIDE_MAX). A tap opens the
-  collection or the clip. Up to 6, then "All favourites" (the library's
-  Favourites filter); none, and the section isn't there. Below them,
-  Collections, Clips and Files, each opening its part of the library
-  (openPart "collections", "pages", "files"); Files only when there are
-  files.
-- **App icon shortcuts.** A long press on the icon: Continue reading,
-  Search, and Save the copied link. Android through static shortcuts in
-  the manifest, iOS through Quick Actions; each opens a waypage:// address
-  the app already takes, like a widget's tap.
-- **Save highlights from Settings.** Every highlight in the library as
-  one file, from Settings: Markdown grouped by clip (title, link, each
-  highlight and its note), the same shape as the clip's Copy all.
+these with 1.14.0 (shipped), grouped into releases that fit together.
 
 ### 1.15.0: saving and sync
 

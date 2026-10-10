@@ -2,6 +2,32 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.14.0] - 2026-10-10
+
+### Added
+- Find in this clip: ⋯, Find in this clip (or Ctrl F, or /) marks every
+  match on the page, counts them, and steps through them with the arrows
+  or Enter.
+- A tap on a footnote mark, like a Wikipedia [1], opens the note in a
+  small sheet over the page, with its links and a way to go to it.
+- A tap on a link inside the page jumps there and leaves a "Back to where
+  you were" button. A link to another site asks first: open the saved
+  clip, save it for later, open it in the browser, or copy it. Saved for
+  later with no connection, it saves when you're back online.
+- Brightness Auto: in the brightness swipe, back to the phone's own
+  level without turning the swipe off.
+- The sidebar shows your favourite collections and clips under Library,
+  then Collections, Clips and Files, each opening that part of the
+  library.
+- App icon shortcuts: a long press on the icon offers Continue reading,
+  Search, and Save the copied link.
+- Settings, Storage: Save all highlights, every highlight and its note
+  in one Markdown file, clip by clip.
+
+### Changed
+- The sidebar no longer lists the three collections used last; it lists
+  favourites instead.
+
 ## [1.13.0] - 2026-10-09
 
 ### Added
