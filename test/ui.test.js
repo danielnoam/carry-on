@@ -377,6 +377,43 @@ const frameText = (p) => p.frameLocator("#readerFrame").locator("body");
       await q.context().close();
     });
 
+    await test("a page that's gone saves from the Internet Archive's copy (1.15.0)", async () => {
+      const q = await page(browser, 390);
+      const gone = ROOT + "test/fixtures/gone-article.html";
+      const article = fs.readFileSync(path.join(__dirname, "fixtures", "article.html"), "utf8")
+        .replace("<body>", '<body><!-- BEGIN WAYBACK TOOLBAR INSERT --><div id="wm-ipp">Wayback toolbar zzqq</div><!-- END WAYBACK TOOLBAR INSERT -->');
+      await q.evaluate((article) => {
+        const P = window.Waypage.platform, real = P.fetchText;
+        P.fetchText = async (url, o) => {
+          if (url.startsWith("https://archive.org/wayback/available?url=")) {
+            const asked = decodeURIComponent(url.split("url=")[1]);
+            return { status: 200, url, text: JSON.stringify({ archived_snapshots: { closest: { available: true, status: "200", timestamp: "20240305120000", url: "http://web.archive.org/web/20240305120000/" + asked } } }) };
+          }
+          if (url.startsWith("https://web.archive.org/web/")) return { status: 200, url, text: article };
+          return real(url, o);
+        };
+      }, article);
+      await q.fill("#saveUrl", gone);
+      await q.press("#saveUrl", "Enter");
+      await q.locator("#downloadsBtn").click();
+      const btn = q.locator(".failed button", { hasText: "Archived copy" });
+      await btn.waitFor({ timeout: 10000 });
+      assert.strictEqual(await q.locator(".failed button", { hasText: "Try again" }).count(), 0);
+      await btn.click();
+      await until(q, async () => (await window.Waypage.store.readIndex()).length === 1, null, 15000);
+      const meta = await q.evaluate(async () => (await window.Waypage.store.readIndex())[0]);
+      assert.strictEqual(meta.url, gone);
+      assert.strictEqual(meta.archived, Date.UTC(2024, 2, 5, 12, 0, 0));
+      assert.strictEqual(meta.site, "localhost");
+      const html = await q.evaluate((id) => window.Waypage.store.readPage(id), meta.id);
+      assert.ok(/Internet Archive's copy of localhost/.test(html), "the footer doesn't say it's archived");
+      assert.ok(!/zzqq/.test(html), "the Wayback toolbar was kept");
+      assert.ok(html.includes('href="' + gone + '"'), "Read the original isn't the page's own address");
+      const errs = q.errors.filter((e) => !/gone-article/.test(e));
+      assert.deepStrictEqual(errs, [], errs.join(" | "));
+      await q.context().close();
+    });
+
     await test("Report a problem lists a failed save and opens an issue without the address's query", async () => {
       const q = await page(browser, 390);
       await q.evaluate(() => { window.__opened = []; window.Waypage.platform.openOutside = (u) => window.__opened.push(u); });

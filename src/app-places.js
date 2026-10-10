@@ -228,7 +228,6 @@ function renderSide() {
       : item(clipCover(f.page), f.page.title, state.open === f.page, null, () => fromSide().then(() => openPage(f.page.id)), "side-sub")),
     favs.length > FAV_MAX ? item(sideMark("star"), "All favourites", inLib && !state.part && state.filter === "favourites", count(favs.length),
       () => goPlace("library").then(() => setFilter("favourites")), "side-sub") : null,
-    favs.length ? el("hr", { class: "side-line" }) : null,
     // The library's parts (1.14.0), each opening alone.
     hasFolders ? item(sideMark("folder"), "Collections", inLib && state.part === "collections", null, () => partFromSide("collections"), "side-sub") : null,
     item(sideMark("open"), "Clips", inLib && state.part === "pages", null, () => partFromSide("pages"), "side-sub"),
