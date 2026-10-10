@@ -32,6 +32,15 @@ Daniel tried the untested list on his phones; the stores wait.
 - **Save highlights from Settings.** Every highlight in the library as
   one file, from Settings: Markdown grouped by clip (title, link, each
   highlight and its note), the same shape as the clip's Copy all.
+- **Footnotes in a sheet.** A tap on a note mark ([1], a Wikipedia
+  reference) opens that note in a small sheet over the page instead of
+  jumping to the list at the end (reader.js, the `#` links). Any jump
+  that stays in the page leaves a way back to where you were.
+- **The archived copy when a page is gone.** A save that fails because
+  the page is missing or refuses (404, 410, 403) offers the Wayback
+  Machine's copy (archive.org's availability API, then the snapshot,
+  saved like any page, with its archive date and the original link). A
+  clip whose original is gone gets the same from its ⋯ menu.
 
 ---
 
