@@ -2,6 +2,24 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.15.0] - 2026-10-10
+
+### Added
+- A page that's gone (not found, or the site refuses) can be saved from
+  the Internet Archive's newest copy: tap Archived copy on the failed
+  save. The clip keeps the page's own address, and says which day the
+  copy is from.
+- A clip's ⋯, More: Use the archived copy, for a page that changed or
+  went away since you saved it. It takes the old copy's place, with its
+  tags, collection and highlights.
+
+### Changed
+- A big library's first sync sends up to 50 clips at once instead of one
+  at a time, and a sync cut off part way still picks up after the last
+  batch that went.
+- The sidebar has no line between your favourites and Collections, Clips
+  and Files.
+
 ## [1.14.0] - 2026-10-10
 
 ### Added

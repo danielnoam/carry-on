@@ -375,6 +375,88 @@
     if (!r.ok && r.status !== 404 && r.status !== 409 && r.status !== 422) throw await fail(r);
   }
 
+  // ---- Sending in batches (1.15.0) ----
+  // A first sync sent each clip with its own Contents PUT, each its own
+  // commit, one after another. Now up to BATCH clips' text goes inline in
+  // one tree, then one commit and one move of the branch. A branch that
+  // moved meanwhile (another device synced) gets the tree and commit made
+  // again on its new head; pictures already sent as blobs stay sent.
+  const BATCH = 50;
+  const BATCH_BYTES = 8 * 1024 * 1024;
+  const utf8 = (t) => new TextEncoder().encode(t);
+  // The sha GitHub gives a file's contents, worked out here, since a tree
+  // made with inline text doesn't say it for files in a folder.
+  async function blobSha(bytes) {
+    const head = utf8("blob " + bytes.length + "\0");
+    const all = new Uint8Array(head.length + bytes.length);
+    all.set(head);
+    all.set(bytes, head.length);
+    const h = new Uint8Array(await crypto.subtle.digest("SHA-1", all));
+    return [...h].map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  async function git(path, opts) {
+    const r = await call(API + "/repos/" + cfg.owner + "/" + cfg.repo + "/git/" + path,
+      Object.assign({ headers: headers({ "Content-Type": "application/json" }) }, opts));
+    if (!r.ok) throw await fail(r);
+    return r.json();
+  }
+  // files: [{ path, text } | { path, sha }], sha null removing it.
+  async function commitFiles(files, message) {
+    const tree = files.map((f) => (f.text != null ? { path: f.path, mode: "100644", type: "blob", content: f.text }
+      : { path: f.path, mode: "100644", type: "blob", sha: f.sha }));
+    for (let tries = 0; ; tries++) {
+      halt();
+      const head = (await git("ref/heads/" + encodeURIComponent(cfg.branch))).object.sha;
+      const base = (await git("commits/" + head)).tree.sha;
+      const made = await git("trees", { method: "POST", body: JSON.stringify({ base_tree: base, tree }) });
+      const commit = await git("commits", { method: "POST", body: JSON.stringify({ message, tree: made.sha, parents: [head] }) });
+      try {
+        await git("refs/heads/" + encodeURIComponent(cfg.branch), { method: "PATCH", body: JSON.stringify({ sha: commit.sha, force: false }) });
+        return;
+      } catch (e) {
+        if (e.status !== 422 || tries >= 3) throw e;
+      }
+    }
+  }
+  // Sends `list` ([{ p, html, packs, was }]) a batch at a time; `sent(p,
+  // file)` is told of each page once its batch is on GitHub.
+  async function sendBatches(list, sent, onProgress, total, from) {
+    let i = 0;
+    while (i < list.length) {
+      const batch = [];
+      let bytes = 0;
+      while (i < list.length && batch.length < BATCH && (!batch.length || bytes + list[i].text.length < BATCH_BYTES)) {
+        batch.push(list[i]);
+        bytes += list[i].text.length;
+        i++;
+      }
+      const files = [];
+      for (const b of batch) {
+        b.packShas = [];
+        for (const [k, bytes] of b.packs.entries()) {
+          halt();
+          const blob = await git("blobs", { method: "POST", body: JSON.stringify({ content: C.store.toBase64(bytes), encoding: "base64" }) });
+          b.packShas.push(blob.sha);
+          files.push({ path: "pages/" + b.p.id + "/pack-" + k, sha: blob.sha });
+        }
+        for (const [k] of ((b.was && b.was.packs) || []).entries()) if (k >= b.packs.length) files.push({ path: "pages/" + b.p.id + "/pack-" + k, sha: null });
+        // Where the WebView has no SHA-1 of its own, the text goes as a blob
+        // too, which says its sha.
+        if (globalThis.crypto && crypto.subtle) {
+          b.sha = await blobSha(utf8(b.text));
+          files.push({ path: "pages/" + b.p.id + ".html", text: b.text });
+        } else {
+          halt();
+          b.sha = (await git("blobs", { method: "POST", body: JSON.stringify({ content: b.text, encoding: "utf-8" }) })).sha;
+          files.push({ path: "pages/" + b.p.id + ".html", sha: b.sha });
+        }
+      }
+      await commitFiles(files, batch.length === 1 ? "Page: " + batch[0].p.title.slice(0, 60) : "Pages: " + batch.length + " clips");
+      for (const b of batch) sent(b);
+      if (onProgress) onProgress({ stage: "up", done: from + i, total });
+    }
+  }
+
   // Connecting: whose token it is, and the repo, made private if missing.
   // ---- Setting up (0.30.1) ----
 
@@ -624,9 +706,42 @@
       // saved again since.
       const mine = new Map(before.map((p) => [p.id, p]));
       const todo = links ? [] : merged.pages.filter((p) => mine.has(p.id) && mine.get(p.id).savedAt === p.savedAt && (!merged.files[p.id] || merged.files[p.id].at !== p.savedAt));
-      for (const [i, p] of todo.entries()) {
+      const sentOne = (p, sha, packShas) => {
+        merged.files[p.id] = uploaded[p.id] = { at: p.savedAt, sha };
+        if (packShas.length) merged.files[p.id].packs = packShas;
+        keep(SENT_KEY, uploaded);
+        up++;
+      };
+      // A few at a time through the Git Data API (1.15.0) when there are
+      // more than a couple; read ahead a batch at a time, so a library of
+      // thousands isn't all in memory at once.
+      let i = 0;
+      if (todo.length > 2) {
+        try {
+          while (i < todo.length) {
+            const ready = [];
+            for (let n = 0; i < todo.length && n < BATCH; i++, n++) {
+              halt();
+              const p = todo[i];
+              let html;
+              try { html = await C.store.readPage(p.id); } catch (e) { html = null; }
+              if (!html) continue;
+              const was = merged.files[p.id] || (remoteDoc && remoteDoc.files && remoteDoc.files[p.id]);
+              const { html: text, packs } = await outgoing(html, mine.get(p.id));
+              ready.push({ p, text, packs, was });
+            }
+            await sendBatches(ready, (b) => sentOne(b.p, b.sha, b.packShas), onProgress, todo.length, i - ready.length);
+          }
+        } catch (e) {
+          // An empty repo has no branch to commit on: one by one, below.
+          if (e.status !== 409) throw e;
+          i = todo.findIndex((p) => !uploaded[p.id] || uploaded[p.id].at !== p.savedAt);
+          if (i < 0) i = todo.length;
+        }
+      }
+      for (const [k, p] of todo.slice(i).entries()) {
         halt();
-        if (onProgress) onProgress({ stage: "up", done: i, total: todo.length });
+        if (onProgress) onProgress({ stage: "up", done: i + k, total: todo.length });
         let html;
         try { html = await C.store.readPage(p.id); } catch (e) { html = null; }
         if (!html) continue;
@@ -640,10 +755,7 @@
         }
         const sha = await put("pages/" + p.id + ".html", body, was && was.sha, "Page: " + p.title.slice(0, 60));
         for (const [k, s] of ((was && was.packs) || []).entries()) if (k >= packs.length) await remove("pages/" + p.id + "/pack-" + k, s).catch(() => {});
-        merged.files[p.id] = uploaded[p.id] = { at: p.savedAt, sha };
-        if (packShas.length) merged.files[p.id].packs = packShas;
-        keep(SENT_KEY, uploaded);
-        up++;
+        sentOne(p, sha, packShas);
       }
       // Text of deleted pages goes too.
       const gone = Object.entries((remoteDoc && remoteDoc.files) || {}).filter(([id]) => merged.deleted[id]);
@@ -808,7 +920,7 @@
   }
 
   C.sync = {
-    merge, mergeTags, mergeMarks, mergeFeeds, oneCopyEach, outgoing, incoming, connect, disconnect, run, SyncError, KEY_URL, tokenIn, setupLink,
+    merge, mergeTags, mergeMarks, mergeFeeds, oneCopyEach, outgoing, incoming, sendBatches, blobSha, connect, disconnect, run, SyncError, KEY_URL, tokenIn, setupLink,
     share, clean, same, urlKey, sameUrl, peek, poll,
     get on() { return !!cfg; },
     get account() { return cfg ? cfg.owner + "/" + cfg.repo : ""; },
