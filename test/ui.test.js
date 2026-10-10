@@ -355,6 +355,28 @@ const frameText = (p) => p.frameLocator("#readerFrame").locator("body");
       await q.context().close();
     });
 
+    await test("Storage saves every highlight as one Markdown file (1.14.0)", async () => {
+      const q = await page(browser, 390);
+      await q.evaluate(async () => {
+        const c = (i, marks) => ({ id: "hl" + i, url: "https://example.com/hl" + i, title: "Clip " + i, site: "example.com", savedAt: 1000 + i, minutes: 3, mode: "links", at: 0, finished: false, marks });
+        await window.Waypage.store.writeIndex([
+          c(1, [{ id: "a", text: "The older one", at: 10 }]),
+          c(2, [{ id: "b", text: "The newer one", note: "Worth a look", at: 20 }]),
+          c(3),
+        ]);
+      });
+      await q.reload();
+      await q.click("#settingsBtn");
+      await q.locator(".nav-row", { hasText: "Storage" }).click();
+      const [dl] = await Promise.all([q.waitForEvent("download"), q.locator(".row", { hasText: "Save all highlights" }).click()]);
+      assert.ok(/^Waypage highlights \d{4}-\d\d-\d\d\.md$/.test(dl.suggestedFilename()), dl.suggestedFilename());
+      const text = fs.readFileSync(await dl.path(), "utf8");
+      assert.ok(text.indexOf("# Clip 2") < text.indexOf("# Clip 1") && text.indexOf("# Clip 2") >= 0, text);
+      assert.ok(/> The newer one\n\nWorth a look/.test(text) && !/Clip 3/.test(text), text);
+      assert.deepStrictEqual(q.errors, [], q.errors.join(" | "));
+      await q.context().close();
+    });
+
     await test("Report a problem lists a failed save and opens an issue without the address's query", async () => {
       const q = await page(browser, 390);
       await q.evaluate(() => { window.__opened = []; window.Waypage.platform.openOutside = (u) => window.__opened.push(u); });
