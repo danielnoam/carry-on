@@ -142,6 +142,11 @@ mark.co-mark {
 }
 mark.co-mark.co-noted { text-decoration: underline dotted var(--muted); text-underline-offset: 3px; }
 
+/* Find in this clip (1.14.0): every match underlined, the one being
+   looked at marked and outlined. */
+mark.co-find { background: none; color: inherit; box-shadow: inset 0 -2px var(--accent); }
+mark.co-find.co-here { background: var(--mark); box-shadow: 0 0 0 2px var(--accent); border-radius: 2px; }
+
 /* Pages (0.29.0): the text in screen-wide columns, one column a page,
    turned by src/reader.js. Each page keeps the bar's room at its top.
    --co-col, --co-side and --co-gap are set from the frame's width so a

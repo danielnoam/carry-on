@@ -299,7 +299,7 @@ function coverUrl(list) {
 // What a save is doing, with the seconds it has taken once that's long
 // enough to wonder, so a slow site doesn't look stuck.
 function savingStatus(s) {
-  if (s.waiting) return (s.wifi ? "Waiting for Wi-Fi" : "Waiting") + (s.folder ? " · into " + s.folder : "");
+  if (s.waiting) return (s.offline ? "Saves when you're back online" : s.wifi ? "Waiting for Wi-Fi" : "Waiting") + (s.folder ? " · into " + s.folder : "");
   const secs = s.started ? Math.floor((Date.now() - s.started) / 1000) : 0;
   const took = secs >= 5 ? " · " + secs + " s" : "";
   if (s.total == null) return (s.drawing ? "Letting the page draw itself" : "Getting the page") + took;
@@ -709,7 +709,9 @@ function savingCard(s) {
         el("span", { class: "progress-fill" })),
       el("span", { class: "card-status accent" },
         s.waiting ? null : el("span", { class: "spinner", "aria-hidden": "true" }),
-        el("span", { class: "status-text" }, savingStatus(s)))));
+        el("span", { class: "status-text" }, savingStatus(s))),
+      s.offline ? el("span", { class: "card-actions" },
+        el("button", { class: "btn-quiet", type: "button", onclick: () => dropLater(s) }, "Remove")) : null));
 }
 
 // Progress lands in the card that's already there, so the bar grows on
@@ -1444,6 +1446,38 @@ async function savePage(url, folder, how) {
   if (meta) savedToast(meta);
   if (meta && !C.platform.native) C.store.keepStored();
   else if (job.contents) contentsFound(job);
+}
+
+// Save for later, offline (1.14.0): the link waits in Downloads, and in
+// waypage.later so closing the app keeps it, and saves once the phone is
+// back online (saveWaiting, on the online event and at start).
+const LATER_KEY = "waypage.later";
+function saveLater(url, folder) {
+  if (navigator.onLine || savedAs(url)) return savePage(url, folder);
+  const list = load(LATER_KEY, []);
+  if (!list.some((x) => sameUrl(x.url, url))) { list.push({ url, folder: folder || null }); store(LATER_KEY, list); }
+  showWaiting();
+  toast("It saves when you're back online. It's in Downloads.");
+}
+function showWaiting() {
+  for (const x of load(LATER_KEY, [])) {
+    if (!state.saving.some((s) => sameUrl(s.url, x.url))) state.saving.push({ ...newJob(x.url, x.folder), waiting: true, offline: true });
+  }
+  renderLibraryLater();
+}
+function dropLater(s) {
+  store(LATER_KEY, load(LATER_KEY, []).filter((x) => !sameUrl(x.url, s.url)));
+  state.saving = state.saving.filter((x) => x !== s);
+  renderLibrary();
+}
+let savingWaiting = false;
+async function saveWaiting() {
+  const list = load(LATER_KEY, []);
+  if (!loaded || !navigator.onLine || !list.length || savingWaiting) return;
+  savingWaiting = true;
+  store(LATER_KEY, []);
+  state.saving = state.saving.filter((s) => !s.offline);
+  try { for (const x of list) await savePage(x.url, x.folder || undefined); } finally { savingWaiting = false; }
 }
 
 // A link that turned out to be a contents page opens as a list to check.

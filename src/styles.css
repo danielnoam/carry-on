@@ -637,6 +637,39 @@ html.native .reader::before {
   content: ""; position: absolute; top: 0; left: 0; right: 0; z-index: 4;
   height: env(safe-area-inset-top); background: var(--bar);
 }
+/* Find in this clip (1.14.0): over the reader's bar while it's open. */
+.find-bar {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 5;
+  display: flex; align-items: center; gap: var(--s-1);
+  padding: var(--s-2); background: var(--bar); border-bottom: 1px solid var(--line);
+}
+html.native .find-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top)); }
+.find-bar[hidden] { display: none; }
+.find-input {
+  flex: 1; min-width: 0; height: var(--tap); padding: 0 var(--s-3);
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--surface); color: var(--ink); font: 400 var(--fs-label)/1 var(--sans);
+}
+.find-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.find-count { min-width: 4.5em; text-align: center; font-size: var(--fs-meta); color: var(--muted); font-variant-numeric: tabular-nums; }
+.find-done { min-height: var(--tap); padding: 0 var(--s-2); }
+/* Back to where you were (1.14.0), after following a link inside the
+   clip: over the text at the bottom, until it's used or the clip closes. */
+.jump-back {
+  position: absolute; z-index: 3; left: 50%; bottom: calc(var(--s-6) + env(safe-area-inset-bottom) + 48px);
+  transform: translateX(-50%);
+  display: inline-flex; align-items: center; gap: var(--s-2);
+  min-height: var(--tap); padding: 0 var(--s-4) 0 var(--s-3);
+  border: 1px solid var(--line); border-radius: var(--r-full);
+  background: var(--surface); color: var(--ink);
+  font: 600 var(--fs-label)/1 var(--sans); white-space: nowrap;
+  box-shadow: 0 8px 24px var(--shadow);
+}
+.jump-back[hidden] { display: none; }
+/* A note, from its mark in the text (1.14.0). */
+.note-text { margin: 0 0 var(--s-4); font: 400 var(--fs-label)/1.5 var(--serif); color: var(--ink); }
+.link-url { margin: var(--s-1) 0 var(--s-4); font-size: var(--fs-meta); color: var(--muted); overflow-wrap: anywhere; }
+
 /* A tapped image, full screen: pinch or double-tap to zoom, drag to look
    around, swipe down (or ×, Escape, back) to close. */
 .viewer {
@@ -712,6 +745,13 @@ html.native .reader::before {
   position: absolute; inset: 0; background: var(--accent);
   transform-origin: bottom; transform: scaleY(0.5);
 }
+/* Back to the phone's own level (1.14.0), lit while it's the phone's. */
+.bright-auto {
+  min-width: 44px; min-height: 44px; padding: 0 var(--s-1);
+  border: 0; border-radius: var(--r-md); background: none;
+  font: inherit; font-size: var(--fs-meta); font-weight: 600; color: inherit;
+}
+.bright-auto[aria-pressed="true"] { color: var(--accent); }
 .bright { opacity: 0.55; }
 .reader.brightening .bright,
 .bright:focus-within { opacity: 1; color: var(--ink); }
