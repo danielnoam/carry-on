@@ -3,6 +3,21 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Comics that fill in as they scroll (1.17.0).** Daniel's .mht of
+  WEBTOON's phone viewer: 215 images, about 100 still
+  bg_transparency.png with no data-* at all after he'd scrolled part
+  way, so the address lives only in the site's scripts, and lots of
+  manga sites do the same. readArticle's comic result now carries
+  `blanks` (images still a stand-in after resolveLazyImages); with two or
+  more, fromAnyPage renders the page with PageRender's new `scroll`
+  mode and keeps that read if it found more panels. Scroll mode (both
+  plugins): a 4000 px tall view, one screen down every 250 ms, done when
+  it's at the end and the count of images with a real src hasn't moved
+  for three steps, or at the 50 s limit. The view's alpha is 0.01, not
+  0, so it's drawn and IntersectionObserver-style loaders fire. Images
+  stay blocked in the hidden view (no double download); a loader that
+  waits for each picture to load before the next would still stop short.
+  Not run on a device from here.
 - **WEBTOON from the desktop page (1.16.1).** 1.16.0's panels() didn't
   help on Daniel's phone: the app's User-Agent is the phone WebView's, so
   WEBTOON serves its mobile viewer, which seems to load all but the first

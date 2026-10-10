@@ -210,11 +210,14 @@
   // native/share's PageRender plugin: { text, url } of the HTML it ended up
   // with. null where there's no such plugin (iOS for now, a browser) or the
   // page never drew.
-  async function render(url) {
+  // `scroll` (1.17.0): scrolled to the end first, for pictures that fill
+  // in as they come into view; a long chapter takes longer.
+  async function render(url, { scroll = false } = {}) {
     const R = plugin("PageRender");
     if (!R) return null;
     try {
-      const res = await deadline(R.render({ url, timeoutMs: 20000 }), 30000);
+      const wait = scroll ? 50000 : 20000;
+      const res = await deadline(R.render({ url, timeoutMs: wait, scroll }), wait + 10000);
       return res && res.html ? { text: res.html, url: res.url || url } : null;
     } catch (e) {
       return null;

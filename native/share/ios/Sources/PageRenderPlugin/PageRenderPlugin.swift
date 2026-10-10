@@ -6,6 +6,8 @@ import WebKit
 // (1.6.0): the same call as Android's PageRenderPlugin.java,
 //
 //   render({ url, timeoutMs })   { html, url } once the page has drawn its text
+//   render({ url, timeoutMs, scroll: true })   the same once it has also been
+//     scrolled to the end and its pictures stopped filling in (1.17.0)
 //
 // The page runs in its own WKWebView, out of sight behind the app's: no
 // Capacitor bridge, no message handlers, a data store of its own that keeps
@@ -33,26 +35,27 @@ public class PageRenderPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
         let timeout = max(5, min(60, (call.getDouble("timeoutMs") ?? 20000) / 1000))
+        let scroll = call.getBool("scroll") ?? false
         DispatchQueue.main.async {
             if self.rules != nil {
-                self.start(call, url, timeout)
+                self.start(call, url, timeout, scroll)
                 return
             }
             WKContentRuleListStore.default().compileContentRuleList(forIdentifier: "waypage-render", encodedContentRuleList: PageRenderPlugin.blockList) { list, _ in
                 DispatchQueue.main.async {
                     self.rules = list
-                    self.start(call, url, timeout)
+                    self.start(call, url, timeout, scroll)
                 }
             }
         }
     }
 
-    private func start(_ call: CAPPluginCall, _ url: URL, _ timeout: Double) {
+    private func start(_ call: CAPPluginCall, _ url: URL, _ timeout: Double, _ scroll: Bool) {
         guard let host = bridge?.viewController?.view else {
             call.reject("No window")
             return
         }
-        let job = Job(call: call, url: url, timeout: timeout, rules: rules) { [weak self] done in
+        let job = Job(call: call, url: url, timeout: timeout, scroll: scroll, rules: rules) { [weak self] done in
             self?.jobs.removeAll { $0 === done }
         }
         jobs.append(job)
@@ -62,10 +65,22 @@ public class PageRenderPlugin: CAPPlugin, CAPBridgedPlugin {
     private final class Job: NSObject, WKNavigationDelegate {
         static let pollSeconds = 0.7
         static let minText = 500
+        static let scrollSeconds = 0.25
+        // A tall window, so a long chapter is a few dozen steps.
+        static let scrollHeight: CGFloat = 4000
+        // One screen further down; "1:" at the end, then how many pictures
+        // have a real address rather than a stand-in.
+        static let scrollStep = "(function(){var h=document.documentElement,b=document.body;"
+            + "var end=Math.max(h.scrollHeight,b?b.scrollHeight:0)-2,at=window.scrollY+innerHeight>=end;"
+            + "if(!at)window.scrollBy(0,innerHeight);var n=0,im=document.images;"
+            + "for(var i=0;i<im.length;i++){var s=im[i].getAttribute('src')||'';"
+            + "if(s&&!/^data:/.test(s)&&!/transparen|blank|spacer|placeholder|loading|lazy|1x1/i.test(s))n++;}"
+            + "return (at?'1:':'0:')+n;})()"
 
         let call: CAPPluginCall
         let url: URL
         let timeout: Double
+        let scroll: Bool
         let rules: WKContentRuleList?
         let finished: (Job) -> Void
         var web: WKWebView?
@@ -73,11 +88,13 @@ public class PageRenderPlugin: CAPPlugin, CAPBridgedPlugin {
         var loaded = false
         var lastLength = -1
         var steady = 0
+        var lastCount = -1
 
-        init(call: CAPPluginCall, url: URL, timeout: Double, rules: WKContentRuleList?, finished: @escaping (Job) -> Void) {
+        init(call: CAPPluginCall, url: URL, timeout: Double, scroll: Bool, rules: WKContentRuleList?, finished: @escaping (Job) -> Void) {
             self.call = call
             self.url = url
             self.timeout = timeout
+            self.scroll = scroll
             self.rules = rules
             self.finished = finished
         }
@@ -89,9 +106,13 @@ public class PageRenderPlugin: CAPPlugin, CAPBridgedPlugin {
             config.allowsInlineMediaPlayback = false
             config.preferences.javaScriptCanOpenWindowsAutomatically = false
             if let r = rules { config.userContentController.add(r) }
-            let w = WKWebView(frame: host.bounds, configuration: config)
+            var frame = host.bounds
+            if scroll { frame.size.height = Job.scrollHeight }
+            let w = WKWebView(frame: frame, configuration: config)
             w.navigationDelegate = self
-            w.alpha = 0
+            // All but invisible, behind the app: a page that isn't drawn
+            // never fills in what scrolls into view.
+            w.alpha = 0.01
             w.isUserInteractionEnabled = false
             w.accessibilityElementsHidden = true
             // Behind the app's own WebView, so it never takes a touch.
@@ -109,7 +130,26 @@ public class PageRenderPlugin: CAPPlugin, CAPBridgedPlugin {
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             if loaded { return }
             loaded = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + Job.pollSeconds) { [weak self] in self?.poll() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + Job.pollSeconds) { [weak self] in
+                guard let self = self else { return }
+                if self.scroll { self.step() } else { self.poll() }
+            }
+        }
+
+        // Down a screen at a time; at the end, it waits for the pictures to
+        // stop filling in (three steps the same), then takes the page.
+        func step() {
+            guard !done, let w = web else { return }
+            w.evaluateJavaScript(Job.scrollStep) { [weak self] v, _ in
+                guard let self = self, !self.done else { return }
+                let r = v as? String ?? ""
+                let end = r.hasPrefix("1:")
+                let n = Int(r.dropFirst(2)) ?? 0
+                self.steady = end && n == self.lastCount ? self.steady + 1 : 0
+                self.lastCount = n
+                if self.steady >= 3 { self.take() }
+                else { DispatchQueue.main.asyncAfter(deadline: .now() + Job.scrollSeconds) { [weak self] in self?.step() } }
+            }
         }
 
         // Waits for the text to stop growing: most of these pages draw an
