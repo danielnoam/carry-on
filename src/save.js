@@ -1090,7 +1090,7 @@
       if (listed && listed.length > (panels ? panels.length : 0)) panels = listed;
       if (own && own.next !== undefined) next = own.next;
       if (own && own.prev !== undefined) prev = own.prev;
-      return panels ? { doc, docTitle, headline: (own && own.title) || headline, next, prev, panels, series: (own && own.series) || "", byline: (own && own.byline) || "" } : null;
+      return panels ? { doc, docTitle, headline: (own && own.title) || headline, next, prev, panels, series: (own && own.series) || "", byline: (own && own.byline) || "", blanks: standIns(doc) } : null;
     }
     if (typeof window.Readability !== "function") throw new SaveError("The reader part of the app didn't load. Restart Waypage.");
     const article = new window.Readability(doc, { charThreshold: 500, keepClasses: false }).parse();
@@ -1134,11 +1134,23 @@
     // saved copy is the same script-free HTML as any other page's.
     if ((!got || got.check) && C.platform.canRender) {
       if (onDrawing) onDrawing();
-      const drawn = await C.platform.render(finalUrl);
+      const drawn = await C.platform.render(finalUrl, { scroll: comic });
       if (drawn) {
         finalUrl = drawn.url;
         html = drawn.text;
         got = readArticle(drawn.text, finalUrl, comic, siteRule(finalUrl), asPage);
+      }
+    } else if (comic && got && got.panels && got.blanks >= 2 && C.platform.canRender) {
+      // A comic whose pictures fill in as it scrolls (1.17.0): drawn in the
+      // hidden browser and scrolled to the end, then read again, kept if
+      // that found more of them.
+      if (onDrawing) onDrawing();
+      const drawn = await C.platform.render(finalUrl, { scroll: true });
+      const again = drawn && readArticle(drawn.text, drawn.url, comic, siteRule(drawn.url), asPage);
+      if (again && again.panels && again.panels.length > got.panels.length) {
+        finalUrl = drawn.url;
+        html = drawn.text;
+        got = again;
       }
     }
     if (got && got.check) throw new SaveError("The site asked for a browser check, so Waypage can't save it yet.", true);
@@ -1202,6 +1214,11 @@
   // Lazy loaders keep the real image in data-src, data-srcset or a
   // <picture>'s <source>, with a placeholder in src. Done before Readability,
   // which drops images it thinks are empty.
+  // Pictures still showing a stand-in once every known lazy loader is
+  // undone (1.17.0): their address is only in the page's scripts, which
+  // swap it in as the reader scrolls.
+  const STAND_IN = /^data:|^$|transparen|blank|spacer|placeholder|loading|lazy|1x1/i;
+  const standIns = (doc) => [...doc.querySelectorAll("body img")].filter((img) => STAND_IN.test(img.getAttribute("src") || "") && !img.getAttribute("srcset")).length;
   const LAZY_URL = /^(https?:)?\/\/[^\s"'<>]+\.(jpe?g|png|gif|webp|avif)(\?[^\s"'<>]*)?$/i;
   function resolveLazyImages(doc, base) {
     doc.querySelectorAll("picture").forEach((pic) => {

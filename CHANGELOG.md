@@ -2,6 +2,15 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.17.0] - 2026-10-10
+
+### Fixed
+- Comics and manga on sites that swap their pictures in as you scroll
+  saved only the first few. When a comic page still has blank pictures,
+  Waypage now opens it in its hidden browser, scrolls to the end so the
+  site loads every picture, and saves those. The site's scripts are
+  never saved. In the app only, on Android and iPhone.
+
 ## [1.16.1] - 2026-10-10
 
 ### Changed
