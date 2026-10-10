@@ -138,15 +138,30 @@ function previewSheet(p) {
 }
 
 // ---- The sidebar ----
-// Library with its collections under it, then Feeds with its feeds,
-// from the bar's menu button, over a dimmed screen in its own history
-// entry. Each list shows the three touched last (0.28.1).
+// Library with its favourites and parts under it, then Feeds with its
+// feeds, from the bar's menu button, over a dimmed screen in its own
+// history entry. Feeds shows the three touched last (0.28.1); Library
+// the favourite collections, then the favourite clips (1.14.0).
 const SIDE_MAX = 3;
+const FAV_MAX = 6;
 function sideCover(name) {
   const list = folderPages(name);
   const src = coverUrl(list) || list.map(thumbUrl).find(Boolean);
   const box = el("span", { class: "side-cover", "aria-hidden": "true" });
   box.append(src ? el("img", { src, alt: "", loading: "lazy" }) : collectionIcon(list, 16));
+  return box;
+}
+
+const sideMark = (name) => {
+  const box = el("span", { class: "side-cover", "aria-hidden": "true" });
+  box.append(svgIcon(name, 16));
+  return box;
+};
+function clipCover(p) {
+  const src = thumbUrl(p);
+  if (!src) return sideMark("open");
+  const box = el("span", { class: "side-cover", "aria-hidden": "true" });
+  box.append(el("img", { src, alt: "", loading: "lazy" }));
   return box;
 }
 
@@ -168,6 +183,20 @@ function openFromSide(name) {
   });
 }
 
+function partFromSide(part) {
+  return fromSide().then(() => {
+    if (state.place !== "library") { state.place = "library"; store(PLACE_KEY, "library"); paintPlace(); }
+    if (state.part !== part) openPart(part);
+  });
+}
+function sideFavourites() {
+  const folders = allFolders().filter(folderFav)
+    .map((name) => ({ name, at: Math.max(...folderPages(name).map((x) => x.folderFavAt || 0)) }))
+    .sort((a, b) => b.at - a.at).map((x) => ({ folder: x.name }));
+  const clips = state.pages.filter((x) => x.fav).sort((a, b) => (b.favAt || 0) - (a.favAt || 0)).map((p) => ({ page: p }));
+  return folders.concat(clips);
+}
+
 const withFeed = (node, f) => { node.dataset.feed = f.url; return node; };
 
 function renderSide() {
@@ -184,20 +213,27 @@ function renderSide() {
   const marked = state.pages.reduce((n, p) => n + (p.marks || []).length, 0);
   const latest = (f) => Math.max(0, ...f.items.map(postAt));
   const big = wide.matches;
-  const inLibrary = !inFeeds && !inMarks && state.part !== "files" && !state.folder;
+  const inLib = !inFeeds && !inMarks;
+  const inLibrary = inLib && !state.part && !state.folder && state.filter !== "favourites";
+  const favs = sideFavourites();
+  const hasFolders = allFolders().length > 0;
   fill($("sidebar"),
     el("div", { class: "side-head" },
       el("p", { class: "side-title" }, "Waypage"),
       big && !inFeeds && !inMarks ? el("button", { class: "icon-btn side-search", type: "button", "aria-label": "Search", title: "Search (/)",
         onclick: () => (pinned.matches ? toLibrary() : back()).then(() => { if (state.place !== "library") goPlace("library"); openSearch(); }) }, sideSvg("search")) : null),
     item(feedIcon("library"), "Library", inLibrary, count(state.pages.length, "side-count"), () => goPlace("library")),
-    ...[...foldersByUse().filter(folderFav), ...foldersByUse().filter((f) => !folderFav(f))].slice(0, SIDE_MAX).map((name) =>
-      item(sideCover(name), name, state.folder === name, count(freshCount(name)), () => openFromSide(name), "side-sub")),
+    ...favs.slice(0, FAV_MAX).map((f) => f.folder
+      ? item(sideCover(f.folder), f.folder, state.folder === f.folder, count(freshCount(f.folder)), () => openFromSide(f.folder), "side-sub")
+      : item(clipCover(f.page), f.page.title, state.open === f.page, null, () => fromSide().then(() => openPage(f.page.id)), "side-sub")),
+    favs.length > FAV_MAX ? item(sideMark("star"), "All favourites", inLib && !state.part && state.filter === "favourites", count(favs.length),
+      () => goPlace("library").then(() => setFilter("favourites")), "side-sub") : null,
+    favs.length ? el("hr", { class: "side-line" }) : null,
+    // The library's parts (1.14.0), each opening alone.
+    hasFolders ? item(sideMark("folder"), "Collections", inLib && state.part === "collections", null, () => partFromSide("collections"), "side-sub") : null,
+    item(sideMark("open"), "Clips", inLib && state.part === "pages", null, () => partFromSide("pages"), "side-sub"),
     // Files of your own (0.31.0), their part of the library.
-    state.pages.some((p) => p.link) ? item(fileMark(), "Files", !inFeeds && !inMarks && state.part === "files", null, () => fromSide().then(() => {
-      if (state.place !== "library") { state.place = "library"; store(PLACE_KEY, "library"); paintPlace(); }
-      if (state.part !== "files") openPart("files");
-    }), "side-sub") : null,
+    state.pages.some((p) => p.link) ? item(fileMark(), "Files", inLib && state.part === "files", null, () => partFromSide("files"), "side-sub") : null,
     el("hr", { class: "side-line" }),
     item(feedIcon("feeds"), "Feeds", inFeeds && !state.feed, fresh ? el("span", { class: "side-pill" }, fresh + " new") : null,
       () => goPlace("feeds")),
