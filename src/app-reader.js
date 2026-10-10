@@ -353,7 +353,7 @@ function show(p, html) {
 // a browser can't change the screen. Off in Settings or the Aa sheet.
 const BRIGHT_KEY = "waypage.brightness";
 const BRIGHT_SWIPE_KEY = "waypage.brightSwipe";
-// Which side the slider and the swipe are on (1.16.0): hold the slider a
+// Which side the slider and the swipe are on (1.16.0): hold the slider half a
 // second, then swipe it across.
 const BRIGHT_SIDE_KEY = "waypage.brightSide";
 const brightSide = () => (load(BRIGHT_SIDE_KEY, "left") === "right" ? "right" : "left");
@@ -454,7 +454,7 @@ const brightEdge = {
     brightFrom = bright;
     setBright(at(e.clientY));
   });
-  // Held still for a second, anywhere on it, it lifts and follows the
+  // Held still for half a second (1.16.1), anywhere on it, it lifts and follows the
   // finger across; let go past the middle and it stays on that side.
   box.addEventListener("pointerdown", (e) => {
     if (e.button) return;
@@ -468,7 +468,7 @@ const brightEdge = {
       $("readerView").classList.add("brightening");
       box.classList.add("lifted");
       if (navigator.vibrate) navigator.vibrate(10);
-    }, 1000) };
+    }, 500) };
   });
   addEventListener("pointermove", (e) => {
     if (press && press.id === e.pointerId) {
@@ -530,7 +530,7 @@ function brightSwitch(id) {
         if (e.target.checked) brightOpen();
         else { brightClose(); $("bright").hidden = true; }
       } })),
-  // Also by holding the slider a second and swiping it across.
+  // Also by holding the slider half a second and swiping it across.
   el("div", { class: "rc-row" }, el("span", { class: "rc-label" }, "Brightness slider"),
     seg(id + "-brightSide", "Brightness slider side", [
       { value: "left", label: "Left" }, { value: "right", label: "Right" },

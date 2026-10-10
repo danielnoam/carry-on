@@ -301,7 +301,7 @@ const frameText = (p) => p.frameLocator("#readerFrame").locator("body");
       await p.evaluate(() => document.getElementById("readerView").classList.remove("bar-away"));
     });
 
-    await test("held a second, the brightness slider swipes to the other side (1.16.0)", async () => {
+    await test("held half a second, the brightness slider swipes to the other side (1.16.0)", async () => {
       await p.evaluate(() => {
         C.platform.brightness = { available: true, get: async () => ({ level: 0.5 }), set: async () => {} };
         brightOpen();
@@ -312,7 +312,7 @@ const frameText = (p) => p.frameLocator("#readerFrame").locator("body");
       const box = await p.locator("#brightTrack").boundingBox();
       await p.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
       await p.mouse.down();
-      await p.waitForTimeout(1150);
+      await p.waitForTimeout(650);
       assert.ok(await p.evaluate(() => document.getElementById("bright").classList.contains("lifted")));
       await p.mouse.move(340, box.y + box.height / 2, { steps: 5 });
       await p.mouse.up();

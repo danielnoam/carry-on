@@ -197,4 +197,12 @@ test("WEBTOON's phone page gives every panel, not the first few (1.16.0)", () =>
   assert.deepStrictEqual(rule.panels({ querySelectorAll: () => [img({ src: P(1) })] }, url, html), [P(1), P(2), P(3)]);
 });
 
+test("WEBTOON is read from the desktop viewer, as a desktop browser (1.16.1)", () => {
+  const rule = S.siteRule("https://m.webtoons.com/en/fantasy/x/episode-1/viewer?title_no=1&episode_no=1");
+  assert.strictEqual(rule.fetch("https://m.webtoons.com/en/fantasy/x/episode-1/viewer?title_no=1&episode_no=1"),
+    "https://www.webtoons.com/en/fantasy/x/episode-1/viewer?title_no=1&episode_no=1");
+  assert.strictEqual(rule.fetch("https://www.webtoons.com/en/x/list?title_no=1"), "https://www.webtoons.com/en/x/list?title_no=1");
+  assert.ok(!/Mobile|Android|iPhone/.test(rule.headers["User-Agent"]));
+});
+
 console.log("\n" + passed + " passed");

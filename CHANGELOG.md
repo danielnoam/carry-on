@@ -2,13 +2,24 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.16.1] - 2026-10-10
+
+### Changed
+- The brightness slider lifts to move after half a second's hold, not a
+  whole second.
+
+### Fixed
+- WEBTOON episodes still saved only their first few panels: they're now
+  read from WEBTOON's desktop page, which lists every panel, whichever
+  address was shared. Save an episode again to get the rest.
+
 ## [1.16.0] - 2026-10-10
 
 ### Added
 - Pinch a clip's text to make it bigger or smaller, keeping your place
   under your fingers. Pictures and PDF pages still zoom as before. A
   switch for it is under Text in the Aa sheet and Settings, Reading.
-- The brightness slider can sit on the right: hold it for a second, then
+- The brightness slider can sit on the right: hold it for half a second, then
   swipe it across (and back the same way). The swipe along the edge
   moves with it, and Settings, Reading has Left and Right for it too.
 - A book or a PDF opens to a spinner, and shows its text once it's laid

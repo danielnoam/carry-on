@@ -273,7 +273,7 @@
   // nothing looks like chapters.
   async function findChapters(url) {
     const site = siteRule(url);
-    const res = await get(site && site.fetch ? site.fetch(url) : url);
+    const res = await get(site && site.fetch ? site.fetch(url) : url, site && site.headers);
     const at = res.url || url;
     const doc = parse(res.text, at);
     const cover = pageImage(doc, at);
@@ -547,6 +547,11 @@
       // episodes a page, newest first.
       name: "WEBTOON",
       host: /(^|\.)webtoons\.com$/i,
+      // The phone's own address and a phone's browser get the mobile
+      // viewer (1.16.1), which names only its first few panels; the
+      // desktop one, asked for as a desktop browser, names them all.
+      fetch: (url) => url.replace(/^(https?:\/\/)m\.webtoons\.com\//i, "$1www.webtoons.com/"),
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36" },
       comic: (url) => /\/viewer\/?$/.test(new URL(url).pathname),
       async contents(doc, url) {
         const u = new URL(url);
@@ -563,7 +568,7 @@
         const a = doc.querySelector("a.subj[href*='/list'], a[href*='/list?title_no=']");
         if (!a) return [];
         const at = new URL(absolute(a.getAttribute("href"), url));
-        return webtoonEpisodes(parse((await get(at.href)).text, at.href), at);
+        return webtoonEpisodes(parse((await get(at.href, this.headers)).text, at.href), at);
       },
       // Every panel (1.16.0): the phone's page (m.webtoons.com) gave only
       // the first few with their picture in src, the rest a stand-in. Each
@@ -750,7 +755,7 @@
       const at = new URL(u.href);
       at.searchParams.set("page", page);
       let more;
-      try { more = read(parse((await get(at.href)).text, at.href)).filter((l) => !all.has(l)); } catch (e) { break; }
+      try { more = read(parse((await get(at.href, siteRule(at.href) && siteRule(at.href).headers)).text, at.href)).filter((l) => !all.has(l)); } catch (e) { break; }
       if (!more.length) break;
       more.forEach((l) => all.add(l));
     }
@@ -1111,7 +1116,7 @@
 
   async function fromAnyPage(url, onDrawing, comic, asPage) {
     const site = siteRule(url);
-    const res = await get(site && site.fetch ? site.fetch(url) : url);
+    const res = await get(site && site.fetch ? site.fetch(url) : url, site && site.headers);
     let finalUrl = res.url || url;
     if (site && site.clean) finalUrl = site.clean(finalUrl);
     if (isArchive(finalUrl)) res.text = unWayback(res.text);
@@ -1729,7 +1734,7 @@
   // which kept no previous one. "" when it has none.
   async function findNext(url, back) {
     const site = siteRule(url);
-    const res = await get(site && site.fetch ? site.fetch(url) : url);
+    const res = await get(site && site.fetch ? site.fetch(url) : url, site && site.headers);
     const at = res.url || url;
     const doc = parse(res.text, at);
     const own = site && site.chapter ? site.chapter(doc, at, res.text) : null;
@@ -1741,7 +1746,7 @@
   // over when a site saves badly ("Send page source" in ⋯).
   async function pageSource(url) {
     const site = siteRule(url);
-    const res = await get(site && site.fetch ? site.fetch(url) : url);
+    const res = await get(site && site.fetch ? site.fetch(url) : url, site && site.headers);
     const name = (siteName(res.url || url) + new URL(res.url || url).pathname).replace(/[^a-z0-9.]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 80) + ".source.html";
     return { name, html: "<!-- " + (res.url || url).replace(/--/g, "%2D%2D") + " -->\n" + res.text };
   }
