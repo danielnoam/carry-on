@@ -3,6 +3,29 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Pinch, the slider's side, the book spinner, WEBTOON (1.16.0).**
+  Pinch: reader.js `textPinchInput` takes two-finger touches that aren't
+  on a comic or printed PDF (`comicRoot()`), sets the size as the fingers
+  move (size = start × spread ratio, whole pixels), and scrolls so the
+  block under the fingers stays there; paged mode relayouts as before.
+  The scroll that keeps the place doesn't tuck the bars away (`pinchedAt`).
+  `gesturestart` is cancelled for Safari's own page zoom. Slider side:
+  `waypage.brightSide`, a `.right` class mirroring the left CSS; held
+  1 s still (8 px slack) it lifts, follows the finger with `translate`,
+  and lands on the half it's let go over, FLIP'd from where it was. The
+  vertical drag is the same pointer, so a hold puts the level back to
+  where it was before the press. A book or PDF (`p.file`) pushes the
+  reader before reading the file (`readerWait`), the frame hidden and a
+  spinner after 200 ms, and shows once the frame's fonts are in and
+  near PDF pages drawn, 4 s at most. WEBTOON: Daniel's saved copy of an
+  m.webtoons.com episode had six panels and the transparency stand-in,
+  so the phone page keeps most panel addresses somewhere other than
+  data-url. Not checkable from here (the site is blocked), so two nets:
+  the rule's new `panels(doc, url, html)` takes whichever attribute in
+  the viewer's images holds a webtoon-phinf address, or every
+  `webtoon-phinf…?type=qNN` address in the raw HTML when that finds more;
+  and resolveLazyImages takes any data-* holding a picture address when
+  src is a blank stand-in.
 - **The archived copy and batched sync (1.15.0).** A save that fails
   with 404, 410 or 403 is marked `gone` (SaveError's third argument), and
   its card offers the Wayback Machine instead of Try again. The

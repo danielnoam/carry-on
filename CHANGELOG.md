@@ -2,6 +2,27 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.16.0] - 2026-10-10
+
+### Added
+- Pinch a clip's text to make it bigger or smaller, keeping your place
+  under your fingers. Pictures and PDF pages still zoom as before. A
+  switch for it is under Text in the Aa sheet and Settings, Reading.
+- The brightness slider can sit on the right: hold it for a second, then
+  swipe it across (and back the same way). The swipe along the edge
+  moves with it, and Settings, Reading has Left and Right for it too.
+- A book or a PDF opens to a spinner, and shows its text once it's laid
+  out, instead of half-styled text first.
+
+### Changed
+- A favourite's star sits on the corner of its picture, for collections,
+  clips and files, instead of beside the name. Collections with a cover
+  no longer carry the small book icon.
+
+### Fixed
+- WEBTOON episodes shared from the phone's browser (m.webtoons.com)
+  saved only the first few panels; they now save every panel.
+
 ## [1.15.0] - 2026-10-10
 
 ### Added

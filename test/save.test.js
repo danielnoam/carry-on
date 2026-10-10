@@ -181,4 +181,20 @@ test("a paywalled article is told from a whole one (1.7.0)", () => {
   assert.strictEqual(S.cutShort("<p></p>", whole + "Subscribe to our newsletter."), false);
 });
 
+test("WEBTOON's phone page gives every panel, not the first few (1.16.0)", () => {
+  const rule = S.siteRule("https://m.webtoons.com/en/fantasy/x/episode-1/viewer?title_no=1&episode_no=1");
+  const url = "https://m.webtoons.com/en/fantasy/x/episode-1/viewer?title_no=1&episode_no=1";
+  const P = (n) => "https://webtoon-phinf.pstatic.net/2021_" + n + "/p" + n + ".jpg?type=q70";
+  const img = (attrs) => ({ attributes: Object.entries(attrs).map(([name, value]) => ({ name, value })) });
+  const BLANK = "https://webtoons-static.pstatic.net/image/bg_transparency.png";
+  // The first panels in src, the rest by an attribute of the page's own.
+  const imgs = [img({ src: P(1) }), img({ src: P(2) }), img({ src: BLANK, "data-image": P(3) }), img({ src: BLANK, "data-image": P(4) })];
+  assert.deepStrictEqual(rule.panels({ querySelectorAll: () => imgs }, url, ""), [P(1), P(2), P(3), P(4)]);
+  // Or only in a script: the addresses in the HTML, in order, once each,
+  // not the series' cover or the other episodes' thumbnails.
+  const html = '<img src="' + P(1) + '"><script>var list=[{"url":"' + P(1) + '"},{"url":"' + P(2) + '"},{"url":"' + P(3) + '"}]</script>' +
+    '<img src="https://webtoon-phinf.pstatic.net/thumb/t.jpg?type=a92"><meta content="https://webtoon-phinf.pstatic.net/c/c.jpg?type=crop540_540">';
+  assert.deepStrictEqual(rule.panels({ querySelectorAll: () => [img({ src: P(1) })] }, url, html), [P(1), P(2), P(3)]);
+});
+
 console.log("\n" + passed + " passed");

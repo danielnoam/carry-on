@@ -727,13 +727,21 @@ html.native .find-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top))
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg);
   box-shadow: 0 8px 24px var(--shadow);
   transform: translateY(-50%);
-  transition: transform var(--spring-control-ms, 300ms) var(--spring-control, ease-out);
+  transition: transform var(--spring-control-ms, 300ms) var(--spring-control, ease-out),
+    translate var(--spring-control-ms, 300ms) var(--spring-control, ease-out),
+    scale var(--spring-control-ms, 300ms) var(--spring-control, ease-out);
   color: var(--muted);
+  touch-action: none; -webkit-user-select: none; user-select: none;
 }
 .bright[hidden] { display: none; }
+/* On the right (1.16.0), held a second and swiped across. */
+.bright.right { left: auto; right: calc(var(--frame-right, 0px) + var(--s-4)); }
+.bright.lifted { scale: 1.06; box-shadow: 0 16px 40px var(--shadow); transition: transform var(--spring-control-ms, 300ms) var(--spring-control, ease-out), scale var(--spring-control-ms, 300ms) var(--spring-control, ease-out); }
 /* Away, it's past the screen's left edge (1.11.0), and slides back in. */
 .reader.bar-away:not(.brightening) .bright,
 .reader:has(.sheet:not([hidden])) .bright { transform: translate(calc(-100% - var(--frame-left, 0px) - var(--s-4) - 16px), -50%); pointer-events: none; }
+.reader.bar-away:not(.brightening) .bright.right,
+.reader:has(.sheet:not([hidden])) .bright.right { transform: translate(calc(100% + var(--frame-right, 0px) + var(--s-4) + 16px), -50%); }
 .bright-track {
   position: relative; width: 44px; height: min(40vh, 280px);
   border-radius: var(--r-md); overflow: hidden;
@@ -756,9 +764,11 @@ html.native .find-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top))
 .reader.brightening .bright,
 .bright:focus-within { opacity: 1; color: var(--ink); }
 @media (prefers-reduced-motion: reduce) {
-  .bright { transition: none; }
+  .bright, .bright.lifted { transition: none; scale: none; }
   .reader.bar-away:not(.brightening) .bright,
-  .reader:has(.sheet:not([hidden])) .bright { transform: translateY(-50%); }
+  .reader:has(.sheet:not([hidden])) .bright,
+  .reader.bar-away:not(.brightening) .bright.right,
+  .reader:has(.sheet:not([hidden])) .bright.right { transform: translateY(-50%); }
 }
 .read-progress { height: 5px; background: var(--line); }
 .read-progress span {
@@ -951,6 +961,16 @@ html.native .find-bar { padding-top: calc(var(--s-2) + env(safe-area-inset-top))
 }
 .pill[hidden] { display: none; }
 .reader-frame { flex: 1; width: 100%; border: 0; background: var(--bg); }
+/* A book or PDF coming in (1.16.0): a spinner in the middle, after a
+   moment so a quick one doesn't flash it, and the text once it's set. */
+.reader-wait { display: none; }
+.reader.waiting .reader-frame { visibility: hidden; }
+.reader.waiting .reader-wait {
+  position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  display: flex; align-items: center; justify-content: center;
+  animation: lib-loading-in 0s 200ms both;
+}
+.reader-wait .spinner { width: 28px; height: 28px; margin: 0; border-width: 3px; }
 .app[hidden] { display: none; }
 
 .toast[hidden] { display: none; }
@@ -1236,7 +1256,6 @@ html { -webkit-tap-highlight-color: transparent; }
 .tile-btn:disabled { opacity: 0.5; cursor: default; }
 .tile-icon { display: flex; color: var(--accent); }
 .tile-btn.on .tile-icon svg { fill: currentColor; }
-.card-fav { color: var(--accent); }
 .page-controls > .overline { margin: var(--s-2) 0 calc(-1 * var(--s-1)) var(--s-1); }
 .page-controls .group .row { min-height: 48px; }
 .chip.some { border-style: dashed; border-color: var(--accent); }
@@ -1333,7 +1352,18 @@ html { -webkit-tap-highlight-color: transparent; }
 .source-row .source-input { flex: 1; min-width: 0; }
 .bar-title .book-icon { display: inline-flex; vertical-align: -2px; margin-inline-end: var(--s-1); color: var(--accent); }
 .tile-thumb .book-icon { color: var(--accent); }
-.tile-book { position: absolute; left: var(--s-1); bottom: var(--s-1); display: inline-flex; padding: var(--s-1); border-radius: var(--r-sm); background: var(--surface); }
+/* A favourite (1.16.0): a star on the picture's corner. */
+.thumb-fav {
+  position: absolute; left: var(--s-1); bottom: var(--s-1); z-index: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 22px; height: 22px; padding: 0 var(--s-1);
+  border-radius: var(--r-sm); background: var(--surface); color: var(--accent);
+  font: 600 var(--fs-meta)/1 var(--sans);
+  box-shadow: 0 1px 3px var(--shadow);
+}
+[dir="rtl"] .thumb-fav { left: auto; right: var(--s-1); }
+.card-thumb.has-fav { position: relative; display: block; }
+.card-thumb.has-fav > img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
 
 /* ---- 0.28.0: Show and Order, and the library's three layouts ---- */
 .lib-tools {

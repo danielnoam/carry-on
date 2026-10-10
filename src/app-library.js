@@ -153,7 +153,7 @@ function folderTile(name) {
           saveNewChapters(name, e.currentTarget);
         } }, "+" + (fresh >= NEW_MAX ? NEW_MAX : fresh)) : null),
     el("span", { class: "tile-name", dir: "auto" }, name),
-    el("span", { class: "tile-meta" }, fav ? el("span", { class: "card-fav", role: "img", "aria-label": "Favourite" }, "★ ") : null, el("span", { class: "tile-kind" }, "Collection · "), (done === list.length ? "All read" : done + " of " + list.length + " read"), el("span", { class: "tile-size" }, " · " + formatSize(sizeOf(list)))),
+    el("span", { class: "tile-meta" }, el("span", { class: "tile-kind" }, "Collection · "), (done === list.length ? "All read" : done + " of " + list.length + " read"), el("span", { class: "tile-size" }, " · " + formatSize(sizeOf(list)))),
     el("span", { class: "progress thin", "aria-hidden": "true" },
       el("span", { class: "progress-fill", style: "transform: scaleX(" + done / list.length + ")" })));
   // A cover whose file is gone (a restored backup) is read again.
@@ -163,7 +163,9 @@ function folderTile(name) {
   }, { once: true });
   // No picture at all: its icon, big, the name already under it.
   if (!thumb) tile.querySelector(".tile-thumb").prepend(collectionIcon(list, 44));
-  else if (folderSource(list)) tile.querySelector(".tile-thumb").append(el("span", { class: "tile-book" }, bookIcon(16)));
+  // A favourite's star in the picture's corner (1.16.0), where a book's
+  // icon used to sit.
+  if (fav) tile.querySelector(".tile-thumb").append(favStar());
   return tile;
 }
 

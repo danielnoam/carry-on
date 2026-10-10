@@ -896,7 +896,8 @@
       e0 = null;
       if (!onEdge || !onEdge.on() || e.touches.length !== 1 || pinch) return;
       const t = e.touches[0], w = frame.contentWindow;
-      if (t.clientX > Math.max(56, w.innerWidth * 0.18)) return;
+      const x = onEdge.side && onEdge.side() === "right" ? w.innerWidth - t.clientX : t.clientX;
+      if (x > Math.max(56, w.innerWidth * 0.18)) return;
       e0 = { x: t.clientX, y: t.clientY, on: false, h: w.innerHeight };
     }, { passive: true });
     doc.addEventListener("touchmove", (e) => {
@@ -919,6 +920,42 @@
     const end = () => { if (e0 && e0.on) onEdge.end(); e0 = null; };
     doc.addEventListener("touchend", end);
     doc.addEventListener("touchcancel", end);
+  }
+
+  // Text size from a pinch (1.16.0): two fingers apart or together set the
+  // size as they go, the line under the fingers kept under them. Pictures
+  // and a PDF's printed pages zoom as before. onPinch: { on(), size(),
+  // set(px) }.
+  let onPinch = null;
+  function textPinchInput() {
+    let p0 = null;
+    const span = (e) => Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    doc.addEventListener("touchstart", (e) => {
+      p0 = null;
+      if (e.touches.length !== 2 || comicRoot() || !onPinch || !onPinch.on()) return;
+      const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      const el = !isPaged() && anchors.find((a) => a.getBoundingClientRect().bottom > my);
+      const r = el && el.getBoundingClientRect();
+      p0 = { d: span(e) || 1, from: onPinch.size(), size: onPinch.size(), my, el, f: r && r.height ? (my - r.top) / r.height : 0 };
+      if (tapTimer) { clearTimeout(tapTimer); tapTimer = 0; }
+      if (e.cancelable) e.preventDefault();
+    }, { passive: false });
+    doc.addEventListener("touchmove", (e) => {
+      if (!p0 || e.touches.length !== 2) return;
+      if (e.cancelable) e.preventDefault();
+      const size = Math.round(p0.from * span(e) / p0.d);
+      if (size === p0.size) return;
+      onPinch.set(size);
+      p0.size = onPinch.size();
+      if (!p0.el) return;
+      const r = p0.el.getBoundingClientRect(), w = frame.contentWindow;
+      w.scrollTo(0, Math.max(0, w.scrollY + r.top + r.height * p0.f - p0.my));
+    }, { passive: false });
+    const done = (e) => { if (p0 && e.touches.length < 2) p0 = null; };
+    doc.addEventListener("touchend", done);
+    doc.addEventListener("touchcancel", done);
+    // Safari's own page zoom, which would take the pinch first.
+    doc.addEventListener("gesturestart", (e) => { if (!comicRoot() && onPinch && onPinch.on()) e.preventDefault(); });
   }
 
   // Turns pages with a swipe and the arrow keys. The page can't scroll on
@@ -993,7 +1030,7 @@
   // `next` ({ over, title, go }) adds a link to the next page at the end;
   // `top` () gives the height the bar covers; onImage(info) opens a tapped
   // image.
-  function open(iframe, html, meta, { at = 0, spot: spotAt = "", onPosition, onScroll, next, top, onImage: image, onTap: tap, onMark: mark, onSelect, pages: asPages, bottom, onKey, onEdge: edge, onLink: link, onNote: note, onJump: jumped } = {}) {
+  function open(iframe, html, meta, { at = 0, spot: spotAt = "", onPosition, onScroll, next, top, onImage: image, onTap: tap, onMark: mark, onSelect, pages: asPages, bottom, onKey, onEdge: edge, onPinch: pinchTo, onLink: link, onNote: note, onJump: jumped } = {}) {
     frame = iframe;
     turning = null;
     paged = !!asPages;
@@ -1008,6 +1045,7 @@
     onTap = tap || null;
     onMark = mark || null;
     onEdge = edge || null;
+    onPinch = pinchTo || null;
     onLink = link || null;
     onNote = note || null;
     onJump = jumped || null;
@@ -1053,6 +1091,7 @@
         pagedInput();
         zoomInput();
         edgeInput();
+        textPinchInput();
         // Keys pressed in the page that it doesn't use itself go to the
         // app's shortcuts (1.5.0).
         if (onKey) doc.addEventListener("keydown", (e) => { if (!e.defaultPrevented) onKey(e); });

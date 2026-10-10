@@ -277,6 +277,82 @@ const frameText = (p) => p.frameLocator("#readerFrame").locator("body");
       await p.locator("#readerView").waitFor({ state: "hidden" });
     });
 
+    await test("a pinch on a clip's words sets the text size (1.16.0)", async () => {
+      await p.locator(".page-card", { hasText: "The Long Haul Flight" }).first().click();
+      await frameText(p).getByText("oceanic track").waitFor();
+      // It opens where it was left, which tucks the bars away; a tap brings them.
+      await p.waitForTimeout(600);
+      await p.evaluate(() => document.getElementById("readerView").classList.remove("bar-away"));
+      const before = await p.evaluate(() => readingPrefs().size);
+      const after = await p.evaluate(() => {
+        const d = document.getElementById("readerFrame").contentDocument;
+        const touch = (id, x, y) => new Touch({ identifier: id, target: d.body, clientX: x, clientY: y });
+        const fire = (type, list) => d.dispatchEvent(new TouchEvent(type, { touches: list, changedTouches: list, bubbles: true, cancelable: true }));
+        fire("touchstart", [touch(1, 150, 300), touch(2, 250, 300)]);
+        fire("touchmove", [touch(1, 125, 300), touch(2, 275, 300)]);
+        fire("touchend", []);
+        return readingPrefs().size;
+      });
+      assert.strictEqual(after, Math.round(before * 1.5));
+      await p.waitForTimeout(500);
+      assert.strictEqual(await p.evaluate(() => document.getElementById("readerView").classList.contains("bar-away")), false, "the pinch tucked the bars away");
+      await p.evaluate((s) => setReading({ size: s }), before);
+      await p.waitForTimeout(300);
+      await p.evaluate(() => document.getElementById("readerView").classList.remove("bar-away"));
+    });
+
+    await test("held a second, the brightness slider swipes to the other side (1.16.0)", async () => {
+      await p.evaluate(() => {
+        C.platform.brightness = { available: true, get: async () => ({ level: 0.5 }), set: async () => {} };
+        brightOpen();
+      });
+      await p.locator("#bright:not([hidden])").waitFor();
+      await until(p, () => document.getElementById("bright").getBoundingClientRect().left > 0);
+      await p.waitForTimeout(400);
+      const box = await p.locator("#brightTrack").boundingBox();
+      await p.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await p.mouse.down();
+      await p.waitForTimeout(1150);
+      assert.ok(await p.evaluate(() => document.getElementById("bright").classList.contains("lifted")));
+      await p.mouse.move(340, box.y + box.height / 2, { steps: 5 });
+      await p.mouse.up();
+      assert.strictEqual(await p.evaluate(() => localStorage.getItem("waypage.brightSide")), JSON.stringify("right"));
+      await until(p, () => document.getElementById("bright").getBoundingClientRect().left > innerWidth / 2);
+      await p.mouse.move(box.x + box.width / 2, box.y + 20);
+      await p.mouse.down();
+      await p.mouse.up();
+      assert.strictEqual(await p.evaluate(() => localStorage.getItem("waypage.brightSide")), JSON.stringify("right"), "a quick tap moved it");
+      await p.evaluate(() => setBrightSide("left"));
+      await p.goBack();
+      await p.locator("#readerView").waitFor({ state: "hidden" });
+    });
+
+    await test("a favourite's star sits on its picture, not by its name (1.16.0)", async () => {
+      await p.evaluate(() => { const c = state.pages.find((x) => /Long Haul/.test(x.title)); return setFavourite([c], true); });
+      const card = p.locator(".page-card", { hasText: "The Long Haul Flight" }).first();
+      await card.locator(".thumb-fav").waitFor();
+      assert.strictEqual(await card.locator(".card-site").innerText().then((t) => t.includes("★")), false);
+      await p.evaluate(() => { const c = state.pages.find((x) => /Long Haul/.test(x.title)); return setFavourite([c], false); });
+      await card.locator(".thumb-fav").waitFor({ state: "detached" });
+    });
+
+    await test("a book opens to a spinner, then its text (1.16.0)", async () => {
+      await p.evaluate(() => {
+        const c = state.pages.find((x) => /Long Haul/.test(x.title));
+        c.file = { name: "long.epub", kind: "epub", ext: "epub", size: 1 };
+        const read = C.store.readPage;
+        C.store.readPage = (id) => new Promise((r) => setTimeout(() => { C.store.readPage = read; r(read(id)); }, 800));
+        openPage(c.id);
+      });
+      await p.locator("#readerView.waiting #readerWait").waitFor({ state: "visible" });
+      assert.strictEqual(await p.evaluate(() => getComputedStyle(document.getElementById("readerFrame")).visibility), "hidden");
+      await until(p, () => !document.getElementById("readerView").classList.contains("waiting"));
+      await frameText(p).getByText("oceanic track").waitFor();
+      await p.goBack();
+      await p.locator("#readerView").waitFor({ state: "hidden" });
+      await p.evaluate(() => { delete state.pages.find((x) => /Long Haul/.test(x.title)).file; });
+    });
+
     await test("nothing went wrong along the way", async () => {
       assert.deepStrictEqual(p.errors, [], p.errors.join(" | "));
     });
