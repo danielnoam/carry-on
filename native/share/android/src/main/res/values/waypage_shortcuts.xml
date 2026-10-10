@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The app icon's shortcuts (1.14.0), xml/waypage_shortcuts.xml. -->
+<resources>
+    <string name="waypage_s_reading">Continue reading</string>
+    <string name="waypage_s_search">Search</string>
+    <string name="waypage_s_paste">Save copied link</string>
+    <string name="waypage_s_paste_long">Save the copied link</string>
+</resources>

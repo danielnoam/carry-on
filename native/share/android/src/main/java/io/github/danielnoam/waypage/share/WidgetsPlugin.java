@@ -1,5 +1,8 @@
 package io.github.danielnoam.waypage.share;
 
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import com.getcapacitor.JSObject;
@@ -15,7 +18,9 @@ import com.getcapacitor.annotation.CapacitorPlugin;
  *            feeds: { following, fresh, posts: [{ title, site, url }] } })
  *   renamed({ from, to })   a collection widget follows a renamed collection
  *   take()    { kind: "page" | "mark" | "post" | "feeds" | "library" | "favourites" | "collection", id, mark, url, name } once,
- *             what a widget's tap asked to open, or {}
+ *             what a widget's tap asked to open, or {}; the app icon's
+ *             shortcuts (1.14.0) add "reading", "search" and "paste"
+ *   copied()  { text }, what's on the clipboard, for Save the copied link
  *
  * and an "open" event when a tap brings the running app back.
  */
@@ -65,6 +70,24 @@ public class WidgetsPlugin extends Plugin {
             Widgets.refresh(getContext());
         }
         call.resolve();
+    }
+
+    // Android 10 and later hand the clipboard only to the app in front
+    // with the focus; before that this is empty, and the page tries again.
+    @PluginMethod
+    public void copied(PluginCall call) {
+        JSObject out = new JSObject();
+        String text = "";
+        try {
+            ClipboardManager m = (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);
+            ClipData c = m == null ? null : m.getPrimaryClip();
+            if (c != null && c.getItemCount() > 0) {
+                CharSequence t = c.getItemAt(0).coerceToText(getContext());
+                if (t != null) text = t.toString();
+            }
+        } catch (Exception e) { /* none */ }
+        out.put("text", text);
+        call.resolve(out);
     }
 
     @PluginMethod

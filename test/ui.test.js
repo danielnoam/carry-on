@@ -338,6 +338,23 @@ const frameText = (p) => p.frameLocator("#readerFrame").locator("body");
       await q.context().close();
     });
 
+    await test("the app icon's shortcuts search, and save the copied link (1.14.0)", async () => {
+      const q = await page(browser, 390);
+      await q.evaluate((url) => {
+        window.Waypage.platform.widgets.take = async () => ({ kind: "paste" });
+        window.Waypage.platform.widgets.copied = async () => "Look at this " + url;
+      }, ARTICLE);
+      await q.evaluate(() => takeWidget());
+      await q.locator(".page-card", { hasText: "The Long Haul Flight" }).first().waitFor({ timeout: 10000 });
+      await q.evaluate(() => { window.Waypage.platform.widgets.take = async () => ({ kind: "search" }); });
+      await q.evaluate(() => takeWidget());
+      await until(q, () => document.activeElement && document.activeElement.id === "librarySearch");
+      await q.evaluate(() => { window.Waypage.platform.widgets.take = async () => ({ kind: "reading" }); });
+      await q.evaluate(() => takeWidget());
+      assert.deepStrictEqual(q.errors, [], q.errors.join(" | "));
+      await q.context().close();
+    });
+
     await test("Report a problem lists a failed save and opens an issue without the address's query", async () => {
       const q = await page(browser, 390);
       await q.evaluate(() => { window.__opened = []; window.Waypage.platform.openOutside = (u) => window.__opened.push(u); });

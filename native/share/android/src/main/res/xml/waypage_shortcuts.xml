@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The app icon's shortcuts (1.14.0), a long press on the icon. Each
+     opens the app the way a widget's tap does (Widgets.OPEN with a
+     waypage-widget:// address), which WidgetsPlugin hands to the page.
+     tools/android-manifest.js points MainActivity at this file. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="reading"
+        android:enabled="true"
+        android:icon="@drawable/waypage_shortcut_reading"
+        android:shortcutShortLabel="@string/waypage_s_reading">
+        <intent
+            android:action="io.github.danielnoam.waypage.WIDGET"
+            android:data="waypage-widget://reading"
+            android:targetPackage="io.github.danielnoam.waypage"
+            android:targetClass="io.github.danielnoam.waypage.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="search"
+        android:enabled="true"
+        android:icon="@drawable/waypage_shortcut_search"
+        android:shortcutShortLabel="@string/waypage_s_search">
+        <intent
+            android:action="io.github.danielnoam.waypage.WIDGET"
+            android:data="waypage-widget://search"
+            android:targetPackage="io.github.danielnoam.waypage"
+            android:targetClass="io.github.danielnoam.waypage.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="paste"
+        android:enabled="true"
+        android:icon="@drawable/waypage_shortcut_paste"
+        android:shortcutShortLabel="@string/waypage_s_paste"
+        android:shortcutLongLabel="@string/waypage_s_paste_long">
+        <intent
+            android:action="io.github.danielnoam.waypage.WIDGET"
+            android:data="waypage-widget://paste"
+            android:targetPackage="io.github.danielnoam.waypage"
+            android:targetClass="io.github.danielnoam.waypage.MainActivity" />
+    </shortcut>
+</shortcuts>

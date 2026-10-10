@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- An app icon shortcut (1.14.0): the sidebar's icon on Paper. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:pathData="M24,2a22,22 0,1 1,0 44a22,22 0,1 1,0 -44z"
+        android:fillColor="#F7F4EE" />
+    <group android:translateX="12" android:translateY="12">
+        <path
+            android:pathData="M5,4.5A1.5,1.5 0,0 1,6.5 3H19v15H6.5A1.5,1.5 0,0 0,5 19.5zM5,19.5A1.5,1.5 0,0 0,6.5 21H19"
+            android:strokeWidth="2"
+            android:strokeColor="#2F5D8A"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+    </group>
+</vector>
