@@ -314,6 +314,30 @@ const frameText = (p) => p.frameLocator("#readerFrame").locator("body");
       await q.context().close();
     });
 
+    await test("the sidebar shows the favourites, then Collections and Clips (1.14.0)", async () => {
+      const q = await page(browser, 390);
+      await q.evaluate(async () => {
+        const c = (i, more) => ({ id: "fv" + i, url: "https://example.com/fv" + i, title: "Clip " + i, site: "example.com", savedAt: 1000 + i, minutes: 3, mode: "links", at: 0, finished: false, ...more });
+        await window.Waypage.store.writeIndex([
+          c(1, { folder: "Trips", folderAt: 0, folderFav: true, folderFavAt: 50 }),
+          c(2, { folder: "Unloved", folderAt: 0 }),
+          c(3, { fav: true, favAt: 60 }),
+          c(4),
+        ]);
+      });
+      await q.reload();
+      await q.locator(".page-card").first().waitFor();
+      await q.click("#sideBtn");
+      const labels = await q.locator("#sidebar .side-item .side-label").allTextContents();
+      assert.deepStrictEqual(labels.slice(0, 5), ["Library", "Trips", "Clip 3", "Collections", "Clips"], labels.join(", "));
+      assert.ok(!labels.includes("Unloved") && !labels.includes("Files"), labels.join(", "));
+      await q.locator("#sidebar .side-item", { hasText: "Collections" }).click();
+      await q.locator("#sidebar").waitFor({ state: "hidden" });
+      await until(q, () => document.querySelectorAll(".library .tile, .library [data-name]").length > 0 && !document.querySelector(".library .page-card:not([data-name])"));
+      assert.deepStrictEqual(q.errors, [], q.errors.join(" | "));
+      await q.context().close();
+    });
+
     await test("Report a problem lists a failed save and opens an issue without the address's query", async () => {
       const q = await page(browser, 390);
       await q.evaluate(() => { window.__opened = []; window.Waypage.platform.openOutside = (u) => window.__opened.push(u); });
