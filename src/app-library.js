@@ -1430,6 +1430,30 @@ async function backUp(btn) {
   label.textContent = "Back up the library";
 }
 
+// Every highlight as one Markdown file (1.14.0), clip by clip, the clip
+// highlighted last first, as the Highlights place's Copy all writes them.
+async function saveHighlights(btn) {
+  const clips = state.pages.filter((p) => (p.marks || []).length)
+    .map((p) => ({ p, last: Math.max(...p.marks.map((m) => m.at || 0)) })).sort((a, b) => b.last - a.last);
+  if (!clips.length) { toast("No highlights yet."); return; }
+  const name = "Waypage highlights " + new Date().toISOString().slice(0, 10) + ".md";
+  const text = clips.map((c) => C.backup.marksMarkdown(c.p)).join("\n");
+  btn.disabled = true;
+  try {
+    const uri = await C.platform.writeCache(name, text);
+    if (!uri) C.platform.download(name, new Blob([text], { type: "text/markdown" }));
+    else {
+      const saved = await C.platform.saveFile(uri, name, "text/markdown");
+      if (saved === null) await C.platform.shareFile(uri, name);
+      else if (saved) toast("Saved " + name);
+    }
+  } catch (e) {
+    console.error(e);
+    toast("Couldn't make the file. Try again.");
+  }
+  btn.disabled = false;
+}
+
 // A backup (a zip) or one page's file, picked from the phone.
 // A file opened from Settings, the save screen, a drop or another app
 // (0.31.0): a backup is restored, a clip sent as a file comes back, and
@@ -1897,8 +1921,10 @@ function backupGroup() {
     el("div", { class: "group" },
       el("button", { class: "row", type: "button", onclick: (e) => backUp(e.currentTarget) },
         el("span", { class: "row-label accent" }, "Back up the library")),
+      state.pages.some((p) => (p.marks || []).length) ? el("button", { class: "row", type: "button", onclick: (e) => saveHighlights(e.currentTarget) },
+        el("span", { class: "row-label accent" }, "Save all highlights")) : null,
       open, input),
-    el("p", { class: "footnote" }, "One file with every clip, its pictures, tags, collections and where you were, and the feeds you follow. " + (C.platform.native ? "Keep it off the phone" : "Keep it somewhere other than this browser") + ". Restoring keeps whichever copy of a clip was saved last. A clip sent as a file opens here too."));
+    el("p", { class: "footnote" }, "One file with every clip, its pictures, tags, collections and where you were, and the feeds you follow. " + (C.platform.native ? "Keep it off the phone" : "Keep it somewhere other than this browser") + ". Restoring keeps whichever copy of a clip was saved last. A clip sent as a file opens here too." + (state.pages.some((p) => (p.marks || []).length) ? " Highlights save as one Markdown file, with their notes and links." : "")));
 }
 // Import, in Saving since 1.12.0 (it was under Backup): the same picker.
 function importGroup() {
