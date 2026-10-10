@@ -9,7 +9,7 @@
 // only use what an earlier part, or its own, has declared. A part's
 // functions can call into any part, since nothing is tapped until all of
 // them have loaded. app-start.js runs last and starts things up.
-const APP_VERSION = "1.15.0";
+const APP_VERSION = "1.16.0";
 window.Waypage.version = APP_VERSION;
 
 const C = window.Waypage;
@@ -788,18 +788,29 @@ function pageCard(p, found, hero) {
     ? el("button", { class: "card-retry", type: "button", onclick: (e) => retryPreviews(p, e.currentTarget) }, "Retry")
     : null;
   return el("div", { class: "card page-card" + (hero ? " continue wide" : "") + (cover ? " has-cover" : ""), "data-ids": p.id },
-    el("button", { class: "card-open", type: "button", "aria-label": p.title, onclick: () => tapPages([p.id], () => openPage(p.id)) }),
+    el("button", { class: "card-open", type: "button", "aria-label": p.title + (p.fav ? ", favourite" : ""), onclick: () => tapPages([p.id], () => openPage(p.id)) }),
     pickMark(),
-    cover ? el("img", { class: "card-thumb cover", src: cover, alt: "", loading: "lazy" })
-      : thumb ? el("img", { class: "card-thumb", src: thumb, alt: "", loading: "lazy" }) : siteMark(p),
+    favThumb(p.fav, cover ? el("img", { class: "card-thumb cover", src: cover, alt: "", loading: "lazy" })
+      : thumb ? el("img", { class: "card-thumb", src: thumb, alt: "", loading: "lazy" }) : siteMark(p)),
     el("span", { class: "card-body" },
-      el("span", { class: "card-site", dir: "auto" }, p.fav ? el("span", { class: "card-fav", role: "img", "aria-label": "Favourite" }, "★ ") : null, p.site, p.folder ? " · " + p.folder : null, ...(p.tags || []).map((t) => el("span", { class: "card-tag" }, " · #" + t))),
+      el("span", { class: "card-site", dir: "auto" }, p.site, p.folder ? " · " + p.folder : null, ...(p.tags || []).map((t) => el("span", { class: "card-tag" }, " · #" + t))),
       el("span", { class: "card-title", dir: "auto" }, p.title),
       found ? el("span", { class: "card-found", dir: "auto" }, found) : null,
       el("span", { class: "card-status" }, facts, status ? " · " : null, status, retry ? " · " : null, retry),
       started ? el("span", { class: "progress thin", role: "progressbar", "aria-label": "Read so far",
         "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": String(Math.round(p.at * 100)) },
         el("span", { class: "progress-fill", style: "transform: scaleX(" + p.at + ")" })) : null));
+}
+
+// A favourite's star sits on its picture's corner (1.16.0), not by its
+// name; a picture is boxed to carry it.
+const favStar = () => el("span", { class: "thumb-fav", "aria-hidden": "true" }, "★");
+function favThumb(fav, thumb) {
+  if (!fav) return thumb;
+  if (thumb.tagName !== "IMG") { thumb.append(favStar()); return thumb; }
+  const box = el("span", { class: thumb.className + " has-fav", "aria-hidden": "true" }, thumb, favStar());
+  thumb.className = "";
+  return box;
 }
 
 // A card with no picture shows its site: the icon on the preview tint,

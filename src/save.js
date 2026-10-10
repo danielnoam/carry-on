@@ -565,6 +565,22 @@
         const at = new URL(absolute(a.getAttribute("href"), url));
         return webtoonEpisodes(parse((await get(at.href)).text, at.href), at);
       },
+      // Every panel (1.16.0): the phone's page (m.webtoons.com) gave only
+      // the first few with their picture in src, the rest a stand-in. Each
+      // picture in the viewer's list by whichever attribute carries its
+      // address, or, when that finds fewer, every panel address in the
+      // page's HTML (they end ?type=q70 or q90; covers and thumbnails
+      // don't), in order.
+      panels(doc, url, html) {
+        const PANEL = /webtoon-phinf\.pstatic\.net\//;
+        const imgs = [...doc.querySelectorAll("#_imageList img, .viewer_img img, img._images")];
+        const fromDom = imgs.map((img) => [...img.attributes].map((a) => a.value.trim()).find((v) => PANEL.test(v) && LAZY_URL.test(v)))
+          .filter(Boolean).map((v) => absolute(v, url));
+        const fromHtml = (String(html || "").match(/https?:\/\/webtoon-phinf\.pstatic\.net\/[^\s"'<>\\]+?\?type=q\d+/g) || [])
+          .map((v) => v.replace(/&amp;/g, "&"));
+        const list = fromHtml.length > fromDom.length ? fromHtml : fromDom;
+        return [...new Set(list)];
+      },
       chapter(doc, url) {
         if (!this.comic(url)) return null;
         const series = doc.querySelector("a.subj[href*='/list']");
@@ -1064,7 +1080,9 @@
       return { doc, docTitle, headline: own.title || headline, next, prev, article, series: own.series || "" };
     }
     if (comic) {
-      const panels = comicPanels(doc, finalUrl);
+      let panels = comicPanels(doc, finalUrl);
+      const listed = site && site.panels ? site.panels(doc, finalUrl, html) : null;
+      if (listed && listed.length > (panels ? panels.length : 0)) panels = listed;
       if (own && own.next !== undefined) next = own.next;
       if (own && own.prev !== undefined) prev = own.prev;
       return panels ? { doc, docTitle, headline: (own && own.title) || headline, next, prev, panels, series: (own && own.series) || "", byline: (own && own.byline) || "" } : null;
@@ -1179,6 +1197,7 @@
   // Lazy loaders keep the real image in data-src, data-srcset or a
   // <picture>'s <source>, with a placeholder in src. Done before Readability,
   // which drops images it thinks are empty.
+  const LAZY_URL = /^(https?:)?\/\/[^\s"'<>]+\.(jpe?g|png|gif|webp|avif)(\?[^\s"'<>]*)?$/i;
   function resolveLazyImages(doc, base) {
     doc.querySelectorAll("picture").forEach((pic) => {
       const img = pic.querySelector("img");
@@ -1192,6 +1211,12 @@
       for (const a of ["data-src", "data-lazy-src", "data-original", "data-url", "data-hi-res-src"]) {
         const v = img.getAttribute(a);
         if (v && !/^data:/.test(v)) { img.setAttribute("src", v); break; }
+      }
+      // A loader whose attribute isn't one of those (1.16.0): any data-*
+      // holding a picture's address, while src is a blank stand-in.
+      if (/^data:|^$|transparen|blank|spacer|placeholder|lazy|loading|1x1/i.test(img.getAttribute("src") || "")) {
+        const other = [...img.attributes].find((a) => /^data-/.test(a.name) && LAZY_URL.test(a.value.trim()));
+        if (other) img.setAttribute("src", other.value.trim());
       }
       const lazySet = img.getAttribute("data-srcset") || img.getAttribute("data-lazy-srcset");
       if (lazySet) img.setAttribute("srcset", lazySet);

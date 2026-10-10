@@ -154,25 +154,65 @@ function showOffline() {
 }
 
 let opening = null;
+// A book or a PDF (1.16.0) opens the reader at once, a spinner where the
+// text goes, and shows the text once it's laid out and in place: a big
+// EPUB showed nothing for seconds, then half-styled text.
+let waiting = null;
+function readerWait(p, fromHistory) {
+  waiting = p.id;
+  const swap = state.open && $("readerView").dataset.pane && !$("readerView").dataset.leaving;
+  if (state.open) { closeSheet(true); hideReadHere(); brightClose(); closeFind(true); state.open = null; }
+  C.reader.close();
+  C.files.closeHeld();
+  $("readerView").classList.add("waiting");
+  $("readerView").classList.remove("bar-away");
+  $("bright").hidden = true;
+  $("readerContents").hidden = true;
+  fill($("readerName"), p.site ? el("span", { class: "reader-site" }, p.site) : null, el("span", { class: "reader-title" }, p.title));
+  if (!fromHistory) swap ? history.replaceState(readerState(p), "") : history.pushState(readerState(p), "");
+  pushScreen($("readerView"));
+}
+function stopWaiting() {
+  waiting = null;
+  $("readerView").classList.remove("waiting");
+}
 async function openPage(id, fromHistory) {
   const p = state.pages.find((x) => x.id === id);
   if (!p || (!fromHistory && opening === id)) return;
   let html, trouble = null;
   opening = id;
+  const wait = !!p.file;
+  if (wait) readerWait(p, fromHistory);
   try {
     html = p.link ? await openLinked(p) : await C.store.readPage(id);
   } catch (e) {
     html = null;
     trouble = e instanceof C.files.FileError ? e.message : null;
   } finally { opening = null; }
-  if (!html) { toast(trouble || "This clip's file is missing. Delete it and save it again."); return; }
+  // Gone back, or on to another clip, while it was coming.
+  if (wait && waiting !== id) return;
+  if (!html) {
+    toast(trouble || "This clip's file is missing. Delete it and save it again.");
+    if (wait) { stopWaiting(); popScreen($("readerView")); if (history.state && history.state.view === "reader") history.back(); }
+    return;
+  }
   // Another post in the Feeds pane takes the place of the one there.
   const swap = state.open && $("readerView").dataset.pane && !$("readerView").dataset.leaving;
-  if (!fromHistory) swap ? history.replaceState(readerState(p), "") : history.pushState(readerState(p), "");
+  if (!fromHistory && !wait) swap ? history.replaceState(readerState(p), "") : history.pushState(readerState(p), "");
   const shown = show(p, html);
-  pushScreen($("readerView"));
+  if (!wait) pushScreen($("readerView"));
   await shown;
-  if (p.link) C.files.drawNear($("readerFrame"));
+  if (wait) {
+    const d = $("readerFrame").contentDocument;
+    await Promise.race([Promise.all([
+      d && d.fonts ? d.fonts.ready : null,
+      p.link ? C.files.drawNear($("readerFrame")) : null,
+    ]), new Promise((r) => setTimeout(r, 4000))]);
+    // The place it was left is set the frame after the fonts are in.
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    if (waiting !== id) return;
+    stopWaiting();
+  } else if (p.link) C.files.drawNear($("readerFrame"));
   $("readerFrame").focus();
   if (markAfterOpen) {
     const id = markAfterOpen, d = $("readerFrame").contentDocument;
@@ -288,6 +328,7 @@ function show(p, html) {
     bottom: () => $("readFoot").offsetHeight,
     onKey: onKeys,
     onEdge: brightEdge,
+    onPinch: textPinch,
     onLink: openLink,
     onNote: openNote,
     onJump: jumped,
@@ -312,6 +353,10 @@ function show(p, html) {
 // a browser can't change the screen. Off in Settings or the Aa sheet.
 const BRIGHT_KEY = "waypage.brightness";
 const BRIGHT_SWIPE_KEY = "waypage.brightSwipe";
+// Which side the slider and the swipe are on (1.16.0): hold the slider a
+// second, then swipe it across.
+const BRIGHT_SIDE_KEY = "waypage.brightSide";
+const brightSide = () => (load(BRIGHT_SIDE_KEY, "left") === "right" ? "right" : "left");
 const brightOn = () => C.platform.brightness.available && load(BRIGHT_SWIPE_KEY, true) !== false;
 let bright = 0.5, brightFrom = 0.5, brightSet = false, brightQueued = false, brightTimer = 0;
 function paintBright() {
@@ -330,8 +375,24 @@ function setBright(v) {
   requestAnimationFrame(() => { brightQueued = false; C.platform.brightness.set(bright).catch(() => {}); });
 }
 function placeBright() {
-  const f = $("readerFrame").getBoundingClientRect();
-  $("bright").style.setProperty("--frame-left", Math.max(0, f.left - $("readerView").getBoundingClientRect().left) + "px");
+  const f = $("readerFrame").getBoundingClientRect(), v = $("readerView").getBoundingClientRect();
+  $("bright").style.setProperty("--frame-left", Math.max(0, f.left - v.left) + "px");
+  $("bright").style.setProperty("--frame-right", Math.max(0, v.right - f.right) + "px");
+  $("bright").classList.toggle("right", brightSide() === "right");
+}
+// To the other side, from where it was let go (`dx` along), so it glides
+// the rest of the way.
+function setBrightSide(side, dx = 0) {
+  const box = $("bright"), was = box.getBoundingClientRect().left;
+  store(BRIGHT_SIDE_KEY, side);
+  box.style.transition = "none";
+  box.classList.toggle("right", side === "right");
+  document.querySelectorAll('input[name$="-brightSide"]').forEach((i) => { i.checked = i.value === side; });
+  const now = box.getBoundingClientRect().left;
+  box.style.translate = (was + dx - now) + "px 0";
+  void box.offsetWidth;
+  box.style.transition = "";
+  box.style.translate = "";
 }
 async function brightOpen() {
   $("bright").hidden = !brightOn();
@@ -366,6 +427,7 @@ function brightClose() {
 }
 const brightEdge = {
   on: () => brightOn() && !state.sheet,
+  side: brightSide,
   start() {
     clearTimeout(brightTimer);
     brightFrom = bright;
@@ -378,19 +440,65 @@ const brightEdge = {
   },
 };
 (() => {
-  const track = $("brightTrack");
-  let dragging = false;
+  const track = $("brightTrack"), box = $("bright");
+  let dragging = false, press = null;
   const at = (y) => { const r = track.getBoundingClientRect(); return 1 - (y - r.top) / r.height; };
   track.addEventListener("pointerdown", (e) => {
     if (e.button) return;
     e.preventDefault();
+    // Moves over the text keep coming here, not to the page's frame.
+    try { track.setPointerCapture(e.pointerId); } catch (err) { /* gone */ }
     dragging = true;
     clearTimeout(brightTimer);
     $("readerView").classList.add("brightening");
+    brightFrom = bright;
     setBright(at(e.clientY));
   });
-  addEventListener("pointermove", (e) => { if (dragging) setBright(at(e.clientY)); });
-  const up = () => {
+  // Held still for a second, anywhere on it, it lifts and follows the
+  // finger across; let go past the middle and it stays on that side.
+  box.addEventListener("pointerdown", (e) => {
+    if (e.button) return;
+    const id = e.pointerId, x = e.clientX, y = e.clientY;
+    press = { id, x, y, lifted: false, timer: setTimeout(() => {
+      if (!press || press.id !== id) return;
+      press.lifted = true;
+      try { box.setPointerCapture(id); } catch (err) { /* let go */ }
+      if (dragging) { dragging = false; setBright(brightFrom); }
+      clearTimeout(brightTimer);
+      $("readerView").classList.add("brightening");
+      box.classList.add("lifted");
+      if (navigator.vibrate) navigator.vibrate(10);
+    }, 1000) };
+  });
+  addEventListener("pointermove", (e) => {
+    if (press && press.id === e.pointerId) {
+      if (press.lifted) {
+        e.preventDefault();
+        box.style.translate = (e.clientX - press.x) + "px 0";
+        return;
+      }
+      if (Math.hypot(e.clientX - press.x, e.clientY - press.y) > 8) { clearTimeout(press.timer); press = null; }
+    }
+    if (dragging) setBright(at(e.clientY));
+  });
+  const up = (e) => {
+    if (press && press.id === e.pointerId) {
+      const p = press;
+      clearTimeout(p.timer);
+      press = null;
+      if (p.lifted) {
+        box.classList.remove("lifted");
+        const v = $("readerView").getBoundingClientRect();
+        const side = e.type === "pointerup" && e.clientX > v.left + v.width / 2 ? "right" : e.type === "pointerup" ? "left" : brightSide();
+        // The tap that ends a hold isn't an Auto.
+        const swallow = (c) => { c.stopPropagation(); c.preventDefault(); };
+        addEventListener("click", swallow, { capture: true, once: true });
+        setTimeout(() => removeEventListener("click", swallow, true), 0);
+        setBrightSide(side, e.clientX - p.x);
+        brightTimer = setTimeout(() => $("readerView").classList.remove("brightening"), 700);
+        return;
+      }
+    }
     if (!dragging) return;
     dragging = false;
     store(BRIGHT_KEY, bright);
@@ -409,11 +517,11 @@ const brightEdge = {
   $("brightAuto").addEventListener("click", brightAuto);
   addEventListener("resize", () => { if (state.open && !$("bright").hidden) placeBright(); });
 })();
-function brightSwitch() {
+function brightSwitch(id) {
   if (!C.platform.brightness.available) return null;
-  return el("label", { class: "rc-row switch-row" },
-    el("span", { class: "choice-text" }, el("span", { class: "rc-label" }, "Brightness on the left edge"),
-      el("span", { class: "choice-note" }, "Swipe up or down along the left side while reading")),
+  return [el("label", { class: "rc-row switch-row" },
+    el("span", { class: "choice-text" }, el("span", { class: "rc-label" }, "Brightness along the edge"),
+      el("span", { class: "choice-note" }, "Swipe up or down along the slider's side while reading")),
     el("input", { class: "switch", type: "checkbox", role: "switch", "data-pref": "brightSwipe", checked: brightOn(),
       onchange: (e) => {
         store(BRIGHT_SWIPE_KEY, e.target.checked);
@@ -421,6 +529,34 @@ function brightSwitch() {
         if (!state.open) return;
         if (e.target.checked) brightOpen();
         else { brightClose(); $("bright").hidden = true; }
+      } })),
+  // Also by holding the slider a second and swiping it across.
+  el("div", { class: "rc-row" }, el("span", { class: "rc-label" }, "Brightness slider"),
+    seg(id + "-brightSide", "Brightness slider side", [
+      { value: "left", label: "Left" }, { value: "right", label: "Right" },
+    ], brightSide(), (v) => { setBrightSide(v); placeBright(); }))];
+}
+
+// Text size from a pinch on a clip's words (1.16.0); pictures and a
+// PDF's printed pages zoom as they did.
+const PINCH_KEY = "waypage.pinchText";
+const pinchOn = () => load(PINCH_KEY, true) !== false;
+// The text keeping its place under the fingers scrolls it, which isn't
+// reading on: the bars stay as they were.
+let pinchedAt = -1e9;
+const textPinch = {
+  on: () => pinchOn() && !state.sheet,
+  size: () => readingPrefs().size,
+  set: (px) => { pinchedAt = performance.now(); px = clamp(px, SIZE_MIN, SIZE_MAX); if (px !== readingPrefs().size) setReading({ size: px }); },
+};
+function pinchSwitch() {
+  return el("label", { class: "rc-row switch-row" },
+    el("span", { class: "choice-text" }, el("span", { class: "rc-label" }, "Pinch for text size"),
+      el("span", { class: "choice-note" }, "Pictures and PDF pages still zoom")),
+    el("input", { class: "switch", type: "checkbox", role: "switch", "data-pref": "pinchText", checked: pinchOn(),
+      onchange: (e) => {
+        store(PINCH_KEY, e.target.checked);
+        document.querySelectorAll('input[data-pref="pinchText"]').forEach((i) => { i.checked = e.target.checked; });
       } }));
 }
 
@@ -459,7 +595,7 @@ function readerScrolled(at, y) {
   const bar = $("readerView").querySelector(".reader-bar").offsetHeight;
   let away = $("readerView").classList.contains("bar-away");
   if (y <= bar || at >= 0.999 || state.sheet) away = false;
-  else if (C.reader.following()) { lastY = y; return; }
+  else if (C.reader.following() || performance.now() - pinchedAt < 400) { lastY = y; return; }
   else if (Math.abs(y - lastY) > 12) away = true;
   else return;
   lastY = y;
@@ -623,6 +759,8 @@ function savePositions() {
 }
 
 function closeReader() {
+  if (waiting && !state.open) { stopWaiting(); C.reader.close(); C.files.closeHeld(); popScreen($("readerView")); return; }
+  stopWaiting();
   if (!state.open) return;
   if (positionTimer) savePositions();
   // Where you got to goes to GitHub now, not in four seconds (1.3.0).
@@ -1300,7 +1438,7 @@ function readingControls(withTheme) {
     row("Margins", seg(id + "-margins", "Margins", [
       { value: "narrow", label: "Narrow" }, { value: "normal", label: "Normal" }, { value: "wide", label: "Wide" },
     ], r.margins, (v) => setReading({ margins: v }))),
-    brightSwitch(),
+    ...(brightSwitch(id) || []),
     // Big screens (1.5.0): two pages side by side, and the contents
     // beside the text.
     wide.matches ? stack("Pages on a wide window", seg(id + "-spread", "Pages on a wide window", [
@@ -1324,6 +1462,7 @@ function readingControls(withTheme) {
       el("button", { class: "step-btn small", type: "button", "data-step": "-1", "aria-label": "Smaller text", onclick: () => nudge(-1) }, "A"),
       slider("Text size", SIZE_MIN, SIZE_MAX, 1, (v) => setReading({ size: v })),
       el("button", { class: "step-btn large", type: "button", "data-step": "1", "aria-label": "Larger text", onclick: () => nudge(1) }, "A")), "size"),
+    pinchSwitch(),
     row("Spacing", el("div", { class: "stepper" },
       slider("Line spacing", SPACING_MIN, SPACING_MAX, 0.05, (v) => setReading({ spacing: v }))), "spacing"),
     el("button", { class: "btn-quiet reset", type: "button", onclick: () => { const r0 = readingPrefs(); setReading({ ...READING_DEFAULT, layout: r0.layout, margins: r0.margins, spread: r0.spread, rail: r0.rail }); } }, "Reset text"));
