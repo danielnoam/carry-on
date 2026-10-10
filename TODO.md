@@ -21,24 +21,20 @@ Decisions every release keeps:
 
 ---
 
-## Next: four releases, in this order (Daniel, 10 Oct 2026)
+## Next: two releases, in this order (Daniel, 10 Oct 2026)
 
 Daniel tried everything that was untested on his phones, and asked for
 all of these, grouped into releases that fit together.
 
-### 1.14.0: app.js in parts
+### 1.14.0: the reader and getting around
 
-Nothing new to see; every release after it is easier to check.
+The split first, so the rest is built on it; then the reader on a plane,
+the sidebar, the app icon and your highlights.
 
 - **Split src/app.js.** 8,500 lines in one file. Into a few plain script
   files loaded in order (library, reader, sheets, settings, highlights),
   each an IIFE on `window.Waypage` like the rest: still no build step.
   Nothing changes for the reader; the tests must pass unchanged.
-
-### 1.15.0: reading
-
-The reader, on a plane.
-
 - **Brightness:** a way back to the phone's own level without turning
   the swipe off.
 - **Footnotes in a sheet.** A tap on a note mark ([1], a Wikipedia
@@ -55,11 +51,6 @@ The reader, on a plane.
   straight to the browser (reader.js, `openOutside`). Save for later
   offline waits and saves when the phone is back online, like any save
   that failed; the toast says so. A link already saved opens that clip.
-
-### 1.16.0: getting around
-
-The sidebar, the app icon and your highlights.
-
 - **Favourites in the sidebar (Daniel, 10 Oct).** Under Library, the
   favourite collections and then the favourite clips, in place of the
   three collections used last (renderSide, SIDE_MAX). A tap opens the
@@ -76,7 +67,7 @@ The sidebar, the app icon and your highlights.
   one file, from Settings: Markdown grouped by clip (title, link, each
   highlight and its note), the same shape as the clip's Copy all.
 
-### 1.17.0: saving and sync
+### 1.15.0: saving and sync
 
 When a page is gone, and a big library's first sync.
 
