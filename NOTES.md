@@ -3,6 +3,15 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **WEBTOON from the desktop page (1.16.1).** 1.16.0's panels() didn't
+  help on Daniel's phone: the app's User-Agent is the phone WebView's, so
+  WEBTOON serves its mobile viewer, which seems to load all but the first
+  few panels with scripts. The rule's `fetch` now turns m.webtoons.com
+  into www.webtoons.com and its new `headers` ask as desktop Chrome
+  (fromAnyPage, the chapter checks and the list pages pass them to get),
+  so the page is the desktop viewer the rule was built from in 0.29.1.
+  Still not checked against the live site from here. The slider's hold is
+  500 ms (Daniel: a second was too long).
 - **Pinch, the slider's side, the book spinner, WEBTOON (1.16.0).**
   Pinch: reader.js `textPinchInput` takes two-finger touches that aren't
   on a comic or printed PDF (`comicRoot()`), sets the size as the fingers
