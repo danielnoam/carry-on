@@ -3,6 +3,24 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **The archived copy and batched sync (1.15.0).** A save that fails
+  with 404, 410 or 403 is marked `gone` (SaveError's third argument), and
+  its card offers the Wayback Machine instead of Try again. The
+  availability API (archive.org/wayback/available) gives the newest copy;
+  it is read from web.archive.org/web/<time>/<url> with the toolbar
+  stripped (the markers around it), not the id_ form, since only the
+  rewritten page has picture addresses that still work. The clip keeps
+  the original url, and `archived` (ms) on its meta changes the footer;
+  sync and backups carry it. Sync: more than two clips to send go through
+  the Git Data API, 50 or 8 MB of text a batch, inline in one tree, then
+  one commit and one ref update (5 requests instead of 50 PUTs, and 1
+  commit instead of 50). A 422 on the ref means another device moved the
+  branch: tree and commit again on the new head. The page's sha is worked
+  out here (SHA-1 of "blob <len>\0" + text) because a tree's answer
+  doesn't list files in folders; with no crypto.subtle the text goes as
+  a blob, which answers its sha. An empty repo (409) falls back to the
+  old one-by-one PUTs. `waypage.syncSent` moves per batch. Not timed on a
+  phone against a real first sync yet. Test: test/syncbatch.test.js.
 - **The 1.14.0 reader and app.js split (1.14.0).** app.js (8,500 lines)
   is now seven classic scripts loaded in order (app, app-reader,
   app-library, app-saving, app-places, app-settings, app-start) sharing

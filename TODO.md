@@ -21,29 +21,10 @@ Decisions every release keeps:
 
 ---
 
-## Next: 1.15.0 (Daniel, 10 Oct 2026)
+## Next
 
-Daniel tried everything that was untested on his phones, and asked for
-these with 1.14.0 (shipped), grouped into releases that fit together.
-
-### 1.15.0: saving and sync
-
-When a page is gone, and a big library's first sync.
-
-- **The archived copy when a page is gone.** A save that fails because
-  the page is missing or refuses (404, 410, 403) offers the Wayback
-  Machine's copy (archive.org's availability API, then the snapshot,
-  saved like any page, with its archive date and the original link). A
-  clip whose original is gone gets the same from its ⋯ menu.
-- **A faster first sync.** Sending is one Contents PUT per clip and per
-  picture pack, one after another, each its own commit. Send in batches
-  of about 50 clips through the Git Data API instead: the clips' text
-  inline in one tree request, picture packs as blobs a few at a time,
-  then one commit and one ref update. A ref that moved under it (another
-  device synced) gets the tree and commit made again on the new head,
-  blobs kept. `waypage.syncSent` moves on per batch, so a cut-off sync
-  resumes from the last batch. Time a first sync on a phone before and
-  after; pictures stay bound by GitHub's ~80 writes a minute.
+Nothing queued: 1.14.0 and 1.15.0 (10 Oct 2026) shipped what Daniel
+asked for. New asks go here.
 
 ---
 
