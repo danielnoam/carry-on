@@ -265,6 +265,9 @@ function show(p, html) {
   $("readProgress").dir = p.dir || "ltr";
   $("readerContents").hidden = true;
   $("readerView").classList.remove("bar-away");
+  jumpFrom = null;
+  $("jumpBack").hidden = true;
+  closeFind(true);
   // The rail is kept from the last clip while this one loads, so the
   // text isn't laid out twice; fitRail settles it once it's in.
   $("readerView").classList.toggle("railed", pinned.matches && readingPrefs().rail && !asPane($("readerView")));
@@ -285,6 +288,9 @@ function show(p, html) {
     bottom: () => $("readFoot").offsetHeight,
     onKey: onKeys,
     onEdge: brightEdge,
+    onLink: openLink,
+    onNote: openNote,
+    onJump: jumped,
   }).then(() => {
     lostMarks = new Set();
     brightOpen();
@@ -310,6 +316,7 @@ const brightOn = () => C.platform.brightness.available && load(BRIGHT_SWIPE_KEY,
 let bright = 0.5, brightFrom = 0.5, brightSet = false, brightQueued = false, brightTimer = 0;
 function paintBright() {
   const pct = Math.round(bright * 100);
+  $("brightAuto").setAttribute("aria-pressed", String(!brightSet));
   $("brightFill").style.transform = "scaleY(" + bright + ")";
   $("brightTrack").setAttribute("aria-valuenow", pct);
   $("brightTrack").setAttribute("aria-valuetext", pct + "%");
@@ -339,6 +346,17 @@ async function brightOpen() {
     try { bright = clamp(Number((await C.platform.brightness.get()).level) || 0.5, 0.01, 1); } catch (e) { bright = 0.5; }
   }
   paintBright();
+}
+// Auto, under the slider (1.14.0): the phone's own level again, and kept
+// so, until the next swipe.
+async function brightAuto() {
+  clearTimeout(brightTimer);
+  if (brightSet) await C.platform.brightness.set(null).catch(() => {});
+  brightSet = false;
+  store(BRIGHT_KEY, 0);
+  try { bright = clamp(Number((await C.platform.brightness.get()).level) || 0.5, 0.01, 1); } catch (e) { bright = 0.5; }
+  paintBright();
+  brightTimer = setTimeout(() => $("readerView").classList.remove("brightening"), 700);
 }
 function brightClose() {
   clearTimeout(brightTimer);
@@ -388,6 +406,7 @@ const brightEdge = {
     setBright(to);
     store(BRIGHT_KEY, bright);
   });
+  $("brightAuto").addEventListener("click", brightAuto);
   addEventListener("resize", () => { if (state.open && !$("bright").hidden) placeBright(); });
 })();
 function brightSwitch() {
@@ -613,6 +632,8 @@ function closeReader() {
   // Reading aloud goes on (1.4.0): the bar along the bottom carries it.
   hideReadHere();
   brightClose();
+  closeFind(true);
+  $("jumpBack").hidden = true;
   state.open = null;
   showAloudBar();
   // The library redraws (where you got to) before the reader shrinks
@@ -1381,6 +1402,9 @@ const SHEETS = {
   page: { button: "readerMore", label: "This clip", build: () => state.open.preview ? previewSheet(state.open) : pageSheet(state.open, "reader") },
   contents: { button: "readerContents", label: "Contents", build: contentsList },
   marks: { button: "readerMarks", label: "Highlights", build: () => marksView(state.open) },
+  // From the text itself (1.14.0), with no button of their own.
+  note: { label: "Note", build: () => noteSheet(noteNow) },
+  link: { label: "Link", build: () => linkSheet(linkNow) },
 };
 
 function openSheet(kind, fromHistory) {
@@ -1391,13 +1415,13 @@ function openSheet(kind, fromHistory) {
   $("readingBody").replaceChildren(s.build());
   $("readingSheet").setAttribute("aria-label", s.label);
   if (!fromHistory) history.pushState(readerState(state.open, kind), "");
-  $(s.button).setAttribute("aria-expanded", "true");
+  if (s.button) $(s.button).setAttribute("aria-expanded", "true");
   $("readerView").classList.remove("bar-away");
   $("sheetCatch").hidden = false;
   const sheet = $("readingSheet");
   sheet.hidden = false;
   // From 700 px the sheet is a panel under its button (1.5.0).
-  if (wide.matches) {
+  if (wide.matches && s.button) {
     const at = $(s.button).getBoundingClientRect(), box = $("readerView").getBoundingClientRect();
     const left = at.left + at.width / 2 < box.left + box.width / 2;
     sheet.dataset.pop = left ? "start" : "end";
@@ -1417,15 +1441,121 @@ function openSheet(kind, fromHistory) {
 
 function closeSheet(now) {
   if (!state.sheet) return;
-  const button = $(SHEETS[state.sheet].button);
+  const button = SHEETS[state.sheet].button ? $(SHEETS[state.sheet].button) : null;
   state.sheet = false;
-  button.setAttribute("aria-expanded", "false");
+  if (button) button.setAttribute("aria-expanded", "false");
   $("sheetCatch").hidden = true;
   const sheet = $("readingSheet");
   if (now) { sheet.hidden = true; return; }
-  (sheet.dataset.pop ? M.popInto(sheet, button.getBoundingClientRect()) : M.sink(sheet, sheetDrop(sheet))).then(() => { if (!state.sheet) sheet.hidden = true; delete sheet.dataset.drop; });
-  afterStart(() => button.focus({ preventScroll: true }));
+  (sheet.dataset.pop && button ? M.popInto(sheet, button.getBoundingClientRect()) : M.sink(sheet, sheetDrop(sheet))).then(() => { if (!state.sheet) sheet.hidden = true; delete sheet.dataset.drop; });
+  if (button) afterStart(() => button.focus({ preventScroll: true }));
 }
+
+// ---- Notes, links and jumps inside a clip (1.14.0) ----
+// A note mark ([3]) opens its note over the page; a link to another page
+// asks whether to open it or save it for later; a jump within the clip
+// (its own contents, "see below") leaves a way back.
+let noteNow = null, linkNow = null, jumpFrom = null;
+function openNote(note) {
+  noteNow = note;
+  if (state.sheet === "note") { $("readingBody").replaceChildren(SHEETS.note.build()); return; }
+  openSheet("note");
+}
+function noteSheet(n) {
+  if (!n) return el("p", { class: "meta" }, "That note isn't here any more.");
+  return el("div", { class: "page-controls" },
+    el("div", { class: "menu-head" }, el("p", { class: "menu-title" }, n.label ? "Note " + n.label.replace(/^\[|\]$/g, "") : "Note")),
+    el("p", { class: "note-text", dir: "auto" }, n.text),
+    n.links.length ? el("div", { class: "group" }, ...n.links.map((l) => el("button", { class: "row", type: "button", onclick: () => openLink(l.href, l.text) },
+      el("span", { class: "choice-text" },
+        el("span", { class: "row-label accent", dir: "auto" }, l.text || hostOf(l.href)),
+        el("span", { class: "choice-note" }, hostOf(l.href)))))) : null,
+    el("div", { class: "group" }, menuRow("Go to the note", () => back().then(() => n.go()))));
+}
+const hostOf = (url) => { try { return new URL(url).hostname.replace(/^www\./, ""); } catch (e) { return url; } };
+function openLink(href, text) {
+  linkNow = { href, text };
+  if (state.sheet === "link") { $("readingBody").replaceChildren(SHEETS.link.build()); return; }
+  openSheet("link");
+}
+function linkSheet(l) {
+  if (!l) return el("p", { class: "meta" }, "That link isn't here any more.");
+  const saved = savedAs(l.href);
+  const go = (f) => () => back().then(f);
+  return el("div", { class: "page-controls" },
+    el("div", { class: "menu-head" },
+      el("p", { class: "menu-title", dir: "auto" }, saved ? saved.title : l.text && l.text.length > 2 ? l.text : hostOf(l.href)),
+      el("p", { class: "link-url" }, l.href)),
+    el("div", { class: "group" },
+      saved ? menuRow("Open the saved clip", go(() => openPage(saved.id))) : null,
+      saved ? null : el("button", { class: "row", type: "button", onclick: go(() => saveLater(l.href)) },
+        el("span", { class: "choice-text" },
+          el("span", { class: "row-label accent" }, "Save for later"),
+          el("span", { class: "choice-note" }, navigator.onLine ? "Into your library, to read offline" : "It saves when you're back online"))),
+      menuRow("Open in the browser", go(() => C.platform.openOutside(l.href))),
+      menuRow("Copy the link", go(() => copyText(l.href, "Link copied")))));
+}
+function jumped(spot) {
+  if (!jumpFrom) jumpFrom = { spot, at: C.reader.position() };
+  $("jumpBack").hidden = false;
+}
+$("jumpBack").addEventListener("click", () => {
+  const from = jumpFrom;
+  jumpFrom = null;
+  $("jumpBack").hidden = true;
+  if (from && state.open) C.reader.jump(from.at, from.spot);
+});
+
+// ---- Find in this clip (1.14.0) ----
+// A bar over the reader's own: every match marked, Enter or the arrows
+// for the next and previous, the count between. Its own history entry,
+// so Back closes it before the clip.
+let findTimer = 0, findCount = 0, findAt = -1;
+function openFind() {
+  if (!state.open) return;
+  if (state.finding) { $("findInput").focus(); return; }
+  if (state.sheet) { back().then(openFind); return; }
+  state.finding = true;
+  history.pushState({ ...readerState(state.open), find: true }, "");
+  $("findBar").hidden = false;
+  $("readerView").classList.remove("bar-away");
+  $("findInput").value = "";
+  paintFind();
+  $("findInput").focus();
+}
+function closeFind(now) {
+  clearTimeout(findTimer);
+  if (state.open || now) C.reader.clearFind();
+  findCount = 0;
+  findAt = -1;
+  $("findBar").hidden = true;
+  if (!state.finding) return;
+  state.finding = false;
+  if (!now) history.back();
+}
+function paintFind() {
+  const q = $("findInput").value.trim();
+  $("findCount").textContent = !q ? "" : findCount ? (findAt + 1) + " of " + findCount : "None";
+  $("findPrev").disabled = $("findNext").disabled = findCount < 2;
+}
+function runFind() {
+  findCount = C.reader.find($("findInput").value);
+  findAt = findCount ? C.reader.findGo(0) : -1;
+  paintFind();
+}
+function stepFind(d) {
+  if (!findCount) return;
+  findAt = C.reader.findGo(findAt + d);
+  paintFind();
+}
+$("findInput").addEventListener("input", () => { clearTimeout(findTimer); findTimer = setTimeout(runFind, 250); });
+$("findInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); clearTimeout(findTimer); if ($("findInput").value.trim() && !findCount) runFind(); else stepFind(e.shiftKey ? -1 : 1); }
+  else if (e.key === "Escape") { e.preventDefault(); closeFind(); }
+});
+$("findPrev").addEventListener("click", () => stepFind(-1));
+$("findNext").addEventListener("click", () => stepFind(1));
+$("findDone").addEventListener("click", () => closeFind());
 
 // A sheet from the bottom drags down to close (1.11.0, touch only): it
 // follows the finger, the dimming behind it follows the sheet, and let

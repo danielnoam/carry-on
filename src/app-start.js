@@ -8,7 +8,6 @@ if (C.platform.android && C.platform.plugin("Files") && C.platform.plugin("Files
   C.platform.plugin("Files").where().then((w) => { androidSdk = (w && w.sdk) || 0; if (!state.pages.length) renderLibrary(); }).catch(() => {});
 }
 
-
 function route(s) {
   const view = s && s.view;
   const inSettings = view === "settings" || (view === "news" && s.over === "settings");
@@ -40,6 +39,8 @@ function route(s) {
   if (view === "reader" && (!state.open || state.open.id !== s.page)) openPage(s.page, true);
   if (state.image && !(view === "reader" && s.image)) closeImage();
   if (view === "reader" && s.image && !state.image) history.back();
+  if (state.finding && !(view === "reader" && s.find)) closeFind(true);
+  if (view === "reader" && s.find && !state.finding) history.back();
   if (view === "reader" && s.sheet !== state.sheet) closeSheet();
   if (view === "reader" && s.sheet && state.open && state.open.id === s.page) openSheet(s.sheet, true);
   if (inSettings) { openSettings(true); if (s.section) openSection(s.section, true); }
@@ -53,7 +54,7 @@ function toLibrary() {
   if (!(history.state && history.state.view)) return Promise.resolve();
   return new Promise((resolve) => {
     addEventListener("popstate", () => resolve(), { once: true });
-    history.go(-[state.folder, state.open, state.sheet, state.image, state.settings, state.section, state.batch, state.news, state.select, state.menu, state.downloads, state.side, state.part].filter(Boolean).length || -1);
+    history.go(-[state.folder, state.open, state.sheet, state.image, state.settings, state.section, state.batch, state.news, state.select, state.menu, state.downloads, state.side, state.part, state.finding].filter(Boolean).length || -1);
   });
 }
 
@@ -260,6 +261,8 @@ Promise.all([C.platform.ready, firstIndex]).then(([, [pages]]) => {
   const share = C.platform.plugin("ShareTarget");
   if (share && share.addListener) share.addListener("shared", saveShared);
   saveShared();
+  showWaiting();
+  setTimeout(saveWaiting, 1000);
   setTimeout(() => dailyCheck(false), 1500);
   setTimeout(() => checkFeeds(false), 3000);
   // Feeds followed before 0.28.4 are handed over once, with the ask.
@@ -286,7 +289,7 @@ Promise.all([C.platform.ready, firstIndex]).then(([, [pages]]) => {
     watchSoon(800);
   });
 });
-addEventListener("online", () => { dailyCheck(false); checkFeeds(false); syncSoon(1000); fetchPictures(); });
+addEventListener("online", () => { saveWaiting(); dailyCheck(false); checkFeeds(false); syncSoon(1000); fetchPictures(); });
 setInterval(() => { if (!document.hidden) syncNow(); }, 5 * 6e4);
 // Between those, a cheap look every minute (1.3.0): an unchanged library
 // is a 304 GitHub doesn't count, so a device reading alongside catches

@@ -35,6 +35,7 @@ const PORT = 5300 + Math.floor(Math.random() * 500);
 const ROOT = "http://localhost:" + PORT + "/";
 const ARTICLE = ROOT + "test/fixtures/article.html";
 const PICTURES = ROOT + "test/fixtures/pictures.html";
+const NOTES = ROOT + "test/fixtures/notes.html";
 const THEMES = ["paper", "sepia", "night"];
 
 function startServer() {
@@ -225,6 +226,53 @@ const frameText = (p) => p.frameLocator("#readerFrame").locator("body");
       await card.getByText("Only the start").waitFor();
       await card.click();
       await frameText(p).locator(".co-cut").getByText("Read the rest on").waitFor();
+      await p.goBack();
+      await p.locator("#readerView").waitFor({ state: "hidden" });
+    });
+
+    await test("a footnote opens in a sheet, not a jump (1.14.0)", async () => {
+      await p.fill("#saveUrl", NOTES);
+      await p.press("#saveUrl", "Enter");
+      const card = p.locator(".page-card", { hasText: "Charting the Ocean Tracks" }).first();
+      await card.waitFor({ timeout: 10000 });
+      await card.click();
+      await frameText(p).getByText("jet stream").first().waitFor();
+      await p.frameLocator("#readerFrame").locator("a", { hasText: "[1]" }).click();
+      const sheet = p.locator("#readingSheet:not([hidden])");
+      await sheet.getByText("issued by the oceanic control centres").waitFor();
+      assert.strictEqual(await sheet.getByText("↩").count(), 0, "the back link was kept");
+      await p.goBack();
+      await p.locator("#readingSheet").waitFor({ state: "hidden" });
+    });
+
+    await test("a link inside a clip jumps and offers the way back (1.14.0)", async () => {
+      await p.frameLocator("#readerFrame").locator("a", { hasText: "the crossing" }).click();
+      await p.locator("#jumpBack:not([hidden])").click();
+      await p.locator("#jumpBack").waitFor({ state: "hidden" });
+    });
+
+    await test("a link out of a clip asks what to do with it (1.14.0)", async () => {
+      await p.frameLocator("#readerFrame").locator("a", { hasText: "official track message" }).click();
+      const sheet = p.locator("#readingSheet:not([hidden])");
+      await sheet.getByText("Save for later").waitFor();
+      await sheet.getByText("Open in the browser").waitFor();
+      await p.goBack();
+      await p.locator("#readingSheet").waitFor({ state: "hidden" });
+    });
+
+    await test("find in this clip counts, steps and clears (1.14.0)", async () => {
+      await p.keyboard.press("Control+f");
+      await p.locator("#findBar:not([hidden])").waitFor();
+      await p.fill("#findInput", "jet stream");
+      await until(p, () => /1 of 2/.test(document.getElementById("findCount").textContent));
+      await p.click("#findNext");
+      await until(p, () => /2 of 2/.test(document.getElementById("findCount").textContent));
+      assert.strictEqual(await p.frameLocator("#readerFrame").locator("mark.co-find.co-here").count(), 1);
+      await p.fill("#findInput", "zeppelinxyz");
+      await until(p, () => document.getElementById("findCount").textContent === "None");
+      await p.click("#findDone");
+      await p.locator("#findBar").waitFor({ state: "hidden" });
+      assert.strictEqual(await p.frameLocator("#readerFrame").locator("mark.co-find").count(), 0);
       await p.goBack();
       await p.locator("#readerView").waitFor({ state: "hidden" });
     });

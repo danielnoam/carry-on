@@ -836,6 +836,7 @@ function pageSheet(p, where) {
       el("div", { class: "group" },
         p.link && p.file && p.file.kind === "pdf" && !p.comic
           ? menuRow(p.view === "text" ? "Show as printed pages" : "Show as text", () => switchView(p, where)) : null,
+        inReader && !C.files.printed(p) ? menuRow("Find in this clip", () => back().then(openFind)) : null,
         menuRow(p.finished ? "Mark as unread" : "Mark as read", () => markRead([p], !p.finished).then(draw)),
         inReader ? null : menuRow("Select", () => back().then(() => startSelect([p.id]))),
         menuRow(p.link ? "Remove from Waypage" : "Delete this clip", () => deletePage(p, where), "warn")));

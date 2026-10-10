@@ -23,6 +23,7 @@
   // The "Next" link this file adds at the end of a page in a folder; only
   // that element (not a look-alike in the page) moves on.
   let nextLink = null, onNext = null, onImage = null, onTap = null, onMark = null;
+  let onLink = null, onNote = null, onJump = null;
   // The page's h2 and h3 headings, found once it's shown.
   let heads = [];
   // A page saved with full images already has them: nothing to swap in.
@@ -186,11 +187,111 @@
       let id = href.slice(1);
       try { id = decodeURIComponent(id); } catch (err) { /* as is */ }
       const target = doc.getElementById(id);
-      if (target && isPaged()) goPage(pageOf(target));
-      else if (target) target.scrollIntoView({ block: "start", behavior: C.motion.reduced() ? "auto" : "smooth" });
+      if (!target) return;
+      const note = onNote && noteOf(a, target);
+      if (note) { onNote(note); return; }
+      if (onJump) onJump(spot());
+      goTo(target);
       return;
     }
+    // Another page (1.14.0): the app asks whether to open or save it.
+    if (/^https?:/.test(a.href) && onLink) { onLink(a.href, a.textContent.replace(/\s+/g, " ").trim()); return; }
     if (/^(https?|mailto):/.test(a.href)) C.platform.openOutside(a.href);
+  }
+
+  function goTo(target) {
+    if (isPaged()) goPage(pageOf(target));
+    else target.scrollIntoView({ block: "start", behavior: C.motion.reduced() ? "auto" : "smooth" });
+  }
+
+  // A note mark (1.14.0): [3] in a Wikipedia article, a site's footnote
+  // number. Its note, as text and links, for a sheet over the page, so
+  // the reader stays where they were. The links back to the mark go.
+  const NOTE_REF = "sup, .reference, [role=doc-noteref], .footnote-ref, a.fn, a[rel=footnote]";
+  const BACKLINKS = ".mw-cite-backlink, [role=doc-backlink], a[href^='#cite_ref'], a.footnote-backref, a.reversefootnote, a[rev=footnote], a.fn-back";
+  function noteOf(a, target) {
+    if (!a.closest(NOTE_REF) && !target.closest(NOTES)) return null;
+    let box = target;
+    if (!box.textContent.trim() || box.tagName === "A") box = target.closest("li, p, aside, dd, div") || target;
+    const copy = box.cloneNode(true);
+    copy.querySelectorAll(BACKLINKS + ", a[href^='#']").forEach((n) => n.remove());
+    const text = copy.textContent.replace(/\s+/g, " ").replace(/^[\s↑^↩︎]+/, "").trim();
+    if (!text) return null;
+    const links = [...copy.querySelectorAll("a[href]")].map((l) => ({ href: l.href, text: l.textContent.replace(/\s+/g, " ").trim() }))
+      .filter((l) => /^https?:/.test(l.href)).slice(0, 3);
+    return { label: a.textContent.replace(/\s+/g, " ").trim(), text: text.slice(0, 4000), links, go: () => { if (onJump) onJump(spot()); goTo(box); } };
+  }
+
+  // Find in this clip (1.14.0): every match marked in the frame, the one
+  // being looked at lit, the reader moved to it. Matches are found in the
+  // text as read, across highlights and links.
+  let finds = [], findAt = -1;
+  function clearFind() {
+    finds = [];
+    findAt = -1;
+    if (!doc) return;
+    const parents = new Set();
+    for (const m of doc.querySelectorAll("mark.co-find")) { parents.add(m.parentNode); m.replaceWith(...m.childNodes); }
+    for (const p of parents) p.normalize();
+  }
+  function find(query) {
+    clearFind();
+    const q = String(query || "").replace(/\s+/g, " ").trim().toLowerCase();
+    if (!doc || !q) return 0;
+    const nodes = [];
+    let text = "";
+    const walk = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT,
+      { acceptNode: (t) => (t.parentElement.closest("script, style, noscript, .co-next, " + ADDED) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT) });
+    for (let t = walk.nextNode(); t; t = walk.nextNode()) { nodes.push([t, text.length]); text += t.data; }
+    // Lower case, any run of white space read as one space; map[i] is
+    // where the i-th letter of that sits in the text.
+    let flat = "";
+    const map = [];
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (/\s/.test(ch)) { if (flat.endsWith(" ")) continue; flat += " "; }
+      else { const lo = ch.toLowerCase(); flat += lo.length === 1 ? lo : ch; }
+      map.push(i);
+    }
+    const ranges = [];
+    for (let i = flat.indexOf(q); i >= 0 && ranges.length < 500; i = flat.indexOf(q, i + q.length)) {
+      ranges.push([map[i], map[i + q.length - 1] + 1]);
+    }
+    if (!ranges.length) return 0;
+    const cuts = new Map();
+    ranges.forEach(([s, e], k) => {
+      for (const [t, at] of nodes) {
+        const a = Math.max(s, at), b = Math.min(e, at + t.length);
+        if (b > a) { if (!cuts.has(t)) cuts.set(t, []); cuts.get(t).push([a - at, b - at, k]); }
+        if (at >= e) break;
+      }
+    });
+    finds = ranges.map(() => []);
+    for (const [t, list] of cuts) {
+      for (const [a, b, k] of list.sort((x, y) => y[0] - x[0])) {
+        let piece = t;
+        if (b < piece.length) piece.splitText(b);
+        if (a > 0) piece = piece.splitText(a);
+        const m = doc.createElement("mark");
+        m.className = "co-find";
+        piece.before(m);
+        m.append(piece);
+        finds[k].push(m);
+      }
+    }
+    for (const f of finds) f.sort((x, y) => (x.compareDocumentPosition(y) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
+    return finds.length;
+  }
+  function findGo(i) {
+    if (!finds.length || !doc) return -1;
+    const n = ((i % finds.length) + finds.length) % finds.length;
+    if (findAt >= 0 && finds[findAt]) finds[findAt].forEach((m) => m.classList.remove("co-here"));
+    findAt = n;
+    finds[n].forEach((m) => m.classList.add("co-here"));
+    const first = finds[n][0];
+    if (isPaged()) goPage(pageOf(first));
+    else first.scrollIntoView({ block: "center", behavior: C.motion.reduced() ? "auto" : "smooth" });
+    return n;
   }
 
   // Where the reader is, as text (1.3.0): the block (paragraph, heading,
@@ -892,7 +993,7 @@
   // `next` ({ over, title, go }) adds a link to the next page at the end;
   // `top` () gives the height the bar covers; onImage(info) opens a tapped
   // image.
-  function open(iframe, html, meta, { at = 0, spot: spotAt = "", onPosition, onScroll, next, top, onImage: image, onTap: tap, onMark: mark, onSelect, pages: asPages, bottom, onKey, onEdge: edge } = {}) {
+  function open(iframe, html, meta, { at = 0, spot: spotAt = "", onPosition, onScroll, next, top, onImage: image, onTap: tap, onMark: mark, onSelect, pages: asPages, bottom, onKey, onEdge: edge, onLink: link, onNote: note, onJump: jumped } = {}) {
     frame = iframe;
     turning = null;
     paged = !!asPages;
@@ -907,6 +1008,11 @@
     onTap = tap || null;
     onMark = mark || null;
     onEdge = edge || null;
+    onLink = link || null;
+    onNote = note || null;
+    onJump = jumped || null;
+    finds = [];
+    findAt = -1;
     heads = [];
     topSpace = top || null;
     bottomSpace = bottom || null;
@@ -1004,6 +1110,11 @@
     onImage = null;
     onTap = null;
     onMark = null;
+    onLink = null;
+    onNote = null;
+    onJump = null;
+    finds = [];
+    findAt = -1;
     heads = [];
     nextLink = null;
     onNext = null;
@@ -1017,5 +1128,5 @@
   addEventListener("resize", applyTop);
   addEventListener("offline", applyConnection);
 
-  C.reader = { open, close, position, spot, jump, setPaged, turn, get paged() { return isPaged(); }, pageInfo, headings, section, jumpTo, readable, firstShown, light, following, selectionSpot, clearSelection, selectionText, selectionMark, selectionMarks, paintMarks, toMark, applyTheme, applyConnection, srcdoc, CSP, setSpread, refit: applyTop, images, imageInfo, printedPages, printedNow, toPrinted };
+  C.reader = { open, close, find, findGo, clearFind, position, spot, jump, setPaged, turn, get paged() { return isPaged(); }, pageInfo, headings, section, jumpTo, readable, firstShown, light, following, selectionSpot, clearSelection, selectionText, selectionMark, selectionMarks, paintMarks, toMark, applyTheme, applyConnection, srcdoc, CSP, setSpread, refit: applyTop, images, imageInfo, printedPages, printedNow, toPrinted };
 })();
