@@ -33,3 +33,6 @@ stops being true.
   shows a stall when a screen opens.
 - **A PDF attached to an email as its own clip (Daniel, 10 Oct 2026).**
   Not needed: an .eml opens as its text, attachments left out.
+- **"Sign in with Google" in the sign-in browser.** Google refuses sign-in
+  in embedded browsers; the way around is against Google's terms. Email
+  and password sign-ins work.

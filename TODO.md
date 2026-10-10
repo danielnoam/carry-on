@@ -23,7 +23,7 @@ Decisions every release keeps:
 
 ## Next (Daniel, 10 Oct 2026)
 
-Daniel tried the untested list on his phones; the stores wait.
+Daniel tried everything that was untested on his phones (10 Oct).
 
 - **Split src/app.js.** 8,500 lines in one file. Into a few plain script
   files loaded in order (library, reader, sheets, settings, highlights),
@@ -63,83 +63,50 @@ Daniel tried the untested list on his phones; the stores wait.
   blobs kept. `waypage.syncSent` moves on per batch, so a cut-off sync
   resumes from the last batch. Time a first sync on a phone before and
   after; pictures stay bound by GitHub's ~80 writes a minute.
+- **Find in this clip.** Search words inside the open clip from the
+  reader's bar or ⋯: matches marked in the frame, a count, next and
+  previous, the reader moving to each (in pages, the page it's on).
+  Done in the app's document against the frame's text, since the frame
+  runs no script.
+- **App icon shortcuts.** A long press on the icon: Continue reading,
+  Search, and Save the copied link. Android through static shortcuts in
+  the manifest, iOS through Quick Actions; each opens a waypage:// address
+  the app already takes, like a widget's tap.
 
 ---
 
-## Files: your own files, and where Waypage keeps everything (Daniel, 6 Oct 2026)
+## Smaller, open
 
-Decided: PDFs through pdf.js, locked down; three places for files, the
-app's private storage the default and recommended. "Files" is the name
-for what you bring in. Order: what you open first, since it can
-be tried in the browser; the folder setting after, since it is mostly
-native code.
-
-### Still open on files and where Waypage keeps them
-
-- **Moving a big library is file by file over the bridge:** fine for
+- **Brightness:** a way back to the phone's own level without turning
+  the swipe off.
+- **Moving a big library** is file by file over the bridge: fine for
   hundreds of megabytes; a native copy would be quicker for gigabytes.
-- **Saving from email (1.10.0, Daniel, 9 Oct):** shared text becomes a
-  clip, and .eml files open. Open: try both on a phone, Gmail's Share
-  on selected text especially; on iOS a long passage goes through the
-  waypage:// address, so check a long email arrives whole.
-- **Brightness while reading (1.10.0, Daniel, 9 Oct):** try on both
-  phones, iOS especially (the level from before should come back when
-  you leave Waypage). Open: a way back to the phone's own level without
-  turning the swipe off.
-
-## iOS, after 1.6.0
-
-1.6.0 built everything iOS lacked that could be built without an iPhone
-(see NOTES.md, "The iOS release"). CI proves it compiles; nothing has run
-on a phone yet. Left:
-
-- **Try it on an iPhone,** each one for the first time: the share sheet
-  (does Waypage come to the front, or does the link wait for the next
-  open?), the three widgets and their taps, Open in from Files and Mail,
-  reading a book from where it is, a library in an iCloud Drive folder,
-  watched folders, a feed notification (iOS runs the check when it
-  likes; Background App Refresh must be on), Wait for Wi-Fi, a
-  script-built page saving. From before: the setup-code scanner, Read
-  aloud with the screen locked, the updater's "Get it" link, and Go on
-  to the next clip with the screen locked.
-- **The Apple Developer Program (Daniel's decision).** Nothing in 1.6.0
-  needs it, but a free Apple account through AltStore or SideStore has 3
-  active apps, AltStore itself and each app extension included: Waypage
-  with its share extension and widgets is 3 on its own, so a free account
-  has to drop the extensions (AltStore offers to) or another app. The
-  program lifts that, ends the 7-day re-signing, and is the way to
-  TestFlight and the App Store.
 - **A collection widget on iOS.** Android's asks which collection; on iOS
   that is an App Intent configuration (iOS 17).
-- **Downloads in the background (0.27.9).** Still the half minute iOS
-  gives the page in progress. Going further means saving in Swift around
-  background `URLSession` downloads, a second copy of the saving code:
-  only if the half minute turns out not to be enough.
-
----
-
-## Saving signed in: what 1.8.0 left
-
 - **Pages drawn by script, signed in, on iOS.** iOS's PageRender keeps
   nothing between pages (a non-persistent data store), so a signed-in
   site whose article only appears after its scripts run still saves as
   the start there. Copying the site's cookies into that store before the
   page loads would do it. Android's PageRender already shares them.
-- **"Sign in with Google" in the sign-in browser.** Google refuses sign-in
-  in embedded browsers, so a site whose only sign-in is Google's can't be
-  signed in to. Email and password sign-ins work. Not worth working
-  around: the way around is against Google's terms.
-- **Privacy forms**, when the store listings are written: sign-in cookies
-  stay on the phone and go only to their own site.
+- **Downloads in the background on iOS (0.27.9).** Still the half minute
+  iOS gives the page in progress. Going further means saving in Swift
+  around background `URLSession` downloads, a second copy of the saving
+  code: only if the half minute turns out not to be enough.
 
-## Waiting on a decision, not on a release slot
+---
 
-- **Saving any site in a browser: a server, later (Daniel, 4 Oct
-  2026).** A stateless fetch worker behind a token, rate-limited, storing
-  nothing, so the browser can save (and follow feeds from) sites that
-  don't allow CORS. Not slotted yet.
+## Parked: the stores (Daniel, 10 Oct 2026: "we don't care for stores for now")
+
 - **Before shipping to other people:** desktop browser version (and its
   worker) in v1 or not; Apple Developer Program or Android first; name
   checks (App Store, Play, trademark); privacy policy and store data
-  forms; real icon assets via @capacitor/assets in CI. These are a
-  release of their own once Daniel decides the two open questions.
+  forms (sign-in cookies stay on the phone and go only to their own
+  site); real icon assets via @capacitor/assets in CI.
+- **The Apple Developer Program.** A free Apple account through AltStore
+  or SideStore has 3 active apps, extensions included, so Waypage with
+  its share extension and widgets fills it; the program lifts that, ends
+  the 7-day re-signing, and is the way to TestFlight and the App Store.
+- **Saving any site in a browser: a server (Daniel, 4 Oct 2026).** A
+  stateless fetch worker behind a token, rate-limited, storing nothing,
+  so the browser can save (and follow feeds from) sites that don't allow
+  CORS. Only with a desktop browser version.
