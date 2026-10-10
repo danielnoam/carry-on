@@ -393,7 +393,8 @@
       const W = plugin("Widgets");
       if (W) W.renamed({ from, to }).catch(() => {});
     },
-    // { kind: "page" | "post" | "feeds" | "library" | "favourites" | "collection", id, url, name }, or {}.
+    // { kind: "page" | "mark" | "post" | "feeds" | "library" | "favourites" | "collection"
+    //   | "reading" | "search" | "paste", id, url, name }, or {}.
     async take() {
       const W = plugin("Widgets");
       if (W) { try { return await W.take(); } catch (e) { /* none */ } }
@@ -402,6 +403,12 @@
     onOpen(f) {
       const W = plugin("Widgets");
       if (W) W.addListener("open", f);
+    },
+    // The copied text, for the app icon's Save the copied link (1.14.0).
+    async copied() {
+      const W = plugin("Widgets");
+      if (W) { try { return (await W.copied()).text || ""; } catch (e) { /* none */ } }
+      try { return await navigator.clipboard.readText(); } catch (e) { return ""; }
     },
   };
 

@@ -24,6 +24,10 @@
 //   scan doesn't wait for it. The scanner is Google's own screen, which is
 //   why Waypage needs no camera permission.
 //
+// - The app icon's shortcuts (1.14.0), native/share's
+//   res/xml/waypage_shortcuts.xml: Continue reading, Search and Save the
+//   copied link, each opening the app as a widget's tap does.
+//
 // Idempotent, and fails loudly if a tag it needs can't be found.
 const fs = require("fs");
 const path = require("path");
@@ -31,6 +35,7 @@ const path = require("path");
 const ENTRIES = [
   { inside: "manifest", xml: '<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />' },
   { inside: "application", xml: '<meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="barcode_ui"/>' },
+  { inside: "main-activity", xml: '<meta-data android:name="android.app.shortcuts" android:resource="@xml/waypage_shortcuts" />' },
   {
     inside: "main-activity",
     xml: '<intent-filter>\n' +

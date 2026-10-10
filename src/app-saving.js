@@ -1199,11 +1199,14 @@ function restoreFeeds(list) {
 // its collection's next clips to read. Handed over whenever the app
 // goes to the background, and after changes.
 let widgetTimer = null;
+function keepReading() {
+  const read = state.pages.filter((p) => p.readAt).sort((a, b) => b.readAt - a.readAt);
+  return read.find((x) => !x.finished) || read[0];
+}
 function updateWidgets() {
   clearTimeout(widgetTimer);
   widgetTimer = setTimeout(() => {
-    const read = state.pages.filter((p) => p.readAt).sort((a, b) => b.readAt - a.readAt);
-    const p = read.find((x) => !x.finished) || read[0];
+    const p = keepReading();
     const posts = feeds.flatMap((f) => feedPosts(f).filter((it) => !savedAs(it.url)).map((it) => ({ f, it })))
       .sort((a, b) => postAt(b.it) - postAt(a.it)).slice(0, 3)
       .map(({ f, it }) => ({ title: it.title, site: f.title, url: it.url, feed: f.url }));
@@ -1242,10 +1245,19 @@ const clipMeta = (x) => [x.site, readingLine(x)].filter(Boolean).join(" · ");
 const readCount = (list) => { const done = list.filter((x) => x.finished).length; return done === list.length ? "All read" : done + " of " + list.length + " read"; };
 
 // A widget's tap: the page to keep reading, a post, Feeds or a collection.
+// The app icon's shortcuts (1.14.0) come the same way: Continue reading,
+// Search, and Save the copied link.
 async function takeWidget() {
   const got = await C.platform.widgets.take();
   if (!got || !got.kind) return;
   await toLibrary();
+  if (got.kind === "reading") {
+    const p = keepReading();
+    if (p) openPage(p.id); else await goPlace("library");
+    return;
+  }
+  if (got.kind === "search") { await goPlace("library"); openSearch(); return; }
+  if (got.kind === "paste") { await goPlace("library"); saveCopied(); return; }
   if (got.kind === "page" && state.pages.some((p) => p.id === got.id)) { openPage(got.id); return; }
   if (got.kind === "mark" && state.pages.some((p) => p.id === got.id)) { markAfterOpen = got.mark || null; openPage(got.id); return; }
   if (got.kind === "post" && got.url) {
@@ -1263,6 +1275,16 @@ async function takeWidget() {
     const name = allFolders().find((n) => sameTag(n, got.name));
     if (name) openFolder(name);
   }
+}
+
+// Android lets only the app in front read the clipboard, which the app
+// just opened may not be yet: one more try, then the field to paste in.
+async function saveCopied() {
+  let text = await C.platform.widgets.copied();
+  if (!linksFrom(text).length) { await new Promise((r) => setTimeout(r, 600)); text = await C.platform.widgets.copied(); }
+  if (linksFrom(text).length) { saveTyped(text); return; }
+  $("saveUrl").focus();
+  toast("No link copied. Paste one here.");
 }
 
 // Posts found with the app closed: those feeds are read again now, and

@@ -32,6 +32,11 @@
 //   (tools/ios-extensions.rb). AltStore and SideStore register it under a
 //   name of their own and rewrite this list; WPGroup reads it.
 //
+// 1.14.0 adds the app icon's Quick Actions: UIApplicationShortcutItems
+// (Continue reading, Search, Save the copied link), each a waypage-widget://
+// address, and the SceneDelegate handing them to WidgetsPlugin.shortcut,
+// at launch and with the app running.
+//
 // Idempotent, and fails loudly if what it edits isn't where it expects.
 const fs = require("fs");
 const path = require("path");
@@ -62,6 +67,10 @@ const imported = (id, desc, conforms, exts, mimes) => "<dict>\n"
   + "\t\t\t<key>UTTypeConformsTo</key>\n\t\t\t<array>" + conforms.map(str).join("") + "</array>\n"
   + "\t\t\t<key>UTTypeTagSpecification</key>\n\t\t\t<dict><key>public.filename-extension</key><array>" + exts.map(str).join("")
   + "</array><key>public.mime-type</key><array>" + mimes.map(str).join("") + "</array></dict>\n\t\t</dict>";
+const quick = ([kind, title, symbol]) => "<dict>\n"
+  + "\t\t\t<key>UIApplicationShortcutItemType</key>\n\t\t\t" + str("waypage-widget://" + kind) + "\n"
+  + "\t\t\t<key>UIApplicationShortcutItemTitle</key>\n\t\t\t" + str(title) + "\n"
+  + "\t\t\t<key>UIApplicationShortcutItemIconSymbolName</key>\n\t\t\t" + str(symbol) + "\n\t\t</dict>";
 const scheme = (name) => "<dict>\n\t\t\t<key>CFBundleURLName</key>\n\t\t\t" + str("io.github.danielnoam." + name)
   + "\n\t\t\t<key>CFBundleURLSchemes</key>\n\t\t\t<array>" + str(name) + "</array>\n\t\t</dict>";
 
@@ -79,6 +88,8 @@ const PLIST = [
   ])],
   ["CFBundleURLTypes", arr([scheme("waypage"), scheme("waypage-widget")])],
   ["ALTAppGroups", arr([str(GROUP)])],
+  ["UIApplicationShortcutItems", arr([["reading", "Continue reading", "book"], ["search", "Search", "magnifyingglass"],
+    ["paste", "Save the copied link", "doc.on.clipboard"]].map(quick))],
 ];
 const MIN_IOS = "15.5";
 
@@ -109,6 +120,20 @@ function patchAppDelegate(src) {
     .replace(launch, "$1        FeedsPlugin.registerBackground()\n");
 }
 
+// The Quick Actions (1.14.0): one that launched the app comes with the
+// scene's connection, one with the app running through the scene.
+function patchSceneDelegate(src) {
+  if (src.includes("WidgetsPlugin.shortcut(")) return src;
+  const connect = /^([ \t]*)SceneDelegateProxy\.shared\.scene\(scene, willConnectTo: session, options: connectionOptions\)\n/m;
+  const end = /\n\}\s*$/;
+  if (!connect.test(src) || !end.test(src) || !/^import Capacitor$/m.test(src)) throw new Error("SceneDelegate.swift isn't the template tools/ios-project.js expects");
+  return src
+    .replace(/^import Capacitor$/m, "import Capacitor\nimport WaypageShare")
+    .replace(connect, (m, sp) => m + sp + "WidgetsPlugin.shortcut(connectionOptions.shortcutItem, launching: true)\n")
+    .replace(end, "\n\n    func windowScene(_ windowScene: UIWindowScene, performActionFor shortcutItem: UIApplicationShortcutItem, completionHandler: @escaping (Bool) -> Void) {\n"
+      + "        completionHandler(WidgetsPlugin.shortcut(shortcutItem))\n    }\n}\n");
+}
+
 function stampPbxproj(src, v) {
   const build = versionCode(v);
   if (!/MARKETING_VERSION = [^;]+;/.test(src) || !/CURRENT_PROJECT_VERSION = [^;]+;/.test(src)) {
@@ -129,8 +154,10 @@ if (require.main === module) {
   fs.writeFileSync(pbx, stampPbxproj(fs.readFileSync(pbx, "utf8"), v));
   const delegate = path.join(app, "App", "AppDelegate.swift");
   fs.writeFileSync(delegate, patchAppDelegate(fs.readFileSync(delegate, "utf8")));
+  const scene = path.join(app, "App", "SceneDelegate.swift");
+  fs.writeFileSync(scene, patchSceneDelegate(fs.readFileSync(scene, "utf8")));
   const podfile = path.join(app, "Podfile");
   fs.writeFileSync(podfile, raiseMinIos(fs.readFileSync(podfile, "utf8")));
   console.log("ios: Info.plist has " + PLIST.length + " Waypage key(s); version " + v + " (" + versionCode(v) + "); iOS " + MIN_IOS + " and later");
 }
-module.exports = { patchPlist, stampPbxproj, raiseMinIos, patchAppDelegate, PLIST, MIN_IOS };
+module.exports = { patchPlist, stampPbxproj, raiseMinIos, patchAppDelegate, patchSceneDelegate, PLIST, MIN_IOS };

@@ -86,6 +86,7 @@ test("the manifest gains the updater's permission and the share target, once", (
   const activity = once.slice(once.indexOf("<activity"), once.indexOf("</activity>"));
   assert.ok(/android.intent.action.SEND"[\s\S]*android.intent.category.DEFAULT"[\s\S]*android:mimeType="text\/plain"/.test(activity));
   assert.ok(/android.intent.action.VIEW"[\s\S]*android:mimeType="application\/epub\+zip"[\s\S]*android:mimeType="application\/x-cbz"/.test(activity));
+  assert.ok(activity.includes('<meta-data android:name="android.app.shortcuts" android:resource="@xml/waypage_shortcuts" />'));
   assert.strictEqual(manifest.patch(once), once);
   assert.throws(() => manifest.patch("<manifest><application></application></manifest>"));
 });
@@ -143,6 +144,34 @@ test("Info.plist gains the document types, link schemes and background check", (
   assert.ok(out.includes("<string>waypage</string>") && out.includes("<string>waypage-widget</string>"));
   assert.ok(/<string>audio<\/string>\s*<string>fetch<\/string>/.test(out));
   assert.strictEqual(iosProject.patchPlist(out), out);
+});
+
+// The app icon's shortcuts (1.14.0): the same three on both phones, each
+// a waypage-widget:// address the widget plugins already take.
+test("the app icon's shortcuts are wired up on Android and iOS", () => {
+  const read = (f) => fs.readFileSync(path.join(ROOT, f), "utf8");
+  const res = "native/share/android/src/main/res/";
+  const xml = read(res + "xml/waypage_shortcuts.xml");
+  const appId = JSON.parse(read("capacitor.config.json")).appId;
+  const kinds = [...xml.matchAll(/android:data="waypage-widget:\/\/(\w+)"/g)].map((m) => m[1]);
+  assert.deepStrictEqual(kinds, ["reading", "search", "paste"]);
+  for (const m of xml.matchAll(/android:targetPackage="([^"]+)"/g)) assert.strictEqual(m[1], appId);
+  for (const m of xml.matchAll(/android:targetClass="([^"]+)"/g)) assert.strictEqual(m[1], appId + ".MainActivity");
+  for (const m of xml.matchAll(/@drawable\/(\w+)/g)) assert.ok(fs.existsSync(path.join(ROOT, res, "drawable", m[1] + ".xml")), m[1]);
+  const strings = read(res + "values/waypage_shortcuts.xml");
+  for (const m of xml.matchAll(/@string\/(\w+)/g)) assert.ok(strings.includes('name="' + m[1] + '"'), m[1]);
+  assert.ok(xml.includes('android:action="' + "io.github.danielnoam.waypage.WIDGET" + '"'));
+  assert.ok(read("native/share/android/src/main/java/io/github/danielnoam/waypage/share/Widgets.java").includes('OPEN = "io.github.danielnoam.waypage.WIDGET"'));
+  const plist = iosProject.patchPlist('<?xml version="1.0"?>\n<plist version="1.0">\n<dict>\n</dict>\n</plist>\n');
+  assert.deepStrictEqual([...plist.matchAll(/<string>waypage-widget:\/\/(\w+)<\/string>/g)].map((m) => m[1]), kinds);
+  const tpl = path.join(ROOT, "node_modules", "@capacitor", "cli", "assets", "ios-pods-template.tar.gz");
+  const src = require("child_process").execFileSync("tar", ["-xzOf", tpl, "App/App/SceneDelegate.swift"], { encoding: "utf8" });
+  const once = iosProject.patchSceneDelegate(src);
+  assert.ok(/import Capacitor\nimport WaypageShare/.test(once));
+  assert.ok(/connectionOptions\)\n        WidgetsPlugin\.shortcut\(connectionOptions\.shortcutItem, launching: true\)\n/.test(once));
+  assert.ok(/performActionFor shortcutItem[^\n]*\{\n        completionHandler\(WidgetsPlugin\.shortcut\(shortcutItem\)\)/.test(once));
+  assert.strictEqual(iosProject.patchSceneDelegate(once), once);
+  assert.ok(read("native/share/ios/Sources/WidgetsPlugin/WidgetsPlugin.swift").includes('CAPPluginMethod(name: "copied"'));
 });
 
 test("the feed check's task id, the App Group and the link schemes agree everywhere", () => {
