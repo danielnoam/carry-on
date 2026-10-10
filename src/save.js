@@ -10,6 +10,10 @@
   const C = window.Waypage;
 
   const PREVIEW_WIDTH = 480;
+  // Full images no wider than this when they're made smaller (1.18.0):
+  // more than a phone shows, so a comic's lettering stays sharp.
+  const FULL_WIDTH = 1600;
+  let compress = true;
   // Wikimedia serves (and caches) thumbnails at fixed steps; other widths
   // are generated on demand and rate-limited for tools.
   const WIKI_PREVIEW = 500;
@@ -1438,9 +1442,11 @@
   // Downloads one image into the page's directory; a preview much wider
   // than the screen needs is redrawn smaller (store.shrink). Resolves to
   // { rel, bytes } of the file kept.
+  // A full image is made smaller too (1.18.0), unless that's turned off.
   async function keep(id, rel, url, mode, page) {
     const size = await C.store.download(id, rel, url, page);
-    return mode === "full" ? { rel, bytes: size } : C.store.shrink(id, rel, size, PREVIEW_WIDTH);
+    if (mode !== "full") return C.store.shrink(id, rel, size, PREVIEW_WIDTH);
+    return compress ? C.store.squeeze(id, rel, size, FULL_WIDTH) : { rel, bytes: size };
   }
 
   // The site's icon beside the page, for a card with no picture of its
@@ -1623,6 +1629,7 @@
     const res = await saveImages(id, media, mode, (done, total) => onProgress && onProgress({ stage: "images", done, total }), got.url);
     // imageBytes (0.27.11) splits a page's size into its pictures and the rest.
     Object.assign(meta, { images: res.total, missing: res.missing, thumb: res.thumb, imageBytes: res.bytes });
+    if (mode === "full" && compress) meta.squeezed = 1;
     const icon = await keepIcon(id, got.icon || new URL("/favicon.ico", got.url).href, got.url);
     if (icon.icon) meta.icon = icon.icon;
     const html = savedPageHtml(meta, root, out);
@@ -1687,20 +1694,45 @@
       const url = img.getAttribute("data-full");
       const rel = "images/f" + stamp + "-" + i + "." + extOf(url);
       try {
-        bytes += await C.store.download(meta.id, rel, url, meta.url);
+        const kept = await keep(meta.id, rel, url, "full", meta.url);
+        bytes += kept.bytes;
         // The library card keeps its small preview.
         const old = img.getAttribute("src") || "";
         if (/^images\//.test(old) && old !== meta.thumb) bytes -= await C.store.removeFile(meta.id, old);
-        img.setAttribute("src", rel);
+        img.setAttribute("src", kept.rel);
         img.removeAttribute("class");
         img.removeAttribute("data-preview");
         got++;
       } catch (e) { failed++; }
       if (onProgress) onProgress(++done, imgs.length);
     }
-    const out = { ...meta, mode: "full", missing: doc.querySelectorAll("img.co-missing").length };
+    const out = { ...meta, mode: "full", missing: doc.querySelectorAll("img.co-missing").length, ...(compress ? { squeezed: 1 } : {}) };
     await C.store.writePage(meta.id, "<!doctype html>\n" + doc.documentElement.outerHTML, out);
     return { got, failed, bytes, missing: out.missing };
+  }
+
+  // A saved clip's full pictures made smaller where they're kept (1.18.0),
+  // for Storage's Make pictures smaller. Resolves to { bytes } with
+  // bytes the change in the clip's size (zero or less).
+  async function compressPictures(meta, onProgress) {
+    const html = await C.store.readPage(meta.id);
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const imgs = [...doc.querySelectorAll("img[src^='images/']")];
+    let bytes = 0, changed = false;
+    for (const [i, img] of imgs.entries()) {
+      const src = img.getAttribute("src");
+      const was = await C.store.sizeOf(meta.id, src);
+      // The card's picture is its own file; it stays as it is. One made
+      // smaller already (its name ends "s.") isn't drawn again, which
+      // would only blur it.
+      if (src !== meta.thumb && !/s\.(webp|jpg|png)$/.test(src) && was > 60 * 1024) {
+        const got = await C.store.squeeze(meta.id, src, was, FULL_WIDTH);
+        if (got.rel !== src) { img.setAttribute("src", got.rel); bytes += got.bytes - was; changed = true; }
+      }
+      if (onProgress) onProgress(i + 1, imgs.length);
+    }
+    if (changed) await C.store.writePage(meta.id, "<!doctype html>\n" + doc.documentElement.outerHTML, meta);
+    return { bytes };
   }
 
   // A saved page's pictures kept another way (0.30.2): as previews, full
@@ -1789,6 +1821,7 @@
   }
 
   C.save = {
+    get compress() { return compress; }, set compress(v) { compress = v !== false; }, compressPictures,
     pageSource, preview,
     save, findArchived, unWayback, formatDate, SaveError, ContentsPage, cutShort, findChapters, pageImage, siteIcon, keepCover, siteRule, removeHidden, scriptJson, chapterNumber, pickChapters, comicGroup, isPanel, retryMissing, saveFullImages, setPictures, findNext, creditLine, cleanSaved, savedPageHtml, newId, textDir, isNextText, isPrevText, plainText,
     wikipediaPage, wikimediaThumb, parseSrcset, pickWidth, youtubeId, vimeoId, extOf, isTrackingPixel, readingMinutes, siteName,

@@ -3,6 +3,20 @@
 Why things are the way they are, newest first. Each entry starts with a
 bold title and its version so a search finds it.
 
+- **Big pictures made smaller (1.18.0).** Daniel asked to compress very
+  large comics and pictures. `store.squeeze` reuses the preview shrink's
+  canvas path: no wider than 1600 px (save.js FULL_WIDTH, enough for a
+  comic's lettering at phone width), WebP at 0.8 where the WebView can
+  write it (checked once with toDataURL; Safari before 17 writes PNG
+  instead, so JPEG then), kept only when at least 10% smaller; GIF/SVG
+  and anything over 16 MP of canvas (iPhone's limit) stay as they are.
+  On by default (`waypage.compress`, C.save.compress). Storage's Make
+  pictures smaller runs `save.compressPictures` over clips with full
+  pictures or comics not yet done (`squeezed` on the index entry), skips
+  the card's thumb, files under 60 KB, and files already made smaller
+  (name ends "s.webp/jpg/png"), so running it twice doesn't blur twice.
+  Canvas re-encoding drops colour profiles; fine for comics and photos.
+  Not measured on a device.
 - **Comics that fill in as they scroll (1.17.0).** Daniel's .mht of
   WEBTOON's phone viewer: 215 images, about 100 still
   bg_transparency.png with no data-* at all after he'd scrolled part

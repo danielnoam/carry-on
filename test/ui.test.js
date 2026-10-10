@@ -551,6 +551,21 @@ const frameText = (p) => p.frameLocator("#readerFrame").locator("body");
       await q.context().close();
     });
 
+    await test("Saving has the switch for making full images smaller, on by default (1.18.0)", async () => {
+      const q = await page(browser, 390);
+      await q.click("#settingsBtn");
+      await q.locator(".nav-row", { hasText: "Saving" }).click();
+      const sw = q.locator("label.row", { hasText: "Make full images smaller" }).locator("input");
+      await sw.waitFor();
+      assert.strictEqual(await sw.isChecked(), true);
+      assert.strictEqual(await q.evaluate(() => window.Waypage.save.compress), true);
+      await sw.click();
+      assert.strictEqual(await q.evaluate(() => window.Waypage.save.compress), false);
+      assert.strictEqual(await q.evaluate(() => localStorage.getItem("waypage.compress")), "false");
+      assert.deepStrictEqual(q.errors, [], q.errors.join(" | "));
+      await q.context().close();
+    });
+
     for (const width of [390, 1280]) {
       for (const theme of THEMES) {
         await test("opens at " + width + " px in " + theme + " with no errors", async () => {

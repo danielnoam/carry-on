@@ -311,7 +311,22 @@
     drawing = turn;
     return turn;
   }
-  async function shrinkNow(id, rel, size, max) {
+  // A full picture made smaller (1.18.0): no wider than `max`, and saved
+  // again as WebP (JPEG where the WebView can't write WebP), kept only
+  // when that's at least a tenth smaller. Pictures stay sharp on a phone.
+  function squeeze(id, rel, size, max) {
+    const turn = drawing.then(() => shrinkNow(id, rel, size, max, true));
+    drawing = turn;
+    return turn;
+  }
+  let webp = null;
+  const writesWebp = () => {
+    if (webp == null) { try { const c = document.createElement("canvas"); c.width = c.height = 1; webp = c.toDataURL("image/webp").startsWith("data:image/webp"); } catch (e) { webp = false; } }
+    return webp;
+  };
+  // A canvas bigger than this fails on iPhones; such a picture is kept.
+  const CANVAS_MAX = 16e6;
+  async function shrinkNow(id, rel, size, max, squeezing) {
     const dir = pageDirUrl(id);
     const same = { rel, bytes: size };
     if (!dir || /\.(gif|svg)$/i.test(rel)) return same;
@@ -319,8 +334,9 @@
       const img = new Image();
       img.src = dir + rel;
       await img.decode();
-      if (img.naturalWidth <= max * 1.25) return same;
-      const w = max, h = Math.max(1, Math.round(img.naturalHeight * max / img.naturalWidth));
+      if (!squeezing && img.naturalWidth <= max * 1.25) return same;
+      const w = Math.min(max, img.naturalWidth), h = Math.max(1, Math.round(img.naturalHeight * w / img.naturalWidth));
+      if (w * h > CANVAS_MAX) return same;
       const canvas = document.createElement("canvas");
       canvas.width = w;
       canvas.height = h;
@@ -328,9 +344,10 @@
       ctx.imageSmoothingQuality = "high";
       ctx.drawImage(img, 0, 0, w, h);
       const clear = !/\.jpe?g$/i.test(rel) && seeThrough(ctx.getImageData(0, 0, w, h).data);
-      const blob = await new Promise((resolve) => canvas.toBlob(resolve, clear ? "image/png" : "image/jpeg", 0.82));
-      if (!blob || blob.size >= size) return same;
-      const out = rel.replace(/\.[^./]*$/, "") + "s." + (clear ? "png" : "jpg");
+      const type = squeezing && writesWebp() ? "image/webp" : clear ? "image/png" : "image/jpeg";
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, type, squeezing ? 0.8 : 0.82));
+      if (!blob || blob.size >= (squeezing ? size * 0.9 : size)) return same;
+      const out = rel.replace(/\.[^./]*$/, "") + "s." + ({ "image/webp": "webp", "image/png": "png" }[type] || "jpg");
       await (await B()).write("pages/" + id + "/" + out, await base64(blob));
       await removeFile(id, rel);
       return { rel: out, bytes: blob.size };
@@ -468,6 +485,6 @@
   }
 
   window.Waypage.store = { ready,
-    get place() { return cur ? cur.place : savedPlace(); }, placeName, get problem() { return problem; }, moveTo, readIndex, writeIndex, writeIndexOnly, set onIndex(f) { onIndex = f; }, writeThumb, readThumbs, storageInfo, keepStored, writePage, readPage, removePage, writeText, readText, download, removeFile, sizeOf, shrink, pageDirUrl, bytesOf,
+    get place() { return cur ? cur.place : savedPlace(); }, placeName, get problem() { return problem; }, moveTo, readIndex, writeIndex, writeIndexOnly, set onIndex(f) { onIndex = f; }, writeThumb, readThumbs, storageInfo, keepStored, writePage, readPage, removePage, writeText, readText, download, removeFile, sizeOf, shrink, squeeze, pageDirUrl, bytesOf,
     listFiles, listSized, readBytes, writeBytes, cacheFile, toBase64 };
 })();
