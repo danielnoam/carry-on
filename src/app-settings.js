@@ -59,6 +59,23 @@ function choiceGroup(g) {
     g.footnote ? el("p", { class: "footnote" }, g.footnote) : null);
 }
 
+// Big pictures made smaller (1.18.0): full images and comics no wider
+// than 1600 px, saved again in a smaller format. On unless turned off.
+const COMPRESS_KEY = "waypage.compress";
+C.save.compress = load(COMPRESS_KEY, true);
+function compressGroup() {
+  return el("section", { class: "settings-section" },
+    el("h2", { class: "overline" }, "Big pictures"),
+    el("div", { class: "group" },
+      el("label", { class: "row" },
+        el("span", { class: "choice-text" },
+          el("span", { class: "choice-label" }, "Make full images smaller"),
+          el("span", { class: "choice-note" }, "Full images and comics are saved at most 1600 px wide, in a smaller format. Usually a quarter of the size, still sharp on a phone")),
+        el("input", { class: "switch", type: "checkbox", role: "switch", checked: C.save.compress,
+          onchange: (e) => { store(COMPRESS_KEY, e.target.checked); C.save.compress = e.target.checked; } }))),
+    el("p", { class: "footnote" }, "For clips already saved, Storage has Make pictures smaller."));
+}
+
 // On mobile data (1.4.1): save or sync as always, or wait for Wi-Fi.
 // Only the app can tell the two apart (on iOS since 1.6.0); in a browser
 // the group stays out.
@@ -210,7 +227,7 @@ function roomGroup() {
   const known = list.reduce((n, p) => n + (p.imageBytes || 0), 0);
   if (list.some((p) => p.imageBytes == null)) measureSizes(list, remeasured);
   const big = [...state.pages].sort((a, b) => (b.bytes || 0) - (a.bytes || 0)).filter((p) => (p.bytes || 0) > 0).slice(0, 5);
-  if (!list.length && !big.length) return [];
+  if (!list.length && !big.length && !squeezable().length) return [];
   const go = el("button", { class: "row room-go", type: "button", ...(list.length && !makingRoom ? {} : { disabled: "" }), onclick: () => dropPictures(list, go) },
     el("span", { class: "choice-text" },
       el("span", { class: "choice-label" + (list.length ? " accent" : "") }, makingRoom ? "Making room…" : "Keep only the text of finished clips"),
@@ -218,9 +235,17 @@ function roomGroup() {
         ? countLine(list.length) + " you've finished" + (known ? ", their pictures about " + formatSize(known) : "") + ". The pictures show again when you're online."
         : "Nothing to drop: the clips you've finished have no saved pictures.")),
     known ? el("span", { class: "row-value" }, formatSize(known)) : null);
+  // Clips with full pictures (1.18.0), made smaller in place.
+  const full = squeezable();
+  const fullBytes = full.reduce((n, p) => n + (p.imageBytes || 0), 0);
+  const squeezeBtn = full.length ? el("button", { class: "row room-squeeze", type: "button", ...(makingRoom ? { disabled: "" } : {}), onclick: () => squeezePictures(full, squeezeBtn) },
+    el("span", { class: "choice-text" },
+      el("span", { class: "choice-label accent" }, makingRoom ? "Making room…" : "Make pictures smaller"),
+      el("span", { class: "choice-note" }, countLine(full.length) + " with full pictures" + (fullBytes ? ", about " + formatSize(fullBytes) : "") + ". Big ones usually end up a quarter of the size; they stay sharp on a phone.")),
+    fullBytes ? el("span", { class: "row-value" }, formatSize(fullBytes)) : null) : null;
   return [el("section", { class: "settings-section room" },
     el("h2", { class: "overline" }, "Make room"),
-    el("div", { class: "group" }, go)),
+    el("div", { class: "group" }, squeezeBtn, go)),
     big.length ? el("section", { class: "settings-section room-big" },
     el("h2", { class: "overline" }, "Biggest clips"),
     el("div", { class: "group" }, ...big.map((p) => el("button", { class: "row", type: "button", onclick: () => toLibrary().then(() => openMenu("page", p)) },
@@ -229,6 +254,30 @@ function roomGroup() {
         el("span", { class: "choice-note" }, [p.site, p.finished ? "Finished" : readingLine(p)].filter(Boolean).join(" · "))),
       el("span", { class: "row-value" }, formatSize(p.bytes || 0))))),
     el("p", { class: "footnote" }, "Tap one to delete it, or change what it keeps.")) : null];
+}
+const squeezable = () => !C.platform.native ? [] : state.pages.filter((p) => !p.link && (p.mode === "full" || p.comic) && p.images && !(p.squeezed >= 1));
+async function squeezePictures(list, btn) {
+  if (makingRoom || !C.platform.native) return;
+  makingRoom = true;
+  const label = btn.querySelector(".choice-label");
+  btn.disabled = true;
+  let freed = 0, done = 0;
+  for (const p of list) {
+    label.textContent = "Making pictures smaller, " + (++done) + " of " + list.length;
+    let res = null;
+    try { res = await C.save.compressPictures(p); } catch (e) { res = null; }
+    if (!res) continue;
+    freed -= res.bytes;
+    p.squeezed = 1;
+    p.bytes = Math.max(0, (p.bytes || 0) + res.bytes);
+    if (p.imageBytes != null) p.imageBytes = Math.max(0, p.imageBytes + res.bytes);
+  }
+  await C.store.writeIndex(state.pages);
+  makingRoom = false;
+  await loadThumbs();
+  renderLibrary();
+  toast(freed > 0 ? "Made " + formatSize(freed) + " of room." : "Done. Those pictures were already small.");
+  if (state.section === "storage") renderSection();
 }
 async function dropPictures(list, btn) {
   if (makingRoom) return;
@@ -454,7 +503,7 @@ const SECTIONS = {
     choiceGroup({ key: LAYOUT_KEY, label: "Layout", get: layout, set: (v) => { store(LAYOUT_KEY, v); renderLibrary(); }, options: LAYOUTS }),
     libraryGroup()],
     value: () => (LAYOUTS.find((l) => l.value === layout()) || LAYOUTS[0]).label },
-  saving: { title: "Saving", build: () => [choiceGroup(SETTINGS[1]), dataGroup(DATA_SAVE_KEY, "Save", "Pages and pictures come down on any connection.", "Saves wait in Downloads until you're on Wi-Fi; feeds, new chapters and missing pictures check then too."), signedGroup(), watchGroup(), importGroup()],
+  saving: { title: "Saving", build: () => [choiceGroup(SETTINGS[1]), compressGroup(), dataGroup(DATA_SAVE_KEY, "Save", "Pages and pictures come down on any connection.", "Saves wait in Downloads until you're on Wi-Fi; feeds, new chapters and missing pictures check then too."), signedGroup(), watchGroup(), importGroup()],
     value: () => SETTINGS[1].options.find((o) => o.value === SETTINGS[1].get()).label },
   sync: { title: "Sync", build: syncSections, value: () => (C.sync.on ? (C.sync.last.error ? "Stopped" : "On") : "Off") },
   storage: { title: "Storage", build: () => [storageGroup(), ...roomGroup(), placeGroup(), backupGroup(), browserStorageGroup()], value: () => formatSize(totalBytes()) },

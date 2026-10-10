@@ -2,6 +2,17 @@
 
 All notable changes to Carry-on. Newest first.
 
+## [1.18.0] - 2026-10-10
+
+### Added
+- Big pictures are made smaller as they're saved: full images and comics
+  are kept at most 1600 px wide and saved again as WebP (or JPEG), only
+  when that's smaller. Scans and big pages usually end up about a
+  quarter of the size and stay sharp on a phone. Settings, Saving, Big
+  pictures turns it off.
+- Settings, Storage, Make pictures smaller does the same for clips you'd
+  already saved with full pictures, and says how much room it made.
+
 ## [1.17.0] - 2026-10-10
 
 ### Fixed
