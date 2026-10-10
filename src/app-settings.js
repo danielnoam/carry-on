@@ -1,0 +1,534 @@
+// Waypage's shell, part 6 of 7 (1.14.0): Settings, making room and
+// Report a problem. See app.js for how the parts share.
+// ---- Settings ----
+// Each group is data: a new setting is a new entry here, not new markup.
+
+const SETTINGS = [
+  {
+    title: "Appearance",
+    key: THEME_KEY,
+    label: "Theme",
+    get: () => state.theme,
+    // The Auto boxes show only while Auto is picked (1.12.0).
+    set: (v) => { setTheme(v); const a = $("autoSection"); if (a) a.hidden = v !== "system"; },
+    options: [
+      { value: "system", label: "Auto", note: "Your light and dark themes, following your phone", swatch: autoSwatch(), auto: true },
+      ...THEMES.map((t) => ({ value: t.value, label: t.label, note: t.note, swatch: [t.value] })),
+    ],
+  },
+  {
+    title: "Saving",
+    key: IMAGES_KEY,
+    label: "Images",
+    get: () => load(IMAGES_KEY, "previews"),
+    set: (v) => { store(IMAGES_KEY, v); toast("New saves use " + v.replace("previews", "previews and links").replace("full", "full images").replace("links", "links only") + "."); },
+    footnote: "Applies to clips you save from now on.",
+    options: [
+      { value: "previews", label: "Previews and links", note: "About 30 KB an image. The full image loads when you're online." },
+      { value: "full", label: "Full images", note: "About 150 KB an image. For maps and diagrams." },
+      { value: "links", label: "Links only", note: "No images on the phone. They load when you're online." },
+    ],
+  },
+];
+
+function swatch(themes, cls) {
+  return el("span", { class: "swatch" + (cls ? " " + cls : ""), "aria-hidden": "true" },
+    ...themes.map((t) => el("span", { class: "swatch-half", "data-theme": t }, el("span", { class: "swatch-dot" }))));
+}
+
+const CHECK = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+
+function choiceGroup(g) {
+  const current = g.get();
+  const list = el("div", { class: "group", role: "radiogroup", "aria-label": g.label });
+  for (const o of g.options) {
+    const check = el("span", { class: "choice-check", "aria-hidden": "true" });
+    check.innerHTML = CHECK;
+    list.append(el("label", { class: "choice" },
+      el("input", { class: "visually-hidden", type: "radio", name: g.key, value: o.value, checked: o.value === current,
+        onchange: () => g.set(o.value) }),
+      o.swatch ? swatch(o.auto ? autoSwatch() : o.swatch, o.auto ? "auto" : "") : null,
+      el("span", { class: "choice-text" },
+        el("span", { class: "choice-label" }, o.label),
+        o.note ? el("span", { class: "choice-note" }, o.note) : null),
+      check));
+  }
+  return el("section", { class: "settings-section" },
+    el("h2", { class: "overline" }, g.label),
+    list,
+    g.footnote ? el("p", { class: "footnote" }, g.footnote) : null);
+}
+
+// On mobile data (1.4.1): save or sync as always, or wait for Wi-Fi.
+// Only the app can tell the two apart (on iOS since 1.6.0); in a browser
+// the group stays out.
+function dataGroup(key, verb, anyNote, wifiNote) {
+  if (!C.platform.knowsConnection) return null;
+  return choiceGroup({ key, label: "On mobile data", get: () => load(key, "any"),
+    set: (v) => { store(key, v); if (v === "any") { while (wifiWaiters.length) wifiWaiters.shift()(); if (key === DATA_SYNC_KEY) syncSoon(1000); else fetchPictures(); } if (state.section) renderSection(); },
+    options: [{ value: "any", label: verb, note: anyNote }, { value: "wifi", label: "Wait for Wi-Fi", note: wifiNote }] });
+}
+
+// Which light and which dark theme Auto switches between.
+function autoGroup() {
+  const a = autoThemes();
+  const row = (text, control) => el("div", { class: "rc-row stack" }, el("span", { class: "rc-label" }, text), control);
+  const box = el("section", { class: "settings-section", id: "autoSection" },
+    el("h2", { class: "overline" }, "Auto uses"),
+    el("div", { class: "group" },
+      el("div", { class: "rc-list" },
+        row("When your phone is light", seg("auto-light", "Light theme for Auto", themeOptions(THEMES.filter((t) => !t.dark), true), a.light,
+          (v) => setAutoTheme({ light: v }), "themes grid five")),
+        row("When your phone is dark", seg("auto-dark", "Dark theme for Auto", themeOptions(THEMES.filter((t) => t.dark), true), a.dark,
+          (v) => setAutoTheme({ dark: v }), "themes grid")))));
+  box.hidden = state.theme !== "system";
+  return box;
+}
+
+// Animations (1.12.0): off, nothing moves at all, for a slow phone or
+// for anyone who'd rather things just change.
+function motionGroup() {
+  return el("section", { class: "settings-section" },
+    el("h2", { class: "overline" }, "Motion"),
+    el("div", { class: "group" },
+      el("label", { class: "row" },
+        el("span", { class: "choice-text" },
+          el("span", { class: "choice-label" }, "Animations"),
+          el("span", { class: "choice-note" }, "Off: screens, menus and pages change at once, with no movement")),
+        el("input", { class: "switch", type: "checkbox", role: "switch", checked: !M.still(),
+          onchange: (e) => { store(MOTION_KEY, e.target.checked); M.setStill(!e.target.checked); } }))),
+    el("p", { class: "footnote" }, "Your phone's Reduce motion setting is followed either way."));
+}
+
+// Read aloud's settings in Settings too (1.12.0), the same as the Aa
+// sheet's tab; the voice is for the phone's language here.
+function aloudGroup() {
+  if (!speech.available) return null;
+  return el("section", { class: "settings-section" },
+    el("h2", { class: "overline" }, "Read aloud"),
+    el("div", { class: "group" }, el("div", { class: "rc-list" }, aloudControls())));
+}
+
+function readingGroup() {
+  return el("section", { class: "settings-section" },
+    el("div", { class: "group" },
+      el("p", { class: "reading-sample" }, "The page is the product. Everything else gets out of its way."),
+      readingControls(false)),
+    el("p", { class: "footnote" }, "The same as the reader's settings, behind the gear while you read."));
+}
+
+function libraryGroup() {
+  const input = el("input", { class: "switch", type: "checkbox", role: "switch", checked: load(CONTINUE_KEY, true),
+    onchange: (e) => { store(CONTINUE_KEY, e.target.checked); renderLibrary(); } });
+  return el("section", { class: "settings-section" },
+    el("h2", { class: "overline" }, "Keeping up"),
+    el("div", { class: "group" },
+      el("label", { class: "row" },
+        el("span", { class: "choice-text" },
+          el("span", { class: "choice-label" }, "Continue reading"),
+          el("span", { class: "choice-note" }, "The clip you read last, at the top of the library")),
+        input),
+      el("label", { class: "row" },
+        el("span", { class: "choice-text" },
+          el("span", { class: "choice-label" }, "Check for new chapters"),
+          el("span", { class: "choice-note" }, "Once a day, for collections saved with Save next, when you're online")),
+        el("input", { class: "switch", type: "checkbox", role: "switch", checked: load(DAILY_KEY, true),
+          onchange: (e) => store(DAILY_KEY, e.target.checked) })),
+      el("button", { class: "row", type: "button", onclick: async (e) => {
+        if (!navigator.onLine) { toast("You're offline. Try again when you're back online."); return; }
+        const b = e.currentTarget;
+        b.disabled = true;
+        const found = await dailyCheck(true);
+        b.disabled = false;
+        toast(found ? countFolders(found) + " with new chapters." : "No new chapters yet.");
+      } }, el("span", { class: "row-label accent" }, "Check all collections now"))));
+}
+const countFolders = (n) => n + (n === 1 ? " collection" : " collections");
+
+// Folders first, biggest first, then the pages in no folder as one
+// more group; a group opens in place to its pages, biggest first.
+const storageOpen = new Set();
+function storageGroup() {
+  const n = state.pages.length;
+  const bySize = (a, b) => (b.bytes || 0) - (a.bytes || 0);
+  const groups = allFolders().map((name) => ({ key: "f:" + name, name, pages: folderPages(name) }));
+  const loose = state.pages.filter((p) => !p.folder);
+  groups.sort((a, b) => sizeOf(b.pages) - sizeOf(a.pages));
+  if (loose.length) groups.push({ key: "loose", name: "Not in a collection", pages: loose, loose: true });
+  const list = el("div", { class: "group" });
+  if (!n) list.append(el("div", { class: "row" }, el("span", { class: "row-label muted" }, "Nothing saved yet")));
+  for (const g of groups) {
+    const open = storageOpen.has(g.key);
+    const pages = el("div", { class: "storage-pages", id: "storage-" + g.key.replace(/[^\w-]/g, "_") });
+    pages.hidden = !open;
+    if (open) {
+      pages.append(savedView(g.pages));
+      measureSizes(g.pages, remeasured);
+    }
+    for (const p of [...g.pages].sort(bySize)) {
+      pages.append(el("button", { class: "row", type: "button", onclick: () => toLibrary().then(() => openPage(p.id)) },
+        el("span", { class: "choice-text" },
+          el("span", { class: "row-label", dir: "auto" }, p.title),
+          el("span", { class: "choice-note" + (p.missing && p.mode !== "links" ? " warn" : "") }, savedNote(p))),
+        el("span", { class: "row-value" }, formatSize(p.bytes || 0))));
+    }
+    const head = el("button", { class: "row storage-folder" + (g.loose ? " loose" : ""), type: "button", "aria-expanded": String(open), "aria-controls": pages.id,
+      onclick: () => {
+        const now = !storageOpen.has(g.key);
+        if (now) storageOpen.add(g.key); else storageOpen.delete(g.key);
+        head.setAttribute("aria-expanded", String(now));
+        pages.hidden = !now;
+        if (now && !pages.querySelector(".saved-view")) {
+          pages.prepend(savedView(g.pages));
+          measureSizes(g.pages, remeasured);
+        }
+      } },
+      el("span", { class: "choice-text" },
+        el("span", { class: "choice-label", dir: "auto" }, g.name),
+        el("span", { class: "choice-note" }, countLine(g.pages.length))),
+      el("span", { class: "row-value" }, formatSize(sizeOf(g.pages))),
+      el("span", { class: "row-chev", "aria-hidden": "true" }, "›"));
+    list.append(head, pages);
+  }
+  return el("section", { class: "settings-section" },
+    el("p", { class: "storage-total" }, formatSize(totalBytes())),
+    el("p", { class: "section-lead" }, n ? countLine(n) + " " + ON_HERE + ". Delete a clip from its menu: press and hold it in the library." : "Clips you save show here with their size."),
+    el("h2", { class: "overline" }, "By collection"),
+    list);
+}
+
+const remeasured = () => { if (state.section === "storage") renderSection(); };
+
+// ---- Making room (1.9.0) ----
+// Clips you've finished keep their text and lose their saved pictures,
+// which show from the web again when you're online: usually most of a
+// clip's size. Then the biggest clips, to open and delete.
+let makingRoom = false;
+const roomFor = () => state.pages.filter((p) => p.finished && !p.link && !p.file && p.images && p.mode !== "links" && /^https?:/.test(p.url || ""));
+function roomGroup() {
+  const list = roomFor();
+  const known = list.reduce((n, p) => n + (p.imageBytes || 0), 0);
+  if (list.some((p) => p.imageBytes == null)) measureSizes(list, remeasured);
+  const big = [...state.pages].sort((a, b) => (b.bytes || 0) - (a.bytes || 0)).filter((p) => (p.bytes || 0) > 0).slice(0, 5);
+  if (!list.length && !big.length) return [];
+  const go = el("button", { class: "row room-go", type: "button", ...(list.length && !makingRoom ? {} : { disabled: "" }), onclick: () => dropPictures(list, go) },
+    el("span", { class: "choice-text" },
+      el("span", { class: "choice-label" + (list.length ? " accent" : "") }, makingRoom ? "Making room…" : "Keep only the text of finished clips"),
+      el("span", { class: "choice-note" }, list.length
+        ? countLine(list.length) + " you've finished" + (known ? ", their pictures about " + formatSize(known) : "") + ". The pictures show again when you're online."
+        : "Nothing to drop: the clips you've finished have no saved pictures.")),
+    known ? el("span", { class: "row-value" }, formatSize(known)) : null);
+  return [el("section", { class: "settings-section room" },
+    el("h2", { class: "overline" }, "Make room"),
+    el("div", { class: "group" }, go)),
+    big.length ? el("section", { class: "settings-section room-big" },
+    el("h2", { class: "overline" }, "Biggest clips"),
+    el("div", { class: "group" }, ...big.map((p) => el("button", { class: "row", type: "button", onclick: () => toLibrary().then(() => openMenu("page", p)) },
+      el("span", { class: "choice-text" },
+        el("span", { class: "row-label", dir: "auto" }, p.title),
+        el("span", { class: "choice-note" }, [p.site, p.finished ? "Finished" : readingLine(p)].filter(Boolean).join(" · "))),
+      el("span", { class: "row-value" }, formatSize(p.bytes || 0))))),
+    el("p", { class: "footnote" }, "Tap one to delete it, or change what it keeps.")) : null];
+}
+async function dropPictures(list, btn) {
+  if (makingRoom) return;
+  makingRoom = true;
+  const label = btn.querySelector(".choice-label");
+  btn.disabled = true;
+  let freed = 0, done = 0;
+  for (const p of list) {
+    label.textContent = "Making room, " + (++done) + " of " + list.length;
+    let res = null;
+    try { res = await C.save.setPictures(p, "links"); } catch (e) { res = null; }
+    if (!res) continue;
+    freed -= res.bytes;
+    Object.assign(p, { mode: "links", missing: res.missing, thumb: res.thumb, bytes: Math.max(0, (p.bytes || 0) + res.bytes) });
+    if (p.imageBytes != null) p.imageBytes = Math.max(0, p.imageBytes + res.bytes);
+  }
+  await C.store.writeIndex(state.pages);
+  makingRoom = false;
+  texts.clear();
+  await loadThumbs();
+  renderLibrary();
+  toast(freed > 0 ? "Made " + formatSize(freed) + " of room." : "Done. Their pictures show when you're online.");
+  if (state.section === "storage") renderSection();
+}
+
+// Where the library lives (0.33.0): the app's own storage, the phone's
+// Documents folder, or a folder you pick. Choosing another moves
+// everything there. Android only: on iOS the app's own storage already
+// shows in the Files app.
+let moving = null;
+function placeGroup() {
+  if (!C.platform.native || !C.platform.files.canPickFolder) return null;
+  const place = C.store.place;
+  // On iOS the app's own storage already shows in the Files app; a folder
+  // you pick (1.6.0) can be in iCloud Drive or on a drive plugged in.
+  const options = [
+    { value: "app", label: "Inside Waypage", note: C.platform.ios
+      ? "Recommended, and the quickest. It shows in the Files app under On My iPhone, then Waypage. Uninstalling Waypage deletes it."
+      : "Recommended. Private to the app, and the quickest. Uninstalling Waypage deletes it." },
+  ];
+  if (androidSdk >= 30 || place.kind === "documents") {
+    options.push({ value: "documents", label: "Documents/Waypage", note: "You can see it in the Files app, and it stays if you uninstall Waypage. After reinstalling, the empty library offers to get it back." });
+  }
+  options.push({ value: "folder", label: place.kind === "folder" ? place.name || "A folder you picked" : "A folder you pick",
+    note: place.kind === "folder" ? "Pick this again to choose another folder."
+      : C.platform.ios ? "Any folder in the Files app, like one in iCloud Drive. Saving there is a little slower."
+      : "Any folder on the phone or a memory card. Saving there is a little slower." });
+  const group = choiceGroup({ key: "storage-place", label: "Where your library is", get: () => place.kind, options,
+    set: (v) => changePlace(v),
+    footnote: moving ? moving : "Changing it moves every clip there. A library already in the new place is added to yours." });
+  if (moving) group.querySelectorAll("input").forEach((i) => { i.disabled = true; });
+  // The picked folder can be picked again, which a radio that's already on doesn't report.
+  const again = group.querySelector('input[value="folder"]');
+  if (again && place.kind === "folder") again.addEventListener("click", () => changePlace("folder"));
+  return group;
+}
+async function changePlace(kind, initial) {
+  if (moving) return;
+  const now = C.store.place;
+  let next = { kind };
+  if (kind === "folder") {
+    let got = null;
+    try { got = await C.platform.files.pickFolder(initial); } catch (e) { got = null; }
+    if (!got) { renderSection(); return; }
+    if (now.kind === "folder" && now.tree === got.ref) { renderSection(); return; }
+    next = { kind, tree: got.ref, name: got.name };
+  } else if (kind === now.kind) return;
+  const say = (t) => { moving = t; if (state.section === "storage") renderSection(); };
+  say("Moving your library…");
+  try {
+    const joined = await C.store.moveTo(next, (done, total) => say(total ? "Moving, " + done + " of " + total + " files…" : "Moving your library…"));
+    state.pages = joined;
+    texts.clear();
+    await loadThumbs();
+    renderLibrary();
+    moving = null;
+    toast(initial && joined.length ? "Your library is back: " + countLine(joined.length) + "." : "Your library is in " + C.store.placeName(next) + " now.");
+  } catch (e) {
+    console.error(e);
+    moving = null;
+    if (next.kind === "folder") C.platform.files.release(next.tree);
+    toast("Couldn't move your library, so it stayed where it was. " + (e && /space|ENOSPC/i.test(e.message) ? "Free some space and try again." : "Try again."));
+  }
+  if (state.section === "storage") renderSection();
+  if (state.settings) renderSettings();
+}
+
+// ---- Report a problem (1.9.0) ----
+// What happened in the person's words, with the version, the phone and
+// the log platform.js keeps, all shown before it goes anywhere: to the
+// share sheet, an issue on GitHub, or the clipboard.
+const REPORT_REPO = "https://github.com/danielnoam/waypage";
+let reportDraft = "";
+const logTime = (at) => new Date(at).toISOString().replace("T", " ").slice(0, 16);
+async function reportText() {
+  const lines = C.platform.log.list().map((x) => logTime(x.at) + " " + x.kind + (x.n ? " ×" + x.n : "") + ": " + x.msg);
+  return [
+    reportDraft.trim() || "(Nothing written)",
+    "",
+    "Waypage " + APP_VERSION + (C.platform.build && C.platform.build.builtAt ? " (built " + String(C.platform.build.builtAt).slice(0, 10) + ")" : "") + ", " + (C.platform.native ? C.platform.os + " app" : "browser"),
+    await C.platform.deviceLine(),
+    countLine(state.pages.length) + ", theme " + state.theme + ", sync " + (C.sync.on ? "on" : "off"),
+    "",
+    lines.length ? "Log:\n" + lines.join("\n") : "Log: empty",
+  ].join("\n");
+}
+function reportGroup() {
+  const list = C.platform.log.list();
+  const field = el("textarea", { class: "mark-note-field report-field", rows: "4", placeholder: "What happened, and what were you doing?", "aria-label": "What happened", dir: "auto" });
+  field.value = reportDraft;
+  field.addEventListener("input", () => { reportDraft = field.value; });
+  const send = async () => {
+    const text = await reportText();
+    try { if (await C.platform.shareText("Waypage problem report", text)) return; } catch (e) { /* below */ }
+    copyText(text, "Report copied. Paste it into a message.");
+  };
+  const issue = async () => {
+    const text = await reportText();
+    const title = (reportDraft.trim().split("\n")[0] || "Problem report").slice(0, 80);
+    // A link longer than this can be refused, so the log is cut from the start.
+    const body = text.length > 6000 ? text.slice(0, 1500) + "\n…\n" + text.slice(-4400) : text;
+    C.platform.openOutside(REPORT_REPO + "/issues/new?title=" + encodeURIComponent(title) + "&body=" + encodeURIComponent("```\n" + body + "\n```"));
+  };
+  return el("section", { class: "settings-section report" },
+    field,
+    el("div", { class: "group" },
+      el("button", { class: "row", type: "button", onclick: send }, el("span", { class: "row-label accent" }, "Send the report")),
+      el("button", { class: "row", type: "button", onclick: issue }, el("span", { class: "row-label accent" }, "Open an issue on GitHub")),
+      el("button", { class: "row", type: "button", onclick: async () => copyText(await reportText(), "Report copied") }, el("span", { class: "row-label accent" }, "Copy the report"))),
+    el("p", { class: "footnote" }, "Nothing leaves " + HERE + " unless you send it. The report holds what you wrote, Waypage's version, the phone's model and system, and the notes below, with addresses cut to their pages."),
+    el("h2", { class: "overline" }, list.length ? "What went wrong lately" : "Nothing went wrong lately"),
+    list.length ? el("ol", { class: "group report-log" }, ...list.slice().reverse().slice(0, 30).map((x) => el("li", { class: "report-line" },
+      el("span", { class: "meta" }, logTime(x.at) + " · " + x.kind + (x.n ? " ×" + x.n : "")),
+      el("span", { class: "report-msg", dir: "auto" }, x.msg)))) : null,
+    list.length ? el("button", { class: "btn-text report-clear", type: "button", onclick: () => { C.platform.log.clear(); renderSection(); renderSettings(); } }, "Clear these") : null);
+}
+
+function aboutGroup() {
+  const list = el("div", { class: "group" });
+  const releases = C.platform.releasesUrl() || "https://github.com/danielnoam/waypage/releases/latest";
+  list.append(el("a", { class: "row", href: releases, target: "_blank", rel: "noopener" },
+    el("span", { class: "row-label accent" }, "Releases and source"),
+    el("span", { class: "row-value", "aria-hidden": "true" }, "↗")));
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const installed = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+  if (!C.platform.native && !installed && installPrompt) {
+    list.prepend(el("button", { class: "row install-row", type: "button", onclick: installApp },
+      el("span", { class: "choice-text" },
+        el("span", { class: "choice-label accent" }, "Install Waypage"),
+        el("span", { class: "choice-note" }, "Opens in its own window and works with no connection"))));
+  }
+  return el("section", { class: "settings-section" },
+    list,
+    !C.platform.native && !installed && !installPrompt && ios
+      ? el("p", { class: "footnote install-hint" }, "To install Waypage, tap Share, then Add to Home Screen.") : null,
+    el("p", { class: "footnote" }, "Clips stay " + ON_HERE + ". Waypage collects nothing."));
+}
+
+// The browser's own install offer (Chrome, Edge, Android), kept for the
+// Install row in About instead of the browser's banner.
+let installPrompt = null;
+addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  installPrompt = e;
+  if (state.section === "updates") renderSection();
+});
+addEventListener("appinstalled", () => {
+  installPrompt = null;
+  if (state.section === "updates") renderSection();
+  toast("Installed. Waypage is with your other apps.");
+});
+async function installApp() {
+  if (!installPrompt) return;
+  const offer = installPrompt;
+  installPrompt = null;
+  offer.prompt();
+  try { await offer.userChoice; } catch (e) { /* closed */ }
+  if (state.section === "updates") renderSection();
+}
+
+// A browser's storage (0.27.12): how much it holds, and whether it may
+// clear the pages to make space, with the ask to keep them.
+function browserStorageGroup() {
+  if (C.platform.native) return null;
+  const box = el("section", { class: "settings-section browser-storage" });
+  box.hidden = true;
+  const draw = (info) => {
+    box.hidden = !info;
+    if (!info) return;
+    const kept = info.kept
+      ? el("div", { class: "row" }, el("span", { class: "choice-text" },
+        el("span", { class: "choice-label" }, "Kept"),
+        el("span", { class: "choice-note" }, "This browser won't clear your clips to make space.")))
+      : el("button", { class: "row keep-row", type: "button", onclick: async () => {
+        const ok = await C.store.keepStored();
+        toast(ok ? "This browser will keep your clips." : "This browser didn't agree. Installing Waypage usually helps.");
+        draw(await C.store.storageInfo());
+      } }, el("span", { class: "choice-text" },
+        el("span", { class: "choice-label accent" }, "Keep clips from being cleared"),
+        el("span", { class: "choice-note" }, "Browsers may clear a site's data when space runs low.")));
+    box.replaceChildren(
+      el("h2", { class: "overline" }, "This browser"),
+      el("div", { class: "group" },
+        el("div", { class: "row" }, el("span", { class: "row-label" }, "Space used"),
+          el("span", { class: "row-value" }, formatSize(info.usage) + (info.quota ? " of " + formatSize(info.quota) : ""))),
+        kept),
+      el("p", { class: "footnote" }, "Clips saved here stay in this browser only. Clearing its site data deletes them, so keep a backup."));
+  };
+  C.store.storageInfo().then(draw);
+  return box;
+}
+
+// Settings is a short menu; each entry is a screen of its own.
+const updateOut = () => ["available", "downloading", "ready"].includes(upd.phase) && upd.latest;
+// Settings sorted by what you came to change (1.12.0): how it looks,
+// how you read, the library; then saving, sync and storage; then About.
+const SECTIONS = {
+  appearance: { title: "Appearance", build: () => [choiceGroup(SETTINGS[0]), autoGroup(), motionGroup()],
+    value: () => themeName(state.theme) },
+  reading: { title: "Reading", build: () => [readingGroup(), aloudGroup()],
+    value: () => { const r = readingPrefs(); return (FONTS.find((f) => f.value === r.font) || FONTS[0]).label + " · " + r.size + " px"; } },
+  library: { title: "Library", build: () => [
+    choiceGroup({ key: LAYOUT_KEY, label: "Layout", get: layout, set: (v) => { store(LAYOUT_KEY, v); renderLibrary(); }, options: LAYOUTS }),
+    libraryGroup()],
+    value: () => (LAYOUTS.find((l) => l.value === layout()) || LAYOUTS[0]).label },
+  saving: { title: "Saving", build: () => [choiceGroup(SETTINGS[1]), dataGroup(DATA_SAVE_KEY, "Save", "Pages and pictures come down on any connection.", "Saves wait in Downloads until you're on Wi-Fi; feeds, new chapters and missing pictures check then too."), signedGroup(), watchGroup(), importGroup()],
+    value: () => SETTINGS[1].options.find((o) => o.value === SETTINGS[1].get()).label },
+  sync: { title: "Sync", build: syncSections, value: () => (C.sync.on ? (C.sync.last.error ? "Stopped" : "On") : "Off") },
+  storage: { title: "Storage", build: () => [storageGroup(), ...roomGroup(), placeGroup(), backupGroup(), browserStorageGroup()], value: () => formatSize(totalBytes()) },
+  updates: { title: "About", build: () => [updatesGroup(), aboutGroup()], value: () => (updateOut() ? upd.latest + " is out" : APP_VERSION) },
+  report: { title: "Report a problem", build: () => [reportGroup()], value: () => { const n = C.platform.log.list().length; return n ? n + (n === 1 ? " note" : " notes") : ""; } },
+};
+
+function renderSettings() {
+  const row = (key) => {
+    const s = SECTIONS[key];
+    const b = el("button", { class: "row nav-row", type: "button", onclick: () => openSection(key) },
+      el("span", { class: "row-label" }, s.title),
+      el("span", { class: "row-value" + (key === "updates" && updateOut() ? " accent" : "") }, s.value()),
+      el("span", { class: "row-chev", "aria-hidden": "true" }, "›"));
+    if (state.section === key) b.setAttribute("aria-current", "page");
+    return b;
+  };
+  const out = updateOut();
+  fill($("settingsBody"),
+    el("div", { class: "settings-menu" },
+      out ? el("div", { class: "group update-card" },
+        el("div", { class: "row update-row out" },
+          el("span", { class: "row-label accent" }, "Waypage " + upd.latest + " is out"),
+          el("button", { class: "btn-small", type: "button", onclick: () => openSection("updates") }, "View"))) : null,
+      el("div", { class: "group" }, row("appearance"), row("reading"), row("library")),
+      el("div", { class: "group" }, row("saving"), row("sync"), row("storage")),
+      el("div", { class: "group" }, row("updates"), row("report"))));
+}
+
+function renderSection() {
+  const s = SECTIONS[state.section];
+  $("sectionTitle").textContent = s.title;
+  $("sectionBody").dataset.key = state.section;
+  fill($("sectionBody"), ...s.build());
+}
+
+// On a phone a section is pushed over the menu; on a desktop it sits
+// beside it, and another entry swaps it in place.
+function openSection(key, fromHistory) {
+  if (!SECTIONS[key] || state.section === key) return;
+  const swap = !!state.section;
+  state.section = key;
+  renderSection();
+  const entry = { view: "settings", section: key };
+  if (!fromHistory) swap ? history.replaceState(entry, "") : history.pushState(entry, "");
+  renderSettings();
+  $("sectionBody").scrollTop = 0;
+  if (!swap) pushScreen($("sectionView")).then(() => { if (!wide.matches) $("sectionBack").focus(); });
+}
+
+function closeSection() {
+  if (!state.section) return;
+  state.section = null;
+  popScreen($("sectionView"));
+  if (state.settings) renderSettings();
+}
+
+// `at` names a section to open over the menu (the update bar opens Updates).
+function openSettings(fromHistory, at) {
+  if (state.settings) return;
+  // With room for the section beside the menu, the first one is open.
+  if (wide.matches && !at && !fromHistory) at = "appearance";
+  state.settings = true;
+  renderSettings();
+  if (!fromHistory) history.pushState({ view: "settings" }, "");
+  $("settingsBody").scrollTop = 0;
+  const shown = pushScreen($("settingsView"));
+  if (at) openSection(at);
+  else shown.then(() => $("settingsBack").focus());
+}
+
+function closeSettings() {
+  if (!state.settings) return;
+  closeSection();
+  state.settings = false;
+  popScreen($("settingsView"));
+}
