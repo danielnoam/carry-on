@@ -907,8 +907,10 @@
   // failed where Retry then worked: the connection still waking as the app
   // comes up from a share, or a page's first drawing timing out while the
   // drawing WebView starts.
+  // `gone`: the page is missing or refuses (404, 410, 403), where the
+  // Wayback Machine's copy may still be had (1.15.0).
   class SaveError extends Error {
-    constructor(message, again) { super(message); this.again = !!again; }
+    constructor(message, again, gone) { super(message); this.again = !!again; this.gone = !!gone; }
   }
 
   // Thrown for a contents page instead of saving it: `contents` holds its
@@ -931,8 +933,8 @@
         : "This browser can't reach that site directly. Save it in Waypage on your phone, then bring it here with a backup.", C.platform.canFetchPages);
     }
     if (res.status === 429) throw new SaveError("The site asked to slow down. Try again in a few minutes.");
-    if (res.status === 404 || res.status === 410) throw new SaveError("That page doesn't exist any more. Check the link.");
-    if (res.status >= 400) throw new SaveError("The site answered with an error (" + res.status + "). Try again later.", res.status >= 500 || res.status === 403);
+    if (res.status === 404 || res.status === 410) throw new SaveError("That page doesn't exist any more. Check the link.", false, true);
+    if (res.status >= 400) throw new SaveError("The site answered with an error (" + res.status + "). Try again later.", res.status >= 500 || res.status === 403, res.status === 403);
     return res;
   }
 
@@ -1094,6 +1096,7 @@
     const res = await get(site && site.fetch ? site.fetch(url) : url);
     let finalUrl = res.url || url;
     if (site && site.clean) finalUrl = site.clean(finalUrl);
+    if (isArchive(finalUrl)) res.text = unWayback(res.text);
     // Some sites keep comics and novels at the same addresses (Tapas).
     if (!comic && site && site.comic && site.comic(finalUrl, res.text)) comic = true;
     if (site && site.prepare && !comic) res.text = await site.prepare(res.text, finalUrl);
@@ -1152,6 +1155,26 @@
       next, prev, icon: siteIcon(doc, finalUrl), cut: cutShort(html, article.textContent),
     };
   }
+
+  // ---- The Wayback Machine (1.15.0) ----
+
+  // The Internet Archive's newest good copy of a page: { url, at } with
+  // `at` its time (ms), or null when it has none.
+  async function findArchived(url) {
+    let res;
+    try { res = await C.platform.fetchText("https://archive.org/wayback/available?url=" + encodeURIComponent(url)); }
+    catch (e) { throw new SaveError("Couldn't reach the Internet Archive. Try again when you're online.", true); }
+    if (res.status >= 400) throw new SaveError("The Internet Archive didn't answer. Try again later.", true);
+    let snap = null;
+    try { snap = JSON.parse(res.text).archived_snapshots.closest; } catch (e) { snap = null; }
+    if (!snap || !snap.available || String(snap.status) !== "200" || !/^\d{14}$/.test(snap.timestamp || "")) return null;
+    const t = snap.timestamp;
+    const at = Date.UTC(+t.slice(0, 4), +t.slice(4, 6) - 1, +t.slice(6, 8), +t.slice(8, 10), +t.slice(10, 12), +t.slice(12, 14));
+    return { url: "https://web.archive.org/web/" + t + "/" + url, at };
+  }
+  const isArchive = (url) => /^https?:\/\/web\.archive\.org\/web\//.test(url);
+  // The bar the Wayback Machine puts on every page it serves.
+  const unWayback = (html) => html.replace(/<!--\s*BEGIN WAYBACK TOOLBAR INSERT\s*-->[\s\S]*?<!--\s*END WAYBACK TOOLBAR INSERT\s*-->/i, "");
 
   // Lazy loaders keep the real image in data-src, data-srcset or a
   // <picture>'s <source>, with a placeholder in src. Done before Readability,
@@ -1471,7 +1494,8 @@
     link.textContent = "Read the original";
     if (!meta.file) foot.append(meta.licence === "wikipedia"
       ? "Text from Wikipedia, CC BY-SA 4.0, by Wikipedia contributors. "
-      : "Saved from " + meta.site + " on " + formatDate(meta.savedAt) + ". ", link);
+      : meta.archived ? "Saved from the Internet Archive's copy of " + meta.site + " from " + formatDate(meta.archived) + ". "
+        : "Saved from " + meta.site + " on " + formatDate(meta.savedAt) + ". ", link);
     const doc = out.implementation.createHTMLDocument(meta.title);
     if (meta.lang) doc.documentElement.lang = meta.lang;
     if (meta.dir) doc.documentElement.dir = meta.dir;
@@ -1511,14 +1535,21 @@
   // script-built page, then images as they land. Resolves to the page's meta, which the library index lists.
   // `kind` "comic" saves the page's pictures as an image chapter instead
   // of reading an article out of it; it is chosen, never guessed.
-  async function save(url, { mode = "previews", kind = "article", asPage = false, onProgress, id: keepId } = {}) {
+  // `archived` ({ url, at }, from findArchived): the page is read from
+  // the Wayback Machine's copy, and keeps its own address.
+  async function save(url, { mode = "previews", kind = "article", asPage = false, onProgress, id: keepId, archived } = {}) {
     // A site's comic pages are saved as comics, with their full pictures,
     // whatever was picked.
     const rule = siteRule(url);
     if (kind !== "comic" && rule && rule.comic && rule.comic(url)) { kind = "comic"; mode = "full"; }
-    const wiki = kind !== "comic" && wikipediaPage(url);
+    const wiki = kind !== "comic" && !archived && wikipediaPage(url);
     if (onProgress) onProgress({ stage: "text" });
-    const got = wiki ? await fromWikipedia(wiki) : await fromAnyPage(url, () => onProgress && onProgress({ stage: "drawing" }), kind === "comic", asPage);
+    const got = wiki ? await fromWikipedia(wiki) : await fromAnyPage(archived ? archived.url : url, () => onProgress && onProgress({ stage: "drawing" }), kind === "comic", asPage);
+    if (archived) {
+      if (!got.site || got.site === "web.archive.org") got.site = siteName(url);
+      got.url = url;
+      got.next = got.prev = "";
+    }
     if (got.comic && kind !== "comic") mode = "full";
     const out = document.implementation.createHTMLDocument("");
     const { root, media } = rebuild(got.body, got.base, got.url, out);
@@ -1539,6 +1570,7 @@
     };
     if (got.series) meta.series = got.series;
     if (got.cut) meta.cut = true;
+    if (archived) meta.archived = archived.at;
     if (got.comic) Object.assign(meta, { comic: true, minutes: Math.max(1, Math.round(media.length / 10)) });
     if (onProgress) onProgress({ stage: "images", done: 0, total: media.length });
     const res = await saveImages(id, media, mode, (done, total) => onProgress && onProgress({ stage: "images", done, total }), got.url);
@@ -1711,7 +1743,7 @@
 
   C.save = {
     pageSource, preview,
-    save, SaveError, ContentsPage, cutShort, findChapters, pageImage, siteIcon, keepCover, siteRule, removeHidden, scriptJson, chapterNumber, pickChapters, comicGroup, isPanel, retryMissing, saveFullImages, setPictures, findNext, creditLine, cleanSaved, savedPageHtml, newId, textDir, isNextText, isPrevText, plainText,
+    save, findArchived, unWayback, formatDate, SaveError, ContentsPage, cutShort, findChapters, pageImage, siteIcon, keepCover, siteRule, removeHidden, scriptJson, chapterNumber, pickChapters, comicGroup, isPanel, retryMissing, saveFullImages, setPictures, findNext, creditLine, cleanSaved, savedPageHtml, newId, textDir, isNextText, isPrevText, plainText,
     wikipediaPage, wikimediaThumb, parseSrcset, pickWidth, youtubeId, vimeoId, extOf, isTrackingPixel, readingMinutes, siteName,
   };
 })();

@@ -320,7 +320,8 @@ function failedCard(s) {
       el("span", { class: "card-title", dir: "auto" }, s.url),
       el("span", { class: "card-status" }, el("span", { class: "warn" }, s.error)),
       el("span", { class: "card-actions" },
-        el("button", { class: "btn-small", type: "button", onclick: () => retryJob(s) }, "Try again"),
+        archiveBtn(s),
+        s.gone ? null : el("button", { class: "btn-small", type: "button", onclick: () => retryJob(s) }, "Try again"),
         el("button", { class: "btn-quiet", type: "button", onclick: () => dropFailed(s) }, "Remove"))));
 }
 
@@ -489,7 +490,7 @@ function failedList(r) {
       el("span", { class: "failed-text" },
         el("span", { class: "failed-url", dir: "auto" }, s.again ? s.again.title : s.url),
         el("span", { class: "failed-why" }, s.error)),
-      el("button", { class: "btn-small", type: "button", onclick: () => retryJob(s) }, "Try again"),
+      archiveBtn(s) || el("button", { class: "btn-small", type: "button", onclick: () => retryJob(s) }, "Try again"),
       dropBtn(s))));
 }
 function dropBtn(s) {
@@ -517,15 +518,16 @@ async function signInFor(p) {
   const now = state.pages.find((x) => x.id === p.id);
   if (now && /^https?:/.test(now.url || "")) saveClipAgain(now);
 }
-async function saveClipAgain(p) {
+async function saveClipAgain(p, archived) {
   if (state.saving.some((s) => s.again === p)) return;
-  const job = { ...newJob(p.url, p.folder), key: "again:" + p.id, again: p, mode: p.mode, kind: p.comic ? "comic" : "article" };
+  const job = { ...newJob(p.url, p.folder), key: "again:" + p.id, again: p, mode: p.mode, kind: p.comic ? "comic" : "article", archived };
   state.saving.unshift(job);
   renderLibrary();
   toast("Saving it again…");
   const meta = await runJob(job);
   if (!meta) { toast("Couldn't save it again. It's in Downloads to try once more."); return; }
-  if (meta.cut) toast("Still only the start. The site may want a subscription, or a different sign-in.", "Sign in", () => signInFor(meta));
+  if (archived) toast("Saved the archived copy from " + C.save.formatDate(archived.at) + ".");
+  else if (meta.cut) toast("Still only the start. The site may want a subscription, or a different sign-in.", "Sign in", () => signInFor(meta));
   else toast("Saved again, the whole article this time.");
   // Open in the reader, it shows the new copy in the old one's place.
   if (state.open === p) {
@@ -533,6 +535,32 @@ async function saveClipAgain(p) {
     if (html && state.open === p) { history.replaceState(readerState(meta), ""); show(meta, html); }
   }
 }
+
+// The Wayback Machine (1.15.0): a page that's gone saved from the
+// Internet Archive's newest copy, with its own address kept.
+async function findArchive(url) {
+  if (!navigator.onLine) { toast("You're offline. Try again when you're back online."); return null; }
+  toast("Looking in the Internet Archive…");
+  let found = null;
+  try { found = await C.save.findArchived(url); }
+  catch (e) { toast(e instanceof C.save.SaveError ? e.message : "Couldn't reach the Internet Archive."); return null; }
+  if (!found) toast("The Internet Archive has no copy of this page.");
+  return found;
+}
+async function saveArchived(s) {
+  const found = await findArchive(s.url);
+  if (!found || !state.saving.includes(s)) return;
+  s.archived = found;
+  s.gone = false;
+  return retryJob(s);
+}
+async function archiveClip(p) {
+  const found = await findArchive(p.url);
+  if (!found) return;
+  if (p.archived && found.at <= p.archived) { toast("This is already the newest archived copy."); return; }
+  saveClipAgain(p, found);
+}
+const archiveBtn = (s) => (s.gone ? el("button", { class: "btn-small", type: "button", onclick: () => saveArchived(s) }, "Archived copy") : null);
 
 // Saves a failed page again where it was headed: its collection, its
 // place there, its tags, or the page it was replacing.
@@ -1634,6 +1662,7 @@ async function runJob(job) {
       kind: job.kind || "article",
       asPage: !!job.asPage,
       id: job.synced ? job.synced.id : undefined,
+      archived: job.archived,
       onProgress: (p) => {
         if (p.stage === "drawing") job.drawing = true;
         if (p.stage === "images") { job.done = p.done; job.total = p.total; }
@@ -1673,6 +1702,7 @@ async function runJob(job) {
     return meta;
   } catch (e) {
     job.error = e instanceof C.save.SaveError ? e.message : "Couldn't save this clip. Try again.";
+    job.gone = e instanceof C.save.SaveError && e.gone && !job.archived;
     if (e instanceof C.save.ContentsPage) job.contents = e.contents;
     if (!(e instanceof C.save.SaveError)) console.error(e);
     else C.platform.log.note("save", (job.site || "") + ": " + job.error);

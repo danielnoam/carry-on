@@ -44,6 +44,7 @@
     if (typeof m.imageBytes === "number" && m.imageBytes >= 0) out.imageBytes = num(m.imageBytes);
     if (m.comic === true) out.comic = true;
     if (m.cut === true) out.cut = true;
+    if (num(m.archived)) out.archived = num(m.archived);
     if (m.fav === true) { out.fav = true; out.favAt = num(m.favAt) || out.savedAt; }
     if (typeof m.next === "string") out.next = httpUrl(m.next);
     if (typeof m.prev === "string") out.prev = httpUrl(m.prev);

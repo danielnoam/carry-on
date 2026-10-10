@@ -29,11 +29,11 @@
   // Fields that come with the page's text, so the copy saved last wins
   // them all together.
   const CONTENT = ["url", "title", "site", "byline", "licence", "savedAt", "minutes", "lang", "dir", "mode", "images",
-    "comic", "next", "prev", "requested", "series", "source", "file", "cut"];
+    "comic", "next", "prev", "requested", "series", "source", "file", "cut", "archived"];
   // Every field an index entry can carry through a backup or sync
   // (backup.cleanMeta); anything else on a page stays on its device.
   const SYNCED = new Set(["id", "url", "title", "site", "byline", "licence", "savedAt", "minutes", "lang", "dir", "mode", "images",
-    "at", "finished", "readAt", "readOn", "spot", "comic", "next", "prev", "requested", "tags", "folder", "folderAt", "source", "series", "fav", "favAt", "folderFav", "folderFavAt", "file", "marks", "cut"]);
+    "at", "finished", "readAt", "readOn", "spot", "comic", "next", "prev", "requested", "tags", "folder", "folderAt", "source", "series", "fav", "favAt", "folderFav", "folderFavAt", "file", "marks", "cut", "archived"]);
   // Where the reader is, which goes with whichever device read last.
   const READING = ["at", "finished", "readAt", "readOn", "spot"];
 

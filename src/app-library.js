@@ -838,6 +838,9 @@ function pageSheet(p, where) {
           ? menuRow(p.view === "text" ? "Show as printed pages" : "Show as text", () => switchView(p, where)) : null,
         inReader && !C.files.printed(p) ? menuRow("Find in this clip", () => back().then(openFind)) : null,
         menuRow(p.finished ? "Mark as unread" : "Mark as read", () => markRead([p], !p.finished).then(draw)),
+        // The original gone or changed (1.15.0): the Wayback Machine's copy.
+        p.file || p.preview || p.comic || !/^https?:/.test(p.url || "") ? null
+          : menuRow(p.archived ? "Find a newer archived copy" : "Use the archived copy", () => back().then(() => archiveClip(p))),
         inReader ? null : menuRow("Select", () => back().then(() => startSelect([p.id]))),
         menuRow(p.link ? "Remove from Waypage" : "Delete this clip", () => deletePage(p, where), "warn")));
   };
