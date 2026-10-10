@@ -49,6 +49,11 @@ Daniel tried the untested list on his phones; the stores wait.
   Collections, Clips and Files, each opening its part of the library
   (openPart "collections", "pages", "files"); Files only when there are
   files.
+- **Links inside a clip (Daniel, 10 Oct).** A tap on a link to another
+  page opens a small sheet, Open and Save for later, instead of going
+  straight to the browser (reader.js, `openOutside`). Save for later
+  offline waits and saves when the phone is back online, like any save
+  that failed; the toast says so. A link already saved opens that clip.
 - **A faster first sync.** Sending is one Contents PUT per clip and per
   picture pack, one after another, each its own commit. Send in batches
   of about 50 clips through the Git Data API instead: the clips' text
