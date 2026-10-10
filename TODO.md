@@ -41,6 +41,14 @@ Daniel tried the untested list on his phones; the stores wait.
   Machine's copy (archive.org's availability API, then the snapshot,
   saved like any page, with its archive date and the original link). A
   clip whose original is gone gets the same from its ⋯ menu.
+- **Favourites in the sidebar (Daniel, 10 Oct).** Under Library, the
+  favourite collections and then the favourite clips, in place of the
+  three collections used last (renderSide, SIDE_MAX). A tap opens the
+  collection or the clip. Up to 6, then "All favourites" (the library's
+  Favourites filter); none, and the section isn't there. Below them,
+  Collections, Clips and Files, each opening its part of the library
+  (openPart "collections", "pages", "files"); Files only when there are
+  files.
 - **A faster first sync.** Sending is one Contents PUT per clip and per
   picture pack, one after another, each its own commit. Send in batches
   of about 50 clips through the Git Data API instead: the clips' text
